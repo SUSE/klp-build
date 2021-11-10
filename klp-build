@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import utils
+
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="The toolkit for livepatch developers")
+
+    sub = parser.add_subparsers(dest="command")
+    setup = sub.add_parser("setup")
+    setup.add_argument('-d', '--dest', type=str,
+            help='Destination directory to build livepatches')
+    setup.add_argument('-f', '--redownload', action='store_true',
+            help='Replaces the currently used codestream.in file')
+
+    return parser
+
+if  __name__ == '__main__':
+    parser = create_parser()
+    args = parser.parse_args()
+
+    if args.command == 'setup':
+        setup = utils.Setup(args.dest, args.redownload)
+        setup.prepare_env()
