@@ -3,16 +3,29 @@
 import argparse
 import os
 import utils
+import templ
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="The toolkit for livepatch developers")
 
     sub = parser.add_subparsers(dest="command")
-    setup = sub.add_parser("setup")
+    setup = sub.add_parser('setup')
     setup.add_argument('-d', '--dest', type=str,
             help='Destination directory to build livepatches')
     setup.add_argument('-f', '--redownload', action='store_true',
             help='Replaces the currently used codestream.in file')
+
+    templ = sub.add_parser('create-lp')
+    templ.add_argument('-m', '--module', type=str, required=True,
+            help='The module that will be livepatched')
+    templ.add_argument('-b', '--bsc', type=str, required=True,
+            help='The bug created for handling this livepatch')
+    templ.add_argument('--cve', type=str, required=True,
+            help='The CVE assigned to this livepatch')
+    templ.add_argument('-c', '--conf', type=str, required=True,
+            help='The kernel CONFIG used to be build the livepatch')
+    templ.add_argument('-t', '--type', type=str, required=True,
+            help='The livepatch type, being kgraft (kgr) or klp', choices=['klp', 'kgr'])
 
     return parser
 
@@ -23,3 +36,7 @@ if  __name__ == '__main__':
     if args.command == 'setup':
         setup = utils.Setup(args.dest, args.redownload)
         setup.prepare_env()
+    elif args.command == 'create-lp':
+        templ = templ.Template(args.module, args.bsc, args.cve, args.conf,
+                                args.type)
+        templ.GenerateLivePatches()

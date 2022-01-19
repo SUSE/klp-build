@@ -1,0 +1,27 @@
+{% from 'helper.j2' import fname with context -%}
+
+#ifndef _{{ fname | upper }}_H
+#define _{{ fname | upper }}_H
+
+#if IS_ENABLED({{ config }})
+
+int {{ fname }}_init(void);
+{% if mod is not defined %}static {% endif %}void {{ fname }}_cleanup(void);
+
+{% if ktype == 'kgr' %}
+#define KGR_PATCH_{{ bsc | upper }}_FUNCS \
+	KGR_PATCH{% if mod is defined %}_OBJ{% endif %}(, kgrp_, "MOD"),
+{% endif %}
+
+#else /* !IS_ENABLED({{ config }}) */
+
+static inline int {{ fname }}_init(void) { return 0; }
+
+static inline void {{ fname }}_cleanup(void) {}
+
+{% if ktype == 'kgr' %}
+#define KGR_PATCH_{{ bsc | upper }}_FUNCS
+{% endif %}
+
+#endif /* IS_ENABLED({{ config }}) */
+#endif /* _{{ fname | upper }}_H */

@@ -1,0 +1,69 @@
+{% from 'helper.j2' import fname with context %}
+
+{% include 'header.j2' %}
+
+#if IS_ENABLED({{ config }})
+
+#if !IS_MODULE({{ config }})
+#error "Live patch supports only CONFIG=m"
+#endif
+
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include "{{ fname }}.h"
+#include "../kallsyms_relocs.h"
+
+#define LP_MODULE "{{ mod }}"
+
+
+
+
+static struct {{ ktype }}_kallsyms_reloc {{ ktype }}_funcs[] = {
+	{ "", (void *)&, "{{ mod }}" }
+};
+
+static int {{ fname }}_modify_notify(struct notifier_block *nb,
+					unsigned long action, void *data)
+{
+	struct module *mod = data;
+	int ret;
+
+	if (action != MODULE_STATE_COMING || strcmp(mod->name, LP_MODULE))
+		return 0;
+
+	ret = __{{ ktype }}_resolve_kallsyms_relocs({{ ktype }}_funcs, ARRAY_SIZE({{ ktype }}_funcs));
+	WARN(ret, "%s: delayed kallsyms lookup failed. System is broken and can crash.\n",
+		__func__);
+
+	return ret;
+}
+
+static struct notifier_block {{ fname }}_module_nb = {
+	.notifier_call = {{ fname }}_modify_notify,
+	.priority = INT_MIN+1,
+};
+
+int {{ fname }}_init(void)
+{
+	int ret;
+
+	mutex_lock(&module_mutex);
+	if (find_module(LP_MODULE)) {
+		ret = __{{ ktype }}_resolve_kallsyms_relocs({{ ktype }}_funcs,
+						    ARRAY_SIZE({{ ktype }}_funcs));
+		if (ret)
+			goto out;
+	}
+
+	ret = register_module_notifier(&{{ ktype }}_{{ bsc }}_module_nb);
+out:
+	mutex_unlock(&module_mutex);
+	return ret;
+}
+
+void {{ fname }}_cleanup(void)
+{
+	unregister_module_notifier(&{{ fname }}_module_nb);
+}
+
+#endif /* IS_ENABLED({{ config }}) */
