@@ -9,11 +9,15 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="The toolkit for livepatch developers")
 
     sub = parser.add_subparsers(dest="command")
-    setup = sub.add_parser('setup')
-    setup.add_argument('-d', '--dest', type=str,
+    setup = sub.add_parser('setup-bsc')
+    setup.add_argument('-d', '--dest', type=str, default='',
             help='Destination directory to build livepatches')
-    setup.add_argument('-f', '--redownload', action='store_true',
+    setup.add_argument('--redownload', action='store_true',
             help='Replaces the currently used codestream.in file')
+    setup.add_argument('--file', type=str, required=True,
+            help='File that containes the function to be livpatched')
+    setup.add_argument('--func', type=str, required=True,
+            help='Function to the livepatched')
 
     templ = sub.add_parser('create-lp')
     templ.add_argument('-m', '--module', type=str, required=True,
@@ -33,8 +37,8 @@ if  __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
 
-    if args.command == 'setup':
-        setup = utils.Setup(args.dest, args.redownload)
+    if args.command == 'setup-bsc':
+        setup = utils.Setup(args.dest, args.redownload, args.file, args.func)
         setup.prepare_env()
     elif args.command == 'create-lp':
         templ = templ.Template(args.module, args.bsc, args.cve, args.conf,
