@@ -14,6 +14,8 @@ def create_parser() -> argparse.ArgumentParser:
             help='Destination directory to build livepatches')
     setup.add_argument('--redownload', action='store_true',
             help='Replaces the currently used codestream.in file')
+    setup.add_argument('--bsc', type=str, required=True,
+            help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
     setup.add_argument('--file', type=str, required=True,
             help='File that containes the function to be livpatched')
     setup.add_argument('--func', type=str, required=True,
@@ -38,7 +40,7 @@ if  __name__ == '__main__':
     args = parser.parse_args()
 
     if args.command == 'setup-bsc':
-        setup = utils.Setup(args.dest, args.redownload, args.file, args.func)
+        setup = utils.Setup(args.dest, args.redownload, args.bsc, args.file, args.func)
         setup.prepare_env()
     elif args.command == 'create-lp':
         templ = templ.Template(args.module, args.bsc, args.cve, args.conf,

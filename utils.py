@@ -7,6 +7,7 @@ class Setup:
     _env = None
     _work = ''
     _bsc_path = ''
+    _bsc = ''
     _src = ''
     _func = ''
     _cs_file = None
@@ -15,18 +16,22 @@ class Setup:
     _ipa_dir = ''
     _cs = {}
 
-    def __init__(self, destination, redownload, src, func):
+    def __init__(self, destination, redownload, bsc, src, func):
         # Prefer the argument over the environment
         if not destination:
             destination = pathlib.Path(os.getenv('KLP_ENV_DIR'))
             if not destination:
-                print('--dest or KLP_ENV_DIR should be defined')
+                raise ValueError('--dest or KLP_ENV_DIR should be defined')
 
         self._env = pathlib.Path(destination)
+        self._work = pathlib.Path(os.getenv('KLP_WORK_DIR'))
+
+        self._bsc_path = pathlib.Path(self._work, bsc)
+        if self._bsc_path.exists() and not self._bsc_path.is_dir():
+            raise ValueError('--bsc needs to be a directory, or not to exist')
+
         self._src = src
         self._func = func
-        self._work = pathlib.Path(os.getenv('KLP_WORK_DIR'))
-        self._bsc_path = pathlib.Path(self._work, os.getenv('KLP_BSC'))
 
         if not self._env.is_dir():
             raise ValueError('Destiny should be a directory')
@@ -114,8 +119,7 @@ class Setup:
         obj = pathlib.Path(self._ex_dir, cs, 'x86_64', 'boot', 'vmlinux-' +
                 self._cs[cs]['kernel'].replace('linux-', '') + '-default')
 
-        ipa = pathlib.Path(self._ipa_dir, cs, self._src +
-                            '000i.ipa-clonoes')
+        ipa = pathlib.Path(self._ipa_dir, cs, 'x86_64', self._src + '.000i.ipa-clones')
 
         with setup.open('w') as f:
             f.write('export KCP_FUNC={}\n'.format(self._func))
