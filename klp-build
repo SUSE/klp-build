@@ -22,8 +22,11 @@ def create_parser() -> argparse.ArgumentParser:
             help='Function to the livepatched')
 
     templ = sub.add_parser('create-lp')
-    templ.add_argument('-m', '--module', type=str, required=True,
+    # FIXME: get mod or vmlinux from setup-bsc prepared file
+    templ.add_argument('-m', '--module', type=str,
             help='The module that will be livepatched')
+    templ.add_argument('--vmlinux', action='store_true',
+            help='The livepatch type, being kgraft (kgr) or klp')
     templ.add_argument('-b', '--bsc', type=str, required=True,
             help='The bug created for handling this livepatch')
     templ.add_argument('--cve', type=str, required=True,
@@ -32,7 +35,6 @@ def create_parser() -> argparse.ArgumentParser:
             help='The kernel CONFIG used to be build the livepatch')
     templ.add_argument('-t', '--type', type=str, required=True,
             help='The livepatch type, being kgraft (kgr) or klp', choices=['klp', 'kgr'])
-
     return parser
 
 if  __name__ == '__main__':
@@ -43,6 +45,5 @@ if  __name__ == '__main__':
         setup = utils.Setup(args.dest, args.redownload, args.bsc, args.file, args.func)
         setup.prepare_env()
     elif args.command == 'create-lp':
-        templ = templ.Template(args.module, args.bsc, args.cve, args.conf,
-                                args.type)
+        templ = templ.Template(args.module, args.vmlinux, args.bsc, args.cve, args.conf, args.type)
         templ.GenerateLivePatches()

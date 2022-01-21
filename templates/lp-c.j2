@@ -1,27 +1,33 @@
 {% from 'helper.j2' import fname with context %}
-
 {% include 'header.j2' %}
 
 #if IS_ENABLED({{ config }})
 
+{% if mod is defined %}
 #if !IS_MODULE({{ config }})
 #error "Live patch supports only CONFIG=m"
 #endif
+{% endif -%}
 
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include "{{ fname }}.h"
 #include "../kallsyms_relocs.h"
 
-#define LP_MODULE "{{ mod }}"
+{%- if mod is defined %}#define LP_MODULE "{{ mod }}"{% endif %}
 
 
 
 
 static struct {{ ktype }}_kallsyms_reloc {{ ktype }}_funcs[] = {
-	{ "", (void *)&, "{{ mod }}" }
+{% if mod is defined %}
+	{ "", (void *)&, "{{ mod }}" },
+{% else %}
+	{ "", (void *)&},
+{% endif %}
 };
 
+{% if mod is defined %}
 static int {{ fname }}_modify_notify(struct notifier_block *nb,
 					unsigned long action, void *data)
 {
@@ -42,9 +48,11 @@ static struct notifier_block {{ fname }}_module_nb = {
 	.notifier_call = {{ fname }}_modify_notify,
 	.priority = INT_MIN+1,
 };
+{% endif -%}
 
 int {{ fname }}_init(void)
 {
+{% if mod is defined %}
 	int ret;
 
 	mutex_lock(&module_mutex);
@@ -59,11 +67,16 @@ int {{ fname }}_init(void)
 out:
 	mutex_unlock(&module_mutex);
 	return ret;
+{% else %}
+	return __{{ ktype }}_resolve_kallsyms_relocs({{ ktype }}_funcs, ARRAY_SIZE({{ ktype }}_funcs));
+{% endif %}
 }
 
+{% if mod is defined %}
 void {{ fname }}_cleanup(void)
 {
 	unregister_module_notifier(&{{ fname }}_module_nb);
 }
+{% endif -%}
 
 #endif /* IS_ENABLED({{ config }}) */
