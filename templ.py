@@ -1,35 +1,29 @@
 from datetime import datetime
 import git
 import jinja2
+import json
 import pathlib
+import os
 
 class Template:
-    _mod = ''
-    _bsc = ''
-    _cve = ''
-    _conf = ''
-    _ktype = ''
-    _env = None
+    def __init__(self, bsc, ktype):
+        conf = pathlib.Path(os.getenv('KLP_WORK_DIR'), bsc, 'conf.json')
+        if not conf.is_file():
+            raise ValueError('config.json not found in {}'.format(str(conf)))
 
-    def __init__(self, mod, vmlinux, bsc, cve, conf, ktype):
-        # TODO: get these values from a file created by prepare command
-        self._mod = mod
         self._bsc = bsc
-        self._cve = cve
-        self._conf = conf
         self._ktype = ktype
+        with open(conf, 'r') as f:
+            data = json.load(f)
+            self._mod = data['mod']
+            self._cve = data['cve']
+            self._conf = data['conf']
         try:
             conf = git.GitConfigParser()
             self._user = conf.get_value('user', 'name')
             self._email = conf.get_value('user', 'email')
         except:
             raise RuntimeError('Please define name/email in global git config')
-
-        if not mod and not vmlinux:
-            raise ValueError('Either --mod or --vmlinux needs to be specified')
-
-        if mod and vmlinux:
-            raise ValueError('You can\'t specify both --mod and --vmlinux')
 
         self._env = jinja2.Environment(loader=jinja2.FileSystemLoader('templates'), \
                     trim_blocks=True)

@@ -1,22 +1,15 @@
+import json
 import pathlib
 import os
 import re
 import requests
 
 class Setup:
-    _env = None
-    _work = ''
-    _bsc_path = ''
-    _bsc = ''
-    _src = ''
-    _func = ''
-    _cs_file = None
-    _rpm_dir = ''
-    _ex_dir = ''
-    _ipa_dir = ''
     _cs = {}
+    _cs_file = None
 
-    def __init__(self, destination, redownload, bsc, src, func):
+    def __init__(self, destination, redownload, bsc, cve, conf,
+                src, func, mod):
         # Prefer the argument over the environment
         if not destination:
             destination = pathlib.Path(os.getenv('KLP_ENV_DIR'))
@@ -26,12 +19,16 @@ class Setup:
         self._env = pathlib.Path(destination)
         self._work = pathlib.Path(os.getenv('KLP_WORK_DIR'))
 
+        self._bsc = bsc
         self._bsc_path = pathlib.Path(self._work, bsc)
         if self._bsc_path.exists() and not self._bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
+        self._cve = cve
+        self._conf = conf
         self._src = src
         self._func = func
+        self._mod = mod
 
         if not self._env.is_dir():
             raise ValueError('Destiny should be a directory')
@@ -151,11 +148,23 @@ class Setup:
 
             self.write_setup_script(cs, dest)
 
+    def write_conf_json(self):
+        with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
+            f.write(json.dumps({ 'bsc' : self._bsc,
+                                'cve' : self._cve,
+                                'conf' : self._conf,
+                                'mod' : self._mod,
+                                'file' : self._src,
+                                'func' : self._func
+                                }, indent=4))
+
     def download_env(self):
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')
 
     def prepare_env(self):
         self._bsc_path.mkdir(exist_ok=True)
+
+        self.write_conf_json()
 
         self.download_codestream_file()
 
