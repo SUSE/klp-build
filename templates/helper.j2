@@ -3,3 +3,9 @@
 {% else %}
 {% set fname = 'kgr_patch_' + bsc %}
 {% endif %}
+
+{% macro up_commits(commits) -%}
+{% for commit, msg in commits.items() -%}
+{{ commit }} ("{{ msg }}"),
+{% endfor -%}
+{% endmacro -%}

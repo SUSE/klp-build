@@ -4,6 +4,8 @@ import os
 import re
 import requests
 
+import templ
+
 class Setup:
     _cs = {}
     _cs_file = None
@@ -28,7 +30,9 @@ class Setup:
         self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
         self._conf = conf
         self._file_funcs = file_funcs
-        self._commits = commits
+        self._commits = []
+        for c in commits:
+            self._commits.append(c[:12])
         # FIXME: currently run-ccp.sh only accepts one file + multiple
         # functions, so grab the first file-func argument as use to create the
         # setup.sh file
@@ -175,6 +179,13 @@ class Setup:
         with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
             f.write(json.dumps(data, indent=4))
 
+    def write_commit_file(self):
+        temp = templ.Template(self._bsc, 'klp')
+        msg = temp.generate_commit_msg()
+
+        with open(pathlib.Path(self._bsc_path, 'commit.msg'), 'w') as f:
+            f.write(msg)
+
     def download_env(self):
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')
 
@@ -191,3 +202,4 @@ class Setup:
                 self._cs[cs] = { 'target' : target, 'kernel' : kernel.replace('rpm', 'linux') }
 
         self.prepare_bsc_dirs()
+        self.write_commit_file()

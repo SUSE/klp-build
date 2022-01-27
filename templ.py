@@ -5,6 +5,8 @@ import json
 import pathlib
 import os
 import re
+import requests
+import textwrap
 
 class Template:
     def __init__(self, bsc, ktype):
@@ -21,6 +23,7 @@ class Template:
             self._cve = data['cve']
             self._conf = data['conf']
             self._files = data['files']
+            self._commits = data['upstream-commits']
         try:
             conf = git.GitConfigParser()
             self._user = conf.get_value('user', 'name')
@@ -63,3 +66,27 @@ class Template:
                     f.write('{} {} {} IS_ENABLED({})\n'.format(mod, func,
                                                     'klpp_' + func,
                                                     self._conf))
+
+
+    def _get_commit_subject(self, commit):
+        req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
+        req.raise_for_status()
+
+        return re.search('Subject: (.*)', req.text).group(1)
+
+    # Return the commit message in a list of wrapped
+    def generate_commit_msg(self):
+        commit_list = {}
+        for commit in self._commits:
+            commit_list[commit] = self._get_commit_subject(commit)
+
+        templ = self._env.get_template('commit.j2')
+        msg = templ.render(bsc = self._bsc,
+                            bsc_num = self._bsc_num,
+                            cve = self._cve,
+                            user = self._user,
+                            email = self._email,
+                            commits = commit_list)
+
+        wrapper = textwrap.TextWrapper(width=80, replace_whitespace=False)
+        return '\n'.join(wrapper.wrap(msg))
