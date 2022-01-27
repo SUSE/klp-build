@@ -4,17 +4,19 @@ import jinja2
 import json
 import pathlib
 import os
+import re
 
 class Template:
     def __init__(self, bsc, ktype):
-        conf = pathlib.Path(os.getenv('KLP_WORK_DIR'), bsc, 'conf.json')
+        self._bsc = 'bsc' + re.search('([0-9]+)', bsc).group(1)
+        conf = pathlib.Path(os.getenv('KLP_WORK_DIR'), self._bsc, 'conf.json')
         if not conf.is_file():
             raise ValueError('config.json not found in {}'.format(str(conf)))
 
-        self._bsc = bsc
         self._ktype = ktype
         with open(conf, 'r') as f:
             data = json.load(f)
+            self._bsc_num = data['bsc']
             self._mod = data['mod']
             self._cve = data['cve']
             self._conf = data['conf']
@@ -47,6 +49,7 @@ class Template:
             lp_file = pathlib.Path(bsc, fname + '.' + ext)
             with open(lp_file, 'w') as f:
                 f.write(templ.render(bsc = self._bsc,
+                                    bsc_num = self._bsc_num,
                                     cve = self._cve,
                                     config = self._conf,
                                     ktype = self._ktype,

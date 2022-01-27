@@ -19,12 +19,13 @@ class Setup:
         self._env = pathlib.Path(destination)
         self._work = pathlib.Path(os.getenv('KLP_WORK_DIR'))
 
-        self._bsc = bsc
+        self._bsc_num = re.search('([0-9]+)', bsc).group(1)
+        self._bsc = 'bsc' + self._bsc_num
         self._bsc_path = pathlib.Path(self._work, bsc)
         if self._bsc_path.exists() and not self._bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
-        self._cve = cve
+        self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
         self._conf = conf
         self._file_funcs = file_funcs
         self._commits = commits
@@ -165,7 +166,7 @@ class Setup:
             filepath = f[0]
             funcs = f[1:]
             files[filepath] = funcs
-        data = { 'bsc' : self._bsc,
+        data = { 'bsc' : self._bsc_num,
                 'cve' : self._cve,
                 'conf' : self._conf,
                 'mod' : self._mod,
