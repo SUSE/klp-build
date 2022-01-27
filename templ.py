@@ -18,6 +18,7 @@ class Template:
             self._mod = data['mod']
             self._cve = data['cve']
             self._conf = data['conf']
+            self._files = data['files']
         try:
             conf = git.GitConfigParser()
             self._user = conf.get_value('user', 'name')
@@ -51,3 +52,11 @@ class Template:
                                     ktype = self._ktype,
                                     user = self._user,
                                     email = self._email))
+
+        with open(pathlib.Path(bsc, 'patched_funcs.csv'), 'w') as f:
+            mod = 'vmlinux' if not self._mod else self._mod
+            for file_funcs in self._files.items():
+                for func in file_funcs[1]:
+                    f.write('{} {} {} IS_ENABLED({})\n'.format(mod, func,
+                                                    'klpp_' + func,
+                                                    self._conf))
