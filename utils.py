@@ -9,7 +9,7 @@ class Setup:
     _cs_file = None
 
     def __init__(self, destination, redownload, bsc, cve, conf,
-                file_funcs, mod):
+                file_funcs, mod, commits):
         # Prefer the argument over the environment
         if not destination:
             destination = pathlib.Path(os.getenv('KLP_ENV_DIR'))
@@ -27,6 +27,7 @@ class Setup:
         self._cve = cve
         self._conf = conf
         self._file_funcs = file_funcs
+        self._commits = commits
         # FIXME: currently run-ccp.sh only accepts one file + multiple
         # functions, so grab the first file-func argument as use to create the
         # setup.sh file
@@ -168,6 +169,7 @@ class Setup:
                 'cve' : self._cve,
                 'conf' : self._conf,
                 'mod' : self._mod,
+                'upstream-commits' : self._commits,
                 'files' : files }
         with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
             f.write(json.dumps(data, indent=4))

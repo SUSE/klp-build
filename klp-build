@@ -25,6 +25,8 @@ def create_parser() -> argparse.ArgumentParser:
             'The format is --file-funcs file/path.c func1 func2 --file-func file/patch2 func1...')
     setup.add_argument('-m', '--module', type=str,
             help='The module that will be livepatched')
+    setup.add_argument('-u', '--upstream-commits', required=True,
+            nargs='+', help='Commit hashes used to solve the CVE')
 
     templ = sub.add_parser('create-lp')
     templ.add_argument('--bsc', type=str, required=True,
@@ -39,7 +41,8 @@ if  __name__ == '__main__':
 
     if args.command == 'setup-bsc':
         setup = utils.Setup(args.dest, args.redownload, args.bsc, args.cve,
-                            args.conf, args.file_funcs, args.module)
+                            args.conf, args.file_funcs, args.module,
+                            args.upstream_commits)
         setup.prepare_env()
     elif args.command == 'create-lp':
         templ = templ.Template(args.bsc, args.type)
