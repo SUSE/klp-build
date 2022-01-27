@@ -20,15 +20,14 @@ def create_parser() -> argparse.ArgumentParser:
             help='The CVE assigned to this livepatch')
     setup.add_argument('--conf', type=str, required=True,
             help='The kernel CONFIG used to be build the livepatch')
-    setup.add_argument('--file', type=str, required=True,
-            help='File that containes the function to be livepatched')
-    setup.add_argument('--func', type=str, required=True,
-            help='Function to the livepatched')
+    setup.add_argument('--file-funcs', required=True, action='append', nargs='*',
+            help='File and functions to be livepatched. Can be set multiple times. '
+            'The format is --file-funcs file/path.c func1 func2 --file-func file/patch2 func1...')
     setup.add_argument('-m', '--module', type=str,
             help='The module that will be livepatched')
 
     templ = sub.add_parser('create-lp')
-    templ.add_argument('--bsc', type=str, requred=True,
+    templ.add_argument('--bsc', type=str, required=True,
             help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
     templ.add_argument('-t', '--type', type=str, required=True,
             help='The livepatch type, being kgraft (kgr) or klp', choices=['klp', 'kgr'])
@@ -40,7 +39,7 @@ if  __name__ == '__main__':
 
     if args.command == 'setup-bsc':
         setup = utils.Setup(args.dest, args.redownload, args.bsc, args.cve,
-                            args.conf, args.file, args.func, args.module)
+                            args.conf, args.file_funcs, args.module)
         setup.prepare_env()
     elif args.command == 'create-lp':
         templ = templ.Template(args.bsc, args.type)

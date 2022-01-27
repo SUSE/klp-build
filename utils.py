@@ -9,7 +9,7 @@ class Setup:
     _cs_file = None
 
     def __init__(self, destination, redownload, bsc, cve, conf,
-                src, func, mod):
+                file_funcs, mod):
         # Prefer the argument over the environment
         if not destination:
             destination = pathlib.Path(os.getenv('KLP_ENV_DIR'))
@@ -26,8 +26,16 @@ class Setup:
 
         self._cve = cve
         self._conf = conf
-        self._src = src
-        self._func = func
+        self._file_funcs = file_funcs
+        # FIXME: currently run-ccp.sh only accepts one file + multiple
+        # functions, so grab the first file-func argument as use to create the
+        # setup.sh file
+        # file_funcs has the content like
+        # [ ['fs/file.c', 'func1', 'func2'], ['fs/open.c', 'func3', 'func4']
+        # Get the file from the first file-func argument
+        self._src = file_funcs[0][0]
+        # Return the files from the first file-func argument
+        self._funcs = file_funcs[0][1:]
         self._mod = mod
 
         if not self._env.is_dir():
@@ -118,8 +126,10 @@ class Setup:
 
         ipa = pathlib.Path(self._ipa_dir, cs, 'x86_64', self._src + '.000i.ipa-clones')
 
+        # TODO: currently run-ccp.sh only handles one file + functions, so pick
+        # the first one in this case
         with setup.open('w') as f:
-            f.write('export KCP_FUNC={}\n'.format(self._func))
+            f.write('export KCP_FUNC={}\n'.format(','.join(self._funcs)))
             f.write('export KCP_PATCHED_SRC={}\n'.format(self._src))
             f.write('export KCP_DEST={}\n'.format(str(dest)))
             # FIXME: check which readelf to use
@@ -149,14 +159,18 @@ class Setup:
             self.write_setup_script(cs, dest)
 
     def write_conf_json(self):
+        files = {}
+        for f in self._file_funcs:
+            filepath = f[0]
+            funcs = f[1:]
+            files[filepath] = funcs
+        data = { 'bsc' : self._bsc,
+                'cve' : self._cve,
+                'conf' : self._conf,
+                'mod' : self._mod,
+                'files' : files }
         with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
-            f.write(json.dumps({ 'bsc' : self._bsc,
-                                'cve' : self._cve,
-                                'conf' : self._conf,
-                                'mod' : self._mod,
-                                'file' : self._src,
-                                'func' : self._func
-                                }, indent=4))
+            f.write(json.dumps(data, indent=4))
 
     def download_env(self):
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')
