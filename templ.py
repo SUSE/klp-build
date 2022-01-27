@@ -1,4 +1,5 @@
 from datetime import datetime
+import git
 import jinja2
 import pathlib
 
@@ -17,6 +18,12 @@ class Template:
         self._cve = cve
         self._conf = conf
         self._ktype = ktype
+        try:
+            conf = git.GitConfigParser()
+            self._user = conf.get_value('user', 'name')
+            self._email = conf.get_value('user', 'email')
+        except:
+            raise RuntimeError('Please define name/email in global git config')
 
         if not mod and not vmlinux:
             raise ValueError('Either --mod or --vmlinux needs to be specified')
@@ -47,4 +54,6 @@ class Template:
                 f.write(templ.render(bsc = self._bsc,
                                     cve = self._cve,
                                     config = self._conf,
-                                    ktype = self._ktype))
+                                    ktype = self._ktype,
+                                    user = self._user,
+                                    email = self._email))
