@@ -28,7 +28,7 @@ class Template:
                     trim_blocks=True)
 
     def GenerateLivePatches(self):
-        fname = 'kgraft_patch' if self._ktype == 'kgr' else 'livepatch'
+        fname = 'kgr_patch' if self._ktype == 'kgr' else 'livepatch'
         fname = fname + '_' + self._bsc
 
         bsc = pathlib.Path(self._bsc)
