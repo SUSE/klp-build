@@ -23,7 +23,7 @@ class Setup:
 
         self._bsc_num = re.search('([0-9]+)', bsc).group(1)
         self._bsc = 'bsc' + self._bsc_num
-        self._bsc_path = pathlib.Path(self._work, bsc)
+        self._bsc_path = pathlib.Path(self._work, self._bsc)
         if self._bsc_path.exists() and not self._bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
