@@ -4,8 +4,12 @@
 {% set fname = 'kgr_patch_' + bsc %}
 {% endif %}
 
-{% macro up_commits(commits) -%}
-{% for commit, msg in commits.items() -%}
-{{ commit }} ("{{ msg }}"),
+{% macro get_commits(codestream) -%}
+{% for commit, msg in commits[codestream].items() -%}
+{% if codestream == 'upstream' %}
+ *  {{ commit }} ("{{ msg }}")
+{% else %}
+ *  {{ commit }}
+{% endif -%}
 {% endfor -%}
 {% endmacro -%}

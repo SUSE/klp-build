@@ -3,15 +3,17 @@ import pathlib
 import os
 import re
 import requests
+import subprocess
 
 import templ
 
 class Setup:
     _cs = {}
     _cs_file = None
+    _cve_branches = []
 
     def __init__(self, destination, redownload, bsc, cve, conf,
-                file_funcs, mod, commits):
+                file_funcs, mod, ups_commits):
         # Prefer the argument over the environment
         if not destination:
             destination = pathlib.Path(os.getenv('KLP_ENV_DIR'))
@@ -30,9 +32,11 @@ class Setup:
         self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
         self._conf = conf
         self._file_funcs = file_funcs
-        self._commits = []
-        for c in commits:
-            self._commits.append(c[:12])
+        self._commits = { 'upstream' : {} }
+        for commit in ups_commits:
+            commit = commit[:12]
+            self._commits['upstream'][commit] = self.get_commit_subject(commit)
+
         # FIXME: currently run-ccp.sh only accepts one file + multiple
         # functions, so grab the first file-func argument as use to create the
         # setup.sh file
@@ -164,17 +168,51 @@ class Setup:
 
             self.write_setup_script(cs, dest)
 
+    def get_commit_subject(self, commit):
+        req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
+        req.raise_for_status()
+
+        return re.search('Subject: (.*)', req.text).group(1)
+
+    def get_commits(self):
+        ksource_git = os.getenv('KLP_KERNEL_SOURCE', '')
+        if not ksource_git:
+            return
+
+        ksource_path = pathlib.Path(ksource_git)
+        if not ksource_path.is_dir():
+            return
+
+        # Get backported commits from the CVE branches
+        for bc in self._cve_branches:
+            self._commits[bc] = {}
+            for commit, msg in self._commits['upstream'].items():
+                # FIXME: commit_hash will contain double quotes, and when
+                # writing the json file it'll add quotes again. I need to find
+                # why...
+                commit_hash = subprocess.check_output(['/usr/bin/git', '-C', str(ksource_path),
+                            'log', '--pretty="%H"', '--grep',  msg,
+                            'remotes/origin/users/jack/cve/linux-' + bc + '/for-next'],
+                            stderr=subprocess.PIPE)
+                cmt = commit_hash.decode('ascii').strip().replace('"', '')
+                # We don't care about branches commit message, because it is the
+                # same as the upstream commit
+                self._commits[bc][cmt] = ''
+
     def write_conf_json(self):
         files = {}
+
         for f in self._file_funcs:
             filepath = f[0]
             funcs = f[1:]
             files[filepath] = funcs
+
         data = { 'bsc' : self._bsc_num,
                 'cve' : self._cve,
                 'conf' : self._conf,
                 'mod' : self._mod,
-                'upstream-commits' : self._commits,
+                'cve_branches' : self._cve_branches,
+                'commits' : self._commits,
                 'files' : files }
         with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
             f.write(json.dumps(data, indent=4))
@@ -192,14 +230,22 @@ class Setup:
     def prepare_env(self):
         self._bsc_path.mkdir(exist_ok=True)
 
-        self.write_conf_json()
-
         self.download_codestream_file()
+
+        cve_branches = []
 
         with self._cs_file.open() as cs_file:
             for line in cs_file:
-                cs, target, _, _, kernel = line.strip().split(',')
+                cs, target, rel, _, kernel = line.strip().split(',')
                 self._cs[cs] = { 'target' : target, 'kernel' : kernel.replace('rpm', 'linux') }
 
+                # do not expect any problems with the kernel release format
+                cve_branches.append(re.search('^([0-9]+\.[0-9]+)', rel).group(1))
+
+            # remove the duplicate entries
+            self._cve_branches = list(dict.fromkeys(cve_branches))
+
         self.prepare_bsc_dirs()
+        self.get_commits()
+        self.write_conf_json()
         self.write_commit_file()
