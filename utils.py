@@ -192,7 +192,7 @@ class Setup:
                 # why...
                 commit_hash = subprocess.check_output(['/usr/bin/git', '-C', str(ksource_path),
                             'log', '--pretty="%H"', '--grep',  msg,
-                            'remotes/origin/users/jack/cve/linux-' + bc + '/for-next'],
+                            'remotes/origin/cve/linux-' + bc],
                             stderr=subprocess.PIPE)
                 cmt = commit_hash.decode('ascii').strip().replace('"', '')
                 # We don't care about branches commit message, because it is the
