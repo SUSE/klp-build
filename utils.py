@@ -1,3 +1,4 @@
+import glob
 import json
 import pathlib
 import os
@@ -131,8 +132,19 @@ class Setup:
                                 'default')
         symvers = pathlib.Path(odir, 'Module.symvers')
 
-        obj = pathlib.Path(self._ex_dir, cs, 'x86_64', 'boot', 'vmlinux-' +
-                self._cs[cs]['kernel'].replace('linux-', '') + '-default')
+        if not self._mod:
+            obj = pathlib.Path(self._ex_dir, cs, 'x86_64', 'boot', 'vmlinux-' +
+                    self._cs[cs]['kernel'].replace('linux-', '') + '-default')
+        else:
+            mod_file = self._mod + '.ko'
+            obj_path = pathlib.Path(self._ex_dir, cs, 'x86_64', 'lib', 'modules')
+            obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
+
+            if not obj or len(obj) > 1:
+                raise RuntimeError('Module list has none or too much entries: ' + str(obj))
+            # Grab the only value of the list and turn obj into a string to be
+            # used later
+            obj = obj[0]
 
         ipa = pathlib.Path(self._ipa_dir, cs, 'x86_64', self._src + '.000i.ipa-clones')
 
@@ -149,7 +161,6 @@ class Setup:
             f.write('export KCP_KBUILD_SDIR={}\n'.format(sdir))
             f.write('export KCP_KBUILD_ODIR={}\n'.format(odir))
             f.write('export KCP_MOD_SYMVERS={}\n'.format(symvers))
-            # FIXME: change fixes vmlinux to module when it fits
             f.write('export KCP_PATCHED_OBJ={}\n'.format(obj))
             f.write('export KCP_IPA_CLONES_DUMP={}\n'.format(ipa))
 
