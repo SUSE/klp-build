@@ -14,7 +14,7 @@
 #include "{{ fname }}.h"
 #include "../kallsyms_relocs.h"
 
-{%- if mod is defined %}#define LP_MODULE "{{ mod }}"{% endif %}
+{% if mod is defined %}#define LP_MODULE "{{ mod }}"{% endif %}
 
 
 
@@ -63,7 +63,7 @@ int {{ fname }}_init(void)
 			goto out;
 	}
 
-	ret = register_module_notifier(&{{ ktype }}_{{ bsc }}_module_nb);
+	ret = register_module_notifier(&{{ fname }}_{{ bsc }}_module_nb);
 out:
 	mutex_unlock(&module_mutex);
 	return ret;
