@@ -1,7 +1,7 @@
 {% from 'helper.j2' import fname with context %}
 {% include 'header.j2' %}
 
-#if IS_ENABLED({{ config }})
+{% if conf is defined %}#if IS_ENABLED({{ config }}){% endif %}
 
 {% if mod is defined %}
 #if !IS_MODULE({{ config }})
@@ -79,4 +79,4 @@ void {{ fname }}_cleanup(void)
 }
 {% endif -%}
 
-#endif /* IS_ENABLED({{ config }}) */
+{% if conf is defined %}#endif /* IS_ENABLED({{ config }}) */{% endif -%}

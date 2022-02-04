@@ -64,9 +64,12 @@ class Template:
             mod = 'vmlinux' if not self._mod else self._mod
             for file_funcs in self._files.items():
                 for func in file_funcs[1]:
-                    f.write('{} {} {} IS_ENABLED({})\n'.format(mod, func,
-                                                    'klpp_' + func,
-                                                    self._conf))
+                    if self._conf:
+                        f.write('{} {} {} IS_ENABLED({})\n'.format(mod, func,
+                                                        'klpp_' + func,
+                                                        self._conf))
+                    else:
+                        f.write('{} {} {}\n'.format(mod, func, 'klpp_' + func))
 
     # Return the commit message in a list of wrapped
     def generate_commit_msg(self):

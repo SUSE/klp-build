@@ -18,7 +18,7 @@ def create_parser() -> argparse.ArgumentParser:
             help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
     setup.add_argument('--cve', type=str, required=True,
             help='The CVE assigned to this livepatch')
-    setup.add_argument('--conf', type=str, required=True,
+    setup.add_argument('--conf', type=str,
             help='The kernel CONFIG used to be build the livepatch')
     setup.add_argument('--file-funcs', required=True, action='append', nargs='*',
             help='File and functions to be livepatched. Can be set multiple times. '
@@ -38,6 +38,8 @@ def create_parser() -> argparse.ArgumentParser:
 if  __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
+
+    # FIXME: Maybe we should require --conf when --module is specified"
 
     if args.command == 'setup-bsc':
         setup = utils.Setup(args.dest, args.redownload, args.bsc, args.cve,
