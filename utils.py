@@ -30,6 +30,8 @@ class Setup:
         if self._bsc_path.exists() and not self._bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
+        self._bsc_path.mkdir(exist_ok=True)
+
         self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
         self._conf = conf
         self._file_funcs = file_funcs
@@ -183,6 +185,11 @@ class Setup:
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
         req.raise_for_status()
 
+        # Save the upstream commit in the bsc directory
+        fpath = pathlib.Path(self._bsc_path, 'commit.patch')
+        with open(fpath, 'w') as f:
+            f.write(req.text)
+
         return re.search('Subject: (.*)', req.text).group(1)
 
     def get_commits(self):
@@ -239,8 +246,6 @@ class Setup:
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')
 
     def prepare_env(self):
-        self._bsc_path.mkdir(exist_ok=True)
-
         self.download_codestream_file()
 
         cve_branches = []
