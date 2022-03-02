@@ -9,9 +9,9 @@ import requests
 import textwrap
 
 class Template:
-    def __init__(self, bsc, ktype):
+    def __init__(self, bsc, work_dir, ktype):
         self._bsc = 'bsc' + re.search('([0-9]+)', bsc).group(1)
-        conf = pathlib.Path(os.getenv('KLP_WORK_DIR'), self._bsc, 'conf.json')
+        conf = pathlib.Path(work_dir, self._bsc, 'conf.json')
         if not conf.is_file():
             raise ValueError('config.json not found in {}'.format(str(conf)))
 

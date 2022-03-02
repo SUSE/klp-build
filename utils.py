@@ -13,16 +13,22 @@ class Setup:
     _cs_file = None
     _cve_branches = []
 
-    def __init__(self, destination, redownload, bsc, cve, conf,
+    def __init__(self, data, work_dir, redownload, bsc, cve, conf,
                 file_funcs, mod, ups_commits):
         # Prefer the argument over the environment
-        if not destination:
-            destination = pathlib.Path(os.getenv('KLP_ENV_DIR'))
-            if not destination:
-                raise ValueError('--dest or KLP_ENV_DIR should be defined')
+        if not data:
+            data = pathlib.Path(os.getenv('KLP_DATA_DIR'))
+            if not data:
+                raise ValueError('--data or KLP_DATA_DIR should be defined')
 
-        self._env = pathlib.Path(destination)
-        self._work = pathlib.Path(os.getenv('KLP_WORK_DIR'))
+        self._env = pathlib.Path(data)
+        # Prefer the argument over the environment
+        if not work_dir:
+            work_dir = pathlib.Path(os.getenv('KLP_WORK_DIR'))
+            if not work_dir:
+                raise ValueError('--work-dir or KLP_WORK_DIR should be defined')
+
+        self._work = work_dir
 
         self._bsc_num = re.search('([0-9]+)', bsc).group(1)
         self._bsc = 'bsc' + self._bsc_num
@@ -171,7 +177,7 @@ class Setup:
 
         if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
             print(self._ex_dir, self._ipa_dir)
-            raise RuntimeError('KLP_ENV_DIR was not defined, or ex-kernel/ipa-clones does not exist')
+            raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
 
         # Create the necessary directories for each codestream and populate the
         # setup.sh script
@@ -236,7 +242,7 @@ class Setup:
             f.write(json.dumps(data, indent=4))
 
     def write_commit_file(self):
-        temp = templ.Template(self._bsc, 'klp')
+        temp = templ.Template(self._bsc, self._work, 'klp')
         msg = temp.generate_commit_msg()
 
         with open(pathlib.Path(self._bsc_path, 'commit.msg'), 'w') as f:
