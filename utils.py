@@ -9,7 +9,6 @@ import subprocess
 import templ
 
 class Setup:
-    _cs = {}
     _cs_file = None
     _cs_json = {}
     _cve_branches = []
@@ -72,31 +71,12 @@ class Setup:
             return 'kgr'
         return 'klp'
 
-    def find_cs_file(self, err=False):
-        # If _cs_file is populated, so is _codestreams
-        if self._cs_file:
-                return
-
-        # If KLP_CS_FILE env var is populated, is must be a valid file
-        self._cs_file = os.getenv('KLP_CS_FILE')
-        if self._cs_file and not os.path.isfile(self._cs_file):
-            raise ValueError(self._cs_file + ' is not a valid file!')
-
-        if not self._cs_file:
-            self._cs_file = pathlib.Path(self._bsc_path, 'codestreams.in')
-
-        # If err is true, return error instead of only populare cs_file member
-        if err and not self._cs_file.is_file():
-            raise ValueError('Couldn\'t find codestreams.in file')
-
     def download_codestream_file(self):
-        self.find_cs_file()
+        self._cs_file = pathlib.Path(self._bsc_path, 'codestreams.in')
 
         if os.path.isfile(self._cs_file) and not self._redownload:
             print('Found codestreams.in file, skipping download.')
             return
-        elif not self._cs_file:
-            self._cs_file = pathlib.Path(self._bsc_path, 'codestreams.in')
 
         print('Downloading the codestreams.in file into ' + str(self._cs_file))
         req = requests.get('https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv')
@@ -107,6 +87,7 @@ class Setup:
         # For now let's keep the current format of codestreams.in and
         # codestreams.json
         first_line = True
+        kernels = []
         with open(self._cs_file, 'w') as f:
             for line in req.iter_lines():
                 # skip empty lines
@@ -122,9 +103,9 @@ class Setup:
                 # and add a fifth field with the forth one + rpm- prefix, and
                 # remove the micro version number
                 columns = line.decode('utf-8').split(',')
-                rpm_name = 'rpm-' + re.sub('\.\d+$', '', columns[2])
+                kernel = re.sub('\.\d+$', '', columns[2])
 
-                f.write(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,' + rpm_name + '\n')
+                f.write(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,rpm-' + kernel + '\n')
 
                 sle, _, u = columns[0].replace('SLE', '').split('_')
                 if '-SP' in sle:
@@ -133,10 +114,18 @@ class Setup:
                     sle = sle + '.0'
                 self._cs_json[sle + 'u' + u] = {
                     'project' : columns[1],
-                    'rpm' : rpm_name,
-                    'micro' : columns[2][-1],
+                    'kernel' : kernel,
+                    'micro-version' : columns[2][-1],
                     'branch' : ''
                 }
+
+                # do not expect any problems with the kernel release format
+                kernels.append(re.search('^([0-9]+\.[0-9]+)', kernel).group(1))
+
+        # We create a dict to remove the duplicate kernel versions, used as CVE
+        # branches for find the fixes for each codestreams in kernel-source
+        # later on
+        self._cve_branches = list(dict.fromkeys(kernels))
 
     def write_setup_script(self, cs, dest):
         cs_dir = pathlib.Path(dest, cs, 'x86_64')
@@ -150,14 +139,14 @@ class Setup:
         work_path.mkdir(parents=True, exist_ok=True)
 
         src = pathlib.Path(self._ex_dir, cs, 'usr', 'src')
-        sdir = pathlib.Path(src, self._cs[cs]['kernel'])
-        odir = pathlib.Path(src, self._cs[cs]['kernel'] + '-obj', 'x86_64',
+        sdir = pathlib.Path(src, self._cs_json[cs]['kernel'])
+        odir = pathlib.Path(src, self._cs_json[cs]['kernel'] + '-obj', 'x86_64',
                                 'default')
         symvers = pathlib.Path(odir, 'Module.symvers')
 
         if not self._mod:
             obj = pathlib.Path(self._ex_dir, cs, 'x86_64', 'boot', 'vmlinux-' +
-                    self._cs[cs]['kernel'].replace('linux-', '') + '-default')
+                    self._cs_json[cs]['kernel'].replace('linux-', '') + '-default')
         else:
             mod_file = self._mod + '.ko'
             obj_path = pathlib.Path(self._ex_dir, cs, 'x86_64', 'lib', 'modules')
@@ -188,15 +177,13 @@ class Setup:
             f.write('export KCP_IPA_CLONES_DUMP={}\n'.format(ipa))
 
     def prepare_bsc_dirs(self):
-        self.find_cs_file(err=True)
-
         if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
             print(self._ex_dir, self._ipa_dir)
             raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
 
         # Create the necessary directories for each codestream and populate the
         # setup.sh script
-        for cs in self._cs.keys():
+        for cs in self._cs_json.keys():
             dest = pathlib.Path(self._bsc_path, 'c')
             dest.mkdir(parents=True, exist_ok=True)
 
@@ -253,6 +240,7 @@ class Setup:
                 'cve_branches' : self._cve_branches,
                 'commits' : self._commits,
                 'files' : files }
+
         with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
             f.write(json.dumps(data, indent=4))
 
@@ -271,19 +259,6 @@ class Setup:
 
     def prepare_env(self):
         self.download_codestream_file()
-
-        cve_branches = []
-
-        with self._cs_file.open() as cs_file:
-            for line in cs_file:
-                cs, target, rel, _, kernel = line.strip().split(',')
-                self._cs[cs] = { 'target' : target, 'kernel' : kernel.replace('rpm', 'linux') }
-
-                # do not expect any problems with the kernel release format
-                cve_branches.append(re.search('^([0-9]+\.[0-9]+)', rel).group(1))
-
-            # remove the duplicate entries
-            self._cve_branches = list(dict.fromkeys(cve_branches))
 
         self.prepare_bsc_dirs()
         self.get_commits()
