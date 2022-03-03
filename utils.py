@@ -11,6 +11,7 @@ import templ
 class Setup:
     _cs = {}
     _cs_file = None
+    _cs_json = {}
     _cve_branches = []
 
     def __init__(self, data, work_dir, redownload, bsc, cve, conf,
@@ -103,6 +104,8 @@ class Setup:
         # exit on error
         req.raise_for_status()
 
+        # For now let's keep the current format of codestreams.in and
+        # codestreams.json
         first_line = True
         with open(self._cs_file, 'w') as f:
             for line in req.iter_lines():
@@ -122,6 +125,18 @@ class Setup:
                 rpm_name = 'rpm-' + re.sub('\.\d+$', '', columns[2])
 
                 f.write(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,' + rpm_name + '\n')
+
+                sle, _, u = columns[0].replace('SLE', '').split('_')
+                if '-SP' in sle:
+                    sle = sle.replace('-SP', '.')
+                else:
+                    sle = sle + '.0'
+                self._cs_json[sle + 'u' + u] = {
+                    'project' : columns[1],
+                    'rpm' : rpm_name,
+                    'micro' : columns[2][-1],
+                    'branch' : ''
+                }
 
     def write_setup_script(self, cs, dest):
         cs_dir = pathlib.Path(dest, cs, 'x86_64')
@@ -223,7 +238,7 @@ class Setup:
                 # same as the upstream commit
                 self._commits[bc][cmt] = ''
 
-    def write_conf_json(self):
+    def write_json_files(self):
         files = {}
 
         for f in self._file_funcs:
@@ -240,6 +255,9 @@ class Setup:
                 'files' : files }
         with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
             f.write(json.dumps(data, indent=4))
+
+        with open(pathlib.Path(self._bsc_path, 'codestreams.json'), 'w') as f:
+            f.write(json.dumps(self._cs_json, indent=4))
 
     def write_commit_file(self):
         temp = templ.Template(self._bsc, self._work, 'klp')
@@ -269,5 +287,5 @@ class Setup:
 
         self.prepare_bsc_dirs()
         self.get_commits()
-        self.write_conf_json()
+        self.write_json_files()
         self.write_commit_file()
