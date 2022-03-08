@@ -4,6 +4,7 @@ import pathlib
 import os
 import re
 import requests
+import shutil
 import subprocess
 
 import templ
@@ -46,15 +47,14 @@ class Setup:
             commit = commit[:12]
             self._commits['upstream'][commit] = self.get_commit_subject(commit)
 
-        # FIXME: currently run-ccp.sh only accepts one file + multiple
-        # functions, so grab the first file-func argument as use to create the
-        # setup.sh file
         # file_funcs has the content like
         # [ ['fs/file.c', 'func1', 'func2'], ['fs/open.c', 'func3', 'func4']
-        # Get the file from the first file-func argument
-        self._src = file_funcs[0][0]
-        # Return the files from the first file-func argument
-        self._funcs = file_funcs[0][1:]
+        self._src = []
+        self._funcs = []
+        for ff in file_funcs:
+            self._src.append(ff[0])
+            self._funcs.append(','.join(ff[1:]))
+
         self._mod = mod
 
         if not self._env.is_dir():
@@ -78,7 +78,6 @@ class Setup:
             print('Found codestreams.in file, skipping download.')
             return
 
-        print('Downloading the codestreams.in file into ' + str(self._cs_file))
         req = requests.get('https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv')
 
         # exit on error
@@ -116,7 +115,8 @@ class Setup:
                     'project' : columns[1],
                     'kernel' : kernel,
                     'micro-version' : columns[2][-1],
-                    'branch' : ''
+                    'branch' : '',
+                    'cs' : columns[0]
                 }
 
                 # do not expect any problems with the kernel release format
@@ -127,29 +127,47 @@ class Setup:
         # later on
         self._cve_branches = list(dict.fromkeys(kernels))
 
-    def write_setup_script(self, cs, dest):
-        cs_dir = pathlib.Path(dest, cs, 'x86_64')
+    def write_setup_script(self, cs):
+        jcs = self._cs_json[cs]
+
+        # Use the old full codestream name to avoid problems for now
+        full_cs = jcs['cs']
+
+        cs_dir = pathlib.Path(self._bsc_path, 'c', full_cs, 'x86_64')
         cs_dir.mkdir(parents=True, exist_ok=True)
 
         setup = pathlib.Path(cs_dir, 'setup.sh')
 
         # Create a work_{file}.c structure to be used in run-ccp.sh
-        work_dir = 'work_' + pathlib.Path(self._src).name
-        work_path = pathlib.Path(setup.with_name(work_dir))
-        work_path.mkdir(parents=True, exist_ok=True)
+        work_paths = []
+        for src in self._src:
+            work_dir = 'work_' + pathlib.Path(src).name
+            work_path = pathlib.Path(setup.with_name(work_dir))
 
-        src = pathlib.Path(self._ex_dir, cs, 'usr', 'src')
-        sdir = pathlib.Path(src, self._cs_json[cs]['kernel'])
-        odir = pathlib.Path(src, self._cs_json[cs]['kernel'] + '-obj', 'x86_64',
-                                'default')
+            # remove any previously generated files
+            shutil.rmtree(work_path, ignore_errors=True)
+
+            # recreate the directory to run ccp on it
+            work_path.mkdir(parents=True, exist_ok=True)
+
+            work_paths.append(str(work_path))
+
+        ex_dir = pathlib.Path(self._ex_dir, full_cs)
+        ipa_dir = pathlib.Path(self._ipa_dir, full_cs)
+
+        kernel = jcs['kernel']
+
+        src = pathlib.Path(ex_dir, 'usr', 'src')
+        sdir = pathlib.Path(src, 'linux-' + kernel)
+        odir = pathlib.Path(src, 'linux-' + kernel + '-obj', 'x86_64', 'default')
         symvers = pathlib.Path(odir, 'Module.symvers')
 
         if not self._mod:
-            obj = pathlib.Path(self._ex_dir, cs, 'x86_64', 'boot', 'vmlinux-' +
-                    self._cs_json[cs]['kernel'].replace('linux-', '') + '-default')
+            obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +
+                    kernel.replace('linux-', '') + '-default')
         else:
             mod_file = self._mod + '.ko'
-            obj_path = pathlib.Path(self._ex_dir, cs, 'x86_64', 'lib', 'modules')
+            obj_path = pathlib.Path(ex_dir, 'x86_64', 'lib', 'modules')
             obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
 
             if not obj or len(obj) > 1:
@@ -158,36 +176,41 @@ class Setup:
             # used later
             obj = obj[0]
 
-        ipa = pathlib.Path(self._ipa_dir, cs, 'x86_64', self._src + '.000i.ipa-clones')
+        ipa_src = []
+        for src in self._src:
+            ipa_src.append(str(pathlib.Path(ipa_dir, 'x86_64', src + '.000i.ipa-clones')))
 
-        # TODO: currently run-ccp.sh only handles one file + functions, so pick
-        # the first one in this case
         with setup.open('w') as f:
-            f.write('export KCP_FUNC={}\n'.format(','.join(self._funcs)))
-            f.write('export KCP_PATCHED_SRC={}\n'.format(self._src))
-            f.write('export KCP_DEST={}\n'.format(str(dest)))
+            f.write('export KCP_FUNC="{}"\n'.format(';'.join(self._funcs)))
+            f.write('export KCP_PATCHED_SRC="{}"\n'.format(';'.join(self._src)))
+            #f.write('export KCP_DEST={}\n'.format(str(dest)))
             # FIXME: check which readelf to use
             f.write('export KCP_READELF={}\n'.format('readelf'))
-            f.write('export KCP_RENAME_PREFIX={}\n'.format(self.get_rename_prefix(cs)))
-            f.write('export KCP_WORK_DIR={}\n'.format(work_path))
+            f.write('export KCP_RENAME_PREFIX={}\n'.format(self.get_rename_prefix(full_cs)))
+            f.write('export KCP_WORK_DIR="{}"\n'.format(';'.join(work_paths)))
             f.write('export KCP_KBUILD_SDIR={}\n'.format(sdir))
             f.write('export KCP_KBUILD_ODIR={}\n'.format(odir))
             f.write('export KCP_MOD_SYMVERS={}\n'.format(symvers))
             f.write('export KCP_PATCHED_OBJ={}\n'.format(obj))
-            f.write('export KCP_IPA_CLONES_DUMP={}\n'.format(ipa))
+            f.write('export KCP_IPA_CLONES_DUMP="{}"\n'.format(';'.join(ipa_src)))
+
+        jcs['readelf'] = 'readelf'
+        jcs['rename_prefix'] = self.get_rename_prefix(full_cs)
+        jcs['work_dir'] = work_paths
+        jcs['sdir'] = str(sdir)
+        jcs['odir'] = str(odir)
+        jcs['symvers'] = str(pathlib.Path(odir, 'Module.symvers'))
+        jcs['object'] = str(obj)
+        jcs['ipa_clones'] = ipa_src
 
     def prepare_bsc_dirs(self):
         if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
-            print(self._ex_dir, self._ipa_dir)
             raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
 
         # Create the necessary directories for each codestream and populate the
         # setup.sh script
         for cs in self._cs_json.keys():
-            dest = pathlib.Path(self._bsc_path, 'c')
-            dest.mkdir(parents=True, exist_ok=True)
-
-            self.write_setup_script(cs, dest)
+            self.write_setup_script(cs)
 
     def get_commit_subject(self, commit):
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
