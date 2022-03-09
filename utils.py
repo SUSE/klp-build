@@ -86,7 +86,6 @@ class Setup:
         # For now let's keep the current format of codestreams.in and
         # codestreams.json
         first_line = True
-        kernels = []
         with open(self._cs_file, 'w') as f:
             for line in req.iter_lines():
                 # skip empty lines
@@ -105,6 +104,13 @@ class Setup:
                 kernel = re.sub('\.\d+$', '', columns[2])
 
                 f.write(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,rpm-' + kernel + '\n')
+
+    def fill_cs_json(self):
+        kernels = []
+        with open(self._cs_file, 'r') as f:
+            for line in f:
+                columns = line.strip().split(',')
+                kernel = re.sub('\.\d+$', '', columns[2])
 
                 sle, _, u = columns[0].replace('SLE', '').split('_')
                 if '-SP' in sle:
@@ -282,6 +288,8 @@ class Setup:
 
     def prepare_env(self):
         self.download_codestream_file()
+
+        self.fill_cs_json()
 
         self.prepare_bsc_dirs()
         self.get_commits()
