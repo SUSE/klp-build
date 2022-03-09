@@ -23,8 +23,8 @@ def create_parser() -> argparse.ArgumentParser:
     setup.add_argument('--conf', type=str,
             help='The kernel CONFIG used to be build the livepatch')
     setup.add_argument('--file-funcs', required=True, action='append', nargs='*',
-            help='File and functions to be livepatched. Can be set multiple times. '
-            'The format is --file-funcs file/path.c func1 func2 --file-func file/patch2 func1...')
+            help='Kernel, file and functions to be livepatched. Can be set multiple times. '
+            'The format is --file-funcs 4.4 file/path.c func1 func2 --file-func 4.12 file/patch2 func1...')
     setup.add_argument('-m', '--module', type=str,
             help='The module that will be livepatched')
     setup.add_argument('-u', '--upstream-commits', required=True,

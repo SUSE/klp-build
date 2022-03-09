@@ -47,14 +47,6 @@ class Setup:
             commit = commit[:12]
             self._commits['upstream'][commit] = self.get_commit_subject(commit)
 
-        # file_funcs has the content like
-        # [ ['fs/file.c', 'func1', 'func2'], ['fs/open.c', 'func3', 'func4']
-        self._src = []
-        self._funcs = []
-        for ff in file_funcs:
-            self._src.append(ff[0])
-            self._funcs.append(','.join(ff[1:]))
-
         self._mod = mod
 
         if not self._env.is_dir():
@@ -106,6 +98,15 @@ class Setup:
                 f.write(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,rpm-' + kernel + '\n')
 
     def fill_cs_json(self):
+        files = {}
+        for f in self._file_funcs:
+            cs = f[0]
+            filepath = f[1]
+            funcs = f[2:]
+            if not files.get(cs, {}):
+                files[cs] = {}
+            files[cs][filepath] = funcs
+
         kernels = []
         with open(self._cs_file, 'r') as f:
             for line in f:
@@ -117,7 +118,8 @@ class Setup:
                     sle = sle.replace('-SP', '.')
                 else:
                     sle = sle + '.0'
-                self._cs_json[sle + 'u' + u] = {
+                cs_key = sle + 'u' + u
+                self._cs_json[cs_key] = {
                     'project' : columns[1],
                     'kernel' : kernel,
                     'micro-version' : columns[2][-1],
@@ -126,7 +128,16 @@ class Setup:
                 }
 
                 # do not expect any problems with the kernel release format
-                kernels.append(re.search('^([0-9]+\.[0-9]+)', kernel).group(1))
+                cs_kernel = re.search('^([0-9]+\.[0-9]+)', kernel).group(1)
+                kernels.append(cs_kernel)
+
+                cs_files = files.get(cs_kernel, {})
+                if not cs_files:
+                    cs_files = files.get('all', {})
+                    if not cs_files:
+                        print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_kernel))
+
+                self._cs_json[cs_key]['files'] = cs_files
 
         # We create a dict to remove the duplicate kernel versions, used as CVE
         # branches for find the fixes for each codestreams in kernel-source
@@ -144,9 +155,20 @@ class Setup:
 
         setup = pathlib.Path(cs_dir, 'setup.sh')
 
+        ex_dir = pathlib.Path(self._ex_dir, full_cs)
+        ipa_dir = pathlib.Path(self._ipa_dir, full_cs)
+
         # Create a work_{file}.c structure to be used in run-ccp.sh
         work_paths = []
-        for src in self._src:
+        ipa_src = []
+        srcs = []
+        funcs = []
+        for src in jcs['files'].keys():
+            srcs.append(src)
+            # join all functions separated by comma, as requested by ccp
+            funcs.append(','.join(jcs['files'][src]))
+            ipa_src.append(str(pathlib.Path(ipa_dir, 'x86_64', src + '.000i.ipa-clones')))
+
             work_dir = 'work_' + pathlib.Path(src).name
             work_path = pathlib.Path(setup.with_name(work_dir))
 
@@ -157,9 +179,6 @@ class Setup:
             work_path.mkdir(parents=True, exist_ok=True)
 
             work_paths.append(str(work_path))
-
-        ex_dir = pathlib.Path(self._ex_dir, full_cs)
-        ipa_dir = pathlib.Path(self._ipa_dir, full_cs)
 
         kernel = jcs['kernel']
 
@@ -182,13 +201,9 @@ class Setup:
             # used later
             obj = obj[0]
 
-        ipa_src = []
-        for src in self._src:
-            ipa_src.append(str(pathlib.Path(ipa_dir, 'x86_64', src + '.000i.ipa-clones')))
-
         with setup.open('w') as f:
-            f.write('export KCP_FUNC="{}"\n'.format(';'.join(self._funcs)))
-            f.write('export KCP_PATCHED_SRC="{}"\n'.format(';'.join(self._src)))
+            f.write('export KCP_FUNC="{}"\n'.format(';'.join(funcs)))
+            f.write('export KCP_PATCHED_SRC="{}"\n'.format(';'.join(srcs)))
             #f.write('export KCP_DEST={}\n'.format(str(dest)))
             # FIXME: check which readelf to use
             f.write('export KCP_READELF={}\n'.format('readelf'))
@@ -214,9 +229,10 @@ class Setup:
             raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
 
         # Create the necessary directories for each codestream and populate the
-        # setup.sh script
+        # setup.sh script, skipping the codestreams without any files associated
         for cs in self._cs_json.keys():
-            self.write_setup_script(cs)
+            if self._cs_json[cs]['files']:
+                self.write_setup_script(cs)
 
     def get_commit_subject(self, commit):
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
@@ -255,20 +271,13 @@ class Setup:
                 self._commits[bc][cmt] = ''
 
     def write_json_files(self):
-        files = {}
-
-        for f in self._file_funcs:
-            filepath = f[0]
-            funcs = f[1:]
-            files[filepath] = funcs
-
         data = { 'bsc' : self._bsc_num,
                 'cve' : self._cve,
                 'conf' : self._conf,
                 'mod' : self._mod,
                 'cve_branches' : self._cve_branches,
-                'commits' : self._commits,
-                'files' : files }
+                'commits' : self._commits
+        }
 
         with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
             f.write(json.dumps(data, indent=4))

@@ -22,7 +22,6 @@ class Template:
             self._mod = data['mod']
             self._cve = data['cve']
             self._conf = data['conf']
-            self._files = data['files']
             self._commits = data['commits']
         try:
             conf = git.GitConfigParser()
@@ -59,17 +58,6 @@ class Template:
                                     user = self._user,
                                     email = self._email,
                                     commits = self._commits))
-
-        with open(pathlib.Path(bsc, 'patched_funcs.csv'), 'w') as f:
-            mod = 'vmlinux' if not self._mod else self._mod
-            for file_funcs in self._files.items():
-                for func in file_funcs[1]:
-                    if self._conf:
-                        f.write('{} {} {} IS_ENABLED({})\n'.format(mod, func,
-                                                        'klpp_' + func,
-                                                        self._conf))
-                    else:
-                        f.write('{} {} {}\n'.format(mod, func, 'klpp_' + func))
 
     # Return the commit message in a list of wrapped
     def generate_commit_msg(self):
