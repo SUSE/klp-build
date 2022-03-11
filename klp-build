@@ -4,6 +4,7 @@ import argparse
 import os
 import utils
 import templ
+import ccp
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="The toolkit for livepatch developers")
@@ -35,6 +36,11 @@ def create_parser() -> argparse.ArgumentParser:
             help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
     templ.add_argument('-t', '--type', type=str, required=True,
             help='The livepatch type, being kgraft (kgr) or klp', choices=['klp', 'kgr'])
+
+    ccp_opts = sub.add_parser('run-ccp')
+    ccp_opts.add_argument('--bsc', type=str, required=True,
+            help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
+
     return parser
 
 if  __name__ == '__main__':
@@ -50,3 +56,6 @@ if  __name__ == '__main__':
     elif args.command == 'create-lp':
         templ = templ.Template(args.bsc, args.work_dir, args.type)
         templ.GenerateLivePatches()
+    elif args.command == 'run-ccp':
+        ccp = ccp.CCP(args.bsc)
+        ccp.run_ccp()
