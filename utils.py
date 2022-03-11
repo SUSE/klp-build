@@ -115,16 +115,19 @@ class Setup:
 
                 sle, _, u = columns[0].replace('SLE', '').split('_')
                 if '-SP' in sle:
-                    sle = sle.replace('-SP', '.')
+                    sle, sp = sle.split('-SP')
                 else:
-                    sle = sle + '.0'
-                cs_key = sle + 'u' + u
+                    sle, sp = sle, '0'
+                cs_key = sle + '.' + sp + 'u' + u
                 self._cs_json[cs_key] = {
                     'project' : columns[1],
                     'kernel' : kernel,
                     'micro-version' : columns[2][-1],
                     'branch' : '',
-                    'cs' : columns[0]
+                    'cs' : columns[0],
+                    'sle' : sle,
+                    'sp' : sp,
+                    'update' : u
                 }
 
                 # do not expect any problems with the kernel release format
