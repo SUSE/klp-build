@@ -4,7 +4,6 @@ import pathlib
 import os
 import re
 import requests
-import shutil
 import subprocess
 
 import templ
@@ -174,9 +173,6 @@ class Setup:
 
             work_dir = 'work_' + pathlib.Path(src).name
             work_path = pathlib.Path(setup.with_name(work_dir))
-
-            # remove any previously generated files
-            shutil.rmtree(work_path, ignore_errors=True)
 
             # recreate the directory to run ccp on it
             work_path.mkdir(parents=True, exist_ok=True)
