@@ -10,7 +10,7 @@ import textwrap
 
 class Template:
     def __init__(self, bsc, work_dir, ktype):
-        self._bsc = 'bsc' + re.search('([0-9]+)', bsc).group(1)
+        self._bsc = 'bsc' + str(bsc)
         conf = pathlib.Path(work_dir, self._bsc, 'conf.json')
         if not conf.is_file():
             raise ValueError('config.json not found in {}'.format(str(conf)))
@@ -30,8 +30,8 @@ class Template:
         except:
             raise RuntimeError('Please define name/email in global git config')
 
-        self._env = jinja2.Environment(loader=jinja2.FileSystemLoader('templates'), \
-                    trim_blocks=True)
+        fsloader = jinja2.FileSystemLoader(pathlib.Path(os.path.dirname(__file__), 'templates'))
+        self._env = jinja2.Environment(loader=fsloader, trim_blocks=True)
 
     def GenerateLivePatches(self):
         fname = 'kgr_patch' if self._ktype == 'kgr' else 'livepatch'
