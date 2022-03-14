@@ -2,6 +2,7 @@ import json
 import pathlib
 import os
 import re
+import shutil
 import subprocess
 
 import sys
@@ -9,8 +10,9 @@ import sys
 class CCP:
     _cs = None
 
-    def __init__(self, bsc):
-        cs_file = pathlib.Path('/home/mpdesouza/bsc' +  bsc, 'codestreams.json')
+    def __init__(self, bsc, work_dir):
+        bsc_dir = 'bsc' + str(bsc)
+        cs_file = pathlib.Path(work_dir, bsc, 'codestreams.json')
         with open(cs_file, 'r') as f:
             self._cs = json.loads(f.read())
 
@@ -26,7 +28,6 @@ class CCP:
         if not result:
             return None
 
-
         # some strings  have single quotes around double quotes, so remove the
         # outer quotes
         output = result.group(1).replace('\'', '')
@@ -36,7 +37,7 @@ class CCP:
         output = output.replace('-fdump-ipa-clones', '')
 
         if int(sle) >= 15 and int(sp) >= 2:
-            outpuut = output + " -D'_Static_assert(e,m)='"
+            output = output + ' -D_Static_assert(e,m)='
 
         return output
 
@@ -56,13 +57,21 @@ class CCP:
 
         ccp_args = [ccp_path]
         for arg in ['may-include-header', 'can-externalize-fun', 'shall-externalize-fun', 'shall-externalize-obj',
-                'modify-externalized-sym', 'modify-patched-func-sym', 'rename-rewritten-fun']:
-            ccp_args.append('--pol-cmd-{0}={1}/kgr-ccp-pol{0}'.format(arg, pol_path))
+                'modify-externalized-sym', 'rename-rewritten-fun']:
+            ccp_args.append('--pol-cmd-{0}={1}/kgr-ccp-pol-{0}.sh'.format(arg, pol_path))
 
-        ccp_args.extend('--compiler=xx86_64-gcc-9.1.0', '-i {}'.format(funcs),
-                        '-o {}'.format(str(lp_out)), '--', cmd)
+        ccp_args.append('--pol-cmd-modify-patched-fun-sym={}/kgr-ccp-pol-modify-patched-sym.sh'.format(pol_path))
 
-        completed = subprocess.run(ccp_args, cwd=odir, capture_output=True, text=True)
+        ccp_args.extend(['--compiler=x86_64-gcc-9.1.0', '-i', '{}'.format(funcs),
+                        '-o', '{}'.format(str(lp_out)), '--'])
+
+        ccp_args.extend(cmd.split(' '))
+
+        ccp_args = list(filter(None, ccp_args))
+
+        completed = subprocess.run(ccp_args, cwd=odir, text=True, capture_output=True)
+        if completed.returncode != 0:
+            raise ValueError('klp-ccp returned {}, stderr: {}'.format(completed.returncode, completed.stderr))
 
 		# Remove the local path prefix of the klp-ccp generated comments
 		#sed -i '/klp-ccp: from / s/\/[a-z].*sr\/src\/linux\(-[0-9]\+\(\.[0-9]\+\)*\)\+\///' \
@@ -86,14 +95,21 @@ class CCP:
             os.environ['KCP_READELF'] = jcs['readelf']
             os.environ['KCP_KBUILD_ODIR'] = jcs['odir']
             os.environ['KCP_KBUILD_SDIR'] = jcs['sdir']
-            os.environ['KCP_PATCHED_OBJECT'] = jcs['object']
+            os.environ['KCP_PATCHED_OBJ'] = jcs['object']
             os.environ['KCP_RENAME_PREFIX'] = jcs['rename_prefix']
 
-            for index, fname in jcs['files']:
-                print(cs, fname)
+            print(cs)
+
+            for index, fname in enumerate(jcs['files']):
+                print('\t', fname)
                 cmd = self.get_make_cmd(fname, jcs)
-                os.environ['KCP_WORK_DIR'] = jcs['work_dir'][index]
+                work_dir = jcs['work_dir'][index]
+                os.environ['KCP_WORK_DIR'] = work_dir
                 os.environ['KCP_IPA_CLONES_DUMP'] = jcs['ipa_clones'][index]
 
-                self.execute_ccp(jcs['odir'], fname, ','.join(jcs['files'][index]),
-                    jcs['work_dir'][index], cmd)
+                # remove any previously generated files
+                shutil.rmtree(work_dir, ignore_errors=True)
+                pathlib.Path(work_dir).mkdir(parents=True, exist_ok=True)
+
+                self.execute_ccp(jcs['odir'], fname, ','.join(jcs['files'][fname]),
+                                jcs['work_dir'][index], cmd)
