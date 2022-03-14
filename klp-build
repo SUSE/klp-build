@@ -7,18 +7,20 @@ import templ
 import ccp
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="The toolkit for livepatch developers")
+    parentparser = argparse.ArgumentParser(add_help=False)
+    parentparser.add_argument('--work-dir', type=str, default='',
+            help='Destination of the to be create bsc directory. This argument can be omitted if KLP_WORK_DIR environment variable is set to a proper directory.')
+    parentparser.add_argument('-b', '--bsc', type=int, required=True,
+            help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
 
-    sub = parser.add_subparsers(dest="command")
-    setup = sub.add_parser('setup-bsc')
+    parser = argparse.ArgumentParser(add_help=False)
+    sub = parser.add_subparsers(dest='commands')
+
+    setup = sub.add_parser('setup', parents = [parentparser])
     setup.add_argument('--data', type=str, default='',
             help='Livepatch data directory (kernel-rpms, ex-kernels, ipa-clones). You can omit this argument if KLP_DATA_DIR environment variable is set to a proper directory.')
-    setup.add_argument('--work-dir', type=str, default='',
-            help='Destination of the to be create bsc directory. This argument can be omitted if KLP_WORK_DIR environment variable is set to a proper directory.')
     setup.add_argument('--redownload', action='store_true',
             help='Replaces the currently used codestream.in file')
-    setup.add_argument('--bsc', type=str, required=True,
-            help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
     setup.add_argument('--cve', type=str, required=True,
             help='The CVE assigned to this livepatch')
     setup.add_argument('--conf', type=str,
@@ -26,20 +28,16 @@ def create_parser() -> argparse.ArgumentParser:
     setup.add_argument('--file-funcs', required=True, action='append', nargs='*',
             help='Kernel, file and functions to be livepatched. Can be set multiple times. '
             'The format is --file-funcs 4.4 file/path.c func1 func2 --file-func 4.12 file/patch2 func1...')
-    setup.add_argument('-m', '--module', type=str,
+    setup.add_argument('--module', type=str,
             help='The module that will be livepatched')
     setup.add_argument('-u', '--upstream-commits', required=True,
             nargs='+', help='Commit hashes used to solve the CVE')
 
-    templ = sub.add_parser('create-lp')
-    templ.add_argument('--bsc', type=str, required=True,
-            help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
-    templ.add_argument('-t', '--type', type=str, required=True,
+    templ = sub.add_parser('create-lp', parents = [parentparser])
+    templ.add_argument('--type', type=str, required=True,
             help='The livepatch type, being kgraft (kgr) or klp', choices=['klp', 'kgr'])
 
-    ccp_opts = sub.add_parser('run-ccp')
-    ccp_opts.add_argument('--bsc', type=str, required=True,
-            help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
+    ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
 
     return parser
 
@@ -48,14 +46,14 @@ if  __name__ == '__main__':
     args = parser.parse_args()
 
     # FIXME: Maybe we should require --conf when --module is specified"
-
-    if args.command == 'setup-bsc':
+    if args.commands == 'setup':
         setup = utils.Setup(args.data, args.work_dir, args.redownload, args.bsc, args.cve,
                             args.conf, args.file_funcs, args.module, args.upstream_commits)
         setup.prepare_env()
-    elif args.command == 'create-lp':
+    elif args.commands == 'create-lp':
         templ = templ.Template(args.bsc, args.work_dir, args.type)
         templ.GenerateLivePatches()
-    elif args.command == 'run-ccp':
+
+    elif args.commands == 'run-ccp':
         ccp = ccp.CCP(args.bsc)
         ccp.run_ccp()
