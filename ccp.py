@@ -5,16 +5,17 @@ import re
 import shutil
 import subprocess
 
-import sys
-
 class CCP:
     _cs = None
+    _conf = None
 
     def __init__(self, bsc, work_dir):
-        bsc_dir = 'bsc' + str(bsc)
-        cs_file = pathlib.Path(work_dir, bsc_dir, 'codestreams.json')
-        with open(cs_file, 'r') as f:
+        bsc_path = pathlib.Path(work_dir, 'bsc' + str(bsc))
+        with open(pathlib.Path(bsc_path, 'codestreams.json')) as f:
             self._cs = json.loads(f.read())
+
+        with open(pathlib.Path(bsc_path, 'conf.json')) as f:
+            self._conf = json.loads(f.read())
 
     def process_make_output(self, filename, output, sle, sp):
         fname = str(filename)
@@ -37,7 +38,7 @@ class CCP:
         output = output.replace('-fdump-ipa-clones', '')
 
         if int(sle) >= 15 and int(sp) >= 2:
-            output = output + ' -D_Static_assert(e,m)='
+            output += ' -D_Static_assert(e,m)='
 
         return output
 
@@ -45,15 +46,17 @@ class CCP:
         filename = pathlib.PurePath(filename)
         file_ = filename.with_suffix('.o')
         completed = subprocess.run(['make', '-sn', file_], cwd=jcs['odir'], capture_output=True, text=True)
+        if completed.returncode != 0:
+            raise RuntimeError('klp-ccp returned {}, stderr: {}'.format(completed.returncode, completed.stderr))
         return self.process_make_output(filename, completed.stdout, jcs['sle'], jcs['sp'])
 
-    def execute_ccp(self, odir, sdir, fname, funcs, work_dir, cmd):
+    def execute_ccp(self, jcs, fname, funcs, work_dir):
         # extract the last component of the path, like the basename bash # function
-        fname = pathlib.PurePath(fname).name
+        fname_ = pathlib.PurePath(fname).name
 
         ccp_path = '/home/mpdesouza/kgr/ccp/build/klp-ccp'
         pol_path = '/home/mpdesouza/kgr/scripts/ccp-pol'
-        lp_out = pathlib.Path(work_dir, fname)
+        lp_out = pathlib.Path(work_dir, fname_)
 
         ccp_args = [ccp_path]
         for arg in ['may-include-header', 'can-externalize-fun', 'shall-externalize-fun', 'shall-externalize-obj',
@@ -65,29 +68,56 @@ class CCP:
         ccp_args.extend(['--compiler=x86_64-gcc-9.1.0', '-i', '{}'.format(funcs),
                         '-o', '{}'.format(str(lp_out)), '--'])
 
-        ccp_args.extend(cmd.split(' '))
+        ccp_args.extend(self.get_make_cmd(fname, jcs).split(' '))
 
         ccp_args = list(filter(None, ccp_args))
 
-        completed = subprocess.run(ccp_args, cwd=odir, text=True, capture_output=True)
+        completed = subprocess.run(ccp_args, cwd=jcs['odir'], text=True, capture_output=True)
         if completed.returncode != 0:
             raise ValueError('klp-ccp returned {}, stderr: {}'.format(completed.returncode, completed.stderr))
 
 		# Remove the local path prefix of the klp-ccp generated comments
-        file_buf = None
         # Open the file, read, seek to the beginning, write the new data, and
         # then truncate (which will use the current position in file as the
         # size)
         with open(str(lp_out), 'r+') as f:
             file_buf = f.read()
             f.seek(0)
-            f.write(file_buf.replace(sdir + '/', ''))
+            f.write(file_buf.replace(jcs['sdir'] + '/', ''))
             f.truncate()
 
 		# Generate the list of exported symbols
-		#for f in `ls $work_dir/{fun,obj}_exts`; do
-		#	~/kgr/scripts/kgr-format-kallsyms-exts.pl $f >> ${LP_SRC}.exts
-		#done
+        exts = []
+        mod = self._conf['mod']
+        mod_len = len(mod) if mod else 0
+
+        for ext_file in ['fun_exts', 'obj_exts']:
+            ext_path = pathlib.Path(work_dir, ext_file)
+            if not ext_path.exists():
+                continue
+
+            with open(ext_path) as f:
+                for line in f:
+                    if not line.startswith('KALLSYMS'):
+                        continue
+                    _, sym, var, _ = line.split(' ')
+                    exts.append( (sym, var) )
+
+        exts.sort(key=lambda tup : tup[0])
+
+        ext_list = []
+        for ext in exts:
+            sym, var = ext
+            buf = '\t{{ "{}", (void *)&{}'.format(sym, var)
+            if mod:
+                buf += ', "{}" }},\n'.format(mod)
+            else:
+                buf += ' }},\n'.format(var)
+
+            ext_list.append(buf)
+
+        with open(pathlib.Path(work_dir, 'exts'), 'w') as f:
+            f.writelines(ext_list)
 
     def run_ccp(self):
         # the current blacklisted function, more can be added as necessary
@@ -109,7 +139,6 @@ class CCP:
 
             for index, fname in enumerate(jcs['files']):
                 print('\t', fname)
-                cmd = self.get_make_cmd(fname, jcs)
                 work_dir = jcs['work_dir'][index]
                 os.environ['KCP_WORK_DIR'] = work_dir
                 os.environ['KCP_IPA_CLONES_DUMP'] = jcs['ipa_clones'][index]
@@ -118,5 +147,5 @@ class CCP:
                 shutil.rmtree(work_dir, ignore_errors=True)
                 pathlib.Path(work_dir).mkdir(parents=True, exist_ok=True)
 
-                self.execute_ccp(jcs['odir'], jcs['sdir'], fname, ','.join(jcs['files'][fname]),
-                                jcs['work_dir'][index], cmd)
+                self.execute_ccp(jcs, fname, ','.join(jcs['files'][fname]),
+                                jcs['work_dir'][index])
