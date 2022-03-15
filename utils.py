@@ -30,7 +30,7 @@ class Setup:
 
         self._work = work_dir
 
-        self._bsc_num = str(bsc)
+        self._bsc_num = bsc
         self._bsc = 'bsc' + str(bsc)
         self._bsc_path = pathlib.Path(self._work, self._bsc)
         if self._bsc_path.exists() and not self._bsc_path.is_dir():
@@ -270,7 +270,7 @@ class Setup:
                 self._commits[bc][cmt] = ''
 
     def write_json_files(self):
-        data = { 'bsc' : self._bsc_num,
+        data = { 'bsc' : str(self._bsc_num),
                 'cve' : self._cve,
                 'conf' : self._conf,
                 'mod' : self._mod,
@@ -285,7 +285,7 @@ class Setup:
             f.write(json.dumps(self._cs_json, indent=4))
 
     def write_commit_file(self):
-        temp = templ.Template(self._bsc, self._work, 'klp')
+        temp = templ.Template(str(self._bsc_num), self._work, 'klp')
         msg = temp.generate_commit_msg()
 
         with open(pathlib.Path(self._bsc_path, 'commit.msg'), 'w') as f:

@@ -12,7 +12,7 @@ class CCP:
 
     def __init__(self, bsc, work_dir):
         bsc_dir = 'bsc' + str(bsc)
-        cs_file = pathlib.Path(work_dir, bsc, 'codestreams.json')
+        cs_file = pathlib.Path(work_dir, bsc_dir, 'codestreams.json')
         with open(cs_file, 'r') as f:
             self._cs = json.loads(f.read())
 
@@ -47,7 +47,7 @@ class CCP:
         completed = subprocess.run(['make', '-sn', file_], cwd=jcs['odir'], capture_output=True, text=True)
         return self.process_make_output(filename, completed.stdout, jcs['sle'], jcs['sp'])
 
-    def execute_ccp(self, odir, fname, funcs, work_dir, cmd):
+    def execute_ccp(self, odir, sdir, fname, funcs, work_dir, cmd):
         # extract the last component of the path, like the basename bash # function
         fname = pathlib.PurePath(fname).name
 
@@ -74,8 +74,15 @@ class CCP:
             raise ValueError('klp-ccp returned {}, stderr: {}'.format(completed.returncode, completed.stderr))
 
 		# Remove the local path prefix of the klp-ccp generated comments
-		#sed -i '/klp-ccp: from / s/\/[a-z].*sr\/src\/linux\(-[0-9]\+\(\.[0-9]\+\)*\)\+\///' \
-		#	$LP_SRC
+        file_buf = None
+        # Open the file, read, seek to the beginning, write the new data, and
+        # then truncate (which will use the current position in file as the
+        # size)
+        with open(str(lp_out), 'r+') as f:
+            file_buf = f.read()
+            f.seek(0)
+            f.write(file_buf.replace(sdir + '/', ''))
+            f.truncate()
 
 		# Generate the list of exported symbols
 		#for f in `ls $work_dir/{fun,obj}_exts`; do
@@ -111,5 +118,5 @@ class CCP:
                 shutil.rmtree(work_dir, ignore_errors=True)
                 pathlib.Path(work_dir).mkdir(parents=True, exist_ok=True)
 
-                self.execute_ccp(jcs['odir'], fname, ','.join(jcs['files'][fname]),
+                self.execute_ccp(jcs['odir'], jcs['sdir'], fname, ','.join(jcs['files'][fname]),
                                 jcs['work_dir'][index], cmd)

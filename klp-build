@@ -55,5 +55,5 @@ if  __name__ == '__main__':
         templ.GenerateLivePatches()
 
     elif args.commands == 'run-ccp':
-        ccp = ccp.CCP(args.bsc)
+        ccp = ccp.CCP(args.bsc, args.work_dir)
         ccp.run_ccp()
