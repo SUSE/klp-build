@@ -83,7 +83,7 @@ class CCP:
         with open(str(lp_out), 'r+') as f:
             file_buf = f.read()
             f.seek(0)
-            f.write(file_buf.replace(jcs['sdir'] + '/', ''))
+            f.write(file_buf.replace('from ' + jcs['sdir'] + '/', 'from '))
             f.truncate()
 
 		# Generate the list of exported symbols
