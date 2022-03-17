@@ -7,21 +7,32 @@
 #if !IS_MODULE({{ config }})
 #error "Live patch supports only CONFIG=m"
 #endif
-{% endif -%}
+{% endif %}
+
+
+
+
+{% if inc_src_file is not none -%}
+{% include inc_src_file %}
+{% endif %}
+
+
+
+
+
+{% if mod is defined %}#define LP_MODULE "{{ mod }}"{% endif %}
 
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include "{{ fname }}.h"
 #include "../kallsyms_relocs.h"
 
-{% if mod is defined %}#define LP_MODULE "{{ mod }}"{% endif %}
-
-
-
-
 static struct {{ ktype }}_kallsyms_reloc {{ ktype }}_funcs[] = {
-{% if mod is defined %}
-	{ "", (void *)&, "{{ mod }}" },
+{% if inc_exts_file is not none -%}
+{% include inc_exts_file %}
+
+{% elif mod is defined %}
+	{ "", (void *)&, LP_MODULE },
 {% else %}
 	{ "", (void *)&},
 {% endif %}
