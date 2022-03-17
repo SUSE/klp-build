@@ -10,7 +10,8 @@ class CCP:
     _conf = None
 
     def __init__(self, bsc, work_dir):
-        bsc_path = pathlib.Path(work_dir, 'bsc' + str(bsc))
+        self._bsc_str = 'bsc' + str(bsc)
+        bsc_path = pathlib.Path(work_dir, self._bsc_str)
         with open(pathlib.Path(bsc_path, 'codestreams.json')) as f:
             self._cs = json.loads(f.read())
 
@@ -52,7 +53,7 @@ class CCP:
 
     def execute_ccp(self, jcs, fname, funcs, work_dir):
         # extract the last component of the path, like the basename bash # function
-        fname_ = pathlib.PurePath(fname).name
+        fname_ = self._bsc_str + '_' + pathlib.PurePath(fname).name
 
         ccp_path = '/home/mpdesouza/kgr/ccp/build/klp-ccp'
         pol_path = '/home/mpdesouza/kgr/scripts/ccp-pol'
