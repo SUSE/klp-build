@@ -33,11 +33,11 @@ def create_parser() -> argparse.ArgumentParser:
     setup.add_argument('-u', '--upstream-commits', required=True,
             nargs='+', help='Commit hashes used to solve the CVE')
 
-    templ = sub.add_parser('create-lp', parents = [parentparser])
-    templ.add_argument('--type', type=str, required=True,
-            help='The livepatch type, being kgraft (kgr) or klp', choices=['klp', 'kgr'])
-
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
+
+    templ = sub.add_parser('create-lp', parents = [parentparser])
+    templ.add_argument('--codestream', type=str, required=True,
+            help='Codestream to generate the livepatch files to. E.g 15.2u12')
 
     return parser
 
@@ -50,10 +50,11 @@ if  __name__ == '__main__':
         setup = utils.Setup(args.data, args.work_dir, args.redownload, args.bsc, args.cve,
                             args.conf, args.file_funcs, args.module, args.upstream_commits)
         setup.prepare_env()
-    elif args.commands == 'create-lp':
-        templ = templ.Template(args.bsc, args.work_dir, args.type)
-        templ.GenerateLivePatches()
 
     elif args.commands == 'run-ccp':
         ccp = ccp.CCP(args.bsc, args.work_dir)
         ccp.run_ccp()
+
+    elif args.commands == 'create-lp':
+        templ = templ.Template(args.bsc, args.work_dir, args.codestream)
+        templ.GenerateLivePatches()
