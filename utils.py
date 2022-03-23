@@ -156,18 +156,15 @@ class Setup:
         cs_dir.mkdir(parents=True, exist_ok=True)
 
         ex_dir = pathlib.Path(self._ex_dir, full_cs)
-        ipa_dir = pathlib.Path(self._ipa_dir, full_cs)
 
         # Create a work_{file}.c structure to be used in run-ccp.sh
         work_paths = []
-        ipa_src = []
         srcs = []
         funcs = []
         for src in jcs['files'].keys():
             srcs.append(src)
             # join all functions separated by comma, as requested by ccp
             funcs.append(','.join(jcs['files'][src]))
-            ipa_src.append(str(pathlib.Path(ipa_dir, 'x86_64', src + '.000i.ipa-clones')))
 
             work_dir = 'work_' + pathlib.Path(src).name
             work_path = pathlib.Path(cs_dir, work_dir)
@@ -205,7 +202,7 @@ class Setup:
         jcs['odir'] = str(odir)
         jcs['symvers'] = str(pathlib.Path(odir, 'Module.symvers'))
         jcs['object'] = str(obj)
-        jcs['ipa_clones'] = ipa_src
+        jcs['ipa_dir'] = str(self._ipa_dir)
 
     def prepare_bsc_dirs(self):
         if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
