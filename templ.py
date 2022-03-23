@@ -27,12 +27,14 @@ class Template:
             self._conf = data['conf']
             self._commits = data['commits']
 
-        with open(codestreams, 'r') as f:
-            data = json.load(f)
-            jcs = data[cs]
-            self._ktype = jcs['rename_prefix']
-            self._files = list(jcs['files'].keys())
-            self._work_dirs = jcs['work_dir']
+        if cs:
+            with open(codestreams, 'r') as f:
+                data = json.load(f)
+                print(cs)
+                jcs = data[cs]
+                self._ktype = jcs['rename_prefix']
+                self._files = list(jcs['files'].keys())
+                self._work_dirs = jcs['work_dir']
 
         try:
             conf = git.GitConfigParser()

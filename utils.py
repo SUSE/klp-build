@@ -285,7 +285,7 @@ class Setup:
             f.write(json.dumps(self._cs_json, indent=4))
 
     def write_commit_file(self):
-        temp = templ.Template(str(self._bsc_num), self._work, 'klp')
+        temp = templ.Template(str(self._bsc_num), self._work, None)
         msg = temp.generate_commit_msg()
 
         with open(pathlib.Path(self._bsc_path, 'commit.msg'), 'w') as f:
