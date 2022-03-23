@@ -97,6 +97,9 @@ class Setup:
                 f.write(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,rpm-' + kernel + '\n')
 
     def fill_cs_json(self):
+        if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
+            raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
+
         files = {}
         for f in self._file_funcs:
             cs = f[0]
@@ -109,24 +112,54 @@ class Setup:
         kernels = []
         with open(self._cs_file, 'r') as f:
             for line in f:
-                columns = line.strip().split(',')
-                kernel = re.sub('\.\d+$', '', columns[2])
+                full_cs, proj, kernel_full, _, _= line.strip().split(',')
 
-                sle, _, u = columns[0].replace('SLE', '').split('_')
+                ex_dir = pathlib.Path(self._ex_dir, full_cs)
+                src = pathlib.Path(ex_dir, 'usr', 'src')
+
+                kernel = re.sub('\.\d+$', '', kernel_full)
+                sdir = pathlib.Path(src, 'linux-' + kernel)
+                odir = pathlib.Path(src, 'linux-' + kernel + '-obj', 'x86_64', 'default')
+                symvers = pathlib.Path(odir, 'Module.symvers')
+
+                if not self._mod:
+                    obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +
+                            kernel.replace('linux-', '') + '-default')
+                else:
+                    mod_file = self._mod + '.ko'
+                    obj_path = pathlib.Path(ex_dir, 'x86_64', 'lib', 'modules')
+                    obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
+
+                    if not obj or len(obj) > 1:
+                        raise RuntimeError('Module list has none or too much entries: ' + str(obj))
+                    # Grab the only value of the list and turn obj into a string to be
+                    # used later
+                    obj = obj[0]
+
+                sle, _, u = full_cs.replace('SLE', '').split('_')
                 if '-SP' in sle:
                     sle, sp = sle.split('-SP')
                 else:
                     sle, sp = sle, '0'
                 cs_key = sle + '.' + sp + 'u' + u
+
                 self._cs_json[cs_key] = {
-                    'project' : columns[1],
+                    'project' : proj,
                     'kernel' : kernel,
-                    'micro-version' : columns[2][-1],
+                    'micro-version' : kernel_full[-1],
                     'branch' : '',
-                    'cs' : columns[0],
+                    'cs' : full_cs,
                     'sle' : sle,
                     'sp' : sp,
-                    'update' : u
+                    'update' : u,
+                    'readelf' : 'readelf',
+                    'rename_prefix' : self.get_rename_prefix(cs),
+                    'work_dir' : str(self._bsc_path),
+                    'sdir' : str(sdir),
+                    'odir' : str(odir),
+                    'symvers' : str(pathlib.Path(odir, 'Module.symvers')),
+                    'object' : str(obj),
+                    'ipa_dir' : str(self._ipa_dir)
                 }
 
                 # do not expect any problems with the kernel release format
@@ -145,51 +178,6 @@ class Setup:
         # branches for find the fixes for each codestreams in kernel-source
         # later on
         self._cve_branches = list(dict.fromkeys(kernels))
-
-    def prepare_dirs(self, cs):
-        jcs = self._cs_json[cs]
-
-        ex_dir = pathlib.Path(self._ex_dir, jcs['cs'])
-
-        kernel = jcs['kernel']
-
-        src = pathlib.Path(ex_dir, 'usr', 'src')
-        sdir = pathlib.Path(src, 'linux-' + kernel)
-        odir = pathlib.Path(src, 'linux-' + kernel + '-obj', 'x86_64', 'default')
-        symvers = pathlib.Path(odir, 'Module.symvers')
-
-        if not self._mod:
-            obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +
-                    kernel.replace('linux-', '') + '-default')
-        else:
-            mod_file = self._mod + '.ko'
-            obj_path = pathlib.Path(ex_dir, 'x86_64', 'lib', 'modules')
-            obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
-
-            if not obj or len(obj) > 1:
-                raise RuntimeError('Module list has none or too much entries: ' + str(obj))
-            # Grab the only value of the list and turn obj into a string to be
-            # used later
-            obj = obj[0]
-
-        jcs['readelf'] = 'readelf'
-        jcs['rename_prefix'] = self.get_rename_prefix(cs)
-        jcs['work_dir'] = str(self._bsc_path)
-        jcs['sdir'] = str(sdir)
-        jcs['odir'] = str(odir)
-        jcs['symvers'] = str(pathlib.Path(odir, 'Module.symvers'))
-        jcs['object'] = str(obj)
-        jcs['ipa_dir'] = str(self._ipa_dir)
-
-    def prepare_bsc_dirs(self):
-        if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
-            raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
-
-        # Create the necessary directories for each codestream skipping the
-        # codestreams without any files associated
-        for cs in self._cs_json.keys():
-            if self._cs_json[cs]['files']:
-                self.prepare_dirs(cs)
 
     def get_commit_subject(self, commit):
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
@@ -257,7 +245,6 @@ class Setup:
 
         self.fill_cs_json()
 
-        self.prepare_bsc_dirs()
         self.get_commits()
         self.write_json_files()
         self.write_commit_file()
