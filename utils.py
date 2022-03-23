@@ -58,7 +58,7 @@ class Setup:
         self._ipa_dir = pathlib.Path(self._env, 'ipa-clones')
 
     def get_rename_prefix(self, cs):
-        if 'SLE12-SP3' in cs:
+        if '12.3' in cs:
             return 'kgr'
         return 'klp'
 
@@ -149,30 +149,7 @@ class Setup:
     def prepare_dirs(self, cs):
         jcs = self._cs_json[cs]
 
-        # Use the old full codestream name to avoid problems for now
-        full_cs = jcs['cs']
-
-        cs_dir = pathlib.Path(self._bsc_path, 'c', full_cs, 'x86_64')
-        cs_dir.mkdir(parents=True, exist_ok=True)
-
-        ex_dir = pathlib.Path(self._ex_dir, full_cs)
-
-        # Create a work_{file}.c structure to be used in run-ccp.sh
-        work_paths = []
-        srcs = []
-        funcs = []
-        for src in jcs['files'].keys():
-            srcs.append(src)
-            # join all functions separated by comma, as requested by ccp
-            funcs.append(','.join(jcs['files'][src]))
-
-            work_dir = 'work_' + pathlib.Path(src).name
-            work_path = pathlib.Path(cs_dir, work_dir)
-
-            # recreate the directory to run ccp on it
-            work_path.mkdir(parents=True, exist_ok=True)
-
-            work_paths.append(str(work_path))
+        ex_dir = pathlib.Path(self._ex_dir, jcs['cs'])
 
         kernel = jcs['kernel']
 
@@ -196,8 +173,8 @@ class Setup:
             obj = obj[0]
 
         jcs['readelf'] = 'readelf'
-        jcs['rename_prefix'] = self.get_rename_prefix(full_cs)
-        jcs['work_dir'] = work_paths
+        jcs['rename_prefix'] = self.get_rename_prefix(cs)
+        jcs['work_dir'] = str(self._bsc_path)
         jcs['sdir'] = str(sdir)
         jcs['odir'] = str(odir)
         jcs['symvers'] = str(pathlib.Path(odir, 'Module.symvers'))

@@ -143,18 +143,19 @@ class CCP:
             print(cs)
 
             ipa_dir = pathlib.Path(jcs['ipa_dir'], jcs['cs'], 'x86_64')
+            work_path = pathlib.Path(jcs['work_dir'], 'c', jcs['cs'], 'x86_64')
 
             for index, fname in enumerate(jcs['files']):
                 print('\t', fname)
-                work_dir = jcs['work_dir'][index]
-                os.environ['KCP_WORK_DIR'] = work_dir
-                ipa_file_path = pathlib.Path(ipa_dir, fname + '.000i.ipa-clones')
-                os.environ['KCP_IPA_CLONES_DUMP'] = str(ipa_file_path)
-                print(ipa_file_path)
 
+                work_dir = pathlib.Path(work_path, 'work_' + pathlib.Path(fname).name)
                 # remove any previously generated files
                 shutil.rmtree(work_dir, ignore_errors=True)
-                pathlib.Path(work_dir).mkdir(parents=True, exist_ok=True)
+                work_dir.mkdir(parents=True, exist_ok=True)
+                os.environ['KCP_WORK_DIR'] = str(work_dir)
+
+                ipa_file_path = pathlib.Path(ipa_dir, fname + '.000i.ipa-clones')
+                os.environ['KCP_IPA_CLONES_DUMP'] = str(ipa_file_path)
 
                 self.execute_ccp(jcs, fname, ','.join(jcs['files'][fname]),
-                                jcs['work_dir'][index])
+                                work_dir)
