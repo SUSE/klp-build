@@ -74,7 +74,7 @@ int {{ fname }}_init(void)
 			goto out;
 	}
 
-	ret = register_module_notifier(&{{ fname }}_{{ bsc }}_module_nb);
+	ret = register_module_notifier(&{{ fname }}_module_nb);
 out:
 	mutex_unlock(&module_mutex);
 	return ret;
