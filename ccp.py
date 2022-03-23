@@ -89,8 +89,6 @@ class CCP:
 
 		# Generate the list of exported symbols
         exts = []
-        mod = self._conf['mod']
-        mod_len = len(mod) if mod else 0
 
         for ext_file in ['fun_exts', 'obj_exts']:
             ext_path = pathlib.Path(work_dir, ext_file)
@@ -101,17 +99,17 @@ class CCP:
                 for line in f:
                     if not line.startswith('KALLSYMS'):
                         continue
-                    _, sym, var, _ = line.split(' ')
-                    exts.append( (sym, var) )
+                    _, sym, var, mod = line.split(' ')
+                    exts.append( (sym, var, mod) )
 
         exts.sort(key=lambda tup : tup[0])
 
         ext_list = []
         for ext in exts:
-            sym, var = ext
+            sym, var, mod = ext
             buf = '\t{{ "{}", (void *)&{}'.format(sym, var)
             if mod:
-                buf += ', "{}" }},\n'.format(mod)
+                buf += ', "{}" }},\n'.format(mod.strip())
             else:
                 buf += ' }},\n'.format(var)
 
