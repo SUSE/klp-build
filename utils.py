@@ -146,7 +146,7 @@ class Setup:
         # later on
         self._cve_branches = list(dict.fromkeys(kernels))
 
-    def write_setup_script(self, cs):
+    def prepare_dirs(self, cs):
         jcs = self._cs_json[cs]
 
         # Use the old full codestream name to avoid problems for now
@@ -154,8 +154,6 @@ class Setup:
 
         cs_dir = pathlib.Path(self._bsc_path, 'c', full_cs, 'x86_64')
         cs_dir.mkdir(parents=True, exist_ok=True)
-
-        setup = pathlib.Path(cs_dir, 'setup.sh')
 
         ex_dir = pathlib.Path(self._ex_dir, full_cs)
         ipa_dir = pathlib.Path(self._ipa_dir, full_cs)
@@ -172,7 +170,7 @@ class Setup:
             ipa_src.append(str(pathlib.Path(ipa_dir, 'x86_64', src + '.000i.ipa-clones')))
 
             work_dir = 'work_' + pathlib.Path(src).name
-            work_path = pathlib.Path(setup.with_name(work_dir))
+            work_path = pathlib.Path(cs_dir, work_dir)
 
             # recreate the directory to run ccp on it
             work_path.mkdir(parents=True, exist_ok=True)
@@ -200,20 +198,6 @@ class Setup:
             # used later
             obj = obj[0]
 
-        with setup.open('w') as f:
-            f.write('export KCP_FUNC="{}"\n'.format(';'.join(funcs)))
-            f.write('export KCP_PATCHED_SRC="{}"\n'.format(';'.join(srcs)))
-            #f.write('export KCP_DEST={}\n'.format(str(dest)))
-            # FIXME: check which readelf to use
-            f.write('export KCP_READELF={}\n'.format('readelf'))
-            f.write('export KCP_RENAME_PREFIX={}\n'.format(self.get_rename_prefix(full_cs)))
-            f.write('export KCP_WORK_DIR="{}"\n'.format(';'.join(work_paths)))
-            f.write('export KCP_KBUILD_SDIR={}\n'.format(sdir))
-            f.write('export KCP_KBUILD_ODIR={}\n'.format(odir))
-            f.write('export KCP_MOD_SYMVERS={}\n'.format(symvers))
-            f.write('export KCP_PATCHED_OBJ={}\n'.format(obj))
-            f.write('export KCP_IPA_CLONES_DUMP="{}"\n'.format(';'.join(ipa_src)))
-
         jcs['readelf'] = 'readelf'
         jcs['rename_prefix'] = self.get_rename_prefix(full_cs)
         jcs['work_dir'] = work_paths
@@ -227,11 +211,11 @@ class Setup:
         if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
             raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
 
-        # Create the necessary directories for each codestream and populate the
-        # setup.sh script, skipping the codestreams without any files associated
+        # Create the necessary directories for each codestream skipping the
+        # codestreams without any files associated
         for cs in self._cs_json.keys():
             if self._cs_json[cs]['files']:
-                self.write_setup_script(cs)
+                self.prepare_dirs(cs)
 
     def get_commit_subject(self, commit):
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
