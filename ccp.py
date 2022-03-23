@@ -18,6 +18,9 @@ class CCP:
         with open(pathlib.Path(bsc_path, 'conf.json')) as f:
             self._conf = json.loads(f.read())
 
+    def unquote_output(self, matchobj):
+        return matchobj.group(0).replace('"', '')
+
     def process_make_output(self, filename, output, sle, sp):
         fname = str(filename)
 
@@ -33,6 +36,9 @@ class CCP:
         # some strings  have single quotes around double quotes, so remove the
         # outer quotes
         output = result.group(1).replace('\'', '')
+
+        # also remove double quotes from macros like -D"KBUILD....=.."
+        output = re.sub('-D"KBUILD_([\w\#\_\=\(\)])+"', self.unquote_output, output)
 
         # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
         output = output.replace('-flive-patching=inline-clone', '')
@@ -75,7 +81,7 @@ class CCP:
 
         completed = subprocess.run(ccp_args, cwd=jcs['odir'], text=True, capture_output=True)
         if completed.returncode != 0:
-            raise ValueError('klp-ccp returned {}, stderr: {}'.format(completed.returncode, completed.stderr))
+            raise ValueError('klp-ccp returned {}, stderr: {}\nArgs: {}'.format(completed.returncode, completed.stderr, ' '.join(ccp_args)))
 
 		# Remove the local path prefix of the klp-ccp generated comments
         # Open the file, read, seek to the beginning, write the new data, and
