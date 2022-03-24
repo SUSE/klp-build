@@ -9,9 +9,9 @@ class CCP:
     _cs = None
     _conf = None
 
-    def __init__(self, bsc, work_dir):
+    def __init__(self, bsc, work_path):
         self._bsc_str = 'bsc' + str(bsc)
-        bsc_path = pathlib.Path(work_dir, self._bsc_str)
+        bsc_path = pathlib.Path(work_path, self._bsc_str)
         with open(pathlib.Path(bsc_path, 'codestreams.json')) as f:
             self._cs = json.loads(f.read())
 
@@ -57,13 +57,13 @@ class CCP:
             raise RuntimeError('klp-ccp returned {}, stderr: {}'.format(completed.returncode, completed.stderr))
         return self.process_make_output(filename, completed.stdout, jcs['sle'], jcs['sp'])
 
-    def execute_ccp(self, jcs, fname, funcs, work_dir, sdir, odir):
+    def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir):
         # extract the last component of the path, like the basename bash # function
         fname_ = self._bsc_str + '_' + pathlib.PurePath(fname).name
 
         ccp_path = '/home/mpdesouza/kgr/ccp/build/klp-ccp'
         pol_path = '/home/mpdesouza/kgr/scripts/ccp-pol'
-        lp_out = pathlib.Path(work_dir, fname_)
+        lp_out = pathlib.Path(out_dir, fname_)
 
         ccp_args = [ccp_path]
         for arg in ['may-include-header', 'can-externalize-fun', 'shall-externalize-fun', 'shall-externalize-obj',
@@ -97,7 +97,7 @@ class CCP:
         exts = []
 
         for ext_file in ['fun_exts', 'obj_exts']:
-            ext_path = pathlib.Path(work_dir, ext_file)
+            ext_path = pathlib.Path(out_dir, ext_file)
             if not ext_path.exists():
                 continue
 
@@ -121,7 +121,7 @@ class CCP:
 
             ext_list.append(buf)
 
-        with open(pathlib.Path(work_dir, 'exts'), 'w') as f:
+        with open(pathlib.Path(out_dir, 'exts'), 'w') as f:
             f.writelines(ext_list)
 
     def run_ccp(self):
@@ -140,7 +140,7 @@ class CCP:
             sdir = pathlib.Path(ex, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
             odir = pathlib.Path(str(sdir) + '-obj', 'x86_64', 'default')
             symvers = pathlib.Path(odir, 'Module.symvers')
-            work_path = pathlib.Path(jcs['work_dir'], 'c', jcs['cs'], 'x86_64')
+            work_path = pathlib.Path(self._conf['work_dir'], 'c', cs, 'x86_64')
 
             os.environ['KCP_MOD_SYMVERS'] = str(symvers)
             os.environ['KCP_READELF'] = jcs['readelf']
@@ -154,14 +154,14 @@ class CCP:
             for fname in jcs['files']:
                 print('\t', fname)
 
-                work_dir = pathlib.Path(work_path, 'work_' + pathlib.Path(fname).name)
+                out_dir = pathlib.Path(work_path, 'work_' + pathlib.Path(fname).name)
                 # remove any previously generated files
-                shutil.rmtree(work_dir, ignore_errors=True)
-                work_dir.mkdir(parents=True, exist_ok=True)
-                os.environ['KCP_WORK_DIR'] = str(work_dir)
+                shutil.rmtree(out_dir, ignore_errors=True)
+                out_dir.mkdir(parents=True, exist_ok=True)
+                os.environ['KCP_WORK_DIR'] = str(out_dir)
 
                 ipa_file_path = pathlib.Path(ipa_dir, fname + '.000i.ipa-clones')
                 os.environ['KCP_IPA_CLONES_DUMP'] = str(ipa_file_path)
 
                 self.execute_ccp(jcs, fname, ','.join(jcs['files'][fname]),
-                                work_dir, sdir, odir)
+                                out_dir, sdir, odir)

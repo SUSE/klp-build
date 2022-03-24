@@ -151,7 +151,6 @@ class Setup:
                     'update' : u,
                     'readelf' : 'readelf',
                     'rename_prefix' : self.get_rename_prefix(cs),
-                    'work_dir' : str(self._bsc_path),
                     'object' : str(obj)
                 }
 
@@ -216,7 +215,8 @@ class Setup:
                 'cve_branches' : self._cve_branches,
                 'commits' : self._commits,
                 'ex_kernels' : str(self._ex_dir),
-                'ipa_clones' : str(self._ipa_dir)
+                'ipa_clones' : str(self._ipa_dir),
+                'work_dir' : str(self._bsc_path)
         }
 
         with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
