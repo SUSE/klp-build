@@ -78,6 +78,7 @@ class Template:
         with open(pathlib.Path(self._bsc, out_name).with_suffix('.' + ext), 'w') as f:
             f.write(templ.render(bsc = self._bsc,
                                 bsc_num = self._bsc_num,
+                                fname = os.path.splitext(out_name)[0],
                                 inc_src_file = lp_file,
                                 inc_exts_file = ext_file,
                                 cve = self._cve,

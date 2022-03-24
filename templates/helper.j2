@@ -1,9 +1,3 @@
-{% if ktype == 'klp' %}
-{% set fname = 'livepatch_' + bsc %}
-{% else %}
-{% set fname = 'kgr_patch_' + bsc %}
-{% endif %}
-
 {% macro get_commits(codestream) -%}
 {% if not commits[codestream] -%}
  *  Not affected
