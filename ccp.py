@@ -49,15 +49,15 @@ class CCP:
 
         return output
 
-    def get_make_cmd(self, filename, jcs):
+    def get_make_cmd(self, filename, jcs, odir):
         filename = pathlib.PurePath(filename)
         file_ = filename.with_suffix('.o')
-        completed = subprocess.run(['make', '-sn', file_], cwd=jcs['odir'], capture_output=True, text=True)
+        completed = subprocess.run(['make', '-sn', file_], cwd=odir, capture_output=True, text=True)
         if completed.returncode != 0:
             raise RuntimeError('klp-ccp returned {}, stderr: {}'.format(completed.returncode, completed.stderr))
         return self.process_make_output(filename, completed.stdout, jcs['sle'], jcs['sp'])
 
-    def execute_ccp(self, jcs, fname, funcs, work_dir):
+    def execute_ccp(self, jcs, fname, funcs, work_dir, sdir, odir):
         # extract the last component of the path, like the basename bash # function
         fname_ = self._bsc_str + '_' + pathlib.PurePath(fname).name
 
@@ -75,11 +75,11 @@ class CCP:
         ccp_args.extend(['--compiler=x86_64-gcc-9.1.0', '-i', '{}'.format(funcs),
                         '-o', '{}'.format(str(lp_out)), '--'])
 
-        ccp_args.extend(self.get_make_cmd(fname, jcs).split(' '))
+        ccp_args.extend(self.get_make_cmd(fname, jcs, odir).split(' '))
 
         ccp_args = list(filter(None, ccp_args))
 
-        completed = subprocess.run(ccp_args, cwd=jcs['odir'], text=True, capture_output=True)
+        completed = subprocess.run(ccp_args, cwd=odir, text=True, capture_output=True)
         if completed.returncode != 0:
             raise ValueError('klp-ccp returned {}, stderr: {}\nArgs: {}'.format(completed.returncode, completed.stderr, ' '.join(ccp_args)))
 
@@ -90,7 +90,7 @@ class CCP:
         with open(str(lp_out), 'r+') as f:
             file_buf = f.read()
             f.seek(0)
-            f.write(file_buf.replace('from ' + jcs['sdir'] + '/', 'from '))
+            f.write(file_buf.replace('from ' + str(sdir) + '/', 'from '))
             f.truncate()
 
 		# Generate the list of exported symbols
@@ -133,19 +133,25 @@ class CCP:
             if not jcs['files']:
                 continue
 
-            os.environ['KCP_MOD_SYMVERS'] = jcs['symvers']
+            ex = self._conf['ex_kernels']
+            ipa = self._conf['ipa_clones']
+            ipa_dir = pathlib.Path(ipa, jcs['cs'], 'x86_64')
+
+            sdir = pathlib.Path(ex, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
+            odir = pathlib.Path(str(sdir) + '-obj', 'x86_64', 'default')
+            symvers = pathlib.Path(odir, 'Module.symvers')
+            work_path = pathlib.Path(jcs['work_dir'], 'c', jcs['cs'], 'x86_64')
+
+            os.environ['KCP_MOD_SYMVERS'] = str(symvers)
             os.environ['KCP_READELF'] = jcs['readelf']
-            os.environ['KCP_KBUILD_ODIR'] = jcs['odir']
-            os.environ['KCP_KBUILD_SDIR'] = jcs['sdir']
+            os.environ['KCP_KBUILD_ODIR'] = str(odir)
+            os.environ['KCP_KBUILD_SDIR'] = str(sdir)
             os.environ['KCP_PATCHED_OBJ'] = jcs['object']
             os.environ['KCP_RENAME_PREFIX'] = jcs['rename_prefix']
 
             print(cs)
 
-            ipa_dir = pathlib.Path(jcs['ipa_dir'], jcs['cs'], 'x86_64')
-            work_path = pathlib.Path(jcs['work_dir'], 'c', jcs['cs'], 'x86_64')
-
-            for index, fname in enumerate(jcs['files']):
+            for fname in jcs['files']:
                 print('\t', fname)
 
                 work_dir = pathlib.Path(work_path, 'work_' + pathlib.Path(fname).name)
@@ -158,4 +164,4 @@ class CCP:
                 os.environ['KCP_IPA_CLONES_DUMP'] = str(ipa_file_path)
 
                 self.execute_ccp(jcs, fname, ','.join(jcs['files'][fname]),
-                                work_dir)
+                                work_dir, sdir, odir)

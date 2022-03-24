@@ -118,9 +118,6 @@ class Setup:
                 src = pathlib.Path(ex_dir, 'usr', 'src')
 
                 kernel = re.sub('\.\d+$', '', kernel_full)
-                sdir = pathlib.Path(src, 'linux-' + kernel)
-                odir = pathlib.Path(src, 'linux-' + kernel + '-obj', 'x86_64', 'default')
-                symvers = pathlib.Path(odir, 'Module.symvers')
 
                 if not self._mod:
                     obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +
@@ -155,11 +152,7 @@ class Setup:
                     'readelf' : 'readelf',
                     'rename_prefix' : self.get_rename_prefix(cs),
                     'work_dir' : str(self._bsc_path),
-                    'sdir' : str(sdir),
-                    'odir' : str(odir),
-                    'symvers' : str(pathlib.Path(odir, 'Module.symvers')),
-                    'object' : str(obj),
-                    'ipa_dir' : str(self._ipa_dir)
+                    'object' : str(obj)
                 }
 
                 # do not expect any problems with the kernel release format
@@ -221,7 +214,9 @@ class Setup:
                 'conf' : self._conf,
                 'mod' : self._mod,
                 'cve_branches' : self._cve_branches,
-                'commits' : self._commits
+                'commits' : self._commits,
+                'ex_kernels' : str(self._ex_dir),
+                'ipa_clones' : str(self._ipa_dir)
         }
 
         with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
