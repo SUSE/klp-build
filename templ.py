@@ -11,11 +11,13 @@ import textwrap
 class Template:
     def __init__(self, bsc, work_dir, cs):
         self._bsc = 'bsc' + str(bsc)
-        conf = pathlib.Path(work_dir, self._bsc, 'conf.json')
+        basepath = pathlib.Path(work_dir, self._bsc)
+
+        conf = pathlib.Path(basepath, 'conf.json')
         if not conf.is_file():
             raise ValueError('config.json not found in {}'.format(str(conf)))
 
-        codestreams = pathlib.Path(work_dir, self._bsc, 'codestreams.json')
+        codestreams = pathlib.Path(basepath, 'codestreams.json')
         if not codestreams.is_file():
             raise ValueError('codestreams.json not found in {}'.format(str(codestreams)))
 
@@ -26,15 +28,15 @@ class Template:
             self._cve = data['cve']
             self._conf = data['conf']
             self._commits = data['commits']
+            self._work_dir  = data['work_dir']
 
         if cs:
+            self._cs = cs
             with open(codestreams, 'r') as f:
                 data = json.load(f)
-                print(cs)
                 jcs = data[cs]
                 self._ktype = jcs['rename_prefix']
                 self._files = list(jcs['files'].keys())
-                self._work_dirs = jcs['work_dir']
 
         try:
             conf = git.GitConfigParser()
@@ -45,8 +47,27 @@ class Template:
 
         self._templ_path = pathlib.Path(os.path.dirname(__file__), 'templates')
  
-    def GenerateLivepatchFile(self, ext, fname, file_path, src_file, ext_file):
-        fsloader = jinja2.FileSystemLoader([self._templ_path, file_path])
+    def GenerateLivepatchFile(self, ext, out_name, src_file, ext_file):
+        if not out_name and not src_file:
+            raise RuntimeError('Both out_name and src_file are empty.  Aborting.')
+
+        if src_file:
+            src_file = str(pathlib.Path(src_file).name)
+
+            work_path = pathlib.Path(self._work_dir, 'c', self._cs, 'x86_64')
+
+            lp_inc_dir = str(pathlib.Path(work_path, 'work_' + src_file))
+            lp_file = self._bsc + '_' + src_file
+        else:
+            lp_inc_dir = ''
+            lp_file = None
+
+        # out_name empty means that we want the final file as:
+        #       bscXXXXXXX_{src_name}.c
+        if not out_name:
+            out_name = lp_file
+
+        fsloader = jinja2.FileSystemLoader([self._templ_path, lp_inc_dir])
         env = jinja2.Environment(loader=fsloader, trim_blocks=True)
 
         templ = env.get_template('lp-' + ext + '.j2')
@@ -54,10 +75,10 @@ class Template:
         if self._mod:
             templ.globals['mod'] = self._mod
 
-        with open(pathlib.Path(self._bsc, fname), 'w') as f:
+        with open(pathlib.Path(self._bsc, out_name).with_suffix('.' + ext), 'w') as f:
             f.write(templ.render(bsc = self._bsc,
                                 bsc_num = self._bsc_num,
-                                inc_src_file = src_file,
+                                inc_src_file = lp_file,
                                 inc_exts_file = ext_file,
                                 cve = self._cve,
                                 config = self._conf,
@@ -73,27 +94,22 @@ class Template:
         bsc.mkdir(exist_ok=True)
 
         # We need at least one header file for the livepatch
-        fname = 'kgr_patch' if self._ktype == 'kgr' else 'livepatch'
-        fname = fname + '_' + self._bsc
+        out_name = 'kgr_patch' if self._ktype == 'kgr' else 'livepatch'
+        out_name = out_name + '_' + self._bsc
 
-        self.GenerateLivepatchFile('h', fname + '.h', '', None, None)
+        self.GenerateLivepatchFile('h', out_name, None, None)
+
+        if len(self._files) == 1:
+            self.GenerateLivepatchFile('c', out_name, self._files[0], 'exts')
+            return
 
         # Run the template engine for each touched source file.
-        for index, wdir in enumerate(self._work_dirs):
-            src_name = self._bsc + '_' + pathlib.Path(self._files[index]).name
-
-            # If the livepatch touches only one source file, generate only a
-            # 'livepatch_' file, including the touched source file
-            _fname = src_name
-            if len(self._work_dirs) == 1:
-                _fname = fname + '.c'
-
-            self.GenerateLivepatchFile('c', _fname, wdir, src_name, 'exts')
+        for src_file in self._files:
+            self.GenerateLivepatchFile('c', None, src_file, 'exts')
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        if len(self._work_dirs) > 1:
-            self.GenerateLivepatchFile('c', fname + '.c', '', None, None)
+        self.GenerateLivepatchFile('c', out_name, None, None)
 
     # Return the commit message in a list of wrapped
     def generate_commit_msg(self):
