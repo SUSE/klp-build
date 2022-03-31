@@ -13,30 +13,10 @@ class Setup:
     _cs_json = {}
     _cve_branches = []
 
-    def __init__(self, data, work_dir, redownload, bsc, cve, conf,
-                file_funcs, mod, ups_commits):
-        # Prefer the argument over the environment
-        if not data:
-            data = os.getenv('KLP_DATA_DIR')
-            if not data:
-                raise ValueError('--data or KLP_DATA_DIR should be defined')
-
-        self._env = pathlib.Path(data)
-        # Prefer the argument over the environment
-        if not work_dir:
-            work_dir = os.getenv('KLP_WORK_DIR')
-            if not work_dir:
-                raise ValueError('--work-dir or KLP_WORK_DIR should be defined')
-
-        self._work = pathlib.Path(work_dir)
-
-        self._bsc_num = bsc
-        self._bsc = 'bsc' + str(bsc)
-        self._bsc_path = pathlib.Path(self._work, self._bsc)
-        if self._bsc_path.exists() and not self._bsc_path.is_dir():
-            raise ValueError('--bsc needs to be a directory, or not to exist')
-
-        self._bsc_path.mkdir(exist_ok=True)
+    def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
+            ups_commits):
+        self.cfg = cfg
+        self.cfg.bsc_path.mkdir(exist_ok=True)
 
         self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
         self._conf = conf
@@ -48,14 +28,11 @@ class Setup:
 
         self._mod = mod
 
-        if not self._env.is_dir():
-            raise ValueError('Destiny should be a directory')
-
         self._redownload = redownload
 
-        self._rpm_dir = pathlib.Path(self._env, 'kernel-rpms')
-        self._ex_dir = pathlib.Path(self._env, 'ex-kernels')
-        self._ipa_dir = pathlib.Path(self._env, 'ipa-clones')
+        self._rpm_dir = pathlib.Path(cfg.env, 'kernel-rpms')
+        self._ex_dir = pathlib.Path(cfg.env, 'ex-kernels')
+        self._ipa_dir = pathlib.Path(cfg.env, 'ipa-clones')
 
     def get_rename_prefix(self, cs):
         if '12.3' in cs:
@@ -63,7 +40,7 @@ class Setup:
         return 'klp'
 
     def download_codestream_file(self):
-        self._cs_file = pathlib.Path(self._bsc_path, 'codestreams.in')
+        self._cs_file = pathlib.Path(self.cfg.bsc_path, 'codestreams.in')
 
         if os.path.isfile(self._cs_file) and not self._redownload:
             print('Found codestreams.in file, skipping download.')
@@ -178,7 +155,7 @@ class Setup:
         req.raise_for_status()
 
         # Save the upstream commit in the bsc directory
-        fpath = pathlib.Path(self._bsc_path, 'commit.patch')
+        fpath = pathlib.Path(self.cfg.bsc_path, 'commit.patch')
         with open(fpath, 'w') as f:
             f.write(req.text)
 
@@ -210,7 +187,7 @@ class Setup:
                 self._commits[bc][cmt] = ''
 
     def write_json_files(self):
-        data = { 'bsc' : str(self._bsc_num),
+        data = { 'bsc' : str(self.cfg.bsc_num),
                 'cve' : self._cve,
                 'conf' : self._conf,
                 'mod' : self._mod,
@@ -218,20 +195,20 @@ class Setup:
                 'commits' : self._commits,
                 'ex_kernels' : str(self._ex_dir),
                 'ipa_clones' : str(self._ipa_dir),
-                'work_dir' : str(self._bsc_path)
+                'work_dir' : str(self.cfg.bsc_path)
         }
 
-        with open(pathlib.Path(self._bsc_path, 'conf.json'), 'w') as f:
+        with open(pathlib.Path(self.cfg.bsc_path, 'conf.json'), 'w') as f:
             f.write(json.dumps(data, indent=4))
 
-        with open(pathlib.Path(self._bsc_path, 'codestreams.json'), 'w') as f:
+        with open(pathlib.Path(self.cfg.bsc_path, 'codestreams.json'), 'w') as f:
             f.write(json.dumps(self._cs_json, indent=4))
 
     def write_commit_file(self):
-        temp = templ.Template(str(self._bsc_num), self._work, None)
+        temp = templ.Template(self.cfg, None)
         msg = temp.generate_commit_msg()
 
-        with open(pathlib.Path(self._bsc_path, 'commit.msg'), 'w') as f:
+        with open(pathlib.Path(self.cfg.bsc_path, 'commit.msg'), 'w') as f:
             f.write(msg)
 
     def download_env(self):

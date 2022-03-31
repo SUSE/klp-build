@@ -9,26 +9,24 @@ import requests
 import textwrap
 
 class Template:
-    def __init__(self, bsc, work_dir, cs):
-        self._bsc = 'bsc' + str(bsc)
-        basepath = pathlib.Path(work_dir, self._bsc)
+    def __init__(self, cfg, cs):
+        self.cfg = cfg
+        self.bsc = cfg.bsc
 
-        conf = pathlib.Path(basepath, 'conf.json')
+        conf = pathlib.Path(cfg.bsc_path, 'conf.json')
         if not conf.is_file():
             raise ValueError('config.json not found in {}'.format(str(conf)))
 
-        codestreams = pathlib.Path(basepath, 'codestreams.json')
+        codestreams = pathlib.Path(cfg.bsc_path, 'codestreams.json')
         if not codestreams.is_file():
             raise ValueError('codestreams.json not found in {}'.format(str(codestreams)))
 
         with open(conf, 'r') as f:
             data = json.load(f)
-            self._bsc_num = data['bsc']
             self._mod = data['mod']
             self._cve = data['cve']
             self._conf = data['conf']
             self._commits = data['commits']
-            self._work_dir  = data['work_dir']
 
         if cs:
             self._cs = cs
@@ -54,10 +52,10 @@ class Template:
         if src_file:
             src_file = str(pathlib.Path(src_file).name)
 
-            work_path = pathlib.Path(self._work_dir, 'c', self._cs, 'x86_64')
+            work_path = pathlib.Path(self.cfg.bsc_path, 'c', self._cs, 'x86_64')
 
             lp_inc_dir = str(pathlib.Path(work_path, 'work_' + src_file))
-            lp_file = self._bsc + '_' + src_file
+            lp_file = self.cfg.bsc + '_' + src_file
         else:
             lp_inc_dir = ''
             lp_file = None
@@ -67,6 +65,8 @@ class Template:
         if not out_name:
             out_name = lp_file
 
+        print(lp_inc_dir)
+
         fsloader = jinja2.FileSystemLoader([self._templ_path, lp_inc_dir])
         env = jinja2.Environment(loader=fsloader, trim_blocks=True)
 
@@ -75,9 +75,9 @@ class Template:
         if self._mod:
             templ.globals['mod'] = self._mod
 
-        with open(pathlib.Path(self._bsc, out_name).with_suffix('.' + ext), 'w') as f:
-            f.write(templ.render(bsc = self._bsc,
-                                bsc_num = self._bsc_num,
+        with open(pathlib.Path(self.cfg.bsc, out_name).with_suffix('.' + ext), 'w') as f:
+            f.write(templ.render(bsc = self.cfg.bsc,
+                                bsc_num = self.cfg.bsc_num,
                                 fname = os.path.splitext(out_name)[0],
                                 inc_src_file = lp_file,
                                 inc_exts_file = ext_file,
@@ -91,12 +91,12 @@ class Template:
     def GenerateLivePatches(self):
         # If the livepatch contains only one file, generate only the livepatch
         # one
-        bsc = pathlib.Path(self._bsc)
+        bsc = pathlib.Path(self.cfg.bsc)
         bsc.mkdir(exist_ok=True)
 
         # We need at least one header file for the livepatch
         out_name = 'kgr_patch' if self._ktype == 'kgr' else 'livepatch'
-        out_name = out_name + '_' + self._bsc
+        out_name = out_name + '_' + self.cfg.bsc
 
         self.GenerateLivepatchFile('h', out_name, None, None)
 
@@ -118,8 +118,8 @@ class Template:
         self._env = jinja2.Environment(loader=fsloader, trim_blocks=True)
 
         templ = self._env.get_template('commit.j2')
-        return templ.render(bsc = self._bsc,
-                            bsc_num = self._bsc_num,
+        return templ.render(bsc = self.cfg.bsc,
+                            bsc_num = self.cfg.bsc_num,
                             cve = self._cve,
                             user = self._user,
                             email = self._email,

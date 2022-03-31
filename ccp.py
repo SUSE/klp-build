@@ -9,14 +9,14 @@ class CCP:
     _cs = None
     _conf = None
 
-    def __init__(self, bsc, work_path):
-        self._bsc_str = 'bsc' + str(bsc)
-        bsc_path = pathlib.Path(work_path, self._bsc_str)
-        with open(pathlib.Path(bsc_path, 'codestreams.json')) as f:
+    def __init__(self, cfg):
+        with open(pathlib.Path(cfg.bsc_path, 'codestreams.json')) as f:
             self._cs = json.loads(f.read())
 
-        with open(pathlib.Path(bsc_path, 'conf.json')) as f:
+        with open(pathlib.Path(cfg.bsc_path, 'conf.json')) as f:
             self._conf = json.loads(f.read())
+
+        self.cfg = cfg
 
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
@@ -59,7 +59,7 @@ class CCP:
 
     def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir):
         # extract the last component of the path, like the basename bash # function
-        fname_ = self._bsc_str + '_' + pathlib.PurePath(fname).name
+        fname_ = self.cfg.bsc + '_' + pathlib.PurePath(fname).name
 
         ccp_path = '/home/mpdesouza/kgr/ccp/build/klp-ccp'
         pol_path = '/home/mpdesouza/kgr/scripts/ccp-pol'
@@ -126,8 +126,9 @@ class CCP:
 
     def run_ccp(self):
         # the current blacklisted function, more can be added as necessary
-        os.environ['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2"
+        os.environ['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen"
 
+        print('Work directory: {}'.format(self.cfg.bsc_path))
         for cs in self._cs.keys():
             jcs = self._cs[cs]
             if not jcs['files']:
@@ -140,7 +141,7 @@ class CCP:
             sdir = pathlib.Path(ex, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
             odir = pathlib.Path(str(sdir) + '-obj', 'x86_64', 'default')
             symvers = pathlib.Path(odir, 'Module.symvers')
-            work_path = pathlib.Path(self._conf['work_dir'], 'c', cs, 'x86_64')
+            work_path = pathlib.Path(self.cfg.bsc_path, 'c', cs, 'x86_64')
 
             os.environ['KCP_MOD_SYMVERS'] = str(symvers)
             os.environ['KCP_READELF'] = jcs['readelf']

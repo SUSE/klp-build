@@ -2,9 +2,11 @@
 
 import argparse
 import os
+
+import ccp
+from config import Config
 import utils
 import templ
-import ccp
 
 def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=False)
@@ -14,7 +16,7 @@ def create_parser() -> argparse.ArgumentParser:
             help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
 
     parser = argparse.ArgumentParser(add_help=False)
-    sub = parser.add_subparsers(dest='commands')
+    sub = parser.add_subparsers(dest='cmd')
 
     setup = sub.add_parser('setup', parents = [parentparser])
     setup.add_argument('--data', type=str, default='',
@@ -45,16 +47,18 @@ if  __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
 
+    config = Config(args)
+
     # FIXME: Maybe we should require --conf when --module is specified"
-    if args.commands == 'setup':
-        setup = utils.Setup(args.data, args.work_dir, args.redownload, args.bsc, args.cve,
-                            args.conf, args.file_funcs, args.module, args.upstream_commits)
+    if args.cmd == 'setup':
+        setup = utils.Setup(config, args.redownload, args.cve, args.conf,
+                args.file_funcs, args.module, args.upstream_commits)
         setup.prepare_env()
 
-    elif args.commands == 'run-ccp':
-        ccp = ccp.CCP(args.bsc, args.work_dir)
+    elif args.cmd == 'run-ccp':
+        ccp = ccp.CCP(config)
         ccp.run_ccp()
 
-    elif args.commands == 'create-lp':
-        templ = templ.Template(args.bsc, args.work_dir, args.codestream)
+    elif args.cmd == 'create-lp':
+        templ = templ.Template(config, args.codestream)
         templ.GenerateLivePatches()
