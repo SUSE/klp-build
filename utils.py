@@ -17,18 +17,18 @@ class Setup:
                 file_funcs, mod, ups_commits):
         # Prefer the argument over the environment
         if not data:
-            data = pathlib.Path(os.getenv('KLP_DATA_DIR'))
+            data = os.getenv('KLP_DATA_DIR')
             if not data:
                 raise ValueError('--data or KLP_DATA_DIR should be defined')
 
         self._env = pathlib.Path(data)
         # Prefer the argument over the environment
         if not work_dir:
-            work_dir = pathlib.Path(os.getenv('KLP_WORK_DIR'))
+            work_dir = os.getenv('KLP_WORK_DIR')
             if not work_dir:
                 raise ValueError('--work-dir or KLP_WORK_DIR should be defined')
 
-        self._work = work_dir
+        self._work = pathlib.Path(work_dir)
 
         self._bsc_num = bsc
         self._bsc = 'bsc' + str(bsc)
