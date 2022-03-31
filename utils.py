@@ -119,6 +119,19 @@ class Setup:
 
                 kernel = re.sub('\.\d+$', '', kernel_full)
 
+                # do not expect any problems with the kernel release format
+                cs_kernel = re.search('^([0-9]+\.[0-9]+)', kernel).group(1)
+
+                kernels.append(cs_kernel)
+
+                cs_files = files.get(cs_kernel, {})
+                if not cs_files:
+                    cs_files = files.get('all', {})
+                    if not cs_files:
+                        print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_kernel))
+                        continue
+
+
                 if not self._mod:
                     obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +
                             kernel.replace('linux-', '') + '-default')
@@ -151,20 +164,9 @@ class Setup:
                     'update' : u,
                     'readelf' : 'readelf',
                     'rename_prefix' : self.get_rename_prefix(cs),
-                    'object' : str(obj)
+                    'object' : str(obj),
+                    'files' : cs_files
                 }
-
-                # do not expect any problems with the kernel release format
-                cs_kernel = re.search('^([0-9]+\.[0-9]+)', kernel).group(1)
-                kernels.append(cs_kernel)
-
-                cs_files = files.get(cs_kernel, {})
-                if not cs_files:
-                    cs_files = files.get('all', {})
-                    if not cs_files:
-                        print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_kernel))
-
-                self._cs_json[cs_key]['files'] = cs_files
 
         # We create a dict to remove the duplicate kernel versions, used as CVE
         # branches for find the fixes for each codestreams in kernel-source
