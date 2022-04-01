@@ -39,6 +39,16 @@ class Setup:
             return 'kgr'
         return 'klp'
 
+    # Parse SLE15-SP2_Update_25 to 15.2u25
+    def parse_cs_line(self, cs):
+        sle, _, u = cs.replace('SLE', '').split('_')
+        if '-SP' in sle:
+            sle, sp = sle.split('-SP')
+        else:
+            sle, sp = sle, '0'
+
+        return sle, sp, u
+
     def download_codestream_file(self):
         self._cs_file = pathlib.Path(self.cfg.bsc_path, 'codestreams.in')
 
@@ -53,6 +63,10 @@ class Setup:
 
         # For now let's keep the current format of codestreams.in and
         # codestreams.json
+
+        if self.cfg.filter:
+            print('Applying filter...')
+
         first_line = True
         with open(self._cs_file, 'w') as f:
             for line in req.iter_lines():
@@ -70,6 +84,11 @@ class Setup:
                 # remove the micro version number
                 columns = line.decode('utf-8').split(',')
                 kernel = re.sub('\.\d+$', '', columns[2])
+
+                sle, sp, u = self.parse_cs_line(columns[0])
+                if self.cfg.filter and not re.match(self.cfg.filter, '{}.{}u{}'.format(sle, sp, u)):
+                    print('Skipping {}'.format(columns[0]))
+                    continue
 
                 f.write(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,rpm-' + kernel + '\n')
 
@@ -123,11 +142,7 @@ class Setup:
                     # used later
                     obj = obj[0]
 
-                sle, _, u = full_cs.replace('SLE', '').split('_')
-                if '-SP' in sle:
-                    sle, sp = sle.split('-SP')
-                else:
-                    sle, sp = sle, '0'
+                sle, sp, u = self.parse_cs_line(full_cs)
                 cs_key = sle + '.' + sp + 'u' + u
 
                 self._cs_json[cs_key] = {

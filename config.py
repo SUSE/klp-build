@@ -6,6 +6,7 @@ class Config:
     def __init__(self, args):
         work_dir = args.work_dir
         bsc = args.bsc
+        self.filter = args.filter
 
         # We only require --data for setup, since conf.json will contain all
         # relevant data for the later steps
@@ -17,9 +18,9 @@ class Config:
                 if not data:
                     raise ValueError('--data or KLP_DATA_DIR should be defined')
 
-                self.env = pathlib.Path(data)
-                if not self.env.is_dir():
-                    raise ValueError('Data dir should be a directory')
+            self.env = pathlib.Path(data)
+            if not self.env.is_dir():
+                raise ValueError('Data dir should be a directory')
 
         # Prefer the argument over the environment
         if not work_dir:
