@@ -103,10 +103,15 @@ class CCP:
                 continue
 
             with open(ext_path) as f:
-                for line in f:
-                    if not line.startswith('KALLSYMS'):
+                for l in f:
+                    l = l.strip()
+                    if not l.startswith('KALLSYMS'):
                         continue
-                    _, sym, var, mod = line.split(' ')
+
+                    _, sym, var, mod = l.split(' ')
+                    if mod == 'vmlinux':
+                        mod = ''
+
                     exts.append( (sym, var, mod) )
 
         exts.sort(key=lambda tup : tup[0])
@@ -114,16 +119,35 @@ class CCP:
         ext_list = []
         for ext in exts:
             sym, var, mod = ext
-            buf = '\t{{ "{}", (void *)&{}'.format(sym, var)
-            if mod:
-                buf += ', "{}" }},\n'.format(mod.strip())
-            else:
-                buf += ' }},\n'.format(var)
 
-            ext_list.append(buf)
+            sym = '\t{{ "{}",'.format(sym)
+            if not mod:
+                var = ' (void *)&{} }},'.format(var)
+            else:
+                var = ' (void *)&{},'.format(var)
+                mod = ' "{}" }},'.format(mod)
+
+            # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
+            # our goal when splitting these lines
+            if len(sym + var + mod) < 73:
+                ext_list.append(sym + var + mod)
+
+            elif len(sym + var) < 73:
+                ext_list.append(sym + var)
+                if mod:
+                    ext_list.append('\t ' + mod)
+
+            else:
+                ext_list.append(sym)
+                if len(var + mod) < 73:
+                    ext_list.append('\t ' + var + mod)
+                else:
+                    ext_list.append('\t ' + var)
+                    if mod:
+                        ext_list.append('\t ' + mod)
 
         with open(pathlib.Path(out_dir, 'exts'), 'w') as f:
-            f.writelines(ext_list)
+            f.write('\n'.join(ext_list))
 
     def run_ccp(self):
         # the current blacklisted function, more can be added as necessary
