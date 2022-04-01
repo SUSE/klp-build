@@ -9,7 +9,7 @@ class CCP:
     _cs = None
     _conf = None
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, cs_regex):
         with open(pathlib.Path(cfg.bsc_path, 'codestreams.json')) as f:
             self._cs = json.loads(f.read())
 
@@ -17,6 +17,7 @@ class CCP:
             self._conf = json.loads(f.read())
 
         self.cfg = cfg
+        self.cs_regex = cs_regex
 
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
@@ -129,7 +130,15 @@ class CCP:
         os.environ['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen"
 
         print('Work directory: {}'.format(self.cfg.bsc_path))
+
+        if self.cs_regex:
+            print('Filtering codestreams...')
+
         for cs in self._cs.keys():
+            if self.cs_regex and not re.match(self.cs_regex, cs):
+                print('Skipping {}'.format(cs))
+                continue
+
             jcs = self._cs[cs]
             if not jcs['files']:
                 continue

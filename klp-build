@@ -36,6 +36,8 @@ def create_parser() -> argparse.ArgumentParser:
             nargs='+', help='Commit hashes used to solve the CVE')
 
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
+    ccp_opts.add_argument('--filter', type=str,
+            help='Filter out codestreams using a regex. Example: 15.3u[0-9]+')
 
     templ = sub.add_parser('create-lp', parents = [parentparser])
     templ.add_argument('--codestream', type=str, required=True,
@@ -56,7 +58,7 @@ if  __name__ == '__main__':
         setup.prepare_env()
 
     elif args.cmd == 'run-ccp':
-        ccp = ccp.CCP(config)
+        ccp = ccp.CCP(config, args.filter)
         ccp.run_ccp()
 
     elif args.cmd == 'create-lp':
