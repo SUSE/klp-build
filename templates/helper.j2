@@ -1,13 +1,13 @@
 {% macro get_commits(codestream) -%}
-{% if not commits[codestream] -%}
+{% if not commits[codestream] %}
  *  Not affected
-{% else %}
-	{% for commit, msg in commits[codestream].items() -%}
-	{% if codestream == 'upstream' %}
+{%- else %}
+{% for commit, msg in commits[codestream].items() -%}
+{% if codestream == 'upstream' %}
  *  {{ commit }} ("{{ msg }}")
-	{% else %}
- *  {{ commit }}
-	{% endif -%}
-	{% endfor -%}
+{%- else %}
+ *  {{ commit -}}
+{%- endif -%}
+{% endfor -%}
 {% endif -%}
 {% endmacro -%}
