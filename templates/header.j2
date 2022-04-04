@@ -4,6 +4,7 @@
  *
  * Fix for CVE-{{ cve }}, bsc#{{ bsc_num }}
  *
+{% if include_header is defined %}
  *  Upstream commit:
 {{ get_commits('upstream') }}
  *
@@ -15,6 +16,7 @@
  *
  *  SLE15-SP2 and -SP3 commit:
 {{ get_commits('5.3') }}
+{% endif %}
  *
  *  Copyright (c) {{ year }} SUSE
  *  Author: {{ user }} <{{ email }}>
