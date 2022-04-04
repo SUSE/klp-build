@@ -8,6 +8,8 @@
 #endif
 {% endif %}
 
+#include "livepatch_bsc{{ bsc_num }}.h"
+
 
 
 
@@ -22,8 +24,7 @@
 {% if mod is defined %}#define LP_MODULE "{{ mod }}"{% endif %}
 
 #include <linux/kernel.h>
-#include <linux/module.h>
-#include "livepatch_bsc{{ bsc_num }}.h"
+{% if mod is defined %}#include <linux/module.h>{% endif %}
 #include "../kallsyms_relocs.h"
 
 static struct {{ ktype }}_kallsyms_reloc {{ ktype }}_funcs[] = {
