@@ -179,6 +179,7 @@ class Setup:
     def get_commits(self):
         ksource_git = os.getenv('KLP_KERNEL_SOURCE', '')
         if not ksource_git:
+            print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
 
         ksource_path = pathlib.Path(ksource_git)
@@ -197,6 +198,11 @@ class Setup:
                             'remotes/origin/cve/linux-' + bc],
                             stderr=subprocess.PIPE)
                 cmt = commit_hash.decode('ascii').strip().replace('"', '')
+
+                # If we don't find any commits, add a note about it
+                if not cmt:
+                    cmt = 'None yet'
+
                 # We don't care about branches commit message, because it is the
                 # same as the upstream commit
                 self._commits[bc][cmt] = ''
