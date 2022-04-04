@@ -38,7 +38,7 @@ static struct {{ ktype }}_kallsyms_reloc {{ ktype }}_funcs[] = {
 };
 
 {% if mod is defined %}
-static int {{ fname }}_modify_notify(struct notifier_block *nb,
+static int {{ fname }}_module_notify(struct notifier_block *nb,
 					unsigned long action, void *data)
 {
 	struct module *mod = data;
