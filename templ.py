@@ -32,9 +32,10 @@ class Template:
             self._cs = cs
             with open(codestreams, 'r') as f:
                 data = json.load(f)
-                jcs = data[cs]
-                self._ktype = jcs['rename_prefix']
-                self._files = list(jcs['files'].keys())
+                self._jcs = data[cs]
+                self._ktype = self._jcs['rename_prefix']
+                self._files = list(self._jcs['files'].keys())
+                self._funcs = []
 
         try:
             conf = git.GitConfigParser()
@@ -44,12 +45,22 @@ class Template:
             raise RuntimeError('Please define name/email in global git config')
 
         self._templ_path = pathlib.Path(os.path.dirname(__file__), 'templates')
- 
+
+    def GeneratePatchedFuncs(self):
+        with open(pathlib.Path(self.cfg.bsc, 'patched_funcs.csv'), 'w') as f:
+            for fun in self._funcs:
+                mod = 'vmlinux' if not self._mod else self._mod
+                f.write('{} {} klpp_{} IS_ENABLED({})\n'.format(mod, fun, fun,
+                    self._conf))
+
     def GenerateLivepatchFile(self, ext, out_name, src_file, ext_file):
         if not out_name and not src_file:
             raise RuntimeError('Both out_name and src_file are empty.  Aborting.')
 
         if src_file:
+            # Will be used when generating patched_funcs.csv
+            self._funcs.extend(self._jcs['files'][src_file])
+
             src_file = str(pathlib.Path(src_file).name)
 
             work_path = pathlib.Path(self.cfg.bsc_path, 'c', self._cs, 'x86_64')
@@ -64,8 +75,6 @@ class Template:
         #       bscXXXXXXX_{src_name}.c
         if not out_name:
             out_name = lp_file
-
-        print(lp_inc_dir)
 
         fsloader = jinja2.FileSystemLoader([self._templ_path, lp_inc_dir])
         env = jinja2.Environment(loader=fsloader, trim_blocks=True)
