@@ -1,6 +1,6 @@
 {% include 'header.j2' %}
 
-{% if conf is defined %}#if IS_ENABLED({{ config }}){% endif %}
+{% if config is defined %}#if IS_ENABLED({{ config }}){% endif %}
 
 {% if mod is defined %}
 #if !IS_MODULE({{ config }})
@@ -90,4 +90,4 @@ void {{ fname }}_cleanup(void)
 }
 {% endif -%}
 
-{% if conf is defined %}#endif /* IS_ENABLED({{ config }}) */{% endif -%}
+{% if config is defined %}#endif /* IS_ENABLED({{ config }}) */{% endif -%}
