@@ -17,6 +17,7 @@ class CCP:
             self._conf = json.loads(f.read())
 
         self.cfg = cfg
+        self._proc_files = []
 
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
@@ -57,13 +58,14 @@ class CCP:
             raise RuntimeError('klp-ccp returned {}, stderr: {}'.format(completed.returncode, completed.stderr))
         return self.process_make_output(filename, completed.stdout, jcs['sle'], jcs['sp'])
 
-    def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir):
-        # extract the last component of the path, like the basename bash # function
-        fname_ = self.cfg.bsc + '_' + pathlib.PurePath(fname).name
+    # extract the last component of the path, like the basename bash # function
+    def lp_out_file(self, fname):
+        return self.cfg.bsc + '_' + pathlib.PurePath(fname).name
 
+    def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir):
         ccp_path = '/home/mpdesouza/kgr/ccp/build/klp-ccp'
         pol_path = '/home/mpdesouza/kgr/scripts/ccp-pol'
-        lp_out = pathlib.Path(out_dir, fname_)
+        lp_out = pathlib.Path(out_dir, self.lp_out_file(fname))
 
         ccp_args = [ccp_path]
         for arg in ['may-include-header', 'can-externalize-fun', 'shall-externalize-fun', 'shall-externalize-obj',
@@ -148,6 +150,126 @@ class CCP:
         with open(pathlib.Path(out_dir, 'exts'), 'w') as f:
             f.write('\n'.join(ext_list))
 
+    # Group all codestreams that share code in a format like bellow:
+    #   { '15.2u10' : [ 15.2u11 15.3u10 15.3u12 ] }
+    # Will be converted to:
+    #   15.2u10-11 15.3u10 15.3u12
+    def classify_codestreams(self, cs_dict):
+        for cs in cs_dict.keys():
+            relatives = [cs]
+            for c in cs_dict[cs]:
+                relatives.append(c)
+
+            # All the codestreams related to the same key share the same code.
+            r = relatives.pop(0)
+
+            # A cs that does not share code with any other
+            if not len(relatives):
+                print('\t{}'.format(r))
+                continue
+
+            # We have other codestreams in the relatives list, so we share code with
+            # other codestreams
+            buf = ''
+            while True:
+                if not r:
+                    break
+
+                # siblings is used to check is the current cs has more than one
+                # 'sibling' prefix and an update + 1. When it's not the case, the cs
+                # in question is alone, so we should avoid printing the up date
+                siblings = False
+                prefix, up = r.split('u')
+                while True:
+                    # If we don't have more cs to process in this list, check if we
+                    # had more than one cs with the same prefix, and only if yes,
+                    # append the upper. This avoids duplicating the update number.
+                    if not len(relatives):
+                        buf += ' ' + r
+                        if siblings:
+                            buf += '-' + up
+                        r = None
+                        break
+
+                    m = relatives.pop(0)
+                    mprefix, mup = m.split('u')
+                    if prefix == mprefix and int(mup) == int(up) + 1:
+                        siblings = True
+                        up = mup
+                        continue
+
+                    buf += ' ' + r
+                    if siblings:
+                      buf += '-' + up
+                    # start grouping the different codestream
+                    r = m
+                    break
+
+            print('\t{}'.format(buf.strip()))
+
+    def group_equal_files(self):
+        codestreams = []
+        files = {}
+
+        print('\nGrouping codestreams for each file processed by ccp:')
+
+        for fname in self._proc_files:
+            src_out = self.lp_out_file(fname)
+
+            for fsrc in pathlib.Path(self.cfg.bsc_path, 'c').rglob(src_out):
+                with open(fsrc, 'r+') as fi:
+                    buf = fi.read()
+
+                    # get the cs from the file path
+                    # /<rootfs>/.../bsc1197705/c/15.3u4/x86_64/work_cls_api.c/bsc1197705_cls_api.c
+                    cs = fsrc.parts[-4]
+
+                    m = re.search('#include "(.+kconfig.h)"', buf)
+                    if not m:
+                        raise RuntimeError('File {} without an include to kconfig.h')
+
+                    kconfig = m.group(1)
+
+                    # check for duplicate kconfig lines
+                    for c in codestreams:
+                        if kconfig == files[c]['kconfig']:
+                            raise RuntimeError('{}\'s kconfig is the same of {}'.format(cs,
+                                c))
+
+                    src = re.sub('#include ".+kconfig.h"', '', buf)
+
+                    codestreams.append(cs)
+                    files[cs] = { 'kconfig' : kconfig, 'src' : src }
+
+            members = {}
+            toprocess = codestreams.copy()
+
+            while len(toprocess):
+                # in the second pass processed will contain data
+                if not toprocess:
+                    break
+
+                codestreams = toprocess.copy()
+
+                c = codestreams.pop(0)
+                toprocess.remove(c)
+                members[c] = []
+
+                while True:
+                    if not len(codestreams):
+                        break
+
+                    cs = codestreams.pop(0)
+                    if files[c]['src'] == files[cs]['src']:
+                        members[c].append(cs)
+                        toprocess.remove(cs)
+
+            # members will contain a dict with the key as a codestream and the
+            # values will be a list of codestreams that share the code
+            print('\t{}'.format(fname))
+            self.classify_codestreams(members)
+            print('')
+
     def run_ccp(self):
         # the current blacklisted function, more can be added as necessary
         os.environ['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen"
@@ -187,6 +309,8 @@ class CCP:
             for fname in jcs['files']:
                 print('\t', fname)
 
+                self._proc_files.append(fname)
+
                 out_dir = pathlib.Path(work_path, 'work_' + pathlib.Path(fname).name)
                 # remove any previously generated files
                 shutil.rmtree(out_dir, ignore_errors=True)
@@ -198,3 +322,5 @@ class CCP:
 
                 self.execute_ccp(jcs, fname, ','.join(jcs['files'][fname]),
                                 out_dir, sdir, odir)
+
+        self.group_equal_files()
