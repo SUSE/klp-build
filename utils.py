@@ -1,6 +1,7 @@
 import glob
 import json
 import pathlib
+from pathlib import Path
 import os
 import re
 import requests
@@ -169,8 +170,11 @@ class Setup:
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
         req.raise_for_status()
 
+        patches = Path(self.cfg.bsc_path, 'patches')
+        patches.mkdir(exist_ok=True)
+
         # Save the upstream commit in the bsc directory
-        fpath = pathlib.Path(self.cfg.bsc_path, 'commit.patch')
+        fpath = Path(patches, commit + '.patch')
         with open(fpath, 'w') as f:
             f.write(req.text)
 
