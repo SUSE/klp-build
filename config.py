@@ -1,4 +1,4 @@
-import pathlib
+from pathlib import Path
 import os
 import re
 
@@ -18,7 +18,7 @@ class Config:
                 if not data:
                     raise ValueError('--data or KLP_DATA_DIR should be defined')
 
-            self.env = pathlib.Path(data)
+            self.env = Path(data)
             if not self.env.is_dir():
                 raise ValueError('Data dir should be a directory')
 
@@ -28,15 +28,19 @@ class Config:
             if not work_dir:
                 raise ValueError('--work-dir or KLP_WORK_DIR should be defined')
 
-        self.work = pathlib.Path(work_dir)
+        self.work = Path(work_dir)
         if not self.work.is_dir():
             raise ValueError('Work dir should be a directory')
 
         self.bsc_num = bsc
         self.bsc = 'bsc' + str(bsc)
-        self.bsc_path = pathlib.Path(self.work, self.bsc)
+        self.bsc_path = Path(self.work, self.bsc)
 
         # We'll create the directory on setup, so we require it to now exists
         if args.cmd == 'setup':
             if self.bsc_path.exists() and not self.bsc_path.is_dir():
                 raise ValueError('--bsc needs to be a directory, or not to exist')
+
+        self.ksrc = os.getenv('KLP_KERNEL_SOURCE')
+        if self.ksrc and not Path(self.ksrc).is_dir():
+            raise ValueError('KLP_KERNEL_SOURCE should point to a directory')

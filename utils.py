@@ -8,6 +8,7 @@ import requests
 import subprocess
 
 import templ
+import ksrc
 
 class Setup:
     _cs_file = None
@@ -180,37 +181,6 @@ class Setup:
 
         return re.search('Subject: (.*)', req.text).group(1)
 
-    def get_commits(self):
-        ksource_git = os.getenv('KLP_KERNEL_SOURCE', '')
-        if not ksource_git:
-            print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
-            return
-
-        ksource_path = pathlib.Path(ksource_git)
-        if not ksource_path.is_dir():
-            return
-
-        # Get backported commits from the CVE branches
-        for bc in self._cve_branches:
-            self._commits[bc] = {}
-            for commit, msg in self._commits['upstream'].items():
-                # FIXME: commit_hash will contain double quotes, and when
-                # writing the json file it'll add quotes again. I need to find
-                # why...
-                commit_hash = subprocess.check_output(['/usr/bin/git', '-C', str(ksource_path),
-                            'log', '--pretty="%H"', '--grep',  msg,
-                            'remotes/origin/cve/linux-' + bc],
-                            stderr=subprocess.PIPE)
-                cmt = commit_hash.decode('ascii').strip().replace('"', '')
-
-                # If we don't find any commits, add a note about it
-                if not cmt:
-                    cmt = 'None yet'
-
-                # We don't care about branches commit message, because it is the
-                # same as the upstream commit
-                self._commits[bc][cmt] = ''
-
     def write_json_files(self):
         data = { 'bsc' : str(self.cfg.bsc_num),
                 'cve' : self._cve,
@@ -244,6 +214,8 @@ class Setup:
 
         self.fill_cs_json()
 
-        self.get_commits()
+        githelper = ksrc.GitHelper(self.cfg)
+        githelper.get_commits(self._cve_branches, self._commits)
+
         self.write_json_files()
         self.write_commit_file()
