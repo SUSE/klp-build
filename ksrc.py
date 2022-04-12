@@ -13,6 +13,8 @@ class GitHelper:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
 
+        print('Getting suse fixes for upstream commits per CVE branch...')
+
         # Get backported commits from the CVE branches
         for bc in cve_branches:
 
@@ -56,7 +58,12 @@ class GitHelper:
 
                 cmt = commit_hash.strip().replace('"', '')
 
-                # Link the suse commit as key and the original commit as value
-                # We don't care about branches commit message, because it is the
-                # same as the upstream commit
-                commits[bc][cmt] = commit
+                # Link the upstream commit as key asn the suse commit as value
+                commits[bc][commit] = cmt
+
+        for key, val in commits['upstream'].items():
+            print('{}: {}'.format(key, val))
+            for cve in cve_branches:
+                hash_cmt = commits[cve].get(key, 'None yet')
+                print('\t{}\t{}'.format(cve, hash_cmt))
+            print('')
