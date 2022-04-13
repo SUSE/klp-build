@@ -39,22 +39,24 @@ class GitHelper:
                 #   branche:file/path
                 branch, fpath = patch_file.strip().split(':')
 
-                # Get the full patch
-                cmt = subprocess.check_output(['/usr/bin/git', '-C',
+                # Get the full patch in reverse order, meaning that if we have
+                # follow up patches to fix any other previous patch, it will be
+                # the first one listed.
+                full_cmt = subprocess.check_output(['/usr/bin/git', '-C',
                             str(self.cfg.ksrc),
-                            'log', '--patch', branch, fpath],
+                            'log', '--reverse', '--patch', branch, fpath],
                             stderr=subprocess.PIPE).decode(sys.stdout.encoding)
 
-                m = re.search('commit (\w+)', cmt)
+                m = re.search('commit (\w+)', full_cmt)
                 if not m:
                     raise RuntimeError('Commit hash not found in patch:\n{}' \
-                            .format(cmt))
+                            .format(full_cmt))
 
                 commit_hash = m.group(1)
 
                 # Save the patch for later review from the livepatch developer
                 with open(Path(cved, commit_hash + '.patch'), 'w') as f:
-                    f.write(cmt)
+                    f.write(full_cmt)
 
                 cmt = commit_hash.strip().replace('"', '')
 
