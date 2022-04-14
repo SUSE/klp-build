@@ -25,6 +25,8 @@ def create_parser() -> argparse.ArgumentParser:
             help='Livepatch data directory (kernel-rpms, ex-kernels, ipa-clones). You can omit this argument if KLP_DATA_DIR environment variable is set to a proper directory.')
     setup.add_argument('--redownload', action='store_true',
             help='Replaces the currently used codestream.in file')
+    setup.add_argument('--disable-ccp', type=bool,
+            help='klp-ccp runs automatically on setup. This option disables it')
     setup.add_argument('--cve', type=str, required=True,
             help='The CVE assigned to this livepatch')
     setup.add_argument('--conf', type=str,
@@ -54,7 +56,8 @@ if  __name__ == '__main__':
     # FIXME: Maybe we should require --conf when --module is specified"
     if args.cmd == 'setup':
         setup = utils.Setup(config, args.redownload, args.cve, args.conf,
-                args.file_funcs, args.module, args.upstream_commits)
+                args.file_funcs, args.module, args.upstream_commits,
+                args.disable_ccp)
         setup.prepare_env()
 
     elif args.cmd == 'run-ccp':

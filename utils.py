@@ -7,16 +7,16 @@ import re
 import requests
 import subprocess
 
+import ccp
 import templ
 import ksrc
 
 class Setup:
     _cs_file = None
     _cs_json = {}
-    _cve_branches = []
 
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
-            ups_commits):
+            ups_commits, disable_ccp):
         self.cfg = cfg
         self.cfg.bsc_path.mkdir(exist_ok=True)
 
@@ -35,6 +35,10 @@ class Setup:
         self._rpm_dir = pathlib.Path(cfg.env, 'kernel-rpms')
         self._ex_dir = pathlib.Path(cfg.env, 'ex-kernels')
         self._ipa_dir = pathlib.Path(cfg.env, 'ipa-clones')
+
+        self._ccp = None
+        if not disable_ccp:
+            self._ccp = ccp.CCP(cfg)
 
     def get_rename_prefix(self, cs):
         if '12.3' in cs:
@@ -219,3 +223,6 @@ class Setup:
 
         self.write_json_files()
         self.write_commit_file()
+
+        if self._ccp:
+            self._ccp.run_ccp()
