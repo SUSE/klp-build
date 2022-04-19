@@ -23,7 +23,11 @@ class Template:
 
         with open(conf, 'r') as f:
             data = json.load(f)
+            # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
+            # and in kallsyms lookup
             self._mod = data['mod']
+            if self._mod:
+                self._mod = self._mod.replace('-', '_')
             self._cve = data['cve']
             self._conf = data['conf']
             self._commits = data['commits']
