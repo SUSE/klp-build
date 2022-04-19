@@ -29,7 +29,7 @@ class CCP:
             if not ccp_path.exists():
                 raise RuntimeError('klp-ccp not found in ~/kgr/ccp/build/klp-ccp. Please set KLP_CCP_PATH env var to a valid klp-ccp binary')
 
-        self.ccp = ccp_path
+        self.ccp = str(ccp_path)
 
         pol_path = os.getenv('KLP_CCP_POL_PATH')
         if pol_path and not pathlib.Path(pol_path).is_dir():
@@ -326,8 +326,7 @@ class CCP:
             os.environ['KCP_RENAME_PREFIX'] = jcs['rename_prefix']
 
             print(cs)
-
-            for fname in jcs['files']:
+            for fname, funcs in jcs['files'].items():
                 print('\t', fname)
 
                 self._proc_files.append(fname)
@@ -341,7 +340,7 @@ class CCP:
                 ipa_file_path = pathlib.Path(ipa_dir, fname + '.000i.ipa-clones')
                 os.environ['KCP_IPA_CLONES_DUMP'] = str(ipa_file_path)
 
-                self.execute_ccp(jcs, fname, ','.join(jcs['files'][fname]),
-                                out_dir, sdir, odir)
+                self.execute_ccp(jcs, fname, ','.join(funcs), out_dir, sdir,
+                                odir)
 
         self.group_equal_files()
