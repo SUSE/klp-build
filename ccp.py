@@ -5,6 +5,8 @@ import re
 import shutil
 import subprocess
 
+import concurrent.futures
+
 class CCP:
     _cs = None
     _conf = None
@@ -41,6 +43,10 @@ class CCP:
                 raise RuntimeError('ccp-pol not found at ~/kgr/scripts/ccp-pol/.  Please set KLP_CCP_POL_PATH env var to a valid ccppol directory')
 
         self.pol_path = pathlib.Path(pol_path)
+        self.env = os.environ
+
+        # the current blacklisted function, more can be added as necessary
+        self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen"
 
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
@@ -85,7 +91,7 @@ class CCP:
     def lp_out_file(self, fname):
         return self.cfg.bsc + '_' + pathlib.PurePath(fname).name
 
-    def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir):
+    def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir, env):
         lp_out = pathlib.Path(out_dir, self.lp_out_file(fname))
 
         ccp_args = [self.ccp]
@@ -102,7 +108,8 @@ class CCP:
 
         ccp_args = list(filter(None, ccp_args))
 
-        completed = subprocess.run(ccp_args, cwd=odir, text=True, capture_output=True)
+        completed = subprocess.run(ccp_args, cwd=odir, text=True,
+                                    capture_output=True, env=env)
         if completed.returncode != 0:
             raise ValueError('klp-ccp returned {}, stderr: {}\nArgs: {}'.format(completed.returncode, completed.stderr, ' '.join(ccp_args)))
 
@@ -241,7 +248,7 @@ class CCP:
 
                     m = re.search('#include "(.+kconfig.h)"', buf)
                     if not m:
-                        raise RuntimeError('File {} without an include to kconfig.h')
+                        raise RuntimeError('File {} without an include to kconfig.h'.format(str(fsrc)))
 
                     kconfig = m.group(1)
 
@@ -285,56 +292,66 @@ class CCP:
             self.classify_codestreams(members)
             print('')
 
-    def run_ccp(self):
-        # the current blacklisted function, more can be added as necessary
-        os.environ['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen"
+    def process_ccp(self, cs):
+        jcs = self._cs[cs]
 
+        ex = self._conf['ex_kernels']
+        ipa = self._conf['ipa_clones']
+        ipa_dir = pathlib.Path(ipa, jcs['cs'], 'x86_64')
+
+        sdir = pathlib.Path(ex, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
+        odir = pathlib.Path(str(sdir) + '-obj', 'x86_64', 'default')
+        symvers = pathlib.Path(odir, 'Module.symvers')
+        work_path = pathlib.Path(self.cfg.bsc_path, 'c', cs, 'x86_64')
+
+        # Needed, otherwise threads would interfere with each other
+        env = self.env.copy()
+
+        env['KCP_MOD_SYMVERS'] = str(symvers)
+        env['KCP_READELF'] = jcs['readelf']
+        env['KCP_KBUILD_ODIR'] = str(odir)
+        env['KCP_KBUILD_SDIR'] = str(sdir)
+        env['KCP_PATCHED_OBJ'] = jcs['object']
+        env['KCP_RENAME_PREFIX'] = jcs['rename_prefix']
+
+        for fname, funcs in jcs['files'].items():
+            print('\t{}\t\t{}'.format(cs, fname))
+
+            self._proc_files.append(fname)
+
+            out_dir = pathlib.Path(work_path, 'work_' + pathlib.Path(fname).name)
+            # remove any previously generated files
+            shutil.rmtree(out_dir, ignore_errors=True)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            env['KCP_WORK_DIR'] = str(out_dir)
+
+            ipa_file_path = pathlib.Path(ipa_dir, fname + '.000i.ipa-clones')
+            env['KCP_IPA_CLONES_DUMP'] = str(ipa_file_path)
+
+            self.execute_ccp(jcs, fname, ','.join(funcs), out_dir, sdir, odir,
+                    env)
+
+    def run_ccp(self):
         print('Work directory: {}'.format(self.cfg.bsc_path))
 
         if self.cfg.filter:
             print('Applying filter...')
 
+        cs_list = []
         for cs in self._cs.keys():
             if self.cfg.filter and not re.match(self.cfg.filter, cs):
                 print('Skipping {}'.format(cs))
                 continue
 
-            jcs = self._cs[cs]
-            if not jcs['files']:
+            if not self._cs[cs]['files']:
+                print('Skipping {} since it doesn\'t contain any files'.format(cs))
                 continue
 
-            ex = self._conf['ex_kernels']
-            ipa = self._conf['ipa_clones']
-            ipa_dir = pathlib.Path(ipa, jcs['cs'], 'x86_64')
+            cs_list.append(cs)
 
-            sdir = pathlib.Path(ex, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
-            odir = pathlib.Path(str(sdir) + '-obj', 'x86_64', 'default')
-            symvers = pathlib.Path(odir, 'Module.symvers')
-            work_path = pathlib.Path(self.cfg.bsc_path, 'c', cs, 'x86_64')
-
-            os.environ['KCP_MOD_SYMVERS'] = str(symvers)
-            os.environ['KCP_READELF'] = jcs['readelf']
-            os.environ['KCP_KBUILD_ODIR'] = str(odir)
-            os.environ['KCP_KBUILD_SDIR'] = str(sdir)
-            os.environ['KCP_PATCHED_OBJ'] = jcs['object']
-            os.environ['KCP_RENAME_PREFIX'] = jcs['rename_prefix']
-
-            print(cs)
-            for fname, funcs in jcs['files'].items():
-                print('\t', fname)
-
-                self._proc_files.append(fname)
-
-                out_dir = pathlib.Path(work_path, 'work_' + pathlib.Path(fname).name)
-                # remove any previously generated files
-                shutil.rmtree(out_dir, ignore_errors=True)
-                out_dir.mkdir(parents=True, exist_ok=True)
-                os.environ['KCP_WORK_DIR'] = str(out_dir)
-
-                ipa_file_path = pathlib.Path(ipa_dir, fname + '.000i.ipa-clones')
-                os.environ['KCP_IPA_CLONES_DUMP'] = str(ipa_file_path)
-
-                self.execute_ccp(jcs, fname, ','.join(funcs), out_dir, sdir,
-                                odir)
+        print('\nRunning klp-ccp...')
+        print('\tCodestream\tFile')
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            executor.map(self.process_ccp, cs_list)
 
         self.group_equal_files()
