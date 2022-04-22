@@ -177,54 +177,47 @@ class CCP:
     #   15.2u10-11 15.3u10 15.3u12
     def classify_codestreams(self, cs_dict):
         for cs in cs_dict.keys():
-            relatives = [cs]
-            for c in cs_dict[cs]:
-                relatives.append(c)
 
-            # All the codestreams related to the same key share the same code.
-            r = relatives.pop(0)
+            # Group all codestreams that share the same codestream by a new dict
+            # divided by the SLE version alone, making it easier to process
+            # later
+            cs_group = {}
+            relatives = [cs] + cs_dict[cs]
+            for l in [cs] + cs_dict[cs]:
+                prefix, up = l.split('u')
+                if not cs_group.get(prefix, ''):
+                    cs_group[prefix] = [up]
+                else:
+                    cs_group[prefix].append(up)
 
-            # A cs that does not share code with any other
-            if not len(relatives):
-                print('\t{}'.format(r))
-                continue
-
-            # We have other codestreams in the relatives list, so we share code with
-            # other codestreams
             buf = ''
-            while True:
-                if not r:
-                    break
+            for g in cs_group.keys():
+                similars = [int(cs_group[g].pop(0))]
 
-                # siblings is used to check is the current cs has more than one
-                # 'sibling' prefix and an update + 1. When it's not the case, the cs
-                # in question is alone, so we should avoid printing the up date
-                siblings = False
-                prefix, up = r.split('u')
                 while True:
-                    # If we don't have more cs to process in this list, check if we
-                    # had more than one cs with the same prefix, and only if yes,
-                    # append the upper. This avoids duplicating the update number.
-                    if not len(relatives):
-                        buf += ' ' + r
-                        if siblings:
-                            buf += '-' + up
-                        r = None
+                    if not cs_group[g]:
                         break
 
-                    m = relatives.pop(0)
-                    mprefix, mup = m.split('u')
-                    if prefix == mprefix and int(mup) == int(up) + 1:
-                        siblings = True
-                        up = mup
+                    r = int(cs_group[g].pop(0))
+                    if r == similars[len(similars) - 1] + 1:
+                        similars.append(r)
                         continue
 
-                    buf += ' ' + r
-                    if siblings:
-                      buf += '-' + up
-                    # start grouping the different codestream
-                    r = m
-                    break
+                    # Current one is different, dump what we stored and clean
+                    # similars
+                    if len(similars) == 1:
+                        buf = buf + ' {}u{}'.format(g, similars[0])
+                    else:
+                        buf = buf + ' {}u{}-{}'.format(g, similars[0],
+                            similars[len(similars) - 1])
+
+                    similars = [r]
+
+                if len(similars) == 1:
+                    buf = buf + ' {}u{}'.format(g, similars[0])
+                else:
+                    buf = buf + ' {}u{}-{}'.format(g, similars[0],
+                                        similars[len(similars) - 1])
 
             print('\t{}'.format(buf.strip()))
 
@@ -234,7 +227,8 @@ class CCP:
 
         print('\nGrouping codestreams for each file processed by ccp:')
 
-        for fname in self._proc_files:
+        # Use set to remove duplicated names
+        for fname in set(self._proc_files):
             src_out = self.lp_out_file(fname)
 
             for fsrc in pathlib.Path(self.cfg.bsc_path, 'c').rglob(src_out):
