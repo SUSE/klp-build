@@ -87,7 +87,7 @@ class Setup:
 
                 # remove the last two columns, which are dates of the line
                 # and add a fifth field with the forth one + rpm- prefix, and
-                # remove the micro version number
+                # remove the build counter number
                 columns = line.decode('utf-8').split(',')
                 kernel = re.sub('\.\d+$', '', columns[2])
 
@@ -154,7 +154,7 @@ class Setup:
                 self._cs_json[cs_key] = {
                     'project' : proj,
                     'kernel' : kernel,
-                    'micro-version' : kernel_full[-1],
+                    'build-counter' : kernel_full[-1],
                     'branch' : '',
                     'cs' : full_cs,
                     'sle' : sle,
