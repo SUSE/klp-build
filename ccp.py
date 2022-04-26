@@ -351,7 +351,10 @@ class CCP:
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(self.process_ccp, cs_list)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            results = executor.map(self.process_ccp, cs_list)
+            for result in results:
+                if result:
+                    print('{}: {}'.format(cs, result))
 
         self.group_equal_files()
