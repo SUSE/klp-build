@@ -188,7 +188,10 @@ class CCP:
     #   { '15.2u10' : [ 15.2u11 15.3u10 15.3u12 ] }
     # Will be converted to:
     #   15.2u10-11 15.3u10 15.3u12
+    # The returned value will be a list of lists, each internal list will
+    # contain all codestreams which share the same code
     def classify_codestreams(self, cs_dict):
+        file_cs_list = []
         for cs in cs_dict.keys():
 
             # Group all codestreams that share the same codestream by a new dict
@@ -203,7 +206,7 @@ class CCP:
                 else:
                     cs_group[prefix].append(up)
 
-            buf = ''
+            cs_list = []
             for g in cs_group.keys():
                 similars = [int(cs_group[g].pop(0))]
 
@@ -219,24 +222,27 @@ class CCP:
                     # Current one is different, dump what we stored and clean
                     # similars
                     if len(similars) == 1:
-                        buf = buf + ' {}u{}'.format(g, similars[0])
+                        cs_list.append('{}u{}'.format(g, similars[0]))
                     else:
-                        buf = buf + ' {}u{}-{}'.format(g, similars[0],
-                            similars[len(similars) - 1])
+                        cs_list.append('{}u{}-{}'.format(g, similars[0],
+                            similars[len(similars) - 1]))
 
                     similars = [r]
 
                 if len(similars) == 1:
-                    buf = buf + ' {}u{}'.format(g, similars[0])
+                    cs_list.append('{}u{}'.format(g, similars[0]))
                 else:
-                    buf = buf + ' {}u{}-{}'.format(g, similars[0],
-                                        similars[len(similars) - 1])
+                    cs_list.append('{}u{}-{}'.format(g, similars[0],
+                                        similars[len(similars) - 1]))
 
-            print('\t{}'.format(buf.strip()))
+            file_cs_list.append(cs_list)
+
+        return file_cs_list
 
     def group_equal_files(self):
         codestreams = []
         files = {}
+        cs_groups = {}
 
         print('\nGrouping codestreams for each file processed by ccp:')
 
@@ -266,6 +272,10 @@ class CCP:
 
                     src = re.sub('#include ".+kconfig.h"', '', buf)
 
+                    # Remove any mentions to klpr_trace, since it's currently
+                    # buggy in klp-ccp
+                    src = re.sub('.+klpr_trace.+', '', src)
+
                     codestreams.append(cs)
                     files[cs] = { 'kconfig' : kconfig, 'src' : src }
 
@@ -294,9 +304,16 @@ class CCP:
 
             # members will contain a dict with the key as a codestream and the
             # values will be a list of codestreams that share the code
-            print('\t{}'.format(fname))
-            self.classify_codestreams(members)
-            print('')
+            cs_groups[fname] = self.classify_codestreams(members)
+
+        with open(Path(self.cfg.bsc_path, 'groups.json'), 'w') as f:
+            f.write(json.dumps(cs_groups, indent=4))
+
+        for file in cs_groups.keys():
+            print('\t{}'.format(file))
+
+            for css in cs_groups[file]:
+                print('\t\t{}'.format(' '.join(css)))
 
     def process_ccp(self, cs):
         jcs = self._cs[cs]
