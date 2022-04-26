@@ -1,5 +1,6 @@
 import json
 import pathlib
+from pathlib import Path
 import os
 import re
 import shutil
@@ -108,10 +109,15 @@ class CCP:
 
         ccp_args = list(filter(None, ccp_args))
 
-        completed = subprocess.run(ccp_args, cwd=odir, text=True,
-                                    capture_output=True, env=env)
+        completed = subprocess.run(ccp_args, cwd=odir, capture_output=True,
+                env=env)
         if completed.returncode != 0:
-            raise ValueError('klp-ccp returned {}, stderr: {}\nArgs: {}'.format(completed.returncode, completed.stderr, ' '.join(ccp_args)))
+            raise ValueError('klp-ccp returned {}, stderr: {}\nArgs: {}'.format(completed.returncode, completed.stderr.decode(), ' '.join(ccp_args)))
+
+        # Store the output for later
+        with open(Path(out_dir, 'klp-ccp.out'), 'w') as f:
+            f.write(completed.stdout.decode())
+            f.write(completed.stderr.decode())
 
 		# Remove the local path prefix of the klp-ccp generated comments
         # Open the file, read, seek to the beginning, write the new data, and
