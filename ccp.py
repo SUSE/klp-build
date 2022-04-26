@@ -237,6 +237,8 @@ class CCP:
 
             file_cs_list.append(cs_list)
 
+        file_cs_list.sort()
+
         return file_cs_list
 
     def group_equal_files(self):
