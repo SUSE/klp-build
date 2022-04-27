@@ -44,3 +44,8 @@ class Config:
         self.ksrc = os.getenv('KLP_KERNEL_SOURCE')
         if self.ksrc and not Path(self.ksrc).is_dir():
             raise ValueError('KLP_KERNEL_SOURCE should point to a directory')
+
+        if args.cmd == 'get-patches' and not self.ksrc:
+            raise ValueError('KLP_KERNEL_SOURCE should be defined')
+
+        self.bsc_path.mkdir(exist_ok=True)

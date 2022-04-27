@@ -5,6 +5,7 @@ import os
 
 import ccp
 from config import Config
+import ksrc
 import utils
 import templ
 
@@ -45,6 +46,10 @@ def create_parser() -> argparse.ArgumentParser:
     templ.add_argument('--codestream', type=str, required=True,
             help='Codestream to generate the livepatch files to. E.g 15.2u12')
 
+    patches = sub.add_parser('get-patches', parents = [parentparser])
+    patches.add_argument('-u', '--upstream-commits', required=True,
+            nargs='+', help='Commit hashes used to solve the CVE')
+
     return parser
 
 if  __name__ == '__main__':
@@ -68,3 +73,7 @@ if  __name__ == '__main__':
         templ = templ.Template(config, args.codestream)
         templ.GenerateLivePatches()
         templ.GeneratePatchedFuncs()
+
+    elif args.cmd == 'get-patches':
+        ksrc = ksrc.GitHelper(config, args.upstream_commits)
+        ksrc.get_commits(['4.4', '4.12', '5.3'])

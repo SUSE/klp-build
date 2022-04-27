@@ -18,27 +18,20 @@ class Setup:
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
             ups_commits, disable_ccp):
         self.cfg = cfg
-        self.cfg.bsc_path.mkdir(exist_ok=True)
 
         self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
         self._conf = conf
         self._file_funcs = file_funcs
-        self._commits = { 'upstream' : {} }
-        for commit in ups_commits:
-            commit = commit[:12]
-            self._commits['upstream'][commit] = self.get_commit_subject(commit)
 
+        self._githelper = ksrc.GitHelper(cfg, ups_commits)
         self._mod = mod
-
         self._redownload = redownload
 
         self._rpm_dir = pathlib.Path(cfg.env, 'kernel-rpms')
         self._ex_dir = pathlib.Path(cfg.env, 'ex-kernels')
         self._ipa_dir = pathlib.Path(cfg.env, 'ipa-clones')
 
-        self._ccp = None
-        if not disable_ccp:
-            self._ccp = ccp.CCP(cfg)
+        self._disable_ccp = disable_ccp
 
     def get_rename_prefix(self, cs):
         if '12.3' in cs:
@@ -171,27 +164,13 @@ class Setup:
         # later on
         self._cve_branches = list(dict.fromkeys(kernels))
 
-    def get_commit_subject(self, commit):
-        req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
-        req.raise_for_status()
-
-        patches = Path(self.cfg.bsc_path, 'patches')
-        patches.mkdir(exist_ok=True)
-
-        # Save the upstream commit in the bsc directory
-        fpath = Path(patches, commit + '.patch')
-        with open(fpath, 'w') as f:
-            f.write(req.text)
-
-        return re.search('Subject: (.*)', req.text).group(1)
-
     def write_json_files(self):
         data = { 'bsc' : str(self.cfg.bsc_num),
                 'cve' : self._cve,
                 'conf' : self._conf,
                 'mod' : self._mod,
                 'cve_branches' : self._cve_branches,
-                'commits' : self._commits,
+                'commits' : self._githelper.commits,
                 'ex_kernels' : str(self._ex_dir),
                 'ipa_clones' : str(self._ipa_dir),
                 'work_dir' : str(self.cfg.bsc_path)
@@ -218,11 +197,11 @@ class Setup:
 
         self.fill_cs_json()
 
-        githelper = ksrc.GitHelper(self.cfg)
-        githelper.get_commits(self._cve_branches, self._commits)
+        self._githelper.get_commits(self._cve_branches)
 
         self.write_json_files()
         self.write_commit_file()
 
-        if self._ccp:
-            self._ccp.run_ccp()
+        if not self._disable_ccp:
+            _ccp = ccp.CCP(self.cfg)
+            _ccp.run_ccp()
