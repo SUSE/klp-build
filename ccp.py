@@ -282,6 +282,8 @@ class CCP:
                     files[cs] = { 'kconfig' : kconfig, 'src' : src }
 
             members = {}
+            # rglob can list codestreams unordered
+            codestreams.sort()
             toprocess = codestreams.copy()
 
             while len(toprocess):
