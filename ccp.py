@@ -367,7 +367,6 @@ class CCP:
         cs_list = []
         for cs in self._cs.keys():
             if self.cfg.filter and not re.match(self.cfg.filter, cs):
-                print('Skipping {}'.format(cs))
                 continue
 
             if not self._cs[cs]['files']:

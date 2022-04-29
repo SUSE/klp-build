@@ -86,7 +86,6 @@ class Setup:
 
                 sle, sp, u = self.parse_cs_line(columns[0])
                 if self.cfg.filter and not re.match(self.cfg.filter, '{}.{}u{}'.format(sle, sp, u)):
-                    print('Skipping {}'.format(columns[0]))
                     continue
 
                 f.write(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,rpm-' + kernel + '\n')
