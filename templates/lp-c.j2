@@ -10,11 +10,6 @@
 #endif
 {% endif %}
 
-#include "livepatch_bsc{{ bsc_num }}.h"
-
-
-
-
 {% if inc_src_file is not none -%}
 {% include inc_src_file %}
 {% endif %}
@@ -30,6 +25,7 @@
 {% if mod is defined %}
 #include <linux/module.h>
 {% endif %}
+#include "livepatch_bsc{{ bsc_num }}.h"
 #include "../kallsyms_relocs.h"
 
 static struct {{ ktype }}_kallsyms_reloc {{ ktype }}_funcs[] = {
