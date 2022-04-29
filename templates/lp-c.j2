@@ -1,6 +1,8 @@
 {% include 'header.j2' %}
 
-{% if config is defined %}#if IS_ENABLED({{ config }}){% endif %}
+{% if config is defined %}
+#if IS_ENABLED({{ config }})
+{% endif %}
 
 {% if mod is defined %}
 #if !IS_MODULE({{ config }})
@@ -20,11 +22,14 @@
 
 
 
-
-{% if mod is defined %}#define LP_MODULE "{{ mod }}"{% endif %}
+{% if mod is defined %}
+#define LP_MODULE "{{ mod }}"
+{% endif %}
 
 #include <linux/kernel.h>
-{% if mod is defined %}#include <linux/module.h>{% endif %}
+{% if mod is defined %}
+#include <linux/module.h>
+{% endif %}
 #include "../kallsyms_relocs.h"
 
 static struct {{ ktype }}_kallsyms_reloc {{ ktype }}_funcs[] = {
@@ -59,6 +64,7 @@ static struct notifier_block {{ fname }}_module_nb = {
 	.notifier_call = {{ fname }}_modify_notify,
 	.priority = INT_MIN+1,
 };
+
 {% endif -%}
 
 int {{ fname }}_init(void)
@@ -89,5 +95,7 @@ void {{ fname }}_cleanup(void)
 	unregister_module_notifier(&{{ fname }}_module_nb);
 }
 {% endif -%}
+{% if config is defined %}
 
-{% if config is defined %}#endif /* IS_ENABLED({{ config }}) */{% endif -%}
+#endif /* IS_ENABLED({{ config }}) */
+{% endif -%}
