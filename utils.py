@@ -154,7 +154,7 @@ class Setup:
                     'sp' : sp,
                     'update' : u,
                     'readelf' : 'readelf',
-                    'rename_prefix' : self.get_rename_prefix(cs),
+                    'rename_prefix' : self.get_rename_prefix(cs_key),
                     'object' : str(obj),
                     'files' : cs_files
                 }
