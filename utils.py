@@ -170,6 +170,7 @@ class Setup:
                 'mod' : self._mod,
                 'cve_branches' : self._cve_branches,
                 'commits' : self._githelper.commits,
+                'patched' : self._githelper.patched,
                 'ex_kernels' : str(self._ex_dir),
                 'ipa_clones' : str(self._ipa_dir),
                 'work_dir' : str(self.cfg.bsc_path)
@@ -197,6 +198,7 @@ class Setup:
         self.fill_cs_json()
 
         self._githelper.get_commits(self._cve_branches)
+        self._githelper.find_patched(self._cve_branches)
 
         self.write_json_files()
         self.write_commit_file()

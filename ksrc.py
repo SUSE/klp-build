@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from natsort import natsorted
 import re
 import requests
 import subprocess
@@ -9,6 +10,7 @@ class GitHelper:
     def __init__(self, cfg, ups_commits):
         self.cfg = cfg
 
+        self.patched = []
         self.commits = { 'upstream' : {} }
         for commit in ups_commits:
             commit = commit[:12]
@@ -88,3 +90,33 @@ class GitHelper:
                 hash_cmt = self.commits[cve].get(key, 'None yet')
                 print('\t{}\t{}'.format(cve, hash_cmt))
             print('')
+
+    def find_patched(self, cve_branches):
+        if not self.cfg.ksrc:
+            print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
+            return
+
+        print('Searching for already patched codestreams...')
+
+        patched = []
+        for branch in cve_branches:
+            for up_commit, suse_commit in self.commits[branch].items():
+                tags = subprocess.check_output(['/usr/bin/git', '-C',
+                            str(self.cfg.ksrc), 'tag', '--contains=' + suse_commit])
+
+                for tag in tags.decode().splitlines():
+                    tag = tag.strip()
+                    if not tag.startswith('rpm-'):
+                        continue
+
+                    # Remove noise around the kernel version, like
+                    # rpm-5.3.18-150200.24.112--sle15-sp2-ltss-updates
+                    tag = tag.replace('rpm-', '')
+                    tag = re.sub('--.*', '', tag)
+
+                    patched.append(tag)
+
+        # remove duplicates
+        self.patched = natsorted(list(set(patched)))
+        for p in self.patched:
+            print('\t{}'.format(p))
