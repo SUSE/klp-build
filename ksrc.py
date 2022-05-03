@@ -63,7 +63,7 @@ class GitHelper:
                 # the first one listed.
                 full_cmt = subprocess.check_output(['/usr/bin/git', '-C',
                             str(self.cfg.ksrc),
-                            'log', '--reverse', '--patch', branch, fpath],
+                            'log', '--reverse', '--patch', branch, '--', fpath],
                             stderr=subprocess.PIPE).decode(sys.stdout.encoding)
 
                 m = re.search('commit (\w+)', full_cmt)
