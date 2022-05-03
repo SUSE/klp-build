@@ -59,7 +59,8 @@ class CCP:
         ofname = pathlib.Path(filename.parent, ofname)
 
         # FIXME: is this regex accurate?
-        cmd_args_regex = '(-Wp,-MD,{} -nostdinc -isystem.*{});'.format(ofname, fname)
+        cmd_args_regex = '(-Wp,-MD,{}\s+-nostdinc\s+-isystem.*{});'.format(ofname, fname)
+
         result = re.search(cmd_args_regex, str(output).strip())
         if not result:
             return None
