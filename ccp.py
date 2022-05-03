@@ -364,7 +364,10 @@ class CCP:
         if self.cfg.filter:
             print('Applying filter...')
 
+        patched = self._conf.get('patched', [])
+
         cs_list = []
+        patched_cs = []
         for cs in self._cs.keys():
             if self.cfg.filter and not re.match(self.cfg.filter, cs):
                 continue
@@ -373,7 +376,16 @@ class CCP:
                 print('Skipping {} since it doesn\'t contain any files'.format(cs))
                 continue
 
+            if self._cs[cs]['kernel'] in patched:
+                patched_cs.append(cs)
+                continue
+
             cs_list.append(cs)
+
+        if patched_cs:
+            print('Skipping the already patched codestreams:')
+            for cs in patched_cs:
+                print('\t{}'.format(cs))
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')

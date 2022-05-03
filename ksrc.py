@@ -118,5 +118,3 @@ class GitHelper:
 
         # remove duplicates
         self.patched = natsorted(list(set(patched)))
-        for p in self.patched:
-            print('\t{}'.format(p))
