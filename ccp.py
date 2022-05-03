@@ -83,10 +83,12 @@ class CCP:
     def get_make_cmd(self, filename, jcs, odir):
         filename = pathlib.PurePath(filename)
         file_ = filename.with_suffix('.o')
-        completed = subprocess.run(['make', '-sn', file_], cwd=odir, capture_output=True, text=True)
-        if completed.returncode != 0:
-            raise RuntimeError('klp-ccp returned {}, stderr: {}'.format(completed.returncode, completed.stderr))
-        return self.process_make_output(filename, completed.stdout, jcs['sle'], jcs['sp'])
+        completed = subprocess.run(['make', '-sn', file_], cwd=odir,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, check=True)
+
+        return self.process_make_output(filename, completed.stdout.decode(),
+                                        jcs['sle'], jcs['sp'])
 
     # extract the last component of the path, like the basename bash # function
     def lp_out_file(self, fname):
@@ -109,10 +111,8 @@ class CCP:
 
         ccp_args = list(filter(None, ccp_args))
 
-        completed = subprocess.run(ccp_args, cwd=odir, capture_output=True,
-                env=env)
-        if completed.returncode != 0:
-            raise ValueError('klp-ccp returned {}, stderr: {}\nArgs: {}'.format(completed.returncode, completed.stderr.decode(), ' '.join(ccp_args)))
+        completed = subprocess.run(ccp_args, cwd=odir, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, env=env, check=True)
 
         # Store the output for later
         with open(Path(out_dir, 'klp-ccp.out'), 'w') as f:
