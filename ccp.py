@@ -1,6 +1,7 @@
 import json
 import pathlib
 from pathlib import Path
+from natsort import natsorted
 import os
 import re
 import shutil
@@ -238,9 +239,7 @@ class CCP:
 
             file_cs_list.append(cs_list)
 
-        file_cs_list.sort()
-
-        return file_cs_list
+        return natsorted(file_cs_list)
 
     def group_equal_files(self):
         codestreams = []
@@ -284,7 +283,7 @@ class CCP:
 
             members = {}
             # rglob can list codestreams unordered
-            codestreams.sort()
+            codestreams = natsorted(codestreams)
             toprocess = codestreams.copy()
 
             while len(toprocess):
