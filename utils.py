@@ -13,7 +13,6 @@ import ksrc
 
 class Setup:
     _cs_file = None
-    _cs_json = {}
 
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
             ups_commits, disable_ccp):
@@ -32,6 +31,14 @@ class Setup:
         self._ipa_dir = pathlib.Path(cfg.env, 'ipa-clones')
 
         self._disable_ccp = disable_ccp
+
+        # Populate _cs_json with codestreams.json if setup was previously
+        # executed.
+        self._cs_json = {}
+        conf_file = Path(cfg.bsc_path, 'codestreams.json')
+        if conf_file.is_file():
+            with open(conf_file, 'r') as f:
+                self._cs_json = json.loads(f.read())
 
     def get_rename_prefix(self, cs):
         if '12.3' in cs:
@@ -106,7 +113,13 @@ class Setup:
         kernels = []
         with open(self._cs_file, 'r') as f:
             for line in f:
-                full_cs, proj, kernel_full, _, _= line.strip().split(',')
+                full_cs, proj, kernel_full, _, _= line.strip().split(',')\
+
+                sle, sp, u = self.parse_cs_line(full_cs)
+                cs_key = sle + '.' + sp + 'u' + u
+
+                if self.cfg.filter and not re.match(self.cfg.filter, cs_key):
+                    continue
 
                 ex_dir = pathlib.Path(self._ex_dir, full_cs)
                 src = pathlib.Path(ex_dir, 'usr', 'src')
@@ -125,7 +138,6 @@ class Setup:
                         print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_kernel))
                         continue
 
-
                 if not self._mod:
                     obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +
                             kernel.replace('linux-', '') + '-default')
@@ -140,8 +152,14 @@ class Setup:
                     # used later
                     obj = obj[0]
 
-                sle, sp, u = self.parse_cs_line(full_cs)
-                cs_key = sle + '.' + sp + 'u' + u
+                # Verify if the functions exist in the specified object
+                for f in cs_files.keys():
+                    for func in cs_files[f]:
+                        if not self._githelper.verify_func_object(func, str(obj)):
+                            print('')
+                            print('ERROR: {}: Function {} does not exist in {}'.format(cs_key, func, obj))
+                            print('Use kgraft-analysis-tool to find out where this function was inlined to.')
+                            sys.exit(1)
 
                 self._cs_json[cs_key] = {
                     'project' : proj,

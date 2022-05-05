@@ -16,6 +16,10 @@ class GitHelper:
             commit = commit[:12]
             self.commits['upstream'][commit] = self.get_commit_subject(commit)
 
+    def verify_func_object(self, func, obj):
+        nm_out = subprocess.check_output(['nm', obj]).decode().strip()
+        return re.search(r' {}\n'.format(func), nm_out)
+
     def get_commit_subject(self, commit):
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
         req.raise_for_status()
