@@ -29,7 +29,7 @@ class Template:
             if self._mod:
                 self._mod = self._mod.replace('-', '_')
             self._cve = data['cve']
-            self._conf = data['conf']
+            self._kernel_conf = data['conf']
             self._commits = data['commits']
 
         if cs:
@@ -55,7 +55,7 @@ class Template:
             for fun in self._funcs:
                 mod = 'vmlinux' if not self._mod else self._mod
                 f.write('{} {} klpp_{} IS_ENABLED({})\n'.format(mod, fun, fun,
-                    self._conf))
+                    self._kernel_conf))
 
     def GenerateLivepatchFile(self, ext, out_name, src_file, ext_file,
             include_header):
@@ -99,7 +99,7 @@ class Template:
                                 inc_src_file = lp_file,
                                 inc_exts_file = ext_file,
                                 cve = self._cve,
-                                config = self._conf,
+                                config = self._kernel_conf,
                                 ktype = self._ktype,
                                 user = self._user,
                                 email = self._email,

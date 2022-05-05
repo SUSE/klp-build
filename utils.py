@@ -20,7 +20,7 @@ class Setup:
         self.cfg = cfg
 
         self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
-        self._conf = conf
+        self._kernel_conf = conf
         self._file_funcs = file_funcs
 
         self._githelper = ksrc.GitHelper(cfg, ups_commits)
@@ -166,7 +166,7 @@ class Setup:
     def write_json_files(self):
         data = { 'bsc' : str(self.cfg.bsc_num),
                 'cve' : self._cve,
-                'conf' : self._conf,
+                'conf' : self._kernel_conf,
                 'mod' : self._mod,
                 'cve_branches' : self._cve_branches,
                 'commits' : self._githelper.commits,
