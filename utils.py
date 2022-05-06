@@ -32,14 +32,6 @@ class Setup:
 
         self._disable_ccp = disable_ccp
 
-        # Populate _cs_json with codestreams.json if setup was previously
-        # executed.
-        self._cs_json = {}
-        conf_file = Path(cfg.bsc_path, 'codestreams.json')
-        if conf_file.is_file():
-            with open(conf_file, 'r') as f:
-                self._cs_json = json.loads(f.read())
-
     def get_rename_prefix(self, cs):
         if '12.3' in cs:
             return 'kgr'
@@ -161,7 +153,7 @@ class Setup:
                             print('Use kgraft-analysis-tool to find out where this function was inlined to.')
                             sys.exit(1)
 
-                self._cs_json[cs_key] = {
+                self.cfg.codestreams[cs_key] = {
                     'project' : proj,
                     'kernel' : kernel,
                     'build-counter' : kernel_full[-1],
@@ -198,7 +190,7 @@ class Setup:
             f.write(json.dumps(data, indent=4))
 
         with open(pathlib.Path(self.cfg.bsc_path, 'codestreams.json'), 'w') as f:
-            f.write(json.dumps(self._cs_json, indent=4))
+            f.write(json.dumps(self.cfg.codestreams, indent=4))
 
     def write_commit_file(self):
         temp = templ.Template(self.cfg, None)

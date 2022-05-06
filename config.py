@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import os
 import re
@@ -47,5 +48,17 @@ class Config:
 
         if args.cmd == 'get-patches' and not self.ksrc:
             raise ValueError('KLP_KERNEL_SOURCE should be defined')
+
+        self.codestreams = {}
+        self.cs_file = Path(self.bsc_path, 'codestreams.json')
+        if self.cs_file.is_file():
+            with open(self.cs_file, 'r') as f:
+                self.codestreams = json.loads(f.read())
+
+        # run-ccp and create-lp commands only work if codestreams.json file
+        # exist, so make sure that it was created by setup step before going
+        # further.
+        if args.cmd in ['run-ccp', 'create-lp'] and not self.codestreams:
+            raise ValueError('codestreams.json file not found.')
 
         self.bsc_path.mkdir(exist_ok=True)

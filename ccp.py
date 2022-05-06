@@ -10,13 +10,9 @@ import subprocess
 import concurrent.futures
 
 class CCP:
-    _cs = None
     _conf = None
 
     def __init__(self, cfg):
-        with open(pathlib.Path(cfg.bsc_path, 'codestreams.json')) as f:
-            self._cs = json.loads(f.read())
-
         with open(pathlib.Path(cfg.bsc_path, 'conf.json')) as f:
             self._conf = json.loads(f.read())
 
@@ -320,7 +316,7 @@ class CCP:
                 print('\t\t{}'.format(' '.join(css)))
 
     def process_ccp(self, cs):
-        jcs = self._cs[cs]
+        jcs = self.cfg.codestreams[cs]
 
         ex = self._conf['ex_kernels']
         ipa = self._conf['ipa_clones']
@@ -368,15 +364,15 @@ class CCP:
 
         cs_list = []
         patched_cs = []
-        for cs in self._cs.keys():
+        for cs in self.cfg.codestreams.keys():
             if self.cfg.filter and not re.match(self.cfg.filter, cs):
                 continue
 
-            if not self._cs[cs]['files']:
+            if not self.cfg.codestreams[cs]['files']:
                 print('Skipping {} since it doesn\'t contain any files'.format(cs))
                 continue
 
-            if self._cs[cs]['kernel'] in patched:
+            if self.cfg.codestreams[cs]['kernel'] in patched:
                 patched_cs.append(cs)
                 continue
 

@@ -17,10 +17,6 @@ class Template:
         if not conf.is_file():
             raise ValueError('config.json not found in {}'.format(str(conf)))
 
-        codestreams = pathlib.Path(cfg.bsc_path, 'codestreams.json')
-        if not codestreams.is_file():
-            raise ValueError('codestreams.json not found in {}'.format(str(codestreams)))
-
         with open(conf, 'r') as f:
             data = json.load(f)
             # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
@@ -34,12 +30,10 @@ class Template:
 
         if cs:
             self._cs = cs
-            with open(codestreams, 'r') as f:
-                data = json.load(f)
-                self._jcs = data[cs]
-                self._ktype = self._jcs['rename_prefix']
-                self._files = list(self._jcs['files'].keys())
-                self._funcs = []
+            self._jcs = self.cfg.codestreams[cs]
+            self._ktype = self._jcs['rename_prefix']
+            self._files = list(self._jcs['files'].keys())
+            self._funcs = []
 
         try:
             conf = git.GitConfigParser()
