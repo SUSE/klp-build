@@ -26,9 +26,9 @@ class Setup:
         self._mod = mod
         self._redownload = redownload
 
-        self._rpm_dir = pathlib.Path(cfg.env, 'kernel-rpms')
-        self._ex_dir = pathlib.Path(cfg.env, 'ex-kernels')
-        self._ipa_dir = pathlib.Path(cfg.env, 'ipa-clones')
+        self._rpm_dir = pathlib.Path(cfg.data, 'kernel-rpms')
+        self._ex_dir = pathlib.Path(cfg.data, 'ex-kernels')
+        self._ipa_dir = pathlib.Path(cfg.data, 'ipa-clones')
 
         self._disable_ccp = disable_ccp
 
