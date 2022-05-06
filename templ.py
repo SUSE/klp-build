@@ -15,12 +15,7 @@ class Template:
 
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
         # and in kallsyms lookup
-        self._mod = self.cfg.conf['mod']
-        if self._mod:
-            self._mod = self._mod.replace('-', '_')
-        self._cve = self.cfg.conf['cve']
-        self._kernel_conf = self.cfg.conf['conf']
-        self._commits = self.cfg.conf['commits']
+        self._mod = self.cfg.conf.get('mod', '').replace('-', '_')
 
         if cs:
             self._cs = cs
@@ -43,7 +38,7 @@ class Template:
             for fun in self._funcs:
                 mod = 'vmlinux' if not self._mod else self._mod
                 f.write('{} {} klpp_{} IS_ENABLED({})\n'.format(mod, fun, fun,
-                    self._kernel_conf))
+                    self.cfg.conf['conf']))
 
     def GenerateLivepatchFile(self, ext, out_name, src_file, ext_file,
             include_header):
@@ -86,12 +81,12 @@ class Template:
                                 fname = os.path.splitext(out_name)[0],
                                 inc_src_file = lp_file,
                                 inc_exts_file = ext_file,
-                                cve = self._cve,
-                                config = self._kernel_conf,
+                                cve = self.cfg.conf['cve'],
+                                config = self.cfg.conf['conf'],
                                 ktype = self._ktype,
                                 user = self._user,
                                 email = self._email,
-                                commits = self._commits))
+                                commits = self.cfg.conf['commits']))
 
     def GenerateLivePatches(self):
         # If the livepatch contains only one file, generate only the livepatch
@@ -126,7 +121,7 @@ class Template:
         templ = self._env.get_template('commit.j2')
         return templ.render(bsc = self.cfg.bsc,
                             bsc_num = self.cfg.bsc_num,
-                            cve = self._cve,
+                            cve = self.cfg.conf['cve'],
                             user = self._user,
                             email = self._email,
-                            commits = self._commits)
+                            commits = self.cfg.conf['commits'])
