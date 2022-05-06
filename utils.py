@@ -186,10 +186,10 @@ class Setup:
                 'work_dir' : str(self.cfg.bsc_path)
         }
 
-        with open(pathlib.Path(self.cfg.bsc_path, 'conf.json'), 'w') as f:
+        with open(self.cfg.conf_file, 'w') as f:
             f.write(json.dumps(data, indent=4))
 
-        with open(pathlib.Path(self.cfg.bsc_path, 'codestreams.json'), 'w') as f:
+        with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4))
 
     def write_commit_file(self):

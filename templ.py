@@ -13,20 +13,14 @@ class Template:
         self.cfg = cfg
         self.bsc = cfg.bsc
 
-        conf = pathlib.Path(cfg.bsc_path, 'conf.json')
-        if not conf.is_file():
-            raise ValueError('config.json not found in {}'.format(str(conf)))
-
-        with open(conf, 'r') as f:
-            data = json.load(f)
-            # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
-            # and in kallsyms lookup
-            self._mod = data['mod']
-            if self._mod:
-                self._mod = self._mod.replace('-', '_')
-            self._cve = data['cve']
-            self._kernel_conf = data['conf']
-            self._commits = data['commits']
+        # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
+        # and in kallsyms lookup
+        self._mod = self.cfg.conf['mod']
+        if self._mod:
+            self._mod = self._mod.replace('-', '_')
+        self._cve = self.cfg.conf['cve']
+        self._kernel_conf = self.cfg.conf['conf']
+        self._commits = self.cfg.conf['commits']
 
         if cs:
             self._cs = cs

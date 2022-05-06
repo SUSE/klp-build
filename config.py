@@ -55,10 +55,19 @@ class Config:
             with open(self.cs_file, 'r') as f:
                 self.codestreams = json.loads(f.read())
 
-        # run-ccp and create-lp commands only work if codestreams.json file
-        # exist, so make sure that it was created by setup step before going
-        # further.
-        if args.cmd in ['run-ccp', 'create-lp'] and not self.codestreams:
-            raise ValueError('codestreams.json file not found.')
+
+        self.conf = {}
+        self.conf_file = Path(self.bsc_path, 'conf.json')
+        if self.conf_file.is_file():
+            with open(self.conf_file, 'r') as f:
+                self.conf = json.loads(f.read())
+
+        # run-ccp and create-lp commands only work if codestreams.json and
+        # conf.json files exist
+        if args.cmd in ['run-ccp', 'create-lp']:
+            if not self.codestreams:
+                raise ValueError('codestreams.json file not found.')
+            if not self.conf:
+                raise ValueError('conf.json file not found.')
 
         self.bsc_path.mkdir(exist_ok=True)

@@ -10,12 +10,7 @@ import subprocess
 import concurrent.futures
 
 class CCP:
-    _conf = None
-
     def __init__(self, cfg):
-        with open(pathlib.Path(cfg.bsc_path, 'conf.json')) as f:
-            self._conf = json.loads(f.read())
-
         self.cfg = cfg
         self._proc_files = []
 
@@ -318,8 +313,8 @@ class CCP:
     def process_ccp(self, cs):
         jcs = self.cfg.codestreams[cs]
 
-        ex = self._conf['ex_kernels']
-        ipa = self._conf['ipa_clones']
+        ex = self.cfg.conf['ex_kernels']
+        ipa = self.cfg.conf['ipa_clones']
         ipa_dir = pathlib.Path(ipa, jcs['cs'], 'x86_64')
 
         sdir = pathlib.Path(ex, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
@@ -360,7 +355,7 @@ class CCP:
         if self.cfg.filter:
             print('Applying filter...')
 
-        patched = self._conf.get('patched', [])
+        patched = self.cfg.conf.get('patched', [])
 
         cs_list = []
         patched_cs = []
