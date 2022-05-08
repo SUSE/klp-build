@@ -1,5 +1,4 @@
 from datetime import datetime
-import git
 import jinja2
 import json
 import pathlib
@@ -23,13 +22,6 @@ class Template:
             self._ktype = self._jcs['rename_prefix']
             self._files = list(self._jcs['files'].keys())
             self._funcs = []
-
-        try:
-            conf = git.GitConfigParser()
-            self._user = conf.get_value('user', 'name')
-            self._email = conf.get_value('user', 'email')
-        except:
-            raise RuntimeError('Please define name/email in global git config')
 
         self._templ_path = pathlib.Path(os.path.dirname(__file__), 'templates')
 
@@ -84,8 +76,8 @@ class Template:
                                 cve = self.cfg.conf['cve'],
                                 config = self.cfg.conf['conf'],
                                 ktype = self._ktype,
-                                user = self._user,
-                                email = self._email,
+                                user = self.cfg.user,
+                                email = self.cfg.email,
                                 commits = self.cfg.conf['commits']))
 
     def GenerateLivePatches(self):

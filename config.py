@@ -1,4 +1,5 @@
 import json
+import git
 from pathlib import Path
 import os
 import re
@@ -69,5 +70,12 @@ class Config:
                 raise ValueError('codestreams.json file not found.')
             if not self.conf:
                 raise ValueError('conf.json file not found.')
+
+        try:
+            git_data = git.GitConfigParser()
+            self.user = git_data.get_value('user', 'name')
+            self.email = git_data.get_value('user', 'email')
+        except:
+            raise ValueError('Please define name/email in global git config')
 
         self.bsc_path.mkdir(exist_ok=True)
