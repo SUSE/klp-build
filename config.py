@@ -20,7 +20,7 @@ class Config:
                     raise ValueError('--data or KLP_DATA_DIR should be defined')
 
             self.data = Path(data)
-            if not self.env.is_dir():
+            if not self.data.is_dir():
                 raise ValueError('Data dir should be a directory')
 
         # Prefer the argument over the environment
