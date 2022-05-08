@@ -8,7 +8,7 @@ import requests
 import subprocess
 
 import ccp
-import templ
+from templ import Template
 import ksrc
 
 class Setup:
@@ -174,7 +174,7 @@ class Setup:
         self._cve_branches = list(dict.fromkeys(kernels))
 
     def write_json_files(self):
-        data = { 'bsc' : str(self.cfg.bsc_num),
+        self.cfg.conf = { 'bsc' : str(self.cfg.bsc_num),
                 'cve' : self._cve,
                 'conf' : self._kernel_conf,
                 'mod' : self._mod,
@@ -187,17 +187,14 @@ class Setup:
         }
 
         with open(self.cfg.conf_file, 'w') as f:
-            f.write(json.dumps(data, indent=4))
+            f.write(json.dumps(self.cfg.conf, indent=4))
 
         with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4))
 
     def write_commit_file(self):
-        temp = templ.Template(self.cfg, None)
-        msg = temp.generate_commit_msg()
-
         with open(pathlib.Path(self.cfg.bsc_path, 'commit.msg'), 'w') as f:
-            f.write(msg)
+            f.write(Template.generate_commit_msg(self.cfg))
 
     def download_env(self):
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')

@@ -2,6 +2,7 @@ from datetime import datetime
 import jinja2
 import json
 import pathlib
+from pathlib import Path
 import os
 import re
 import requests
@@ -105,15 +106,16 @@ class Template:
         # of the other source files
         self.GenerateLivepatchFile('c', out_name, None, None, True)
 
-    # Return the commit message in a list of wrapped
-    def generate_commit_msg(self):
-        fsloader = jinja2.FileSystemLoader(self._templ_path)
-        self._env = jinja2.Environment(loader=fsloader, trim_blocks=True)
+    @staticmethod
+    def generate_commit_msg(cfg):
+        fsloader = jinja2.FileSystemLoader(Path(os.path.dirname(__file__),
+                                            'templates'))
+        env = jinja2.Environment(loader=fsloader, trim_blocks=True)
 
-        templ = self._env.get_template('commit.j2')
-        return templ.render(bsc = self.cfg.bsc,
-                            bsc_num = self.cfg.bsc_num,
-                            cve = self.cfg.conf['cve'],
-                            user = self._user,
-                            email = self._email,
-                            commits = self.cfg.conf['commits'])
+        templ = env.get_template('commit.j2')
+        return templ.render(bsc = cfg.bsc,
+                            bsc_num = cfg.bsc_num,
+                            cve = cfg.conf['cve'],
+                            user = cfg.user,
+                            email = cfg.email,
+                            commits = cfg.conf['commits'])
