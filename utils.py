@@ -21,7 +21,6 @@ class Setup:
 
         self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
         self._kernel_conf = conf
-        self._file_funcs = file_funcs
 
         self._githelper = ksrc.GitHelper(cfg, ups_commits)
         self._mod = mod
@@ -32,6 +31,18 @@ class Setup:
         self._ipa_dir = pathlib.Path(cfg.data, 'ipa-clones')
 
         self._disable_ccp = disable_ccp
+        self._file_funcs = {}
+
+        for f in file_funcs:
+            cs = f[0]
+            filepath = f[1]
+            funcs = f[2:]
+            # We can have multiple files per cs being specified, so do not
+            # remove previously stored file/funcs pairs
+            if not self._file_funcs.get(cs):
+                self._file_funcs[cs] = {}
+
+            self._file_funcs[cs][filepath] = funcs
 
     def get_rename_prefix(self, cs):
         if '12.3' in cs:
@@ -94,15 +105,6 @@ class Setup:
         if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
             raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
 
-        files = {}
-        for f in self._file_funcs:
-            cs = f[0]
-            filepath = f[1]
-            funcs = f[2:]
-            if not files.get(cs, {}):
-                files[cs] = {}
-            files[cs][filepath] = funcs
-
         kernels = []
         with open(self._cs_file, 'r') as f:
             for line in f:
@@ -114,22 +116,24 @@ class Setup:
                 if self.cfg.filter and not re.match(self.cfg.filter, cs_key):
                     continue
 
+                cs_files = {}
+                for cs_regex in self._file_funcs.keys():
+                    if not re.search(cs_regex, cs_key):
+                        continue
+                    cs_files = self._file_funcs[cs_regex]
+                    break
+
+                if not cs_files:
+                    print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_key))
+                    continue
+
                 ex_dir = pathlib.Path(self._ex_dir, full_cs)
                 src = pathlib.Path(ex_dir, 'usr', 'src')
 
                 kernel = re.sub('\.\d+$', '', kernel_full)
 
                 # do not expect any problems with the kernel release format
-                cs_kernel = re.search('^([0-9]+\.[0-9]+)', kernel).group(1)
-
-                kernels.append(cs_kernel)
-
-                cs_files = files.get(cs_kernel, {})
-                if not cs_files:
-                    cs_files = files.get('all', {})
-                    if not cs_files:
-                        print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_kernel))
-                        continue
+                kernels.append(re.search('^([0-9]+\.[0-9]+)', kernel).group(1))
 
                 if not self._mod:
                     obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +

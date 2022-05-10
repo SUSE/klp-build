@@ -8,8 +8,8 @@ klp-build setup --bsc 1197597 --cve 2022-1048 \
 		--upstream-commits 92ee3c60ec9fe64404dc035e7c41277d74aa26cb \
 		--mod snd-pcm \
 		--conf CONFIG_SND_PCM \
-		--file-funcs all sound/core/pcm.c snd_pcm_attach_substream snd_pcm_detach_substream \
-		--file-funcs all sound/core/pcm_native.c snd_pcm_hw_params snd_pcm_common_ioctl1
+		--file-funcs "1[25].*" sound/core/pcm.c snd_pcm_attach_substream snd_pcm_detach_substream \
+		--file-funcs ".*" sound/core/pcm_native.c snd_pcm_hw_params snd_pcm_common_ioctl1
 ```
 
 This command create a new directory in --work-dir argument, and the directory
@@ -20,9 +20,9 @@ Explaining some arguments:
 --data: location of ex-kernels, ipa-clones and kernel-rpms directory.
 --mod: The module to be livepatched. If empty, vmlinux will be livepatched
        instead.
---file-funcs: The first argument is the kernel family (4.4, 4.12 or 5.3
-	      currently), but can be set to all. The next argument needs to be a file, and the
-	      following values are function names.
+--file-funcs: The first argument is a regex for a codestream, but can be set to
+	      all. The next argument needs to be a file, and the following
+	      values are function names.
 
 --work-dir and --data can be ommited the KLP_WORK_DIR and KLP_DATA_DIR env vars
 are set.
