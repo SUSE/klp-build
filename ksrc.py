@@ -41,11 +41,12 @@ class GitHelper:
 
         print('Getting suse fixes for upstream commits per CVE branch...')
 
+        fixes = Path(self.cfg.bsc_path, 'fixes')
+        fixes.mkdir(exist_ok=True)
+
         # Get backported commits from the CVE branches
         for bc in cve_branches:
-            cved = Path(self.cfg.bsc_path, 'fixes', bc)
-
-            cved.mkdir(exist_ok=True, parents=True)
+            patches = ''
 
             self.commits[bc] = {}
             for commit, _ in self.commits['upstream'].items():
@@ -79,14 +80,16 @@ class GitHelper:
 
                 commit_hash = m.group(1)
 
-                # Save the patch for later review from the livepatch developer
-                with open(Path(cved, commit_hash + '.patch'), 'w') as f:
-                    f.write(full_cmt)
+                patches = patches + full_cmt
 
                 cmt = commit_hash.strip().replace('"', '')
 
                 # Link the upstream commit as key asn the suse commit as value
                 self.commits[bc][commit] = cmt
+
+            # Save the patch for later review from the livepatch developer
+            with open(Path(fixes, bc + '.patch'), 'w') as f:
+                f.write(patches)
 
         for key, val in self.commits['upstream'].items():
             print('{}: {}'.format(key, val))
