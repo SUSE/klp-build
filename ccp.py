@@ -14,28 +14,6 @@ class CCP:
         self.cfg = cfg
         self._proc_files = []
 
-        # Prefer the env var to the HOME directory location
-        ccp_path = os.getenv('KLP_CCP_PATH')
-        if ccp_path and not pathlib.Path(ccp_path).is_file():
-            raise RuntimeError('KLP_CCP_PATH does not point to a file')
-
-        elif not ccp_path:
-            ccp_path = pathlib.Path(pathlib.Path().home(), 'kgr', 'ccp', 'build', 'klp-ccp')
-            if not ccp_path.exists():
-                raise RuntimeError('klp-ccp not found in ~/kgr/ccp/build/klp-ccp. Please set KLP_CCP_PATH env var to a valid klp-ccp binary')
-
-        self.ccp = str(ccp_path)
-
-        pol_path = os.getenv('KLP_CCP_POL_PATH')
-        if pol_path and not pathlib.Path(pol_path).is_dir():
-            raise RuntimeError('KLP_CCP_POL_PATH does not point to a directory')
-
-        elif not pol_path:
-            pol_path = pathlib.Path(pathlib.Path().home(), 'kgr', 'scripts', 'ccp-pol')
-            if not pol_path.is_dir():
-                raise RuntimeError('ccp-pol not found at ~/kgr/scripts/ccp-pol/.  Please set KLP_CCP_POL_PATH env var to a valid ccppol directory')
-
-        self.pol_path = pathlib.Path(pol_path)
         self.env = os.environ
 
         # the current blacklisted function, more can be added as necessary
@@ -90,12 +68,12 @@ class CCP:
     def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir, env):
         lp_out = pathlib.Path(out_dir, self.lp_out_file(fname))
 
-        ccp_args = [self.ccp]
+        ccp_args = [self.cfg.ccp_path]
         for arg in ['may-include-header', 'can-externalize-fun', 'shall-externalize-fun', 'shall-externalize-obj',
                 'modify-externalized-sym', 'rename-rewritten-fun']:
-            ccp_args.append('--pol-cmd-{0}={1}/kgr-ccp-pol-{0}.sh'.format(arg, self.pol_path))
+            ccp_args.append('--pol-cmd-{0}={1}/kgr-ccp-pol-{0}.sh'.format(arg, self.cfg.pol_path))
 
-        ccp_args.append('--pol-cmd-modify-patched-fun-sym={}/kgr-ccp-pol-modify-patched-sym.sh'.format(self.pol_path))
+        ccp_args.append('--pol-cmd-modify-patched-fun-sym={}/kgr-ccp-pol-modify-patched-sym.sh'.format(self.cfg.pol_path))
 
         ccp_args.extend(['--compiler=x86_64-gcc-9.1.0', '-i', '{}'.format(funcs),
                         '-o', '{}'.format(str(lp_out)), '--'])
