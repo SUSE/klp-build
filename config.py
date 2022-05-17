@@ -42,18 +42,8 @@ class Config:
             if not self.data.is_dir():
                 raise ValueError('Data dir should be a directory')
 
-        self.ex_dir = Path(self.data, 'ex-kernels')
-        self.ipa_dir = Path(self.data, 'ipa-clones')
-
-        if not self.ex_dir.is_dir() or not self.ipa_dir.is_dir():
-            raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
-
-        self.ksrc = os.getenv('KLP_KERNEL_SOURCE')
-        if self.ksrc and not Path(self.ksrc).is_dir():
-            raise ValueError('KLP_KERNEL_SOURCE should point to a directory')
-
-        if args.cmd == 'get-patches' and not self.ksrc:
-            raise ValueError('KLP_KERNEL_SOURCE should be defined')
+            self.ex_dir = Path(self.data, 'ex-kernels')
+            self.ipa_dir = Path(self.data, 'ipa-clones')
 
         self.codestreams = {}
         self.cs_file = Path(self.bsc_path, 'codestreams.json')
@@ -71,6 +61,22 @@ class Config:
         if self.conf_file.is_file():
             with open(self.conf_file, 'r') as f:
                 self.conf = json.loads(f.read())
+
+        if args.cmd != 'setup':
+            self.data = self.conf['data']
+            self.ex_dir = Path(self.data, 'ex-kernels')
+            self.ipa_dir = Path(self.data, 'ipa-clones')
+
+        if not self.ex_dir.is_dir() or not self.ipa_dir.is_dir():
+            raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
+
+        self.ksrc = os.getenv('KLP_KERNEL_SOURCE')
+        if self.ksrc and not Path(self.ksrc).is_dir():
+            raise ValueError('KLP_KERNEL_SOURCE should point to a directory')
+
+        if args.cmd == 'get-patches' and not self.ksrc:
+            raise ValueError('KLP_KERNEL_SOURCE should be defined')
+
 
         # run-ccp and create-lp commands only work if codestreams.json and
         # conf.json files exist
@@ -115,3 +121,16 @@ class Config:
                 raise RuntimeError('ccp-pol not found at ~/kgr/scripts/ccp-pol/.  Please set KLP_CCP_POL_PATH env var to a valid ccp-pol directory')
 
         self.pol_path = str(pol_path)
+
+    def get_work_dir(self, cs):
+        return Path(self.bsc_path, 'c', cs, 'x86_64')
+
+    def get_ex_dir(self, cs):
+        if not cs:
+            return self.ex_dir
+        return Path(self.ex_dir, cs, 'x86_64')
+
+    def get_ipa_dir(self, cs):
+        if not cs:
+            return self.ipa_dir
+        return Path(self.ipa_dir, cs, 'x86_64')

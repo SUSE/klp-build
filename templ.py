@@ -1,12 +1,9 @@
 from datetime import datetime
 import jinja2
-import json
-import pathlib
 from pathlib import Path
 import os
 import re
 import requests
-import textwrap
 
 class Template:
     def __init__(self, cfg, cs):
@@ -24,10 +21,10 @@ class Template:
             self._files = list(self._jcs['files'].keys())
             self._funcs = []
 
-        self._templ_path = pathlib.Path(os.path.dirname(__file__), 'templates')
+        self._templ_path = Path(os.path.dirname(__file__), 'templates')
 
     def GeneratePatchedFuncs(self):
-        with open(pathlib.Path(self.cfg.bsc, 'patched_funcs.csv'), 'w') as f:
+        with open(Path(self.cfg.bsc, 'patched_funcs.csv'), 'w') as f:
             for fun in self._funcs:
                 mod = 'vmlinux' if not self._mod else self._mod
                 f.write('{} {} klpp_{} IS_ENABLED({})\n'.format(mod, fun, fun,
@@ -42,11 +39,9 @@ class Template:
             # Will be used when generating patched_funcs.csv
             self._funcs.extend(self._jcs['files'][src_file])
 
-            src_file = str(pathlib.Path(src_file).name)
+            src_file = str(Path(src_file).name)
 
-            work_path = pathlib.Path(self.cfg.bsc_path, 'c', self._cs, 'x86_64')
-
-            lp_inc_dir = str(pathlib.Path(work_path, 'work_' + src_file))
+            lp_inc_dir = str(Path(self.cfg.get_work_dir(self._cs), 'work_' + src_file))
             lp_file = self.cfg.bsc + '_' + src_file
         else:
             lp_inc_dir = ''
@@ -68,7 +63,7 @@ class Template:
         if include_header:
             templ.globals['include_header'] = True
 
-        with open(pathlib.Path(self.cfg.bsc, out_name).with_suffix('.' + ext), 'w') as f:
+        with open(Path(self.cfg.bsc, out_name).with_suffix('.' + ext), 'w') as f:
             f.write(templ.render(bsc = self.cfg.bsc,
                                 bsc_num = self.cfg.bsc_num,
                                 fname = os.path.splitext(out_name)[0],
@@ -84,7 +79,7 @@ class Template:
     def GenerateLivePatches(self):
         # If the livepatch contains only one file, generate only the livepatch
         # one
-        bsc = pathlib.Path(self.cfg.bsc)
+        bsc = Path(self.cfg.bsc)
         bsc.mkdir(exist_ok=True)
 
         # We need at least one header file for the livepatch

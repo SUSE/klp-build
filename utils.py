@@ -1,6 +1,5 @@
 import glob
 import json
-import pathlib
 from pathlib import Path
 import os
 import re
@@ -102,11 +101,6 @@ class Setup:
         for line in self.cfg.in_codestreams.splitlines():
             full_cs, proj, kernel_full, _, _= line.strip().split(',')\
 
-            ex_dir = Path(self.cfg.ex_dir, full_cs, 'x86_64')
-            if not ex_dir.is_dir():
-                print('Codestream not found at {}. Aborting.'.format(str(ex_dir)))
-                sys.exit(1)
-
             sle, sp, u = self.parse_cs_line(full_cs)
             cs_key = sle + '.' + sp + 'u' + u
 
@@ -124,17 +118,21 @@ class Setup:
                 print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_key))
                 continue
 
+            ex_dir = self.cfg.get_ex_dir(full_cs)
+            if not ex_dir.is_dir():
+                print('Codestream not found at {}. Aborting.'.format(str(ex_dir)))
+                sys.exit(1)
+
             kernel = re.sub('\.\d+$', '', kernel_full)
 
             # do not expect any problems with the kernel release format
             kernels.append(re.search('^([0-9]+\.[0-9]+)', kernel).group(1))
 
             if not self._mod:
-                obj = pathlib.Path(ex_dir, 'boot', 'vmlinux-' +
-                        kernel.replace('linux-', '') + '-default')
+                obj = Path(ex_dir, 'boot', 'vmlinux-' + kernel + '-default')
             else:
                 mod_file = self._mod + '.ko'
-                obj_path = pathlib.Path(ex_dir, 'lib', 'modules')
+                obj_path = Path(ex_dir, 'lib', 'modules')
                 obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
 
                 if not obj or len(obj) > 1:
@@ -182,7 +180,8 @@ class Setup:
                 'cve_branches' : self._cve_branches,
                 'commits' : self._githelper.commits,
                 'patched' : self._githelper.patched,
-                'work_dir' : str(self.cfg.bsc_path)
+                'work_dir' : str(self.cfg.bsc_path),
+                'data' : str(self.cfg.data)
         }
 
         with open(self.cfg.conf_file, 'w') as f:
@@ -192,7 +191,7 @@ class Setup:
             f.write(json.dumps(self.cfg.codestreams, indent=4))
 
     def write_commit_file(self):
-        with open(pathlib.Path(self.cfg.bsc_path, 'commit.msg'), 'w') as f:
+        with open(Path(self.cfg.bsc_path, 'commit.msg'), 'w') as f:
             f.write(Template.generate_commit_msg(self.cfg))
 
     def download_env(self):

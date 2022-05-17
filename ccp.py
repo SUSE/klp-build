@@ -1,6 +1,5 @@
 import json
-import pathlib
-from pathlib import Path
+from pathlib import Path, PurePath
 from natsort import natsorted
 import os
 import re
@@ -26,7 +25,7 @@ class CCP:
         fname = str(filename)
 
         ofname = '.' + filename.name.replace('.c', '.o.d')
-        ofname = pathlib.Path(filename.parent, ofname)
+        ofname = Path(filename.parent, ofname)
 
         # FIXME: is this regex accurate?
         cmd_args_regex = '(-Wp,-MD,{}\s+-nostdinc\s+-isystem.*{});'.format(ofname, fname)
@@ -52,7 +51,7 @@ class CCP:
         return output
 
     def get_make_cmd(self, filename, jcs, odir):
-        filename = pathlib.PurePath(filename)
+        filename = PurePath(filename)
         file_ = filename.with_suffix('.o')
         completed = subprocess.run(['make', '-sn', file_], cwd=odir,
                                     stdout=subprocess.PIPE,
@@ -63,10 +62,10 @@ class CCP:
 
     # extract the last component of the path, like the basename bash # function
     def lp_out_file(self, fname):
-        return self.cfg.bsc + '_' + pathlib.PurePath(fname).name
+        return self.cfg.bsc + '_' + PurePath(fname).name
 
     def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir, env):
-        lp_out = pathlib.Path(out_dir, self.lp_out_file(fname))
+        lp_out = Path(out_dir, self.lp_out_file(fname))
 
         ccp_args = [self.cfg.ccp_path]
         for arg in ['may-include-header', 'can-externalize-fun', 'shall-externalize-fun', 'shall-externalize-obj',
@@ -104,7 +103,7 @@ class CCP:
         exts = []
 
         for ext_file in ['fun_exts', 'obj_exts']:
-            ext_path = pathlib.Path(out_dir, ext_file)
+            ext_path = Path(out_dir, ext_file)
             if not ext_path.exists():
                 continue
 
@@ -152,7 +151,7 @@ class CCP:
                     if mod:
                         ext_list.append('\t ' + mod)
 
-        with open(pathlib.Path(out_dir, 'exts'), 'w') as f:
+        with open(Path(out_dir, 'exts'), 'w') as f:
             f.write('\n'.join(ext_list))
 
     # Group all codestreams that share code in a format like bellow:
@@ -221,7 +220,7 @@ class CCP:
         for fname in set(self._proc_files):
             src_out = self.lp_out_file(fname)
 
-            for fsrc in pathlib.Path(self.cfg.bsc_path, 'c').rglob(src_out):
+            for fsrc in Path(self.cfg.bsc_path, 'c').rglob(src_out):
                 with open(fsrc, 'r+') as fi:
                     buf = fi.read()
 
@@ -291,16 +290,13 @@ class CCP:
     def process_ccp(self, cs):
         jcs = self.cfg.codestreams[cs]
 
-        ipa_dir = Path(self.cfg.ipa_dir, jcs['cs'], 'x86_64')
         sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
-        odir = pathlib.Path(str(sdir) + '-obj', 'x86_64', 'default')
-        symvers = pathlib.Path(odir, 'Module.symvers')
-        work_path = pathlib.Path(self.cfg.bsc_path, 'c', cs, 'x86_64')
+        odir = Path(str(sdir) + '-obj', 'x86_64', 'default')
 
         # Needed, otherwise threads would interfere with each other
         env = self.env.copy()
 
-        env['KCP_MOD_SYMVERS'] = str(symvers)
+        env['KCP_MOD_SYMVERS'] = str(Path(odir, 'Module.symvers'))
         env['KCP_READELF'] = jcs['readelf']
         env['KCP_KBUILD_ODIR'] = str(odir)
         env['KCP_KBUILD_SDIR'] = str(sdir)
@@ -312,14 +308,14 @@ class CCP:
 
             self._proc_files.append(fname)
 
-            out_dir = pathlib.Path(work_path, 'work_' + pathlib.Path(fname).name)
+            out_dir = Path(self.cfg.get_work_dir(cs), 'work_' + Path(fname).name)
             # remove any previously generated files
             shutil.rmtree(out_dir, ignore_errors=True)
             out_dir.mkdir(parents=True, exist_ok=True)
             env['KCP_WORK_DIR'] = str(out_dir)
 
-            ipa_file_path = pathlib.Path(ipa_dir, fname + '.000i.ipa-clones')
-            env['KCP_IPA_CLONES_DUMP'] = str(ipa_file_path)
+            env['KCP_IPA_CLONES_DUMP'] = str(Path(self.cfg.get_ipa_dir(jcs['cs']),
+                                                fname + '.000i.ipa-clones'))
 
             self.execute_ccp(jcs, fname, ','.join(funcs), out_dir, sdir, odir,
                     env)
