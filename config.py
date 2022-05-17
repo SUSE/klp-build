@@ -55,6 +55,10 @@ class Config:
             with open(self.cs_file, 'r') as f:
                 self.codestreams = json.loads(f.read())
 
+        self.in_file = Path(self.bsc_path, 'codestreams.in')
+        if self.in_file.is_file():
+            with open(self.in_file, 'r') as f:
+                self.in_codestreams = f.read()
 
         self.conf = {}
         self.conf_file = Path(self.bsc_path, 'conf.json')

@@ -13,8 +13,6 @@ from templ import Template
 import ksrc
 
 class Setup:
-    _cs_file = None
-
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
             ups_commits, disable_ccp):
         self.cfg = cfg
@@ -60,9 +58,7 @@ class Setup:
         return sle, sp, u
 
     def download_codestream_file(self):
-        self._cs_file = pathlib.Path(self.cfg.bsc_path, 'codestreams.in')
-
-        if os.path.isfile(self._cs_file) and not self._redownload:
+        if self.cfg.in_file.exists() and not self._redownload:
             print('Found codestreams.in file, skipping download.')
             return
 
@@ -73,105 +69,109 @@ class Setup:
 
         # For now let's keep the current format of codestreams.in and
         # codestreams.json
-
         if self.cfg.filter:
             print('Applying filter...')
 
         first_line = True
-        with open(self._cs_file, 'w') as f:
-            for line in req.iter_lines():
-                # skip empty lines
-                if not line:
-                    continue
+        file_buf = []
+        for line in req.iter_lines():
+            # skip empty lines
+            if not line:
+                continue
 
-                # skip file header
-                if first_line:
-                    first_line = False
-                    continue
+            # skip file header
+            if first_line:
+                first_line = False
+                continue
 
-                # remove the last two columns, which are dates of the line
-                # and add a fifth field with the forth one + rpm- prefix, and
-                # remove the build counter number
-                columns = line.decode('utf-8').split(',')
-                kernel = re.sub('\.\d+$', '', columns[2])
+            # remove the last two columns, which are dates of the line
+            # and add a fifth field with the forth one + rpm- prefix, and
+            # remove the build counter number
+            columns = line.decode('utf-8').split(',')
+            kernel = re.sub('\.\d+$', '', columns[2])
 
-                sle, sp, u = self.parse_cs_line(columns[0])
-                if self.cfg.filter and not re.match(self.cfg.filter, '{}.{}u{}'.format(sle, sp, u)):
-                    continue
+            sle, sp, u = self.parse_cs_line(columns[0])
+            if self.cfg.filter and not re.match(self.cfg.filter, '{}.{}u{}'.format(sle, sp, u)):
+                continue
 
-                f.write(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,rpm-' + kernel + '\n')
+            file_buf.append(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,rpm-' + kernel)
+
+        self.cfg.in_codestreams = '\n'.join(file_buf)
+        with open(self.cfg.in_file, 'w') as f:
+            f.write(self.cfg.in_codestreams)
 
     def fill_cs_json(self):
         if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
             raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
 
         kernels = []
-        with open(self._cs_file, 'r') as f:
-            for line in f:
-                full_cs, proj, kernel_full, _, _= line.strip().split(',')\
 
-                sle, sp, u = self.parse_cs_line(full_cs)
-                cs_key = sle + '.' + sp + 'u' + u
+        for line in self.cfg.in_codestreams.splitlines():
+            full_cs, proj, kernel_full, _, _= line.strip().split(',')\
 
-                if self.cfg.filter and not re.match(self.cfg.filter, cs_key):
+            sle, sp, u = self.parse_cs_line(full_cs)
+            cs_key = sle + '.' + sp + 'u' + u
+
+            if self.cfg.filter and not re.match(self.cfg.filter, cs_key):
+                continue
+
+            cs_files = {}
+            for cs_regex in self._file_funcs.keys():
+                if not re.search(cs_regex, cs_key):
                     continue
+                cs_files = self._file_funcs[cs_regex]
+                break
 
-                cs_files = {}
-                for cs_regex in self._file_funcs.keys():
-                    if not re.search(cs_regex, cs_key):
-                        continue
-                    cs_files = self._file_funcs[cs_regex]
-                    break
+            if not cs_files:
+                print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_key))
+                continue
 
-                if not cs_files:
-                    print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_key))
-                    continue
+            ex_dir = pathlib.Path(self._ex_dir, full_cs)
+            src = pathlib.Path(ex_dir, 'usr', 'src')
 
-                ex_dir = pathlib.Path(self._ex_dir, full_cs)
-                src = pathlib.Path(ex_dir, 'usr', 'src')
+            kernel = re.sub('\.\d+$', '', kernel_full)
 
-                kernel = re.sub('\.\d+$', '', kernel_full)
+            # do not expect any problems with the kernel release format
+            kernels.append(re.search('^([0-9]+\.[0-9]+)', kernel).group(1))
 
-                # do not expect any problems with the kernel release format
-                kernels.append(re.search('^([0-9]+\.[0-9]+)', kernel).group(1))
+            if not self._mod:
+                obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +
+                        kernel.replace('linux-', '') + '-default')
+            else:
+                mod_file = self._mod + '.ko'
+                obj_path = pathlib.Path(ex_dir, 'x86_64', 'lib', 'modules')
+                obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
 
-                if not self._mod:
-                    obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +
-                            kernel.replace('linux-', '') + '-default')
-                else:
-                    mod_file = self._mod + '.ko'
-                    obj_path = pathlib.Path(ex_dir, 'x86_64', 'lib', 'modules')
-                    obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
+                if not obj or len(obj) > 1:
+                    print(line)
+                    raise RuntimeError('Module list has none or too much entries: ' + str(obj))
+                # Grab the only value of the list and turn obj into a string to be
+                # used later
+                obj = obj[0]
 
-                    if not obj or len(obj) > 1:
-                        raise RuntimeError('Module list has none or too much entries: ' + str(obj))
-                    # Grab the only value of the list and turn obj into a string to be
-                    # used later
-                    obj = obj[0]
+            # Verify if the functions exist in the specified object
+            for f in cs_files.keys():
+                for func in cs_files[f]:
+                    if not self._githelper.verify_func_object(func, str(obj)):
+                        print('')
+                        print('ERROR: {}: Function {} does not exist in {}'.format(cs_key, func, obj))
+                        print('Use kgraft-analysis-tool to find out where this function was inlined to.')
+                        sys.exit(1)
 
-                # Verify if the functions exist in the specified object
-                for f in cs_files.keys():
-                    for func in cs_files[f]:
-                        if not self._githelper.verify_func_object(func, str(obj)):
-                            print('')
-                            print('ERROR: {}: Function {} does not exist in {}'.format(cs_key, func, obj))
-                            print('Use kgraft-analysis-tool to find out where this function was inlined to.')
-                            sys.exit(1)
-
-                self.cfg.codestreams[cs_key] = {
-                    'project' : proj,
-                    'kernel' : kernel,
-                    'build-counter' : kernel_full[-1],
-                    'branch' : '',
-                    'cs' : full_cs,
-                    'sle' : sle,
-                    'sp' : sp,
-                    'update' : u,
-                    'readelf' : 'readelf',
-                    'rename_prefix' : self.get_rename_prefix(cs_key),
-                    'object' : str(obj),
-                    'files' : cs_files
-                }
+            self.cfg.codestreams[cs_key] = {
+                'project' : proj,
+                'kernel' : kernel,
+                'build-counter' : kernel_full[-1],
+                'branch' : '',
+                'cs' : full_cs,
+                'sle' : sle,
+                'sp' : sp,
+                'update' : u,
+                'readelf' : 'readelf',
+                'rename_prefix' : self.get_rename_prefix(cs_key),
+                'object' : str(obj),
+                'files' : cs_files
+            }
 
         # We create a dict to remove the duplicate kernel versions, used as CVE
         # branches for find the fixes for each codestreams in kernel-source
