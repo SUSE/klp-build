@@ -291,11 +291,8 @@ class CCP:
     def process_ccp(self, cs):
         jcs = self.cfg.codestreams[cs]
 
-        ex = self.cfg.conf['ex_kernels']
-        ipa = self.cfg.conf['ipa_clones']
-        ipa_dir = pathlib.Path(ipa, jcs['cs'], 'x86_64')
-
-        sdir = pathlib.Path(ex, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
+        ipa_dir = Path(self.cfg.ipa_dir, jcs['cs'], 'x86_64')
+        sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
         odir = pathlib.Path(str(sdir) + '-obj', 'x86_64', 'default')
         symvers = pathlib.Path(odir, 'Module.symvers')
         work_path = pathlib.Path(self.cfg.bsc_path, 'c', cs, 'x86_64')

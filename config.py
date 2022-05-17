@@ -42,6 +42,12 @@ class Config:
             if not self.data.is_dir():
                 raise ValueError('Data dir should be a directory')
 
+        self.ex_dir = Path(self.data, 'ex-kernels')
+        self.ipa_dir = Path(self.data, 'ipa-clones')
+
+        if not self.ex_dir.is_dir() or not self.ipa_dir.is_dir():
+            raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
+
         self.ksrc = os.getenv('KLP_KERNEL_SOURCE')
         if self.ksrc and not Path(self.ksrc).is_dir():
             raise ValueError('KLP_KERNEL_SOURCE should point to a directory')

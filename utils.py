@@ -24,10 +24,6 @@ class Setup:
         self._mod = mod
         self._redownload = redownload
 
-        self._rpm_dir = pathlib.Path(cfg.data, 'kernel-rpms')
-        self._ex_dir = pathlib.Path(cfg.data, 'ex-kernels')
-        self._ipa_dir = pathlib.Path(cfg.data, 'ipa-clones')
-
         self._disable_ccp = disable_ccp
         self._file_funcs = {}
 
@@ -101,9 +97,6 @@ class Setup:
             f.write(self.cfg.in_codestreams)
 
     def fill_cs_json(self):
-        if not self._ex_dir.is_dir() or not self._ipa_dir.is_dir():
-            raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
-
         kernels = []
 
         for line in self.cfg.in_codestreams.splitlines():
@@ -126,8 +119,7 @@ class Setup:
                 print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_key))
                 continue
 
-            ex_dir = pathlib.Path(self._ex_dir, full_cs)
-            src = pathlib.Path(ex_dir, 'usr', 'src')
+            ex_dir = Path(self.cfg.ex_dir, full_cs)
 
             kernel = re.sub('\.\d+$', '', kernel_full)
 
@@ -179,15 +171,14 @@ class Setup:
         self._cve_branches = list(dict.fromkeys(kernels))
 
     def write_json_files(self):
-        self.cfg.conf = { 'bsc' : str(self.cfg.bsc_num),
+        self.cfg.conf = {
+                'bsc' : str(self.cfg.bsc_num),
                 'cve' : self._cve,
                 'conf' : self._kernel_conf,
                 'mod' : self._mod,
                 'cve_branches' : self._cve_branches,
                 'commits' : self._githelper.commits,
                 'patched' : self._githelper.patched,
-                'ex_kernels' : str(self._ex_dir),
-                'ipa_clones' : str(self._ipa_dir),
                 'work_dir' : str(self.cfg.bsc_path)
         }
 
