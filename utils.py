@@ -102,6 +102,11 @@ class Setup:
         for line in self.cfg.in_codestreams.splitlines():
             full_cs, proj, kernel_full, _, _= line.strip().split(',')\
 
+            ex_dir = Path(self.cfg.ex_dir, full_cs, 'x86_64')
+            if not ex_dir.is_dir():
+                print('Codestream not found at {}. Aborting.'.format(str(ex_dir)))
+                sys.exit(1)
+
             sle, sp, u = self.parse_cs_line(full_cs)
             cs_key = sle + '.' + sp + 'u' + u
 
@@ -119,19 +124,17 @@ class Setup:
                 print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_key))
                 continue
 
-            ex_dir = Path(self.cfg.ex_dir, full_cs)
-
             kernel = re.sub('\.\d+$', '', kernel_full)
 
             # do not expect any problems with the kernel release format
             kernels.append(re.search('^([0-9]+\.[0-9]+)', kernel).group(1))
 
             if not self._mod:
-                obj = pathlib.Path(ex_dir, 'x86_64', 'boot', 'vmlinux-' +
+                obj = pathlib.Path(ex_dir, 'boot', 'vmlinux-' +
                         kernel.replace('linux-', '') + '-default')
             else:
                 mod_file = self._mod + '.ko'
-                obj_path = pathlib.Path(ex_dir, 'x86_64', 'lib', 'modules')
+                obj_path = pathlib.Path(ex_dir, 'lib', 'modules')
                 obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
 
                 if not obj or len(obj) > 1:
