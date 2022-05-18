@@ -63,7 +63,8 @@ class Config:
                 self.conf = json.loads(f.read())
 
         if args.cmd != 'setup':
-            self.data = self.conf['data']
+            if not self.conf.get('data', ''):
+                self.data = os.getenv('KLP_DATA_DIR', '')
             self.ex_dir = Path(self.data, 'ex-kernels')
             self.ipa_dir = Path(self.data, 'ipa-clones')
 
