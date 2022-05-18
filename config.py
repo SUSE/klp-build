@@ -2,7 +2,6 @@ import json
 import git
 from pathlib import Path
 import os
-import re
 
 class Config:
     def __init__(self, args):

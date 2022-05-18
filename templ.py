@@ -2,8 +2,6 @@ from datetime import datetime
 import jinja2
 from pathlib import Path
 import os
-import re
-import requests
 
 class Template:
     def __init__(self, cfg, cs):
