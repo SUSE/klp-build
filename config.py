@@ -24,6 +24,8 @@ class Config:
         self.bsc = 'bsc' + str(bsc)
         self.bsc_path = Path(self.work, self.bsc)
 
+        self.data = None
+
         # We'll create the directory on setup, so we require it to now exists
         if args.cmd == 'setup':
             if self.bsc_path.exists() and not self.bsc_path.is_dir():
@@ -42,9 +44,6 @@ class Config:
             if not self.data.is_dir():
                 raise ValueError('Data dir should be a directory')
 
-            self.ex_dir = Path(self.data, 'ex-kernels')
-            self.ipa_dir = Path(self.data, 'ipa-clones')
-
         self.codestreams = {}
         self.cs_file = Path(self.bsc_path, 'codestreams.json')
         if self.cs_file.is_file():
@@ -62,11 +61,16 @@ class Config:
             with open(self.conf_file, 'r') as f:
                 self.conf = json.loads(f.read())
 
-        if args.cmd != 'setup':
-            if not self.conf.get('data', ''):
-                self.data = os.getenv('KLP_DATA_DIR', '')
-            self.ex_dir = Path(self.data, 'ex-kernels')
-            self.ipa_dir = Path(self.data, 'ipa-clones')
+        # Set self.data from conf.json or from the env var is the args.cmd is
+        # not setup
+        if not self.data:
+            if self.conf.get('data', ''):
+                self.data = Path(self.conf['data'])
+            else:
+                self.data = Path(os.getenv('KLP_DATA_DIR', ''))
+
+        self.ex_dir = Path(self.data, 'ex-kernels')
+        self.ipa_dir = Path(self.data, 'ipa-clones')
 
         if not self.ex_dir.is_dir() or not self.ipa_dir.is_dir():
             raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
