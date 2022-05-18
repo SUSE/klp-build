@@ -104,15 +104,22 @@ class Setup:
             sle, sp, u = self.parse_cs_line(full_cs)
             cs_key = sle + '.' + sp + 'u' + u
 
-            if self.cfg.filter and not re.match(self.cfg.filter, cs_key):
-                continue
-
             cs_files = {}
+
             for cs_regex in self._file_funcs.keys():
-                if not re.search(cs_regex, cs_key):
-                    continue
-                cs_files = self._file_funcs[cs_regex]
-                break
+                if re.match(cs_regex, cs_key):
+                    # Convert dict to tuples
+                    for k, v in list(self._file_funcs[cs_regex].items()):
+                        # At this point we can have multiple regexes to specify
+                        # different functions per file per codestream. In this case,
+                        # we need to append the new functions to a file that can be
+                        # added in a previous iteration.
+
+                        # Copy the list here to avoid changing the _file_funcs
+                        values = v.copy()
+                        if cs_files.get(k, []):
+                            values.extend(cs_files[k])
+                        cs_files[k] = values
 
             if not cs_files:
                 print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_key))
