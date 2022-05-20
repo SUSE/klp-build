@@ -58,7 +58,6 @@ if  __name__ == '__main__':
 
     config = Config(args)
 
-    # FIXME: Maybe we should require --conf when --module is specified"
     if args.cmd == 'setup':
         setup = utils.Setup(config, args.redownload, args.cve, args.conf,
                 args.file_funcs, args.module, args.upstream_commits,
