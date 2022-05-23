@@ -1,5 +1,6 @@
 from pathlib import Path
 from natsort import natsorted
+import git
 import re
 import requests
 import subprocess
@@ -14,6 +15,66 @@ class GitHelper:
         for commit in ups_commits:
             commit = commit[:12]
             self.commits['upstream'][commit] = self.get_commit_subject(commit)
+
+    @staticmethod
+    def build(cfg):
+        build_cs = []
+        repo = git.Repo(cfg.kgr_patches)
+
+        # TODO: exclude codestreams from cfg.filter
+        # TODO: call osckgr-commit.sh script
+
+        # Filter only the branches related to this BSC
+        branches = [ r.name for r in repo.branches if cfg.bsc in r.name ]
+
+        css = cfg.codestreams
+
+        for cs in css.keys():
+            jcs = css[cs]
+
+            entry = [ jcs['cs'],
+                        jcs['project'],
+                        jcs['kernel'] + '.' + jcs['build-counter'],
+                        'change-me',
+                        'rpm-' + jcs['kernel']
+                        ]
+
+            for branch in branches:
+                # First check if the branch has more than code stream sharing
+                # the same code
+                for b in branch.replace(cfg.bsc + '_', '').split('_'):
+                    sle, u = b.split('u')
+                    if sle != jcs['sle'] + '.' + jcs['sp']:
+                        continue
+
+                    # Get codestreams interval
+                    up = u
+                    down = u
+                    cs_update = int(jcs['update'])
+                    if '-' in u:
+                        down, up = u.split('-')
+
+                    # Codestream between the branch codestream interval
+                    if cs_update >= int(down) and cs_update <= int(up):
+                        # replace the 'change-me' string in entry
+                        entry[3] = branch
+
+                    # At this point we found a match for our codestream in
+                    # codestreams.json, but we may have a more specialized git
+                    # branch later one, like:
+                    # bsc1197597_12.4u21-25_15.0u25-28
+                    # bsc1197597_15.0u25-28
+                    # Since 15.0 SLE uses a different kgraft-patches branch to
+                    # be built on. In this case, we continue to loop over the
+                    # other branches.
+
+            # If there was a match in all available branches
+            if entry[3] != 'change-me':
+                build_cs.append(','.join(entry))
+
+        # Save file to be used later by osckgr scripts
+        with open(Path(cfg.bsc_path, 'full_codestreams.in'), 'w') as f:
+            f.write('\n'.join(build_cs))
 
     def verify_func_object(self, func, obj):
         nm_out = subprocess.check_output(['nm', obj]).decode().strip()

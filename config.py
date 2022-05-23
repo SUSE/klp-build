@@ -81,6 +81,14 @@ class Config:
         if args.cmd == 'get-patches' and not self.ksrc:
             raise ValueError('KLP_KERNEL_SOURCE should be defined')
 
+        if args.cmd == 'build':
+            if not self.codestreams:
+                raise RuntimeError('codestreams.json doesn\'t exists. Aborting.')
+
+            kgr_patches = Path(Path().home(), 'kgr', 'kgraft-patches')
+            if not kgr_patches.is_dir:
+                raise RuntimeError('kgraft-patches does not exists in ~/kgr')
+            self.kgr_patches = kgr_patches
 
         # run-ccp and create-lp commands only work if codestreams.json and
         # conf.json files exist
