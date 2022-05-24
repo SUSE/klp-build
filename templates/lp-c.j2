@@ -49,7 +49,10 @@ static int {{ fname }}_module_notify(struct notifier_block *nb,
 	if (action != MODULE_STATE_COMING || strcmp(mod->name, LP_MODULE))
 		return 0;
 
+	mutex_lock(&module_mutex);
 	ret = __{{ ktype }}_resolve_kallsyms_relocs({{ ktype }}_funcs, ARRAY_SIZE({{ ktype }}_funcs));
+	mutex_unlock(&module_mutex);
+
 	WARN(ret, "%s: delayed kallsyms lookup failed. System is broken and can crash.\n",
 		__func__);
 
