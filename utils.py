@@ -151,10 +151,7 @@ class Setup:
             for f in cs_files.keys():
                 for func in cs_files[f]:
                     if not self._githelper.verify_func_object(func, str(obj)):
-                        print('')
-                        print('ERROR: {}: Function {} does not exist in {}'.format(cs_key, func, obj))
-                        print('Use kgraft-analysis-tool to find out where this function was inlined to.')
-                        sys.exit(1)
+                        print('WARN: {}: Function {} does not exist in {}.'.format(cs_key, func, obj))
 
             self.cfg.codestreams[cs_key] = {
                 'project' : proj,
