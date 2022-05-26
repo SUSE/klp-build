@@ -7,15 +7,6 @@ import subprocess
 import sys
 
 class GitHelper:
-    def __init__(self, cfg, ups_commits):
-        self.cfg = cfg
-
-        self.patched = []
-        self.commits = { 'upstream' : {} }
-        for commit in ups_commits:
-            commit = commit[:12]
-            self.commits['upstream'][commit] = self.get_commit_subject(commit)
-
     @staticmethod
     def build(cfg):
         build_cs = []
@@ -81,11 +72,12 @@ class GitHelper:
         nm_out = subprocess.check_output(['nm', obj]).decode().strip()
         return re.search(r' {}\n'.format(func), nm_out)
 
-    def get_commit_subject(self, commit):
+    @staticmethod
+    def get_commit_subject(cfg, commit):
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
         req.raise_for_status()
 
-        patches = Path(self.cfg.bsc_path, 'patches')
+        patches = Path(cfg.bsc_path, 'patches')
         patches.mkdir(exist_ok=True)
 
         # Save the upstream commit in the bsc directory
@@ -95,31 +87,37 @@ class GitHelper:
 
         return re.search('Subject: (.*)', req.text).group(1)
 
-    def get_commits(self, cve_branches):
-        if not self.cfg.ksrc:
+    @staticmethod
+    def get_commits(cfg, ups_commits):
+        if not cfg.ksrc:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
 
         print('Getting suse fixes for upstream commits per CVE branch...')
 
-        fixes = Path(self.cfg.bsc_path, 'fixes')
+        commits = { 'upstream' : {} }
+        for commit in ups_commits:
+            commit = commit[:12]
+            commits['upstream'][commit] = GitHelper.get_commit_subject(cfg, commit)
+
+        fixes = Path(cfg.bsc_path, 'fixes')
         fixes.mkdir(exist_ok=True)
 
         # Get backported commits from the CVE branches
-        for bc in cve_branches:
+        for bc in cfg.cve_branches:
             patches = ''
 
-            self.commits[bc] = {}
-            for commit, _ in self.commits['upstream'].items():
+            commits[bc] = {}
+            for commit, _ in commits['upstream'].items():
                 patch_file = subprocess.check_output(['/usr/bin/git', '-C',
-                            str(self.cfg.ksrc),
+                            str(cfg.ksrc),
                             'grep', '-l', 'Git-commit: ' + commit, 
                             'remotes/origin/cve/linux-' + bc],
                             stderr=subprocess.PIPE).decode(sys.stdout.encoding)
 
                 # If we don't find any commits, add a note about it
                 if not patch_file:
-                    self.commits[bc]['None yet'] = ''
+                    commits[bc]['None yet'] = ''
                     continue
 
                 # The command above returns a string in the format
@@ -130,7 +128,7 @@ class GitHelper:
                 # follow up patches to fix any other previous patch, it will be
                 # the first one listed.
                 full_cmt = subprocess.check_output(['/usr/bin/git', '-C',
-                            str(self.cfg.ksrc),
+                            str(cfg.ksrc),
                             'log', '--reverse', '--patch', branch, '--', fpath],
                             stderr=subprocess.PIPE).decode(sys.stdout.encoding)
 
@@ -146,31 +144,34 @@ class GitHelper:
                 cmt = commit_hash.strip().replace('"', '')
 
                 # Link the upstream commit as key asn the suse commit as value
-                self.commits[bc][commit] = cmt
+                commits[bc][commit] = cmt
 
             # Save the patch for later review from the livepatch developer
             with open(Path(fixes, bc + '.patch'), 'w') as f:
                 f.write(patches)
 
-        for key, val in self.commits['upstream'].items():
+        for key, val in commits['upstream'].items():
             print('{}: {}'.format(key, val))
-            for cve in cve_branches:
-                hash_cmt = self.commits[cve].get(key, 'None yet')
+            for cve in cfg.cve_branches:
+                hash_cmt = commits[cve].get(key, 'None yet')
                 print('\t{}\t{}'.format(cve, hash_cmt))
             print('')
 
-    def find_patched(self, cve_branches):
-        if not self.cfg.ksrc:
+        return commits
+
+    @staticmethod
+    def get_patched_cs(cfg, commits):
+        if not cfg.ksrc:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
 
         print('Searching for already patched codestreams...')
 
         patched = []
-        for branch in cve_branches:
-            for up_commit, suse_commit in self.commits[branch].items():
+        for branch in cfg.cve_branches:
+            for up_commit, suse_commit in commits[branch].items():
                 tags = subprocess.check_output(['/usr/bin/git', '-C',
-                            str(self.cfg.ksrc), 'tag', '--contains=' + suse_commit])
+                            str(cfg.ksrc), 'tag', '--contains=' + suse_commit])
 
                 for tag in tags.decode().splitlines():
                     tag = tag.strip()
@@ -185,4 +186,4 @@ class GitHelper:
                     patched.append(tag)
 
         # remove duplicates
-        self.patched = natsorted(list(set(patched)))
+        return natsorted(list(set(patched)))

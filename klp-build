@@ -4,7 +4,7 @@ import argparse
 
 import ccp
 from config import Config
-import ksrc
+from ksrc import GitHelper
 import utils
 import templ
 
@@ -77,8 +77,7 @@ if  __name__ == '__main__':
         templ.GeneratePatchedFuncs()
 
     elif args.cmd == 'get-patches':
-        ksrc = ksrc.GitHelper(config, args.upstream_commits)
-        ksrc.get_commits(['4.4', '4.12', '5.3'])
+        GitHelper.get_commits(config, args.upstream_commits)
 
     elif args.cmd == 'build':
-        ksrc.GitHelper.build(config)
+        GitHelper.build(config)

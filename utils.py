@@ -7,7 +7,7 @@ import sys
 
 import ccp
 from templ import Template
-import ksrc
+from ksrc import GitHelper
 
 class Setup:
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
@@ -17,7 +17,7 @@ class Setup:
         self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
         self._kernel_conf = conf
 
-        self._githelper = ksrc.GitHelper(cfg, ups_commits)
+        self._ups_commits = ups_commits
         self._mod = mod
         self._redownload = redownload
 
@@ -145,7 +145,7 @@ class Setup:
             # Verify if the functions exist in the specified object
             for f in cs_files.keys():
                 for func in cs_files[f]:
-                    if not ksrc.GitHelper.verify_func_object(func, str(obj)):
+                    if not GitHelper.verify_func_object(func, str(obj)):
                         print('WARN: {}: Function {} does not exist in {}.'.format(cs_key, func, obj))
 
             self.cfg.codestreams[cs_key] = {
@@ -163,14 +163,14 @@ class Setup:
                 'files' : cs_files
             }
 
-    def write_json_files(self):
+    def write_json_files(self, commits, patched):
         self.cfg.conf = {
                 'bsc' : str(self.cfg.bsc_num),
                 'cve' : self._cve,
                 'conf' : self._kernel_conf,
                 'mod' : self._mod,
-                'commits' : self._githelper.commits,
-                'patched' : self._githelper.patched,
+                'commits' : commits,
+                'patched' : patched,
                 'work_dir' : str(self.cfg.bsc_path),
                 'data' : str(self.cfg.data)
         }
@@ -193,10 +193,10 @@ class Setup:
 
         self.fill_cs_json()
 
-        self._githelper.get_commits(self.cfg.cve_branches)
-        self._githelper.find_patched(self.cfg.cve_branches)
+        commits = GitHelper.get_commits(self.cfg, self._ups_commits)
+        patched = GitHelper.get_patched_cs(self.cfg, commits)
 
-        self.write_json_files()
+        self.write_json_files(commits, patched)
         self.write_commit_file()
 
         if not self._disable_ccp:
