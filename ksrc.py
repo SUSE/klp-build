@@ -76,7 +76,8 @@ class GitHelper:
         with open(Path(cfg.bsc_path, 'full_codestreams.in'), 'w') as f:
             f.write('\n'.join(build_cs))
 
-    def verify_func_object(self, func, obj):
+    @staticmethod
+    def verify_func_object(func, obj):
         nm_out = subprocess.check_output(['nm', obj]).decode().strip()
         return re.search(r' {}\n'.format(func), nm_out)
 

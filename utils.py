@@ -150,7 +150,7 @@ class Setup:
             # Verify if the functions exist in the specified object
             for f in cs_files.keys():
                 for func in cs_files[f]:
-                    if not self._githelper.verify_func_object(func, str(obj)):
+                    if not ksrc.GitHelper.verify_func_object(func, str(obj)):
                         print('WARN: {}: Function {} does not exist in {}.'.format(cs_key, func, obj))
 
             self.cfg.codestreams[cs_key] = {
