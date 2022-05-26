@@ -181,10 +181,6 @@ class Setup:
         with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4))
 
-    def write_commit_file(self):
-        with open(Path(self.cfg.bsc_path, 'commit.msg'), 'w') as f:
-            f.write(Template.generate_commit_msg(self.cfg))
-
     def download_env(self):
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')
 
@@ -197,7 +193,8 @@ class Setup:
         patched = GitHelper.get_patched_cs(self.cfg, commits)
 
         self.write_json_files(commits, patched)
-        self.write_commit_file()
+        # Needs to be called after write_json_files, since needs self.cfg data
+        Template.generate_commit_msg_file(self.cfg)
 
         if not self._disable_ccp:
             _ccp = ccp.CCP(self.cfg)

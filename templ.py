@@ -100,15 +100,18 @@ class Template:
         self.GenerateLivepatchFile('c', out_name, None, None, True)
 
     @staticmethod
-    def generate_commit_msg(cfg):
+    def generate_commit_msg_file(cfg):
         fsloader = jinja2.FileSystemLoader(Path(os.path.dirname(__file__),
                                             'templates'))
         env = jinja2.Environment(loader=fsloader, trim_blocks=True)
 
         templ = env.get_template('commit.j2')
-        return templ.render(bsc = cfg.bsc,
+        buf = templ.render(bsc = cfg.bsc,
                             bsc_num = cfg.bsc_num,
                             cve = cfg.conf['cve'],
                             user = cfg.user,
                             email = cfg.email,
                             commits = cfg.conf['commits'])
+
+        with open(Path(cfg.bsc_path, 'commit.msg'), 'w') as f:
+            f.write(buf)
