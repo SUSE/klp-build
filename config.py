@@ -6,6 +6,7 @@ import os
 class Config:
     def __init__(self, args):
         self.filter = args.filter
+        self.cve_branches = ['4.4', '4.12', '5.3' ]
 
         # Prefer the argument over the environment
         work_dir = args.work_dir

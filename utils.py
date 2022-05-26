@@ -94,8 +94,6 @@ class Setup:
             f.write(self.cfg.in_codestreams)
 
     def fill_cs_json(self):
-        kernels = []
-
         for line in self.cfg.in_codestreams.splitlines():
             full_cs, proj, kernel_full, _, _= line.strip().split(',')\
 
@@ -129,9 +127,6 @@ class Setup:
                 sys.exit(1)
 
             kernel = re.sub('\.\d+$', '', kernel_full)
-
-            # do not expect any problems with the kernel release format
-            kernels.append(re.search('^([0-9]+\.[0-9]+)', kernel).group(1))
 
             if not self._mod:
                 obj = Path(ex_dir, 'boot', 'vmlinux-' + kernel + '-default')
@@ -168,18 +163,12 @@ class Setup:
                 'files' : cs_files
             }
 
-        # We create a dict to remove the duplicate kernel versions, used as CVE
-        # branches for find the fixes for each codestreams in kernel-source
-        # later on
-        self._cve_branches = list(dict.fromkeys(kernels))
-
     def write_json_files(self):
         self.cfg.conf = {
                 'bsc' : str(self.cfg.bsc_num),
                 'cve' : self._cve,
                 'conf' : self._kernel_conf,
                 'mod' : self._mod,
-                'cve_branches' : self._cve_branches,
                 'commits' : self._githelper.commits,
                 'patched' : self._githelper.patched,
                 'work_dir' : str(self.cfg.bsc_path),
@@ -204,8 +193,8 @@ class Setup:
 
         self.fill_cs_json()
 
-        self._githelper.get_commits(self._cve_branches)
-        self._githelper.find_patched(self._cve_branches)
+        self._githelper.get_commits(self.cfg.cve_branches)
+        self._githelper.find_patched(self.cfg.cve_branches)
 
         self.write_json_files()
         self.write_commit_file()
