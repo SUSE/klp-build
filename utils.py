@@ -24,6 +24,9 @@ class Setup:
         self._disable_ccp = disable_ccp
         self._file_funcs = {}
 
+        self.commits = []
+        self.patched = []
+
         for f in file_funcs:
             cs = f[0]
             filepath = f[1]
@@ -50,61 +53,71 @@ class Setup:
 
         return sle, sp, u
 
-    def download_codestream_file(self):
-        if self.cfg.in_file.exists() and not self._redownload:
-            print('Found codestreams.in file, skipping download.')
-            return
+    def setup_project_files(self):
+        if self.cfg.cs_file.exists() and not self._redownload:
+            print('Found codestreams.json file, loading downloaded file.')
+        else:
+            print('Downloading codestreams file')
+            req = requests.get('https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv')
 
-        req = requests.get('https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv')
+            # exit on error
+            req.raise_for_status()
 
-        # exit on error
-        req.raise_for_status()
+            first_line = True
+            for line in req.iter_lines():
+                # skip empty lines
+                if not line:
+                    continue
 
+                # skip file header
+                if first_line:
+                    first_line = False
+                    continue
+
+                # remove the last two columns, which are dates of the line
+                # and add a fifth field with the forth one + rpm- prefix, and
+                # remove the build counter number
+                full_cs, proj, kernel_full, _, _= line.decode('utf-8').strip().split(',')
+                kernel = re.sub('\.\d+$', '', kernel_full)
+
+                # Fill the majority of possible fields here
+                sle, sp, u = self.parse_cs_line(full_cs)
+                cs_key = sle + '.' + sp + 'u' + u
+                self.cfg.codestreams[cs_key] = {
+                        'project' : proj,
+                        'kernel' : kernel,
+                        'build-counter' : kernel_full[-1],
+                        'branch' : '',
+                        'cs' : full_cs,
+                        'sle' : sle,
+                        'sp' : sp,
+                        'update' : u,
+                        'readelf' : 'readelf',
+                        'rename_prefix' : self.get_rename_prefix(cs_key)
+                }
+
+        print('Validating codestreams data...')
         # For now let's keep the current format of codestreams.in and
         # codestreams.json
         if self.cfg.filter:
             print('Applying filter...')
 
-        first_line = True
-        file_buf = []
-        for line in req.iter_lines():
-            # skip empty lines
-            if not line:
+        skip_cs = []
+        for cs in self.cfg.codestreams.keys():
+            jcs = self.cfg.codestreams[cs]
+
+            if self.cfg.filter and not re.match(self.cfg.filter, cs):
+                skip_cs.append(cs)
                 continue
 
-            # skip file header
-            if first_line:
-                first_line = False
-                continue
-
-            # remove the last two columns, which are dates of the line
-            # and add a fifth field with the forth one + rpm- prefix, and
-            # remove the build counter number
-            columns = line.decode('utf-8').split(',')
-            kernel = re.sub('\.\d+$', '', columns[2])
-
-            sle, sp, u = self.parse_cs_line(columns[0])
-            if self.cfg.filter and not re.match(self.cfg.filter, '{}.{}u{}'.format(sle, sp, u)):
-                continue
-
-            file_buf.append(columns[0] + ',' + columns[1] + ',' + columns[2] + ',,rpm-' + kernel)
-
-        self.cfg.in_codestreams = '\n'.join(file_buf)
-        with open(self.cfg.in_file, 'w') as f:
-            f.write(self.cfg.in_codestreams)
-
-    def fill_cs_json(self):
-        print('Validating codestreams data...')
-        for line in self.cfg.in_codestreams.splitlines():
-            full_cs, proj, kernel_full, _, _= line.strip().split(',')\
-
-            sle, sp, u = self.parse_cs_line(full_cs)
-            cs_key = sle + '.' + sp + 'u' + u
+            ex_dir = self.cfg.get_ex_dir(jcs['cs'])
+            if not ex_dir.is_dir():
+                print('Codestream not found at {}. Aborting.'.format(str(ex_dir)))
+                sys.exit(1)
 
             cs_files = {}
-
             for cs_regex in self._file_funcs.keys():
-                if re.match(cs_regex, cs_key):
+                if re.match(cs_regex, cs):
                     # Convert dict to tuples
                     for k, v in list(self._file_funcs[cs_regex].items()):
                         # At this point we can have multiple regexes to specify
@@ -120,17 +133,13 @@ class Setup:
 
             if not cs_files:
                 print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_key))
+                skip_cs.append(cs)
                 continue
 
-            ex_dir = self.cfg.get_ex_dir(full_cs)
-            if not ex_dir.is_dir():
-                print('Codestream not found at {}. Aborting.'.format(str(ex_dir)))
-                sys.exit(1)
-
-            kernel = re.sub('\.\d+$', '', kernel_full)
+            jcs['files'] = cs_files
 
             if not self._mod:
-                obj = Path(ex_dir, 'boot', 'vmlinux-' + kernel + '-default')
+                obj = Path(ex_dir, 'boot', 'vmlinux-' + jcs['kernel'] + '-default')
             else:
                 mod_file = self._mod + '.ko'
                 obj_path = Path(ex_dir, 'lib', 'modules')
@@ -149,29 +158,23 @@ class Setup:
                     if not GitHelper.verify_func_object(func, str(obj)):
                         print('WARN: {}: Function {} does not exist in {}.'.format(cs_key, func, obj))
 
-            self.cfg.codestreams[cs_key] = {
-                'project' : proj,
-                'kernel' : kernel,
-                'build-counter' : kernel_full[-1],
-                'branch' : '',
-                'cs' : full_cs,
-                'sle' : sle,
-                'sp' : sp,
-                'update' : u,
-                'readelf' : 'readelf',
-                'rename_prefix' : self.get_rename_prefix(cs_key),
-                'object' : str(obj),
-                'files' : cs_files
-            }
+            jcs['object'] = str(obj)
 
-    def write_json_files(self, commits, patched):
+        # Removing filtered/skipped codestreams
+        for cs in skip_cs:
+            del self.cfg.codestreams[cs]
+
+        with open(self.cfg.cs_file, 'w') as f:
+            f.write(json.dumps(self.cfg.codestreams, indent=4))
+
+        # set cfg.conf so ccp can use it later
         self.cfg.conf = {
                 'bsc' : str(self.cfg.bsc_num),
                 'cve' : self._cve,
                 'conf' : self._kernel_conf,
                 'mod' : self._mod,
-                'commits' : commits,
-                'patched' : patched,
+                'commits' : self.commits,
+                'patched' : self.patched,
                 'work_dir' : str(self.cfg.bsc_path),
                 'data' : str(self.cfg.data)
         }
@@ -179,21 +182,15 @@ class Setup:
         with open(self.cfg.conf_file, 'w') as f:
             f.write(json.dumps(self.cfg.conf, indent=4))
 
-        with open(self.cfg.cs_file, 'w') as f:
-            f.write(json.dumps(self.cfg.codestreams, indent=4))
-
     def download_env(self):
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')
 
     def prepare_env(self):
-        commits = GitHelper.get_commits(self.cfg, self._ups_commits)
-        patched = GitHelper.get_patched_cs(self.cfg, commits)
+        self.commits = GitHelper.get_commits(self.cfg, self._ups_commits)
+        self.patched = GitHelper.get_patched_cs(self.cfg, self.commits)
 
-        self.download_codestream_file()
-        self.fill_cs_json()
+        self.setup_project_files()
 
-        self.write_json_files(commits, patched)
-        # Needs to be called after write_json_files, since needs self.cfg data
         Template.generate_commit_msg_file(self.cfg)
 
         if not self._disable_ccp:
