@@ -12,35 +12,30 @@ class Template:
         # and in kallsyms lookup
         self._mod = self.cfg.conf.get('mod', '').replace('-', '_')
 
-        if cs:
-            self._cs = cs
-            self._jcs = self.cfg.codestreams[cs]
-            self._ktype = self._jcs['rename_prefix']
-            self._files = list(self._jcs['files'].keys())
-            self._funcs = []
-
-        self._templ_path = Path(os.path.dirname(__file__), 'templates')
+        self.cs = cs
+        self.cs_data = self.cfg.codestreams[cs]
 
     def GeneratePatchedFuncs(self):
-        with open(Path(self.cfg.bsc, 'patched_funcs.csv'), 'w') as f:
-            for fun in self._funcs:
+        funcs = []
+        for f, flist in self.cs_data['files'].items():
+            funcs.extend(flist)
+
+        with open(Path(self.bsc, 'patched_funcs.csv'), 'w') as f:
+            for func in funcs:
                 mod = 'vmlinux' if not self._mod else self._mod
-                f.write('{} {} klpp_{} IS_ENABLED({})\n'.format(mod, fun, fun,
+                f.write('{} {} klpp_{} IS_ENABLED({})\n'.format(mod, func, func,
                     self.cfg.conf['conf']))
 
-    def GenerateLivepatchFile(self, ext, out_name, src_file, ext_file,
+    def __GenerateLivepatchFile(self, ext, out_name, src_file, ext_file,
             include_header):
         if not out_name and not src_file:
             raise RuntimeError('Both out_name and src_file are empty.  Aborting.')
 
         if src_file:
-            # Will be used when generating patched_funcs.csv
-            self._funcs.extend(self._jcs['files'][src_file])
-
             src_file = str(Path(src_file).name)
 
-            lp_inc_dir = str(Path(self.cfg.get_work_dir(self._cs), 'work_' + src_file))
-            lp_file = self.cfg.bsc + '_' + src_file
+            lp_inc_dir = str(Path(self.cfg.get_work_dir(self.cs), 'work_' + src_file))
+            lp_file = self.bsc + '_' + src_file
         else:
             lp_inc_dir = ''
             lp_file = None
@@ -50,7 +45,8 @@ class Template:
         if not out_name:
             out_name = lp_file
 
-        fsloader = jinja2.FileSystemLoader([self._templ_path, lp_inc_dir])
+        fsloader = jinja2.FileSystemLoader([Path(os.path.dirname(__file__),
+                                            'templates'), lp_inc_dir])
         env = jinja2.Environment(loader=fsloader, trim_blocks=True)
 
         templ = env.get_template('lp-' + ext + '.j2')
@@ -61,15 +57,15 @@ class Template:
         if include_header:
             templ.globals['include_header'] = True
 
-        with open(Path(self.cfg.bsc, out_name).with_suffix('.' + ext), 'w') as f:
-            f.write(templ.render(bsc = self.cfg.bsc,
+        with open(Path(self.bsc, out_name).with_suffix('.' + ext), 'w') as f:
+            f.write(templ.render(bsc = self.bsc,
                                 bsc_num = self.cfg.bsc_num,
                                 fname = os.path.splitext(out_name)[0],
                                 inc_src_file = lp_file,
                                 inc_exts_file = ext_file,
                                 cve = self.cfg.conf['cve'],
                                 config = self.cfg.conf['conf'],
-                                ktype = self._ktype,
+                                ktype = self.cs_data['rename_prefix'],
                                 user = self.cfg.user,
                                 email = self.cfg.email,
                                 commits = self.cfg.conf['commits']))
@@ -77,27 +73,28 @@ class Template:
     def GenerateLivePatches(self):
         # If the livepatch contains only one file, generate only the livepatch
         # one
-        bsc = Path(self.cfg.bsc)
+        bsc = Path(self.bsc)
         bsc.mkdir(exist_ok=True)
 
         # We need at least one header file for the livepatch
-        out_name = 'kgr_patch' if self._ktype == 'kgr' else 'livepatch'
-        out_name = out_name + '_' + self.cfg.bsc
+        out_name = 'kgr_patch' if self.cs_data['rename_prefix'] == 'kgr' else 'livepatch'
+        out_name = out_name + '_' + self.bsc
 
-        self.GenerateLivepatchFile('h', out_name, None, None, False)
+        self.__GenerateLivepatchFile('h', out_name, None, None, False)
 
-        if len(self._files) == 1:
-            self.GenerateLivepatchFile('c', out_name, self._files[0], 'exts',
+        files = self.cs_data['files']
+        if len(files.keys()) == 1:
+            self.__GenerateLivepatchFile('c', out_name, next(iter(files)), 'exts',
                     True)
             return
 
         # Run the template engine for each touched source file.
-        for src_file in self._files:
-            self.GenerateLivepatchFile('c', None, src_file, 'exts', False)
+        for src_file, funcs in self.files.items():
+            self.__GenerateLivepatchFile('c', None, src_file, 'exts', False)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        self.GenerateLivepatchFile('c', out_name, None, None, True)
+        self.__GenerateLivepatchFile('c', out_name, None, None, True)
 
     @staticmethod
     def generate_commit_msg_file(cfg):
