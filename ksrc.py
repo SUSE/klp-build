@@ -186,4 +186,12 @@ class GitHelper:
                     patched.append(tag)
 
         # remove duplicates
-        return natsorted(list(set(patched)))
+        patched = natsorted(list(set(patched)))
+
+        css = []
+        # Find which codestreams are related to each patched kernel
+        for cs in cfg.codestreams.keys():
+            if cfg.codestreams[cs]['kernel'] in patched:
+                css.append(cs)
+
+        return css

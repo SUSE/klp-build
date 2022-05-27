@@ -329,7 +329,6 @@ class CCP:
         patched = self.cfg.conf.get('patched', [])
 
         cs_list = []
-        patched_cs = []
         for cs in self.cfg.codestreams.keys():
             if self.cfg.filter and not re.match(self.cfg.filter, cs):
                 continue
@@ -338,13 +337,12 @@ class CCP:
                 print('Skipping {} since it doesn\'t contain any files'.format(cs))
                 continue
 
-            if self.cfg.codestreams[cs]['kernel'] in patched:
-                patched_cs.append(cs)
+            if cs in patched:
                 continue
 
             cs_list.append(cs)
 
-        if patched_cs:
+        if patched:
             print('Skipping the already patched codestreams:')
             for cs in patched_cs:
                 print('\t{}'.format(cs))

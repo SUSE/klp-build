@@ -94,6 +94,7 @@ class Setup:
             f.write(self.cfg.in_codestreams)
 
     def fill_cs_json(self):
+        print('Validating codestreams data...')
         for line in self.cfg.in_codestreams.splitlines():
             full_cs, proj, kernel_full, _, _= line.strip().split(',')\
 
@@ -185,12 +186,11 @@ class Setup:
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')
 
     def prepare_env(self):
-        self.download_codestream_file()
-
-        self.fill_cs_json()
-
         commits = GitHelper.get_commits(self.cfg, self._ups_commits)
         patched = GitHelper.get_patched_cs(self.cfg, commits)
+
+        self.download_codestream_file()
+        self.fill_cs_json()
 
         self.write_json_files(commits, patched)
         # Needs to be called after write_json_files, since needs self.cfg data
