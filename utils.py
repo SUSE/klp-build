@@ -112,8 +112,8 @@ class Setup:
 
             ex_dir = self.cfg.get_ex_dir(jcs['cs'])
             if not ex_dir.is_dir():
-                print('Codestream not found at {}. Aborting.'.format(str(ex_dir)))
-                sys.exit(1)
+                print('Data related to codestream {} not found.  Downloading...'.format(cs))
+                GitHelper.download_cs_data(self.cfg, jcs['cs'], jcs['project'])
 
             cs_files = {}
             for cs_regex in self._file_funcs.keys():
@@ -132,7 +132,7 @@ class Setup:
                         cs_files[k] = values
 
             if not cs_files:
-                print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs_key))
+                print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs))
                 skip_cs.append(cs)
                 continue
 

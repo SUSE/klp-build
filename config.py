@@ -19,6 +19,10 @@ class Config:
         if not self.work.is_dir():
             raise ValueError('Work dir should be a directory')
 
+        self.scripts_path = Path(Path().home(), 'kgr', 'scripts')
+        if not self.scripts_path.is_dir():
+            raise ValueError('Script dir not found in ~/kgr/scripts')
+
         bsc = args.bsc
         self.bsc_num = bsc
         self.bsc = 'bsc' + str(bsc)
