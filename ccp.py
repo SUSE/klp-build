@@ -344,7 +344,7 @@ class CCP:
 
         if patched:
             print('Skipping the already patched codestreams:')
-            for cs in patched_cs:
+            for cs in patched:
                 print('\t{}'.format(cs))
 
         print('\nRunning klp-ccp...')
