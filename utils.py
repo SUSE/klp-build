@@ -136,6 +136,14 @@ class Setup:
                 skip_cs.append(cs)
                 continue
 
+            # Check if the files exist in the respective codestream directories
+            sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
+            for f in cs_files.keys():
+                fdir = Path(sdir, f)
+                if not fdir.is_file():
+                    raise RuntimeError('File {} doesn\'t exists in {}'.format(f,
+                        str(sdir)))
+
             jcs['files'] = cs_files
 
             if not self._mod:
