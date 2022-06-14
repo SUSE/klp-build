@@ -114,11 +114,14 @@ class GitHelper:
 
             commits[bc] = {}
             for commit, _ in commits['upstream'].items():
-                patch_file = subprocess.check_output(['/usr/bin/git', '-C',
-                            str(cfg.ksrc),
-                            'grep', '-l', 'Git-commit: ' + commit, 
-                            'remotes/origin/cve/linux-' + bc],
-                            stderr=subprocess.PIPE).decode(sys.stdout.encoding)
+                try:
+                    patch_file = subprocess.check_output(['/usr/bin/git', '-C',
+                                str(cfg.ksrc),
+                                'grep', '-l', 'Git-commit: ' + commit,
+                                'remotes/origin/cve/linux-' + bc],
+                                stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+                except subprocess.CalledProcessError:
+                    patch_file = ''
 
                 # If we don't find any commits, add a note about it
                 if not patch_file:
@@ -175,6 +178,9 @@ class GitHelper:
         patched = []
         for branch in cfg.cve_branches:
             for up_commit, suse_commit in commits[branch].items():
+                if suse_commit == '':
+                    continue
+
                 tags = subprocess.check_output(['/usr/bin/git', '-C',
                             str(cfg.ksrc), 'tag', '--contains=' + suse_commit])
 
