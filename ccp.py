@@ -27,12 +27,15 @@ class CCP:
         ofname = '.' + filename.name.replace('.c', '.o.d')
         ofname = Path(filename.parent, ofname)
 
-        # FIXME: is this regex accurate?
-        cmd_args_regex = '(-Wp,-MD,{}\s+-nostdinc\s+-isystem.*{});'.format(ofname, fname)
+        cmd_args_regex = '(-Wp,{},{}\s+-nostdinc\s+-isystem.*{});'
 
-        result = re.search(cmd_args_regex, str(output).strip())
+        result = re.search(cmd_args_regex.format('-MD', ofname, fname), str(output).strip())
         if not result:
-            return None
+            # 15.4 onwards changes the regex a little: -MD -> -MMD
+            result = re.search(cmd_args_regex.format('-MMD', ofname, fname), str(output).strip())
+
+        if not result:
+            raise RuntimeError('Failed to get the kernel cmdline for file {} in {}{}'.format(str(ofname), sle, sp))
 
         # some strings  have single quotes around double quotes, so remove the
         # outer quotes
