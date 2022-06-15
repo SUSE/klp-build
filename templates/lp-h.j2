@@ -1,7 +1,7 @@
 #ifndef _{{ fname | upper }}_H
 #define _{{ fname | upper }}_H
 
-{% if config is defined %}
+{% if config is not none %}
 #if IS_ENABLED({{ config }})
 {% endif %}
 
@@ -17,7 +17,7 @@ static inline void {{ fname }}_cleanup(void) {}
 	KGR_PATCH{% if mod is defined %}_OBJ{% endif %}(, kgrp_, "MOD"),
 
 {% endif %}
-{% if config is defined %}
+{% if config is not none %}
 #else /* !IS_ENABLED({{ config }}) */
 {% endif %}
 
@@ -28,7 +28,7 @@ static inline void {{ fname }}_cleanup(void) {}
 #define KGR_PATCH_{{ bsc | upper }}_FUNCS
 
 {% endif %}
-{% if config is defined %}
+{% if config is not none %}
 #endif /* IS_ENABLED({{ config }}) */
 {% endif %}
 
