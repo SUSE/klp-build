@@ -54,6 +54,13 @@ class Template:
         if self._mod:
             templ.globals['mod'] = self._mod
 
+        # 15.4 onwards we don't have module_mutex, so template generate
+        # different code
+        sle = int(self.cs_data['sle'])
+        sp = int(self.cs_data['sp'])
+        if sle <= 15 and sp < 4:
+            templ.globals['mod_mutex'] = True
+
         if include_header:
             templ.globals['include_header'] = True
 

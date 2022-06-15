@@ -48,10 +48,13 @@ static int {{ fname }}_module_notify(struct notifier_block *nb,
 
 	if (action != MODULE_STATE_COMING || strcmp(mod->name, LP_MODULE))
 		return 0;
-
+{% if mod_mutex is defined %}
 	mutex_lock(&module_mutex);
 	ret = __{{ ktype }}_resolve_kallsyms_relocs({{ ktype }}_funcs, ARRAY_SIZE({{ ktype }}_funcs));
 	mutex_unlock(&module_mutex);
+{% else %}
+	ret = klp_resolve_kallsyms_relocs({{ ktype }}_funcs, ARRAY_SIZE({{ ktype }}_funcs));
+{% endif %}
 
 	WARN(ret, "%s: delayed kallsyms lookup failed. System is broken and can crash.\n",
 		__func__);
@@ -70,6 +73,7 @@ int {{ fname }}_init(void)
 {
 {% if mod is defined %}
 	int ret;
+{% if mod_mutex is defined %}
 
 	mutex_lock(&module_mutex);
 	if (find_module(LP_MODULE)) {
@@ -84,7 +88,40 @@ out:
 	mutex_unlock(&module_mutex);
 	return ret;
 {% else %}
+	struct module *mod;
+
+	ret = klp_kallsyms_relocs_init();
+	if (ret)
+		return ret;
+
+	ret = register_module_notifier(&{{ fname }}_module_nb);
+	if (ret)
+		return ret;
+
+	rcu_read_lock_sched();
+	mod = (*klpe_find_module)(LP_MODULE);
+	if (!try_module_get(mod))
+		mod = NULL;
+	rcu_read_unlock_sched();
+
+	if (mod) {
+		ret = klp_resolve_kallsyms_relocs({{ ktype }}_funcs,
+						ARRAY_SIZE({{ ktype }}_funcs));
+	}
+
+	if (ret)
+		unregister_module_notifier(&{{ fname }}_module_nb);
+	module_put(mod);
+
+	return ret;
+{% endif %}
+{% else %}
+{% if mod_mutex is defined %}
 	return __{{ ktype }}_resolve_kallsyms_relocs({{ ktype }}_funcs, ARRAY_SIZE({{ ktype }}_funcs));
+{% else %}
+	return klp_resolve_kallsyms_relocs({{ ktype }}_funcs,
+						ARRAY_SIZE({{ ktype }}_funcs));
+{% endif %}
 {% endif %}
 }
 
