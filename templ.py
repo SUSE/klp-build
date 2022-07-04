@@ -21,10 +21,16 @@ class Template:
             funcs.extend(flist)
 
         with open(Path(self.bsc, 'patched_funcs.csv'), 'w') as f:
+            conf = self.cfg.conf['conf']
+            if conf:
+                conf = ' IS_ENABLED({})'.format(conf)
+            else:
+                conf = ''
+
             for func in funcs:
                 mod = 'vmlinux' if not self._mod else self._mod
-                f.write('{} {} klpp_{} IS_ENABLED({})\n'.format(mod, func, func,
-                    self.cfg.conf['conf']))
+                f.write('{} {} klpp_{} {}\n'.format(mod, func, func,
+                    conf))
 
     def __GenerateLivepatchFile(self, ext, out_name, src_file, ext_file,
             include_header):
