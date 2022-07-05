@@ -28,7 +28,7 @@
 #include "livepatch_bsc{{ bsc_num }}.h"
 #include "../kallsyms_relocs.h"
 
-static struct {{ ktype }}_kallsyms_reloc {{ ktype }}_funcs[] = {
+static struct klp_kallsyms_reloc klp_funcs[] = {
 {% if inc_exts_file is not none -%}
 {% include inc_exts_file %}
 
@@ -50,10 +50,10 @@ static int {{ fname }}_module_notify(struct notifier_block *nb,
 		return 0;
 {% if mod_mutex is defined %}
 	mutex_lock(&module_mutex);
-	ret = __{{ ktype }}_resolve_kallsyms_relocs({{ ktype }}_funcs, ARRAY_SIZE({{ ktype }}_funcs));
+	ret = __klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
 	mutex_unlock(&module_mutex);
 {% else %}
-	ret = klp_resolve_kallsyms_relocs({{ ktype }}_funcs, ARRAY_SIZE({{ ktype }}_funcs));
+	ret = klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
 {% endif %}
 
 	WARN(ret, "%s: delayed kallsyms lookup failed. System is broken and can crash.\n",
@@ -77,8 +77,8 @@ int {{ fname }}_init(void)
 
 	mutex_lock(&module_mutex);
 	if (find_module(LP_MODULE)) {
-		ret = __{{ ktype }}_resolve_kallsyms_relocs({{ ktype }}_funcs,
-						    ARRAY_SIZE({{ ktype }}_funcs));
+		ret = __klp_resolve_kallsyms_relocs(klp_funcs,
+						    ARRAY_SIZE(klp_funcs));
 		if (ret)
 			goto out;
 	}
@@ -105,8 +105,8 @@ out:
 	rcu_read_unlock_sched();
 
 	if (mod) {
-		ret = klp_resolve_kallsyms_relocs({{ ktype }}_funcs,
-						ARRAY_SIZE({{ ktype }}_funcs));
+		ret = klp_resolve_kallsyms_relocs(klp_funcs,
+						ARRAY_SIZE(klp_funcs));
 	}
 
 	if (ret)
@@ -117,10 +117,9 @@ out:
 {% endif %}
 {% else %}
 {% if mod_mutex is defined %}
-	return __{{ ktype }}_resolve_kallsyms_relocs({{ ktype }}_funcs, ARRAY_SIZE({{ ktype }}_funcs));
+	return __klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
 {% else %}
-	return klp_resolve_kallsyms_relocs({{ ktype }}_funcs,
-						ARRAY_SIZE({{ ktype }}_funcs));
+	return klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
 {% endif %}
 {% endif %}
 }

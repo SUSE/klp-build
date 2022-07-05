@@ -12,11 +12,6 @@ void {{ fname }}_cleanup(void);
 static inline void {{ fname }}_cleanup(void) {}
 {% endif %}
 
-{% if ktype == 'kgr' %}
-#define KGR_PATCH_{{ bsc | upper }}_FUNCS \
-	KGR_PATCH{% if mod is defined %}_OBJ{% endif %}(, kgrp_, "MOD"),
-
-{% endif %}
 {% if config is not none %}
 #else /* !IS_ENABLED({{ config }}) */
 {% endif %}
@@ -24,10 +19,6 @@ static inline void {{ fname }}_cleanup(void) {}
 static inline int {{ fname }}_init(void) { return 0; }
 static inline void {{ fname }}_cleanup(void) {}
 
-{% if ktype == 'kgr' %}
-#define KGR_PATCH_{{ bsc | upper }}_FUNCS
-
-{% endif %}
 {% if config is not none %}
 #endif /* IS_ENABLED({{ config }}) */
 {% endif %}

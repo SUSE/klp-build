@@ -78,7 +78,6 @@ class Template:
                                 inc_exts_file = ext_file,
                                 cve = self.cfg.conf['cve'],
                                 config = self.cfg.conf['conf'],
-                                ktype = self.cs_data['rename_prefix'],
                                 user = self.cfg.user,
                                 email = self.cfg.email,
                                 commits = self.cfg.conf['commits']))
@@ -90,8 +89,7 @@ class Template:
         bsc.mkdir(exist_ok=True)
 
         # We need at least one header file for the livepatch
-        out_name = 'kgr_patch' if self.cs_data['rename_prefix'] == 'kgr' else 'livepatch'
-        out_name = out_name + '_' + self.bsc
+        out_name = 'livepatch_' + self.bsc
 
         self.__GenerateLivepatchFile('h', out_name, None, None, False)
 

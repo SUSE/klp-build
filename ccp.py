@@ -304,7 +304,7 @@ class CCP:
         env['KCP_KBUILD_ODIR'] = str(odir)
         env['KCP_KBUILD_SDIR'] = str(sdir)
         env['KCP_PATCHED_OBJ'] = jcs['object']
-        env['KCP_RENAME_PREFIX'] = jcs['rename_prefix']
+        env['KCP_RENAME_PREFIX'] = 'klp'
 
         for fname, funcs in jcs['files'].items():
             print('\t{}\t\t{}'.format(cs, fname))

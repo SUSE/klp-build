@@ -38,11 +38,6 @@ class Setup:
 
             self._file_funcs[cs][filepath] = funcs
 
-    def get_rename_prefix(self, cs):
-        if '12.3' in cs:
-            return 'kgr'
-        return 'klp'
-
     # Parse SLE15-SP2_Update_25 to 15.2u25
     def parse_cs_line(self, cs):
         sle, _, u = cs.replace('SLE', '').split('_')
@@ -92,8 +87,7 @@ class Setup:
                         'sle' : sle,
                         'sp' : sp,
                         'update' : u,
-                        'readelf' : 'readelf',
-                        'rename_prefix' : self.get_rename_prefix(cs_key)
+                        'readelf' : 'readelf'
                 }
 
         print('Validating codestreams data...')
