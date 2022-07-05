@@ -64,8 +64,8 @@ class Template:
         # different code
         sle = int(self.cs_data['sle'])
         sp = int(self.cs_data['sp'])
-        if sle <= 15 and sp < 4:
-            templ.globals['mod_mutex'] = True
+        if sle < 15 or (sle == 15 and sp < 4):
+                templ.globals['mod_mutex'] = True
 
         if include_header:
             templ.globals['include_header'] = True
