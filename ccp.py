@@ -310,11 +310,14 @@ class CCP:
             print('\t{}\t\t{}'.format(cs, fname))
 
             self._proc_files.append(fname)
+            base_fname = Path(fname).name
 
-            out_dir = Path(self.cfg.get_work_dir(cs), 'work_' + Path(fname).name)
+            out_dir = Path(self.cfg.get_work_dir(cs), 'work_' + base_fname)
             # remove any previously generated files
             shutil.rmtree(out_dir, ignore_errors=True)
             out_dir.mkdir(parents=True, exist_ok=True)
+            # create symlink to the respective codestream file
+            os.symlink(Path(sdir, fname), Path(out_dir, base_fname))
             env['KCP_WORK_DIR'] = str(out_dir)
 
             env['KCP_IPA_CLONES_DUMP'] = str(Path(self.cfg.get_ipa_dir(jcs['cs']),
