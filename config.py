@@ -108,6 +108,12 @@ class Config:
         except:
             raise ValueError('Please define name/email in global git config')
 
+        # kgraft-patches is only necessary for --push
+        if args.cmd == 'ibs' and not args.push:
+            kgraft_path = Path(Path().home(), 'kgr', 'kgraft-patches')
+            if not kgraft_path.is_dir():
+                raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches')
+
         self.bsc_path.mkdir(exist_ok=True)
 
     def validate_ccp_args(self, args):
