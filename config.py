@@ -116,6 +116,9 @@ class Config:
 
         self.bsc_path.mkdir(exist_ok=True)
 
+        self.bsc_download = Path(self.bsc_path, 'downloads')
+        self.bsc_download.mkdir(exist_ok=True)
+
     def validate_ccp_args(self, args):
         # Prefer the env var to the HOME directory location
         ccp_path = os.getenv('KLP_CCP_PATH', '')

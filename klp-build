@@ -66,6 +66,9 @@ def create_parser() -> argparse.ArgumentParser:
     ibs.add_argument('--status', action='store_true',
             help='Check livepatch build status')
 
+    ibs.add_argument('--download', action='store_true',
+            help='Download livepatch rpms')
+
     return parser
 
 if  __name__ == '__main__':
@@ -101,5 +104,7 @@ if  __name__ == '__main__':
             ibs.status()
         elif args.cleanup:
             ibs.cleanup()
+        elif args.download:
+            ibs.download()
         elif args.push:
             print('TODO!')

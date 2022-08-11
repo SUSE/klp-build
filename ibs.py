@@ -1,6 +1,8 @@
 import concurrent.futures
+import errno
 import json
 from lxml import etree
+from pathlib import Path
 import os
 from osctiny import Osc
 import re
@@ -15,12 +17,14 @@ class IBS:
 
     # The projects has different format: 12_5u5 instead of 12.5u5
     def get_projects(self):
-        ret = self.osc.search.project("starts-with(@name, '{}')".format(self.prj_prefix))
-        prjs = []
-        for result in ret.findall('project'):
-            prjs.append(result.get('name'))
+        return self.osc.search.project("starts-with(@name, '{}')".format(self.prj_prefix))
 
-        return prjs
+    def get_project_names(self):
+        names = []
+        for result in self.get_projects().findall('project'):
+            names.append(result.get('name'))
+
+        return names
 
     def delete_project(self, prj):
         exists = self.osc.projects.exists(prj)
@@ -34,18 +38,45 @@ class IBS:
 
         print('Removed ' + prj)
 
+    def download_rpms(self, args):
+        prj, arch, filename = args
+        try:
+            ret = self.osc.build.get_binary(prj, 'devbuild', arch, 'klp', filename)
+            with open(Path(self.cfg.bsc_download, filename), "wb") as f:
+                f.write(ret)
+
+            print('\t{}: ok'.format(filename))
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise RuntimeError('download error on {}: {}'.format(prj, filename))
+
+    def download(self):
+        for result in self.get_projects().findall('project'):
+            prj = result.get('name')
+            archs = result.xpath('repository/arch')
+            rpms = []
+            for arch in archs:
+                ret = self.osc.build.get_binary_list(prj, 'devbuild', arch, 'klp')
+                rpm_name = '{}.rpm'.format(arch)
+                for rpm in ret.xpath('binary/@filename'):
+                    if not rpm.endswith(rpm_name):
+                        continue
+                    rpms.append( (prj, arch, rpm) )
+
+            print('Downloading {} packages'.format(prj))
+            #with concurrent.futures.ThreadPoolExecutor(max_workers=len(rpms)) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                results = executor.map(self.download_rpms, rpms)
+                for result in results:
+                    if result:
+                        print(result)
 
     def status(self):
         prjs = {}
-        ret = self.osc.search.project("starts-with(@name, '{}')".format(self.prj_prefix))
-
-        for result in ret.findall('project'):
-            prj = result.get('name')
+        for prj in self.get_project_names():
             prjs[prj] = {}
 
-            ret = self.osc.build.get(prj)
-
-            for res in ret.findall('result'):
+            for res in self.osc.build.get(prj).findall('result'):
                 code = res.xpath('status/@code')[0]
                 prjs[prj][res.get('arch')] = code
 
