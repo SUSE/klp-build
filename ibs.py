@@ -27,8 +27,7 @@ class IBS:
         return names
 
     def delete_project(self, prj):
-        exists = self.osc.projects.exists(prj)
-        if not exists:
+        if not self.osc.projects.exists(prj):
             return
 
         ret = self.osc.projects.delete(prj)
@@ -87,7 +86,7 @@ class IBS:
             print('{}\t{}'.format(prj, '\t'.join(st)))
 
     def cleanup(self):
-        prjs = self.get_projects()
+        prjs = self.get_project_names()
 
         if len(prjs) == 0:
             return
