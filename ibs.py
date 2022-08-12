@@ -15,6 +15,11 @@ class IBS:
         ibs_user = re.search('(\w+)@', cfg.email).group(1)
         self.prj_prefix = 'home:{}:klp'.format(ibs_user)
 
+        self.cs_data = {
+                'kernel-default' : '(kernel-default\-(extra|(livepatch-devel|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
+                'kernel-source' : '(kernel-(source|macros|devel)\-?[\d\.\-]+.noarch.rpm)'
+        }
+
     # The projects has different format: 12_5u5 instead of 12.5u5
     def get_projects(self):
         return self.osc.search.project("starts-with(@name, '{}')".format(self.prj_prefix))
@@ -37,21 +42,73 @@ class IBS:
 
         print('Removed ' + prj)
 
-    def download_rpms(self, args):
-        prj, arch, filename = args
+    def download_cs_data(self, cs):
+        jcs = self.cfg.codestreams[cs]
+
+        prj = jcs['project']
+        if not jcs['update']:
+            repo = 'standard'
+        else:
+            repo = 'SUSE_SLE-{}'.format(jcs['sle'])
+            if jcs['sp']:
+                repo = '{}-SP{}'.format(repo, jcs['sp'])
+            repo = '{}_Update'.format(repo)
+
+        path_dest = Path(self.cfg.kernel_rpms, jcs['cs'])
+        path_dest.mkdir(exist_ok=True)
+
+        print('Downloading {} packages into {}'.format(cs, str(path_dest)))
+        for k, regex in self.cs_data.items():
+            pkg = '{}.{}'.format(k, repo)
+
+            rpms = []
+            # arch is fixed for now
+            ret = self.osc.build.get_binary_list(prj, repo, 'x86_64', pkg)
+            for file in re.findall(regex, str(etree.tostring(ret))):
+                rpm = file[0]
+                if Path(path_dest, rpm).exists():
+                    print('\t{} already downloaded, skipping.'.format(rpm))
+                    continue
+
+                rpms.append( (prj, repo, 'x86_64', pkg, rpm, path_dest) )
+
+            if len(rpms) == 0:
+                continue
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(rpms)) as executor:
+                results = executor.map(self.download_binary_rpms, rpms)
+                for result in results:
+                    if result:
+                        print(result)
+
+    def download_binary_rpms(self, args):
+        prj, repo, arch, pkg, filename, dest = args
         try:
-            ret = self.osc.build.get_binary(prj, 'devbuild', arch, 'klp', filename)
-            with open(Path(self.cfg.bsc_download, filename), "wb") as f:
-                f.write(ret)
+            self.osc.build.download_binary(prj, repo, arch, pkg, filename, dest)
 
             print('\t{}: ok'.format(filename))
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise RuntimeError('download error on {}: {}'.format(prj, filename))
 
+    def apply_filter(self, item_list):
+        filtered = []
+
+        for item in item_list:
+            if not re.match(self.cfg.filter, rpm.replace('_', '.')):
+                continue
+
+            filtered.append(item)
+
+        return filtered
+
     def download(self):
         for result in self.get_projects().findall('project'):
             prj = result.get('name')
+
+            if self.cfg.filter and not re.match(self.cfg.filter, prj):
+                continue
+
             archs = result.xpath('repository/arch')
             rpms = []
             for arch in archs:
@@ -60,12 +117,15 @@ class IBS:
                 for rpm in ret.xpath('binary/@filename'):
                     if not rpm.endswith(rpm_name):
                         continue
-                    rpms.append( (prj, arch, rpm) )
+
+                    if 'preempt' in rpm:
+                        continue
+
+                    rpms.append( (prj, 'devbuild', arch, 'klp', rpm, self.cfg.bsc_download) )
 
             print('Downloading {} packages'.format(prj))
-            #with concurrent.futures.ThreadPoolExecutor(max_workers=len(rpms)) as executor:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                results = executor.map(self.download_rpms, rpms)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(rpms)) as executor:
+                results = executor.map(self.download_binary_rpms, rpms)
                 for result in results:
                     if result:
                         print(result)
@@ -93,15 +153,7 @@ class IBS:
 
         print('{} projects found.'.format(len(prjs)))
 
-        if self.cfg.filter:
-            filtered = []
-            for prj in prjs:
-                if not re.match(self.cfg.filter, prj.replace('_', '.')):
-                    continue
-
-                filtered.append(prj)
-
-            prjs = filtered
+        prjs = self.apply_filter(rpms)
 
         print('Removing {} projects.'.format(len(prjs)))
 

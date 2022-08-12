@@ -68,11 +68,6 @@ class GitHelper:
             f.write('\n'.join(build_cs))
 
     @staticmethod
-    def download_cs_data(cfg, cs, project):
-        script = str(Path(cfg.scripts_path, 'kgr-osc-get-kernel-rpms.sh'))
-        subprocess.run([script, cs, project, str(cfg.data)], check=True)
-
-    @staticmethod
     def verify_func_object(func, obj):
         nm_out = subprocess.check_output(['nm', obj]).decode().strip()
         return re.search(r' {}\n'.format(func), nm_out)

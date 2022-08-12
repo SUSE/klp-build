@@ -68,6 +68,7 @@ class Config:
             else:
                 self.data = Path(os.getenv('KLP_DATA_DIR', ''))
 
+        self.kernel_rpms = Path(self.data, 'kernel-rpms')
         self.ex_dir = Path(self.data, 'ex-kernels')
         self.ipa_dir = Path(self.data, 'ipa-clones')
 

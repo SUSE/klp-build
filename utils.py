@@ -6,6 +6,7 @@ import requests
 import sys
 
 import ccp
+from ibs import IBS
 from templ import Template
 from ksrc import GitHelper
 
@@ -26,6 +27,8 @@ class Setup:
 
         self.commits = []
         self.patched = []
+
+        self.ibs = None
 
         for f in file_funcs:
             cs = f[0]
@@ -106,8 +109,11 @@ class Setup:
 
             ex_dir = self.cfg.get_ex_dir(jcs['cs'])
             if not ex_dir.is_dir():
+                if not self.ibs:
+                    self.ibs = IBS(self.cfg)
+
                 print('Data related to codestream {} not found.  Downloading...'.format(cs))
-                GitHelper.download_cs_data(self.cfg, jcs['cs'], jcs['project'])
+                self.ibs.download_cs_data(cs)
 
             cs_files = {}
             for cs_regex in self._file_funcs.keys():

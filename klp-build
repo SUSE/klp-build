@@ -7,7 +7,7 @@ from config import Config
 from ksrc import GitHelper
 import utils
 import templ
-import ibs
+from ibs import IBS
 
 def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=False)
@@ -99,7 +99,8 @@ if  __name__ == '__main__':
         GitHelper.build(config)
 
     elif args.cmd == 'ibs':
-        ibs = ibs.IBS(config)
+        ibs = IBS(config)
+
         if args.status:
             ibs.status()
         elif args.cleanup:
