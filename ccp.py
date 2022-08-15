@@ -15,6 +15,16 @@ class CCP:
 
         self.env = os.environ
 
+        gcc_ver = subprocess.check_output(['gcc', '-dumpversion']).decode().strip()
+        # gcc12 has a problem with kernel and xrealloc implementation
+        if gcc_ver != '12':
+            self.cc = 'gcc'
+        # if gcc12 is the default compiler, check if gcc11 is available
+        elif gcc_ver == '12' and shutil.which('gcc-11'):
+            self.cc = 'gcc-11'
+        else:
+            raise RuntimeError('Only gcc12 is available, and it\'s problematic with kernel sources')
+
         # the current blacklisted function, more can be added as necessary
         self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen"
 
@@ -56,7 +66,8 @@ class CCP:
     def get_make_cmd(self, filename, jcs, odir):
         filename = PurePath(filename)
         file_ = filename.with_suffix('.o')
-        completed = subprocess.run(['make', '-sn', file_], cwd=odir,
+        completed = subprocess.run(['make', '-sn', 'CC={}'.format(self.cc),
+                                    'HOSTCC={}'.format(self.cc), file_], cwd=odir,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, check=True)
 
