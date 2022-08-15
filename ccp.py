@@ -55,8 +55,15 @@ class CCP:
         output = re.sub('-D"KBUILD_([\w\#\_\=\(\)])+"', self.unquote_output, output)
 
         # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
-        output = output.replace('-flive-patching=inline-clone', '')
-        output = output.replace('-fdump-ipa-clones', '')
+        # 15.4u0 options
+        # -fno-allow-store-data-races and -Wno-zero-length-bounds
+        # 15.4u1 options
+        # -mindirect-branch-cs-prefix appear in 15.4u1
+        # more options to be removed
+        for opt in ['-flive-patching=inline-clone', '-fdump-ipa-clones',
+                '-fno-allow-store-data-races', '-Wno-zero-length-bounds',
+                '-mindirect-branch-cs-prefix']:
+            output = output.replace(opt, '')
 
         if int(sle) >= 15 and int(sp) >= 2:
             output += ' -D_Static_assert(e,m)='
@@ -95,13 +102,9 @@ class CCP:
 
         ccp_args = list(filter(None, ccp_args))
 
-        completed = subprocess.run(ccp_args, cwd=odir, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, env=env, check=True)
-
-        # Store the output for later
         with open(Path(out_dir, 'klp-ccp.out'), 'w') as f:
-            f.write(completed.stdout.decode())
-            f.write(completed.stderr.decode())
+            subprocess.run(ccp_args, cwd=odir, stdout=f, stderr=f, env=env,
+                        check=True)
 
 		# Remove the local path prefix of the klp-ccp generated comments
         # Open the file, read, seek to the beginning, write the new data, and

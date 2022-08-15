@@ -132,7 +132,6 @@ class Setup:
                         cs_files[k] = values
 
             if not cs_files:
-                print('Kernel {} does not have any file-funcs associated. Skipping'.format(cs))
                 skip_cs.append(cs)
                 continue
 
@@ -169,7 +168,10 @@ class Setup:
             jcs['object'] = str(obj)
 
         # Removing filtered/skipped codestreams
+        if skip_cs:
+            print('Skipping the following codestreams without file-funcs associated:')
         for cs in skip_cs:
+            print('\t{}'.format(cs))
             del self.cfg.codestreams[cs]
 
         with open(self.cfg.cs_file, 'w') as f:
