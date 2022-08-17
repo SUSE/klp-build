@@ -20,6 +20,16 @@ class IBS:
                 'kernel-source' : '(kernel-(source|macros|devel)\-?[\d\.\-]+.noarch.rpm)'
         }
 
+    def do_work(self, func, args):
+        if len(args) == 0:
+            return
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            results = executor.map(func, args)
+            for result in results:
+                if result:
+                    print(result)
+
     # The projects has different format: 12_5u5 instead of 12.5u5
     def get_projects(self):
         return self.osc.search.project("starts-with(@name, '{}')".format(self.prj_prefix))
@@ -72,14 +82,7 @@ class IBS:
 
                 rpms.append( (prj, repo, 'x86_64', pkg, rpm, path_dest) )
 
-            if len(rpms) == 0:
-                continue
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(rpms)) as executor:
-                results = executor.map(self.download_binary_rpms, rpms)
-                for result in results:
-                    if result:
-                        print(result)
+            self.do_work(self.download_binary_rpms, rpms)
 
     def download_binary_rpms(self, args):
         prj, repo, arch, pkg, filename, dest = args
@@ -88,7 +91,9 @@ class IBS:
 
             print('\t{}: ok'.format(filename))
         except OSError as e:
-            if e.errno != errno.EEXIST:
+            if e.errno == errno.EEXIST:
+                print('\t{}: already downloaded. skipping.'.format(filename))
+            else:
                 raise RuntimeError('download error on {}: {}'.format(prj, filename))
 
     def apply_filter(self, item_list):
@@ -126,11 +131,7 @@ class IBS:
                     rpms.append( (prj, 'devbuild', arch, 'klp', rpm, self.cfg.bsc_download) )
 
             print('Downloading {} packages'.format(prj))
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(rpms)) as executor:
-                results = executor.map(self.download_binary_rpms, rpms)
-                for result in results:
-                    if result:
-                        print(result)
+            self.do_work(self.download_binary_rpms, rpms)
 
     def status(self):
         prjs = {}
@@ -159,9 +160,4 @@ class IBS:
 
         print('Deleting {} projects...'.format(len(prjs)))
 
-        # Remove the projects
-        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-            results = executor.map(self.delete_project, prjs)
-            for result in results:
-                if result:
-                    print(result)
+        self.do_work(self.delete_project, prjs)
