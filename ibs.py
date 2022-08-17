@@ -40,7 +40,7 @@ class IBS:
             print(etree.tostring(ret))
             raise ValueError(prj)
 
-        print('Removed ' + prj)
+        print('\t' + prj)
 
     def download_cs_data(self, cs):
         jcs = self.cfg.codestreams[cs]
@@ -92,10 +92,12 @@ class IBS:
                 raise RuntimeError('download error on {}: {}'.format(prj, filename))
 
     def apply_filter(self, item_list):
-        filtered = []
+        if not self.cfg.filter:
+            return item_list
 
+        filtered = []
         for item in item_list:
-            if not re.match(self.cfg.filter, rpm.replace('_', '.')):
+            if not re.match(self.cfg.filter, item.replace('_', '.')):
                 continue
 
             filtered.append(item)
@@ -153,9 +155,9 @@ class IBS:
 
         print('{} projects found.'.format(len(prjs)))
 
-        prjs = self.apply_filter(rpms)
+        prjs = self.apply_filter(prjs)
 
-        print('Removing {} projects.'.format(len(prjs)))
+        print('Deleting {} projects...'.format(len(prjs)))
 
         # Remove the projects
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
