@@ -107,14 +107,6 @@ class Setup:
                 skip_cs.append(cs)
                 continue
 
-            ex_dir = self.cfg.get_ex_dir(jcs['cs'])
-            if not ex_dir.is_dir():
-                if not self.ibs:
-                    self.ibs = IBS(self.cfg)
-
-                print('Data related to codestream {} not found.  Downloading...'.format(cs))
-                self.ibs.download_cs_data(cs)
-
             cs_files = {}
             for cs_regex in self._file_funcs.keys():
                 if re.match(cs_regex, cs):
@@ -134,6 +126,27 @@ class Setup:
             if not cs_files:
                 skip_cs.append(cs)
                 continue
+
+        # Removing filtered/skipped codestreams
+        if skip_cs:
+            print('Skipping the following codestreams without file-funcs associated:')
+        for cs in skip_cs:
+            print('\t{}'.format(cs))
+            del self.cfg.codestreams[cs]
+
+        # Save codestreams file before something bad can happen
+        with open(self.cfg.cs_file, 'w') as f:
+            f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
+
+        # Iterate over the codestreams that are enabled
+        for cs in self.cfg.codestreams.keys():
+            ex_dir = self.cfg.get_ex_dir(jcs['cs'])
+            if not ex_dir.is_dir():
+                if not self.ibs:
+                    self.ibs = IBS(self.cfg)
+
+                print('Data related to codestream {} not found.  Downloading...'.format(cs))
+                self.ibs.download_cs_data(cs)
 
             # Check if the files exist in the respective codestream directories
             sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
@@ -167,16 +180,6 @@ class Setup:
 
             jcs['object'] = str(obj)
 
-        # Removing filtered/skipped codestreams
-        if skip_cs:
-            print('Skipping the following codestreams without file-funcs associated:')
-        for cs in skip_cs:
-            print('\t{}'.format(cs))
-            del self.cfg.codestreams[cs]
-
-        with open(self.cfg.cs_file, 'w') as f:
-            f.write(json.dumps(self.cfg.codestreams, indent=4))
-
         # set cfg.conf so ccp can use it later
         self.cfg.conf = {
                 'bsc' : str(self.cfg.bsc_num),
@@ -190,7 +193,7 @@ class Setup:
         }
 
         with open(self.cfg.conf_file, 'w') as f:
-            f.write(json.dumps(self.cfg.conf, indent=4))
+            f.write(json.dumps(self.cfg.conf, indent=4, sort_keys=True))
 
     def download_env(self):
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')
