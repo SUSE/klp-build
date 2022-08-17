@@ -128,7 +128,11 @@ class IBS:
                     if 'preempt' in rpm:
                         continue
 
-                    rpms.append( (prj, 'devbuild', arch, 'klp', rpm, self.cfg.bsc_download) )
+                    # Create a directory for each arch supported
+                    dest = Path(self.cfg.bsc_download, str(arch))
+                    dest.mkdir(exist_ok=True)
+
+                    rpms.append( (prj, 'devbuild', arch, 'klp', rpm, dest) )
 
             print('Downloading {} packages'.format(prj))
             self.do_work(self.download_binary_rpms, rpms)
