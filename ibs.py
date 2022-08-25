@@ -92,48 +92,49 @@ class IBS:
             os.remove(Path(path_dest, 'Symbols.list'))
             shutil.rmtree(Path(path_dest, 'usr'))
 
-    def download_cs_data(self, cs):
-        jcs = self.cfg.codestreams[cs]
-        prj = jcs['project']
-        repo = jcs['repo']
-
-        path_dest = Path(self.cfg.kernel_rpms, jcs['cs'])
-        path_dest.mkdir(exist_ok=True)
-
+    def download_cs_data(self, cs_list):
         rpms = []
         extract = []
 
-        for k, regex in self.cs_data.items():
-            pkg = '{}.{}'.format(k, repo)
+        print('Getting list of files...')
+        for cs in cs_list:
+            jcs = self.cfg.codestreams[cs]
+            prj = jcs['project']
+            repo = jcs['repo']
 
-            # arch is fixed for now
-            ret = self.osc.build.get_binary_list(prj, repo, self.arch, pkg)
-            for file in re.findall(regex, str(etree.tostring(ret))):
-                rpm = file[0]
-                if Path(path_dest, rpm).exists():
-                    print('\t{} already downloaded, skipping.'.format(rpm))
-                    continue
+            path_dest = Path(self.cfg.kernel_rpms, jcs['cs'])
+            path_dest.mkdir(exist_ok=True)
 
-                rpms.append( (prj, repo, self.arch, pkg, rpm, path_dest) )
+            for k, regex in self.cs_data.items():
+                if repo == 'standard':
+                    pkg = k
+                else:
+                    pkg = '{}.{}'.format(k, repo)
 
-                # Do not extract kernel-macros rpm
-                if 'kernel-macros' not in rpm:
-                    extract.append( (jcs, rpm, path_dest) )
+                # arch is fixed for now
+                ret = self.osc.build.get_binary_list(prj, repo, self.arch, pkg)
+                for file in re.findall(regex, str(etree.tostring(ret))):
+                    rpm = file[0]
+                    rpms.append( (cs, prj, repo, self.arch, pkg, rpm, path_dest) )
 
-        print('Data related to codestream {} not found. Downloading {} rpms...'.format(cs, len(rpms)))
+                    # Do not extract kernel-macros rpm
+                    if 'kernel-macros' not in rpm:
+                        extract.append( (jcs, rpm, path_dest) )
+
+        print('Downloading {} rpms...'.format(len(rpms)))
         self.do_work(self.download_binary_rpms, rpms)
+        print('Extracting rpms...')
         self.do_work(self.extract_rpms, extract)
 
     def download_binary_rpms(self, args):
-        prj, repo, arch, pkg, rpm, dest = args
+        cs, prj, repo, arch, pkg, rpm, dest = args
 
         try:
             self.osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
-
-            print('\t{}: ok'.format(rpm))
+            print('{} {}: ok'.format(cs, rpm))
         except OSError as e:
             if e.errno == errno.EEXIST:
-                print('\t{}: already downloaded. skipping.'.format(rpm))
+                print('{} {}: already downloaded. skipping.'.format(cs, rpm))
             else:
                 raise RuntimeError('download error on {}: {}'.format(prj, rpm))
 
@@ -173,7 +174,7 @@ class IBS:
                     dest = Path(self.cfg.bsc_download, str(arch))
                     dest.mkdir(exist_ok=True)
 
-                    rpms.append( (prj, 'devbuild', arch, 'klp', rpm, dest) )
+                    rpms.append( (prj, prj, 'devbuild', arch, 'klp', rpm, dest) )
 
             print('Downloading {} packages'.format(prj))
             self.do_work(self.download_binary_rpms, rpms)

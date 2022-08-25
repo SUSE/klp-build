@@ -151,18 +151,24 @@ class Setup:
         with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
 
-        # Iterate over the codestreams that are enabled
+        # Search for all missing codestreams data
+        cs_data_missing = []
         for cs in self.cfg.codestreams.keys():
             jcs = self.cfg.codestreams[cs]
 
             ex_dir = self.cfg.get_ex_dir(jcs['cs'])
             if not ex_dir.is_dir():
-                if not self.ibs:
-                    self.ibs = IBS(self.cfg)
+                cs_data_missing.append(cs)
 
-                # Found missing cs data, downloading it
-                self.ibs.download_cs_data(cs)
+        # Found missing cs data, downloading and extract
+        if cs_data_missing:
+            print('Download the necessary data from the following codestreams:')
+            print('\t{}'.format(' '.join(cs_data_missing)))
+            ibs = IBS(self.cfg)
+            ibs.download_cs_data(cs_data_missing)
 
+        # Iterate over all codestreams to find the last config pieces
+        for cs in self.cfg.codestreams.keys():
             # Check if the files exist in the respective codestream directories
             sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
             for f in cs_files.keys():
