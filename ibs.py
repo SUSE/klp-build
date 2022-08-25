@@ -1,30 +1,37 @@
 import concurrent.futures
 import errno
-import json
 from lxml import etree
 from pathlib import Path
 import os
 from osctiny import Osc
 import re
+import shutil
+import subprocess
+import xml.etree.ElementTree as ET
 
 class IBS:
     def __init__(self, cfg):
         self.cfg = cfg
         self.osc = Osc(url='https://api.suse.de')
 
-        ibs_user = re.search('(\w+)@', cfg.email).group(1)
-        self.prj_prefix = 'home:{}:klp'.format(ibs_user)
+        self.ibs_user = re.search('(\w+)@', cfg.email).group(1)
+        self.prj_prefix = 'home:{}:klp'.format(self.ibs_user)
+
+        self.arch = 'x86_64'
 
         self.cs_data = {
                 'kernel-default' : '(kernel-default\-(extra|(livepatch-devel|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
                 'kernel-source' : '(kernel-(source|macros|devel)\-?[\d\.\-]+.noarch.rpm)'
         }
 
-    def do_work(self, func, args):
+    def do_work(self, func, args, workers=0):
         if len(args) == 0:
             return
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+        if workers == 0:
+            workers = os.cpu_count()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             results = executor.map(func, args)
             for result in results:
                 if result:
@@ -41,7 +48,7 @@ class IBS:
 
         return names
 
-    def delete_project(self, prj):
+    def delete_project(self, prj, verbose=True):
         if not self.osc.projects.exists(prj):
             return
 
@@ -50,51 +57,85 @@ class IBS:
             print(etree.tostring(ret))
             raise ValueError(prj)
 
-        print('\t' + prj)
+        if verbose:
+            print('\t' + prj)
+
+    def extract_rpms(self, args):
+        jcs, rpm, dest = args
+
+        fcs = jcs['cs']
+
+        if 'livepatch' in rpm or 'kgraft-devel' in rpm:
+            path_dest = Path(self.cfg.ipa_dir, fcs, self.arch)
+        elif re.search('kernel\-default\-\d+', rpm) or \
+                re.search('kernel\-default\-devel\-\d+', rpm):
+            path_dest = Path(self.cfg.ex_dir, fcs, self.arch)
+        else:
+            path_dest = Path(self.cfg.ex_dir, fcs)
+
+        fdest = Path(dest, rpm)
+        path_dest.mkdir(exist_ok=True, parents=True)
+
+        cmd = 'rpm2cpio {} | cpio --quiet -idm'.format(str(fdest))
+        subprocess.check_output(cmd, shell=True, cwd=path_dest)
+
+        # Move ipa-clone files to path_dest
+        if 'livepatch' in rpm or 'kgraft-devel' in rpm:
+            src_dir = Path(path_dest, 'usr', 'src',
+                                    'linux-{}-obj'.format(jcs['kernel']),
+                                  self.arch, 'default')
+
+            for f in os.listdir(src_dir):
+                shutil.move(Path(src_dir, f), path_dest)
+
+            # remove leftovers
+            os.remove(Path(path_dest, 'Symbols.list'))
+            shutil.rmtree(Path(path_dest, 'usr'))
 
     def download_cs_data(self, cs):
         jcs = self.cfg.codestreams[cs]
-
         prj = jcs['project']
-        if not jcs['update']:
-            repo = 'standard'
-        else:
-            repo = 'SUSE_SLE-{}'.format(jcs['sle'])
-            if jcs['sp']:
-                repo = '{}-SP{}'.format(repo, jcs['sp'])
-            repo = '{}_Update'.format(repo)
+        repo = jcs['repo']
 
         path_dest = Path(self.cfg.kernel_rpms, jcs['cs'])
         path_dest.mkdir(exist_ok=True)
 
-        print('Downloading {} packages into {}'.format(cs, str(path_dest)))
+        rpms = []
+        extract = []
+
         for k, regex in self.cs_data.items():
             pkg = '{}.{}'.format(k, repo)
 
-            rpms = []
             # arch is fixed for now
-            ret = self.osc.build.get_binary_list(prj, repo, 'x86_64', pkg)
+            ret = self.osc.build.get_binary_list(prj, repo, self.arch, pkg)
             for file in re.findall(regex, str(etree.tostring(ret))):
                 rpm = file[0]
                 if Path(path_dest, rpm).exists():
                     print('\t{} already downloaded, skipping.'.format(rpm))
                     continue
 
-                rpms.append( (prj, repo, 'x86_64', pkg, rpm, path_dest) )
+                rpms.append( (prj, repo, self.arch, pkg, rpm, path_dest) )
 
-            self.do_work(self.download_binary_rpms, rpms)
+                # Do not extract kernel-macros rpm
+                if 'kernel-macros' not in rpm:
+                    extract.append( (jcs, rpm, path_dest) )
+
+        print('Data related to codestream {} not found. Downloading {} rpms...'.format(cs, len(rpms)))
+        self.do_work(self.download_binary_rpms, rpms)
+        self.do_work(self.extract_rpms, extract)
 
     def download_binary_rpms(self, args):
-        prj, repo, arch, pkg, filename, dest = args
-        try:
-            self.osc.build.download_binary(prj, repo, arch, pkg, filename, dest)
+        prj, repo, arch, pkg, rpm, dest = args
 
-            print('\t{}: ok'.format(filename))
+        try:
+            self.osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
+
+            print('\t{}: ok'.format(rpm))
         except OSError as e:
             if e.errno == errno.EEXIST:
-                print('\t{}: already downloaded. skipping.'.format(filename))
+                print('\t{}: already downloaded. skipping.'.format(rpm))
             else:
-                raise RuntimeError('download error on {}: {}'.format(prj, filename))
+                raise RuntimeError('download error on {}: {}'.format(prj, rpm))
 
     def apply_filter(self, item_list):
         if not self.cfg.filter:
@@ -165,3 +206,63 @@ class IBS:
         print('Deleting {} projects...'.format(len(prjs)))
 
         self.do_work(self.delete_project, prjs)
+
+    def cs_to_project(self, cs):
+        return self.prj_prefix + '-' + cs.replace('.', '_')
+
+    # Some attributes are set by default on osctiny:
+    # build: enable
+    # publish: disable
+    def create_prj_meta(self, prj, jcs):
+        prj = ET.Element('project', { 'name' : prj})
+
+        debug = ET.SubElement(prj, 'debuginfo')
+        ET.SubElement(debug, 'disable')
+
+        ET.SubElement(prj, 'person', { 'userid' : 'mpdesouz', 'role' : 'bugowner'})
+
+        repo = ET.SubElement(prj, 'repository', {'name' : 'devbuild'})
+        ET.SubElement(repo, 'path', {'project' : jcs['project'],
+                                     'repository' : jcs['repo']
+                                     })
+
+        for arch in jcs['archs']:
+            ar = ET.SubElement(repo, 'arch')
+            ar.text = arch
+
+        return ET.tostring(prj).decode()
+
+    def create_lp_package(self, cs):
+        jcs = self.cfg.codestreams[cs]
+
+        prj = self.cs_to_project(cs)
+
+        # If the project exists, drop it first
+        self.delete_project(prj, verbose=False)
+
+        meta = self.create_prj_meta(prj, jcs)
+        prj_desc = 'Development of livepatches for SLE{}-SP{} Update {}' \
+                .format(jcs['sle'], jcs['sp'], jcs['update'])
+
+        try:
+            self.osc.projects.set_meta(prj, metafile=meta, title='',
+                                       bugowner='mpdesouza',
+                                       maintainer='mpdesouza',
+                                       description=prj_desc)
+
+            self.osc.packages.set_meta(prj, 'klp', title='', description='Test livepatch')
+
+            print('\t{}: ok'.format(prj))
+
+        except Exception as e:
+            print(e, e.response.content)
+            raise RuntimeError('')
+
+    def push(self):
+        cs_list = self.apply_filter(self.cfg.codestreams.keys())
+
+        if cs_list:
+            print('Pushing projects to IBS...')
+
+        # More threads makes OBS to return error 500
+        self.do_work(self.create_lp_package, cs_list, 1)

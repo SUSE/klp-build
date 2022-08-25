@@ -127,6 +127,19 @@ class Setup:
                 skip_cs.append(cs)
                 continue
 
+            # Set supported archs for the codestream
+            archs = ['x86_64']
+            if self.is_ppc_supported(int(jcs['sle']), int(jcs['sp']),
+                                     int(jcs['update'])):
+                archs.extend(['ppc64le'])
+
+            if self.is_s390_supported(int(jcs['sle']), int(jcs['sp']),
+                                     int(jcs['update'])):
+                archs.extend(['s390x'])
+
+            jcs['archs'] = archs
+            jcs['repo'] = self.cs_repo(jcs)
+
         # Removing filtered/skipped codestreams
         if skip_cs:
             print('Skipping the following codestreams without file-funcs associated:')
@@ -140,12 +153,14 @@ class Setup:
 
         # Iterate over the codestreams that are enabled
         for cs in self.cfg.codestreams.keys():
+            jcs = self.cfg.codestreams[cs]
+
             ex_dir = self.cfg.get_ex_dir(jcs['cs'])
             if not ex_dir.is_dir():
                 if not self.ibs:
                     self.ibs = IBS(self.cfg)
 
-                print('Data related to codestream {} not found.  Downloading...'.format(cs))
+                # Found missing cs data, downloading it
                 self.ibs.download_cs_data(cs)
 
             # Check if the files exist in the respective codestream directories
@@ -180,6 +195,12 @@ class Setup:
 
             jcs['object'] = str(obj)
 
+        # Save again to now include object being set.
+        # TODO: adapt the code above to be more resilient, so we can rely on
+        # saving only at this point.
+        with open(self.cfg.cs_file, 'w') as f:
+            f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
+
         # set cfg.conf so ccp can use it later
         self.cfg.conf = {
                 'bsc' : str(self.cfg.bsc_num),
@@ -194,6 +215,40 @@ class Setup:
 
         with open(self.cfg.conf_file, 'w') as f:
             f.write(json.dumps(self.cfg.conf, indent=4, sort_keys=True))
+
+    def cs_repo(self, jcs):
+        if jcs['update'] == "0":
+            return 'standard'
+
+        repo = 'SUSE_SLE-{}'.format(jcs['sle'])
+        if jcs['sp'] != '0':
+            repo = '{}-SP{}'.format(repo, jcs['sp'])
+
+        return '{}_Update'.format(repo)
+
+    # s390x shall be enabled from SLE12-SP4 update 13 onwards.
+    # s390x is supported from 12.5u3 onwards
+    # s390x is supported from SLE15-SP2 onwards.
+    def is_s390_supported(self, sle, sp, up):
+        if (sle == 12 and sp == 4 and up >= 13) or \
+                (sle == 12 and sp == 5 and up >= 3) or \
+                (sle == 15 and sp >= 2):
+            return True
+
+        return False
+
+    # ppc64le is supported from 12_3u5 onwards
+    # ppc64le is also supported on 12sp2 from u25 onwards
+    def is_ppc_supported(self, sle, sp, up):
+        if sle > 12:
+            return True
+        elif sle == 12 and sp > 3:
+            return True
+        elif (sle == 12 and sp == 2 and up >= 25) or \
+                (sle == 12 and sp == 3 and up >= 5):
+           return True
+
+        return False
 
     def download_env(self):
         print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')

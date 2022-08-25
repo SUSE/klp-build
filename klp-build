@@ -108,4 +108,4 @@ if  __name__ == '__main__':
         elif args.download:
             ibs.download()
         elif args.push:
-            print('TODO!')
+            ibs.push()

@@ -7,7 +7,7 @@ class Config:
     def __init__(self, args):
         self.filter = args.filter
         self.kernel_branches = {
-                                '4.12.' : 'cve/linux-4.12',
+                                '4.12' : 'cve/linux-4.12',
                                 '5.3' : 'cve/linux-5.3',
                                 '5.14' : 'SLE15-SP4'
                                 }
