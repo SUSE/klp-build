@@ -104,7 +104,7 @@ class GitHelper:
         fixes.mkdir(exist_ok=True)
 
         # Get backported commits from the CVE branches
-        for bc in cfg.cve_branches:
+        for bc, branch in cfg.kernel_branches.items():
             patches = ''
 
             commits[bc] = {}
@@ -113,7 +113,7 @@ class GitHelper:
                     patch_file = subprocess.check_output(['/usr/bin/git', '-C',
                                 str(cfg.ksrc),
                                 'grep', '-l', 'Git-commit: ' + commit,
-                                'remotes/origin/cve/linux-' + bc],
+                                'remotes/origin/' + branch],
                                 stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
                 except subprocess.CalledProcessError:
                     patch_file = ''
@@ -155,9 +155,9 @@ class GitHelper:
 
         for key, val in commits['upstream'].items():
             print('{}: {}'.format(key, val))
-            for cve in cfg.cve_branches:
-                hash_cmt = commits[cve].get(key, 'None yet')
-                print('\t{}\t{}'.format(cve, hash_cmt))
+            for bc, branch in cfg.kernel_branches.items():
+                hash_cmt = commits[bc].get(key, 'None yet')
+                print('\t{}\t{}'.format(bc, hash_cmt))
             print('')
 
         return commits
@@ -171,8 +171,8 @@ class GitHelper:
         print('Searching for already patched codestreams...')
 
         patched = []
-        for branch in cfg.cve_branches:
-            for up_commit, suse_commit in commits[branch].items():
+        for bc, branch in cfg.kernel_branches.items():
+            for up_commit, suse_commit in commits[bc].items():
                 if suse_commit == '':
                     continue
 
