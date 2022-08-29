@@ -61,9 +61,10 @@ class IBS:
             print('\t' + prj)
 
     def extract_rpms(self, args):
-        jcs, rpm, dest = args
+        cs, rpm, dest = args
 
-        fcs = jcs['cs']
+        fcs = self.cfg.codestreams[cs]['cs']
+        kernel = self.cfg.codestreams[cs]['kernel']
 
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
             path_dest = Path(self.cfg.ipa_dir, fcs, self.arch)
@@ -82,7 +83,7 @@ class IBS:
         # Move ipa-clone files to path_dest
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
             src_dir = Path(path_dest, 'usr', 'src',
-                                    'linux-{}-obj'.format(jcs['kernel']),
+                                    'linux-{}-obj'.format(kernel),
                                   self.arch, 'default')
 
             for f in os.listdir(src_dir):
@@ -91,6 +92,17 @@ class IBS:
             # remove leftovers
             os.remove(Path(path_dest, 'Symbols.list'))
             shutil.rmtree(Path(path_dest, 'usr'))
+
+        print('Extracting {} {}: ok'.format(cs, rpm))
+
+    def download_and_extract(self, args):
+        cs, prj, repo, arch, pkg, rpm, dest = args
+
+        self.download_binary_rpms(args)
+
+        # Do not extract kernel-macros rpm
+        if 'kernel-macros' not in rpm:
+            self.extract_rpms( (cs, rpm, dest) )
 
     def download_cs_data(self, cs_list):
         rpms = []
@@ -119,12 +131,10 @@ class IBS:
 
                     # Do not extract kernel-macros rpm
                     if 'kernel-macros' not in rpm:
-                        extract.append( (jcs, rpm, path_dest) )
+                        extract.append( (cs, rpm, path_dest) )
 
         print('Downloading {} rpms...'.format(len(rpms)))
-        self.do_work(self.download_binary_rpms, rpms)
-        print('Extracting rpms...')
-        self.do_work(self.extract_rpms, extract)
+        self.do_work(self.download_and_extract, rpms)
 
     def download_binary_rpms(self, args):
         cs, prj, repo, arch, pkg, rpm, dest = args
