@@ -72,12 +72,15 @@ class Config:
             else:
                 self.data = Path(os.getenv('KLP_DATA_DIR', ''))
 
-        self.kernel_rpms = Path(self.data, 'kernel-rpms')
-        self.ex_dir = Path(self.data, 'ex-kernels')
-        self.ipa_dir = Path(self.data, 'ipa-clones')
+        if not self.data.is_dir():
+            raise RuntimeError('KLP_DATA_DIR does not exists')
 
-        if not self.ex_dir.is_dir() or not self.ipa_dir.is_dir():
-            raise RuntimeError('KLP_DATA_DIR was not defined, or ex-kernel/ipa-clones does not exist')
+        self.kernel_rpms = Path(self.data, 'kernel-rpms')
+        self.kernel_rpms.mkdir(exist_ok=True)
+        self.ex_dir = Path(self.data, 'ex-kernels')
+        self.ex_dir.mkdir(exist_ok=True)
+        self.ipa_dir = Path(self.data, 'ipa-clones')
+        self.ipa_dir.mkdir(exist_ok=True)
 
         self.ksrc = os.getenv('KLP_KERNEL_SOURCE')
         if self.ksrc and not Path(self.ksrc).is_dir():
