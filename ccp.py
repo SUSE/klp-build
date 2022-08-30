@@ -353,7 +353,7 @@ class CCP:
             if self.cfg.filter and not re.match(self.cfg.filter, cs):
                 continue
 
-            if not self.cfg.codestreams[cs]['files']:
+            if not self.cfg.codestreams[cs].get('files', ''):
                 print('Skipping {} since it doesn\'t contain any files'.format(cs))
                 continue
 
