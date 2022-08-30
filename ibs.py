@@ -17,11 +17,19 @@ class IBS:
         self.ibs_user = re.search('(\w+)@', cfg.email).group(1)
         self.prj_prefix = 'home:{}:klp'.format(self.ibs_user)
 
-        self.arch = 'x86_64'
-
+        # Download all sources for x86
+        # For ppc64le and s390x only download vmlinux and the built modules
         self.cs_data = {
-                'kernel-default' : '(kernel-default\-(extra|(livepatch-devel|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
-                'kernel-source' : '(kernel-(source|macros|devel)\-?[\d\.\-]+.noarch.rpm)'
+                'ppc64le' : {
+                    'kernel-default' : '(kernel-default-[\d\.\-]+.ppc64le.rpm)',
+                },
+                's390x' : {
+                    'kernel-default' : '(kernel-default-[\d\.\-]+.s390x.rpm)',
+                },
+                'x86_64' : {
+                    'kernel-default' : '(kernel-default\-(extra|(livepatch-devel|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
+                    'kernel-source' : '(kernel-(source|devel)\-?[\d\.\-]+.noarch.rpm)'
+                }
         }
 
     def do_work(self, func, args, workers=0):
@@ -61,16 +69,16 @@ class IBS:
             print('\t' + prj)
 
     def extract_rpms(self, args):
-        cs, rpm, dest = args
+        cs, arch, rpm, dest = args
 
         fcs = self.cfg.codestreams[cs]['cs']
         kernel = self.cfg.codestreams[cs]['kernel']
 
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
-            path_dest = Path(self.cfg.ipa_dir, fcs, self.arch)
+            path_dest = Path(self.cfg.ipa_dir, fcs, arch)
         elif re.search('kernel\-default\-\d+', rpm) or \
                 re.search('kernel\-default\-devel\-\d+', rpm):
-            path_dest = Path(self.cfg.ex_dir, fcs, self.arch)
+            path_dest = Path(self.cfg.ex_dir, fcs, arch)
         else:
             path_dest = Path(self.cfg.ex_dir, fcs)
 
@@ -84,7 +92,7 @@ class IBS:
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
             src_dir = Path(path_dest, 'usr', 'src',
                                     'linux-{}-obj'.format(kernel),
-                                  self.arch, 'default')
+                                  arch, 'default')
 
             for f in os.listdir(src_dir):
                 shutil.move(Path(src_dir, f), path_dest)
@@ -92,6 +100,8 @@ class IBS:
             # remove leftovers
             os.remove(Path(path_dest, 'Symbols.list'))
             shutil.rmtree(Path(path_dest, 'usr'))
+
+        # TODO: extract all compressed files
 
         print('Extracting {} {}: ok'.format(cs, rpm))
 
@@ -102,7 +112,7 @@ class IBS:
 
         # Do not extract kernel-macros rpm
         if 'kernel-macros' not in rpm:
-            self.extract_rpms( (cs, rpm, dest) )
+            self.extract_rpms( (cs, arch, rpm, dest) )
 
     def download_cs_data(self, cs_list):
         rpms = []
@@ -117,21 +127,25 @@ class IBS:
             path_dest = Path(self.cfg.kernel_rpms, jcs['cs'])
             path_dest.mkdir(exist_ok=True)
 
-            for k, regex in self.cs_data.items():
-                if repo == 'standard':
-                    pkg = k
-                else:
-                    pkg = '{}.{}'.format(k, repo)
+            for arch, val in self.cs_data.items():
+                if arch not in jcs['archs']:
+                    continue
 
-                # arch is fixed for now
-                ret = self.osc.build.get_binary_list(prj, repo, self.arch, pkg)
-                for file in re.findall(regex, str(etree.tostring(ret))):
-                    rpm = file[0]
-                    rpms.append( (cs, prj, repo, self.arch, pkg, rpm, path_dest) )
+                for k, regex in val.items():
+                    if repo == 'standard':
+                        pkg = k
+                    else:
+                        pkg = '{}.{}'.format(k, repo)
 
-                    # Do not extract kernel-macros rpm
-                    if 'kernel-macros' not in rpm:
-                        extract.append( (cs, rpm, path_dest) )
+                    # arch is fixed for now
+                    ret = self.osc.build.get_binary_list(prj, repo, arch, pkg)
+                    for file in re.findall(regex, str(etree.tostring(ret))):
+                        # FIXME: adjust the regex to only deal with strings
+                        if isinstance(file, str):
+                            rpm = file
+                        else:
+                            rpm = file[0]
+                        rpms.append( (cs, prj, repo, arch, pkg, rpm, path_dest) )
 
         print('Downloading {} rpms...'.format(len(rpms)))
         self.do_work(self.download_and_extract, rpms)
