@@ -93,6 +93,10 @@ class GitHelper:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
 
+        # do not get the commits twice
+        if cfg.conf.get('commits', ''):
+            return cfg.conf['commits']
+
         print('Getting suse fixes for upstream commits per CVE branch...')
 
         commits = { 'upstream' : {} }
@@ -167,6 +171,10 @@ class GitHelper:
         if not cfg.ksrc:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
+
+        # do not get the commits twice
+        if cfg.conf.get('patched', ''):
+            return cfg.conf['patched']
 
         print('Searching for already patched codestreams...')
 
