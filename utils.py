@@ -169,6 +169,8 @@ class Setup:
 
         # Iterate over all codestreams to find the last config pieces
         for cs in self.cfg.codestreams.keys():
+            jcs = self.cfg.codestreams[cs]
+
             # Check if the files exist in the respective codestream directories
             sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
             for f in cs_files.keys():
