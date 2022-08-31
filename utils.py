@@ -102,12 +102,12 @@ class Setup:
         skip_cs = []
         for cs in self.cfg.codestreams.keys():
             jcs = self.cfg.codestreams[cs]
+            cs_files = {}
 
             if self.cfg.filter and not re.match(self.cfg.filter, cs):
                 skip_cs.append(cs)
                 continue
 
-            cs_files = {}
             for cs_regex in self._file_funcs.keys():
                 if re.match(cs_regex, cs):
                     # Convert dict to tuples
@@ -127,6 +127,9 @@ class Setup:
                 skip_cs.append(cs)
                 continue
 
+            jcs['files'] = cs_files
+            jcs['repo'] = self.cs_repo(jcs)
+
             # Set supported archs for the codestream
             archs = ['x86_64']
             if self.is_ppc_supported(int(jcs['sle']), int(jcs['sp']),
@@ -138,7 +141,6 @@ class Setup:
                 archs.extend(['s390x'])
 
             jcs['archs'] = archs
-            jcs['repo'] = self.cs_repo(jcs)
 
         # Removing filtered/skipped codestreams
         if skip_cs:
@@ -170,6 +172,7 @@ class Setup:
         # Iterate over all codestreams to find the last config pieces
         for cs in self.cfg.codestreams.keys():
             jcs = self.cfg.codestreams[cs]
+            cs_files = jcs['files']
 
             # Check if the files exist in the respective codestream directories
             sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
@@ -179,8 +182,7 @@ class Setup:
                     raise RuntimeError('File {} doesn\'t exists in {}'.format(f,
                         str(sdir)))
 
-            jcs['files'] = cs_files
-
+            ex_dir = self.cfg.get_ex_dir(jcs['cs'])
             if not self._mod:
                 obj = Path(ex_dir, 'boot', 'vmlinux-' + jcs['kernel'] + '-default')
             else:
@@ -189,7 +191,7 @@ class Setup:
                 obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
 
                 if not obj or len(obj) > 1:
-                    print(line)
+                    print(obj_path)
                     raise RuntimeError('Module list has none or too much entries: ' + str(obj))
                 # Grab the only value of the list and turn obj into a string to be
                 # used later
