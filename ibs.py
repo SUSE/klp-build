@@ -176,6 +176,7 @@ class IBS:
         return filtered
 
     def download(self):
+        rpms = []
         for result in self.get_projects().findall('project'):
             prj = result.get('name')
 
@@ -183,7 +184,6 @@ class IBS:
                 continue
 
             archs = result.xpath('repository/arch')
-            rpms = []
             for arch in archs:
                 ret = self.osc.build.get_binary_list(prj, 'devbuild', arch, 'klp')
                 rpm_name = '{}.rpm'.format(arch)
@@ -200,8 +200,8 @@ class IBS:
 
                     rpms.append( (prj, prj, 'devbuild', arch, 'klp', rpm, dest) )
 
-            print('Downloading {} packages'.format(prj))
-            self.do_work(self.download_binary_rpms, rpms)
+        print(f'Downloading {len(rpms)} packages')
+        self.do_work(self.download_binary_rpms, rpms)
 
     def status(self):
         prjs = {}
