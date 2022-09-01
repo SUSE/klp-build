@@ -26,7 +26,7 @@ class CCP:
             raise RuntimeError('Only gcc12 is available, and it\'s problematic with kernel sources')
 
         # the current blacklisted function, more can be added as necessary
-        self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen"
+        self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen,twaddle,set_geometry,valid_floppy_drive_params"
 
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
@@ -45,7 +45,7 @@ class CCP:
             result = re.search(cmd_args_regex.format('-MMD', ofname, fname), str(output).strip())
 
         if not result:
-            raise RuntimeError('Failed to get the kernel cmdline for file {} in {}{}'.format(str(ofname), sle, sp))
+            raise RuntimeError(f'Failed to get the kernel cmdline for file {str(ofname)} in {sle}{sp}')
 
         # some strings  have single quotes around double quotes, so remove the
         # outer quotes
@@ -73,8 +73,8 @@ class CCP:
     def get_make_cmd(self, filename, jcs, odir):
         filename = PurePath(filename)
         file_ = filename.with_suffix('.o')
-        completed = subprocess.run(['make', '-sn', 'CC={}'.format(self.cc),
-                                    'HOSTCC={}'.format(self.cc), file_], cwd=odir,
+        completed = subprocess.run(['make', '-sn', f'CC={self.cc}',
+                                    f'HOSTCC={self.cc}', file_], cwd=odir,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, check=True)
 
@@ -87,16 +87,17 @@ class CCP:
 
     def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir, env):
         lp_out = Path(out_dir, self.lp_out_file(fname))
+        ppath = self.cfg.pol_path
 
         ccp_args = [self.cfg.ccp_path]
         for arg in ['may-include-header', 'can-externalize-fun', 'shall-externalize-fun', 'shall-externalize-obj',
                 'modify-externalized-sym', 'rename-rewritten-fun']:
-            ccp_args.append('--pol-cmd-{0}={1}/kgr-ccp-pol-{0}.sh'.format(arg, self.cfg.pol_path))
+            ccp_args.append(f'--pol-cmd-{arg}={ppath}/kgr-ccp-pol-{arg}.sh')
 
-        ccp_args.append('--pol-cmd-modify-patched-fun-sym={}/kgr-ccp-pol-modify-patched-sym.sh'.format(self.cfg.pol_path))
+        ccp_args.append(f'--pol-cmd-modify-patched-fun-sym={ppath}/kgr-ccp-pol-modify-patched-sym.sh')
 
-        ccp_args.extend(['--compiler=x86_64-gcc-9.1.0', '-i', '{}'.format(funcs),
-                        '-o', '{}'.format(str(lp_out)), '--'])
+        ccp_args.extend(['--compiler=x86_64-gcc-9.1.0', '-i', f'{funcs}',
+                        '-o', f'{str(lp_out)}', '--'])
 
         ccp_args.extend(self.get_make_cmd(fname, jcs, odir).split(' '))
 
@@ -113,7 +114,7 @@ class CCP:
         with open(str(lp_out), 'r+') as f:
             file_buf = f.read()
             f.seek(0)
-            f.write(file_buf.replace('from ' + str(sdir) + '/', 'from '))
+            f.write(file_buf.replace(f'from {str(sdir)}/', 'from '))
             f.truncate()
 
 		# Generate the list of exported symbols
@@ -142,12 +143,12 @@ class CCP:
         for ext in exts:
             sym, var, mod = ext
 
-            sym = '\t{{ "{}",'.format(sym)
+            sym = f'\t{{ "{sym}",'
             if not mod:
-                var = ' (void *)&{} }},'.format(var)
+                var = f' (void *)&{var} }},'
             else:
-                var = ' (void *)&{},'.format(var)
-                mod = ' "{}" }},'.format(mod)
+                var = f' (void *)&{var},'
+                mod = f' "{mod}" }},'
 
             # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
             # our goal when splitting these lines
@@ -162,11 +163,11 @@ class CCP:
             else:
                 ext_list.append(sym)
                 if len(var + mod) < 73:
-                    ext_list.append('\t ' + var + mod)
+                    ext_list.append(f'\t {var}{mod}')
                 else:
-                    ext_list.append('\t ' + var)
+                    ext_list.append(f'\t {var}')
                     if mod:
-                        ext_list.append('\t ' + mod)
+                        ext_list.append(f'\t {mod}')
 
         with open(Path(out_dir, 'exts'), 'w') as f:
             f.write('\n'.join(ext_list))
@@ -247,15 +248,14 @@ class CCP:
 
                     m = re.search('#include "(.+kconfig.h)"', buf)
                     if not m:
-                        raise RuntimeError('File {} without an include to kconfig.h'.format(str(fsrc)))
+                        raise RuntimeError(f'File {str(fsrc)} without an include to kconfig.h')
 
                     kconfig = m.group(1)
 
                     # check for duplicate kconfig lines
                     for c in codestreams:
                         if kconfig == files[c]['kconfig']:
-                            raise RuntimeError('{}\'s kconfig is the same of {}'.format(cs,
-                                c))
+                            raise RuntimeError(f'{cs}\'s kconfig is the same of {c}')
 
                     src = re.sub('#include ".+kconfig.h"', '', buf)
 
@@ -299,10 +299,10 @@ class CCP:
             f.write(json.dumps(cs_groups, indent=4))
 
         for file in cs_groups.keys():
-            print('\t{}'.format(file))
+            print(f'\t{file}')
 
             for css in cs_groups[file]:
-                print('\t\t{}'.format(' '.join(css)))
+                print(f"\t\t{' '.join(css)}")
 
     def process_ccp(self, cs):
         jcs = self.cfg.codestreams[cs]
@@ -321,12 +321,12 @@ class CCP:
         env['KCP_RENAME_PREFIX'] = 'klp'
 
         for fname, funcs in jcs['files'].items():
-            print('\t{}\t\t{}'.format(cs, fname))
+            print(f'\t{cs}\t\t{fname}')
 
             self._proc_files.append(fname)
             base_fname = Path(fname).name
 
-            out_dir = Path(self.cfg.get_work_dir(cs), 'work_' + base_fname)
+            out_dir = Path(self.cfg.get_work_dir(cs), f'work_{base_fname}')
             # remove any previously generated files
             shutil.rmtree(out_dir, ignore_errors=True)
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -335,13 +335,13 @@ class CCP:
             env['KCP_WORK_DIR'] = str(out_dir)
 
             env['KCP_IPA_CLONES_DUMP'] = str(Path(self.cfg.get_ipa_dir(jcs['cs']),
-                                                fname + '.000i.ipa-clones'))
+                                                f'{fname}.000i.ipa-clones'))
 
             self.execute_ccp(jcs, fname, ','.join(funcs), out_dir, sdir, odir,
                     env)
 
     def run_ccp(self):
-        print('Work directory: {}'.format(self.cfg.bsc_path))
+        print(f'Work directory: {self.cfg.bsc_path}')
 
         if self.cfg.filter:
             print('Applying filter...')
@@ -354,7 +354,7 @@ class CCP:
                 continue
 
             if not self.cfg.codestreams[cs].get('files', ''):
-                print('Skipping {} since it doesn\'t contain any files'.format(cs))
+                print(f'Skipping {cs} since it doesn\'t contain any files')
                 continue
 
             if cs in patched:
@@ -365,7 +365,7 @@ class CCP:
         if patched:
             print('Skipping the already patched codestreams:')
             for cs in patched:
-                print('\t{}'.format(cs))
+                print(f'\t{cs}')
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')
@@ -373,6 +373,6 @@ class CCP:
             results = executor.map(self.process_ccp, cs_list)
             for result in results:
                 if result:
-                    print('{}: {}'.format(cs, result))
+                    print(f'{cs}: {result}')
 
         self.group_equal_files()
