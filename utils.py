@@ -146,7 +146,7 @@ class Setup:
         if skip_cs:
             print('Skipping the following codestreams without file-funcs associated:')
         for cs in skip_cs:
-            print('\t{}'.format(cs))
+            print(f'\t{cs}')
             del self.cfg.codestreams[cs]
 
         # Save codestreams file before something bad can happen
@@ -175,16 +175,15 @@ class Setup:
             cs_files = jcs['files']
 
             # Check if the files exist in the respective codestream directories
-            sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
+            sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', f"linux-{jcs['kernel']}")
             for f in cs_files.keys():
                 fdir = Path(sdir, f)
                 if not fdir.is_file():
-                    raise RuntimeError('File {} doesn\'t exists in {}'.format(f,
-                        str(sdir)))
+                    raise RuntimeError(f'File {f} doesn\'t exists in {str(sdir)}')
 
             ex_dir = self.cfg.get_ex_dir(jcs['cs'])
             if not self._mod:
-                obj = Path(ex_dir, 'boot', 'vmlinux-' + jcs['kernel'] + '-default')
+                obj = Path(ex_dir, 'boot', f"vmlinux-{jcs['kernel']}-default")
             else:
                 mod_file = self._mod + '.ko'
                 obj_path = Path(ex_dir, 'lib', 'modules')
@@ -192,7 +191,7 @@ class Setup:
 
                 if not obj or len(obj) > 1:
                     print(obj_path)
-                    raise RuntimeError('Module list has none or too much entries: ' + str(obj))
+                    raise RuntimeError(f'Module list has none or too much entries: {str(obj)}')
                 # Grab the only value of the list and turn obj into a string to be
                 # used later
                 obj = obj[0]
@@ -201,7 +200,7 @@ class Setup:
             for f in cs_files.keys():
                 for func in cs_files[f]:
                     if not GitHelper.verify_func_object(func, str(obj)):
-                        print('WARN: {}: Function {} does not exist in {}.'.format(cs, func, obj))
+                        print(f'WARN: {cs}: Function {func} does not exist in {obj}.')
 
             jcs['object'] = str(obj)
 
@@ -230,11 +229,11 @@ class Setup:
         if jcs['update'] == "0":
             return 'standard'
 
-        repo = 'SUSE_SLE-{}'.format(jcs['sle'])
+        repo = f"SUSE_SLE-{jcs['sle']}"
         if jcs['sp'] != '0':
-            repo = '{}-SP{}'.format(repo, jcs['sp'])
+            repo = f"{repo}-SP{jcs['sp']}"
 
-        return '{}_Update'.format(repo)
+        return f'{repo}_Update'
 
     # s390x shall be enabled from SLE12-SP4 update 13 onwards.
     # s390x is supported from 12.5u3 onwards
@@ -259,9 +258,6 @@ class Setup:
            return True
 
         return False
-
-    def download_env(self):
-        print('FIXME: implement the download and extraction of kernel rpms and ipa-clones')
 
     def prepare_env(self):
         self.commits = GitHelper.get_commits(self.cfg, self._ups_commits)
