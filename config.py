@@ -58,6 +58,9 @@ class Config:
             with open(self.cs_file, 'r') as f:
                 self.codestreams = json.loads(f.read())
 
+        # Codestreams remaining after applying filter
+        self.working_cs = []
+
         self.conf = {}
         self.conf_file = Path(self.bsc_path, 'conf.json')
         if self.conf_file.is_file():

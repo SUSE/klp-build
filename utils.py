@@ -99,13 +99,13 @@ class Setup:
         if self.cfg.filter:
             print('Applying filter...')
 
-        skip_cs = []
+        cs_data_missing = []
+
         for cs in self.cfg.codestreams.keys():
             jcs = self.cfg.codestreams[cs]
             cs_files = {}
 
             if self.cfg.filter and not re.match(self.cfg.filter, cs):
-                skip_cs.append(cs)
                 continue
 
             for cs_regex in self._file_funcs.keys():
@@ -124,7 +124,6 @@ class Setup:
                         cs_files[k] = values
 
             if not cs_files:
-                skip_cs.append(cs)
                 continue
 
             jcs['files'] = cs_files
@@ -142,25 +141,20 @@ class Setup:
 
             jcs['archs'] = archs
 
-        # Removing filtered/skipped codestreams
+            ex_dir = self.cfg.get_ex_dir(jcs['cs'])
+            if not ex_dir.is_dir():
+                cs_data_missing.append(cs)
+
+            self.cfg.working_cs.append(cs)
+
+        skip_cs = set(self.cfg.codestreams.keys()) - set(self.cfg.working_cs)
         if skip_cs:
-            print('Skipping the following codestreams without file-funcs associated:')
-        for cs in skip_cs:
-            print(f'\t{cs}')
-            del self.cfg.codestreams[cs]
+            print('Skipping codestreams:')
+            print(f'\t{" ".join(skip_cs)}')
 
         # Save codestreams file before something bad can happen
         with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
-
-        # Search for all missing codestreams data
-        cs_data_missing = []
-        for cs in self.cfg.codestreams.keys():
-            jcs = self.cfg.codestreams[cs]
-
-            ex_dir = self.cfg.get_ex_dir(jcs['cs'])
-            if not ex_dir.is_dir():
-                cs_data_missing.append(cs)
 
         # Found missing cs data, downloading and extract
         if cs_data_missing:
@@ -169,8 +163,8 @@ class Setup:
             ibs = IBS(self.cfg)
             ibs.download_cs_data(cs_data_missing)
 
-        # Iterate over all codestreams to find the last config pieces
-        for cs in self.cfg.codestreams.keys():
+        # Setup the missing codestream info needed
+        for cs in self.cfg.working_cs:
             jcs = self.cfg.codestreams[cs]
             cs_files = jcs['files']
 

@@ -343,34 +343,33 @@ class CCP:
     def run_ccp(self):
         print(f'Work directory: {self.cfg.bsc_path}')
 
-        if self.cfg.filter:
-            print('Applying filter...')
+        # working_cs can be populated by the setup
+        if not self.cfg.working_cs:
+            if self.cfg.filter:
+                print('Applying filter...')
 
-        patched = self.cfg.conf.get('patched', [])
+            patched = self.cfg.conf.get('patched', [])
+            if patched:
+                print('Skipping the already patched codestreams:')
+                print(f'\t{" ".join(patched)}')
 
-        cs_list = []
-        for cs in self.cfg.codestreams.keys():
-            if self.cfg.filter and not re.match(self.cfg.filter, cs):
-                continue
+            for cs in self.cfg.codestreams.keys():
+                if self.cfg.filter and not re.match(self.cfg.filter, cs):
+                    continue
 
-            if not self.cfg.codestreams[cs].get('files', ''):
-                print(f'Skipping {cs} since it doesn\'t contain any files')
-                continue
+                if not self.cfg.codestreams[cs].get('files', ''):
+                    print(f'Skipping {cs} since it doesn\'t contain any files')
+                    continue
 
-            if cs in patched:
-                continue
+                if cs in patched:
+                    continue
 
-            cs_list.append(cs)
-
-        if patched:
-            print('Skipping the already patched codestreams:')
-            for cs in patched:
-                print(f'\t{cs}')
+                self.cfg.working_cs.append(cs)
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-            results = executor.map(self.process_ccp, cs_list)
+            results = executor.map(self.process_ccp, self.cfg.working_cs)
             for result in results:
                 if result:
                     print(f'{cs}: {result}')
