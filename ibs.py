@@ -1,6 +1,7 @@
 import concurrent.futures
 import errno
 from lxml import etree
+import git
 from pathlib import Path
 import os
 from osctiny import Osc
@@ -257,7 +258,54 @@ class IBS:
 
         return ET.tostring(prj).decode()
 
+    def get_cs_branch(self, cs):
+        jcs = self.cfg.codestreams[cs]
+        repo = git.Repo(self.cfg.kgr_patches)
+
+        all_branches = git.Repo(cfg.kgr_patches).branches
+
+        # Filter only the branches related to this BSC
+        branches = [ b for b in all_branches if self.cfg.bsc in b ]
+        branch_name = ''
+
+        for branch in branches:
+            # First check if the branch has more than code stream sharing
+            # the same code
+            for b in branch.replace(cfg.bsc + '_', '').split('_'):
+                sle, u = b.split('u')
+                if sle != jcs['sle'] + '.' + jcs['sp']:
+                    continue
+
+                # Get codestreams interval
+                up = u
+                down = u
+                cs_update = int(jcs['update'])
+                if '-' in u:
+                    down, up = u.split('-')
+
+                # Codestream between the branch codestream interval
+                if cs_update >= int(down) and cs_update <= int(up):
+                    branch_name = branch
+                    break
+
+                # At this point we found a match for our codestream in
+                # codestreams.json, but we may have a more specialized git
+                # branch later one, like:
+                # bsc1197597_12.4u21-25_15.0u25-28
+                # bsc1197597_15.0u25-28
+                # Since 15.0 SLE uses a different kgraft-patches branch to
+                # be built on. In this case, we continue to loop over the
+                # other branches.
+
+        return branch_name
+
     def create_lp_package(self, cs):
+
+        # get the kgraft branch related to this codestream
+        branch = self.get_cs_branch(cs)
+        if not branch:
+            raise RuntimeError(f'Could not find git branch for {cs}')
+
         jcs = self.cfg.codestreams[cs]
 
         prj = self.cs_to_project(cs)
@@ -282,6 +330,31 @@ class IBS:
         except Exception as e:
             print(e, e.response.content)
             raise RuntimeError('')
+
+        base_path = Path(self.cfg.bsc_path, 'c', cs)
+
+        # Remove previously created directories
+        prj_path = Path(base_path, 'checkout')
+        if prj_path.exists():
+            shutil.rmtree(prj_path)
+
+        code_path = Path(base_path, 'code')
+        if code_path.exists():
+            shutil.rmtree(code_path)
+
+        self.osc.packages.checkout(prj, 'klp', prj_path)
+
+        # Get the code from codestream
+        subprocess.check_output(['/usr/bin/git', '-C',
+                                 'clone', '--single-branch', '-b', branch,
+                                 str(self.cfg.kgraft_path), str(code_path)],
+                                stderr=subprocess.STDOUT)
+
+        subprocess.checkout(['./scripts/tar-up.sh', '-d', str(prj_path)],
+                            stderr.subprocess.STDOUT)
+
+        # Check how to push multiple files
+        # TODO: this isn't supported by osctiny YET.
 
     def push(self):
         cs_list = self.apply_filter(self.cfg.codestreams.keys())
