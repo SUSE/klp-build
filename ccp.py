@@ -343,28 +343,9 @@ class CCP:
     def run_ccp(self):
         print(f'Work directory: {self.cfg.bsc_path}')
 
-        # working_cs can be populated by the setup
+        # working_cs could be populated by the setup
         if not self.cfg.working_cs:
-            if self.cfg.filter:
-                print('Applying filter...')
-
-            patched = self.cfg.conf.get('patched', [])
-            if patched:
-                print('Skipping the already patched codestreams:')
-                print(f'\t{" ".join(patched)}')
-
-            for cs in self.cfg.codestreams.keys():
-                if self.cfg.filter and not re.match(self.cfg.filter, cs):
-                    continue
-
-                if not self.cfg.codestreams[cs].get('files', ''):
-                    print(f'Skipping {cs} since it doesn\'t contain any files')
-                    continue
-
-                if cs in patched:
-                    continue
-
-                self.cfg.working_cs.append(cs)
+            self.cfg.working_cs = seflf.cfg.filter_cs(self.codestreams.keys(), True)
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')

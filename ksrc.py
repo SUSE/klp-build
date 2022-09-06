@@ -185,20 +185,22 @@ class GitHelper:
         return commits
 
     @staticmethod
-    def get_patched_cs(cfg, commits):
+    def get_patched_cs(cfg):
+        conf = cfg.conf
         if not cfg.ksrc:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
 
         # do not get the commits twice
-        if cfg.conf.get('patched', ''):
-            return cfg.conf['patched']
+        patched = conf.get('patched', [])
+        if patched:
+            return patched
 
         print('Searching for already patched codestreams...')
 
         patched = []
         for bc, branch in cfg.kernel_branches.items():
-            for up_commit, suse_commit in commits[bc].items():
+            for up_commit, suse_commit in conf['commits'][bc].items():
                 if suse_commit == '':
                     continue
 

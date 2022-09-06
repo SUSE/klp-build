@@ -52,6 +52,8 @@ class Setup:
         return sle, sp, u
 
     def setup_project_files(self):
+        conf = self.cfg.conf
+
         if self.cfg.cs_file.exists() and not self._redownload:
             print('Found codestreams.json file, loading downloaded file.')
         else:
@@ -94,6 +96,11 @@ class Setup:
                 }
 
         print('Validating codestreams data...')
+
+        # Called at this point because codestreams is populated
+        conf['commits'] = GitHelper.get_commits(self.cfg, self._ups_commits)
+        conf['patched'] = GitHelper.get_patched_cs(self.cfg)
+
         # For now let's keep the current format of codestreams.in and
         # codestreams.json
         if self.cfg.filter:
@@ -101,12 +108,13 @@ class Setup:
 
         cs_data_missing = []
 
-        for cs in self.cfg.codestreams.keys():
+        filter_out = []
+        working_cs = self.cfg.filter_cs(self.cfg.codestreams.keys())
+
+        # Filter by file-funcs
+        for cs in working_cs:
             jcs = self.cfg.codestreams[cs]
             cs_files = {}
-
-            if self.cfg.filter and not re.match(self.cfg.filter, cs):
-                continue
 
             for cs_regex in self._file_funcs.keys():
                 if re.match(cs_regex, cs):
@@ -124,6 +132,7 @@ class Setup:
                         cs_files[k] = values
 
             if not cs_files:
+                filter_out.append(cs)
                 continue
 
             jcs['files'] = cs_files
@@ -145,12 +154,14 @@ class Setup:
             if not ex_dir.is_dir():
                 cs_data_missing.append(cs)
 
-            self.cfg.working_cs.append(cs)
+        if filter_out:
+            print('Skipping codestreams without file-funcs:')
+            print(f'\t{" ".join(filter_out)}')
 
-        skip_cs = set(self.cfg.codestreams.keys()) - set(self.cfg.working_cs)
-        if skip_cs:
-            print('Skipping codestreams:')
-            print(f'\t{" ".join(skip_cs)}')
+        # self.cfg.working_cs will contain the final list of codestreams that
+        # was set by the user, avoid downloading missing codestreams that are
+        # not affected
+        self.cfg.working_cs = list(set(working_cs) - set(filter_out))
 
         # Save codestreams file before something bad can happen
         with open(self.cfg.cs_file, 'w') as f:
@@ -204,17 +215,15 @@ class Setup:
         with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
 
-        # set cfg.conf so ccp can use it later
-        self.cfg.conf = {
-                'bsc' : str(self.cfg.bsc_num),
-                'cve' : self._cve,
-                'conf' : self._kernel_conf,
-                'mod' : self._mod,
-                'commits' : self.commits,
-                'patched' : self.patched,
-                'work_dir' : str(self.cfg.bsc_path),
-                'data' : str(self.cfg.data)
-        }
+        # cpp will use this data in the next step
+        conf['bsc'] = str(self.cfg.bsc_num)
+        conf['cve'] = self._cve
+        conf['conf'] = self._kernel_conf
+        conf['mod'] = self._mod
+        conf['commits'] = self.commits
+        conf['patched'] = self.patched
+        conf['work_dir'] = str(self.cfg.bsc_path)
+        conf['data'] = str(self.cfg.data)
 
         with open(self.cfg.conf_file, 'w') as f:
             f.write(json.dumps(self.cfg.conf, indent=4, sort_keys=True))
@@ -254,9 +263,6 @@ class Setup:
         return False
 
     def prepare_env(self):
-        self.commits = GitHelper.get_commits(self.cfg, self._ups_commits)
-        self.patched = GitHelper.get_patched_cs(self.cfg, self.commits)
-
         self.setup_project_files()
 
         Template.generate_commit_msg_file(self.cfg)

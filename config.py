@@ -166,3 +166,40 @@ class Config:
         if not cs:
             return self.ipa_dir
         return Path(self.ipa_dir, cs, 'x86_64')
+
+    # Return the codestreams list but removing already patched codestreams,
+    # codestreams without file-funcs and not matching the filter
+    def filter_cs(self, cs_list, check_file_funcs=False):
+        cs_new_list = []
+
+        patched = self.conf.get('patched', [])
+        if patched:
+            print('Skipping patched codestreams:')
+            print(f'\t{" ".join(patched)}')
+
+        cs_new_list = list(set(cs_list) - set(patched))
+
+        if self.filter:
+            print('Applying filter...')
+            filtered = []
+            for cs in cs_new_list:
+                if re.match(self.filter, cs):
+                    filtered.append(cs)
+
+            print('Skipping codestreams:')
+            print(f'\t{" ".join(filtered)}')
+
+            cs_new_list = list(set(cs_new_list) - set(filtered))
+
+        if check_file_funcs:
+            filtered = []
+            for cs in cs_new_list:
+                if not self.codestreams[cs].get('files', ''):
+                    filtered.append(cs)
+
+            print('Skipping codestreams without file-funcs:')
+            print(f'\t{" ".join(filtered)}')
+
+            cs_new_list = list(set(cs_new_list) - set(filtered))
+
+        return cs_new_list
