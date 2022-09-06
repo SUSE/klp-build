@@ -89,7 +89,7 @@ class Config:
         if args.cmd == 'get-patches' and not self.ksrc:
             raise ValueError('KLP_KERNEL_SOURCE should be defined')
 
-        if args.cmd == 'build':
+        if args.cmd in ['build', 'format-patches', 'ibs']:
             if not self.codestreams:
                 raise RuntimeError('codestreams.json doesn\'t exists. Aborting.')
 

@@ -50,6 +50,9 @@ def create_parser() -> argparse.ArgumentParser:
     sub.add_parser('build', parents = [parentparser],
             help='Build the specified codestreams using osckgr')
 
+    sub.add_parser('format-patches', parents = [parentparser],
+            help='Extract patches from kgraft-patches')
+
     patches = sub.add_parser('get-patches', parents = [parentparser])
     patches.add_argument('-u', '--upstream-commits', required=True,
             nargs='+', help='Commit hashes used to solve the CVE')
@@ -97,6 +100,9 @@ if  __name__ == '__main__':
 
     elif args.cmd == 'build':
         GitHelper.build(config)
+
+    elif args.cmd == 'format-patches':
+        GitHelper.format_patches(config)
 
     elif args.cmd == 'ibs':
         ibs = IBS(config)

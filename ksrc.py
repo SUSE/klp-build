@@ -68,6 +68,24 @@ class GitHelper:
             f.write('\n'.join(build_cs))
 
     @staticmethod
+    def format_patches(cfg):
+        repo = git.Repo(cfg.kgr_patches)
+
+        # Filter only the branches related to this BSC
+        branches = [ r.name for r in repo.branches if cfg.bsc in r.name ]
+
+        for branch in branches:
+            print(branch)
+            bname = branch.replace(cfg.bsc + '_', '')
+            bs = ' '.join(bname.split('_'))
+            bsc = cfg.bsc.replace('bsc', 'bsc#')
+
+            subprocess.check_output(['/usr/bin/git', '-C', str(cfg.kgr_patches),
+                            'format-patch', '-1', branch,
+                            f'--subject-prefix=PATCH v2 {bsc} {bs}', '--output',
+                                     f'{bname}.patch'])
+
+    @staticmethod
     def verify_func_object(func, obj):
         nm_out = subprocess.check_output(['nm', obj]).decode().strip()
         return re.search(r' {}\n'.format(func), nm_out)
