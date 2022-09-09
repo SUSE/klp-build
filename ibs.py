@@ -102,8 +102,6 @@ class IBS:
             os.remove(Path(path_dest, 'Symbols.list'))
             shutil.rmtree(Path(path_dest, 'usr'))
 
-        # TODO: extract all compressed files
-
         print('Extracting {} {}: ok'.format(cs, rpm))
 
     def download_and_extract(self, args):
@@ -150,6 +148,15 @@ class IBS:
 
         print('Downloading {} rpms...'.format(len(rpms)))
         self.do_work(self.download_and_extract, rpms)
+
+        for fext, ecmd in [('zst', 'unzstd --rm -f -d'), ('xz', 'xz -d')]:
+            cmd = f'find {self.cfg.ex_dir} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
+            subprocess.check_output(cmd, shell=True)
+
+        subprocess.check_output(f'find {self.cfg.ex_dir} -name "vmlinux*default.gz" -exec gzip -d {{}} \;',
+                                shell=True)
+
+        print('Finished extract vmlinux and modules...')
 
     def download_binary_rpms(self, args):
         cs, prj, repo, arch, pkg, rpm, dest = args
