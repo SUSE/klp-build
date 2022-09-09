@@ -126,7 +126,7 @@ class GitHelper:
         fixes.mkdir(exist_ok=True)
 
         # Get backported commits from the CVE branches
-        for bc, branch in cfg.kernel_branches.items():
+        for bc, mbranch in cfg.kernel_branches.items():
             patches = ''
 
             commits[bc] = {}
@@ -134,8 +134,8 @@ class GitHelper:
                 try:
                     patch_file = subprocess.check_output(['/usr/bin/git', '-C',
                                 str(cfg.ksrc),
-                                'grep', '-l', 'Git-commit: ' + commit,
-                                'remotes/origin/' + branch],
+                                'grep', '-l', f'Git-commit: {commit}',
+                                f'remotes/origin/{mbranch}'],
                                 stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
                 except subprocess.CalledProcessError:
                     patch_file = ''
@@ -177,7 +177,7 @@ class GitHelper:
 
         for key, val in commits['upstream'].items():
             print('{}: {}'.format(key, val))
-            for bc, branch in cfg.kernel_branches.items():
+            for bc, _ in cfg.kernel_branches.items():
                 hash_cmt = commits[bc].get(key, 'None yet')
                 print('\t{}\t{}'.format(bc, hash_cmt))
             print('')
