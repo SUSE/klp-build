@@ -156,7 +156,7 @@ class Setup:
 
         if filter_out:
             print('Skipping codestreams without file-funcs:')
-            print(f'\t{" ".join(filter_out)}')
+            print(f'\t{" ".join(filter_out)}\n')
 
         # self.cfg.working_cs will contain the final list of codestreams that
         # was set by the user, avoid downloading missing codestreams that are
@@ -170,7 +170,7 @@ class Setup:
         # Found missing cs data, downloading and extract
         if cs_data_missing:
             print('Download the necessary data from the following codestreams:')
-            print('\t{}'.format(' '.join(cs_data_missing)))
+            print(f'\t{" ".join(cs_data_missing)}\n')
             ibs = IBS(self.cfg)
             ibs.download_cs_data(cs_data_missing)
 
