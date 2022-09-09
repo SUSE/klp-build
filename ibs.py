@@ -28,7 +28,7 @@ class IBS:
                     'kernel-default' : '(kernel-default-[\d\.\-]+.s390x.rpm)',
                 },
                 'x86_64' : {
-                    'kernel-default' : '(kernel-default\-(extra|(livepatch-devel|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
+                    'kernel-default' : '(kernel-default\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
                     'kernel-source' : '(kernel-(source|devel)\-?[\d\.\-]+.noarch.rpm)'
                 }
         }
@@ -77,8 +77,8 @@ class IBS:
 
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
             path_dest = Path(self.cfg.ipa_dir, fcs, arch)
-        elif re.search('kernel\-default\-\d+', rpm) or \
-                re.search('kernel\-default\-devel\-\d+', rpm):
+        elif re.search(   'kernel\-default\-\d+', rpm) or \
+                re.search('kernel\-default\-extra\-\d+', rpm):
             path_dest = Path(self.cfg.ex_dir, fcs, arch)
         else:
             path_dest = Path(self.cfg.ex_dir, fcs)
