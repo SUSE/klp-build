@@ -345,7 +345,7 @@ class CCP:
 
         # working_cs could be populated by the setup
         if not self.cfg.working_cs:
-            self.cfg.working_cs = seflf.cfg.filter_cs(self.codestreams.keys(), True)
+            self.cfg.working_cs = self.cfg.filter_cs(self.cfg.codestreams.keys(), True)
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')
