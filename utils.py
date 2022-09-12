@@ -25,9 +25,6 @@ class Setup:
         self._disable_ccp = disable_ccp
         self._file_funcs = {}
 
-        self.commits = []
-        self.patched = []
-
         self.ibs = None
 
         for f in file_funcs:
@@ -220,8 +217,6 @@ class Setup:
         conf['cve'] = self._cve
         conf['conf'] = self._kernel_conf
         conf['mod'] = self._mod
-        conf['commits'] = self.commits
-        conf['patched'] = self.patched
         conf['work_dir'] = str(self.cfg.bsc_path)
         conf['data'] = str(self.cfg.data)
 
