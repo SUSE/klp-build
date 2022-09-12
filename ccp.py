@@ -60,9 +60,10 @@ class CCP:
         # 15.4u1 options
         # -mindirect-branch-cs-prefix appear in 15.4u1
         # more options to be removed
+        # -mharden-sls=all
         for opt in ['-flive-patching=inline-clone', '-fdump-ipa-clones',
                 '-fno-allow-store-data-races', '-Wno-zero-length-bounds',
-                '-mindirect-branch-cs-prefix']:
+                '-mindirect-branch-cs-prefix', '-mharden-sls=all']:
             output = output.replace(opt, '')
 
         if int(sle) >= 15 and int(sp) >= 2:
