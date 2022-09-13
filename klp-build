@@ -40,6 +40,8 @@ def create_parser() -> argparse.ArgumentParser:
             help='The module that will be livepatched')
     setup.add_argument('-u', '--upstream-commits', required=True,
             nargs='+', help='Commit hashes used to solve the CVE')
+    setup.add_argument('--archs', required=True,
+            nargs='+', help='Supported architectures for this livepatch')
 
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
 
@@ -83,7 +85,7 @@ if  __name__ == '__main__':
     if args.cmd == 'setup':
         setup = utils.Setup(config, args.redownload, args.cve, args.conf,
                 args.file_funcs, args.module, args.upstream_commits,
-                args.disable_ccp)
+                args.disable_ccp, args.archs)
         setup.prepare_env()
 
     elif args.cmd == 'run-ccp':

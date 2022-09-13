@@ -12,7 +12,7 @@ from ksrc import GitHelper
 
 class Setup:
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
-            ups_commits, disable_ccp):
+            ups_commits, disable_ccp, archs):
         self.cfg = cfg
 
         self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
@@ -24,6 +24,8 @@ class Setup:
 
         self._disable_ccp = disable_ccp
         self._file_funcs = {}
+
+        self._archs = archs
 
         self.ibs = None
 
@@ -219,6 +221,7 @@ class Setup:
         conf['mod'] = self._mod
         conf['work_dir'] = str(self.cfg.bsc_path)
         conf['data'] = str(self.cfg.data)
+        conf['archs'] = self._archs
 
         with open(self.cfg.conf_file, 'w') as f:
             f.write(json.dumps(self.cfg.conf, indent=4, sort_keys=True))
