@@ -10,7 +10,9 @@ class Template:
 
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
         # and in kallsyms lookup
-        self._mod = self.cfg.conf.get('mod', '').replace('-', '_')
+        self._mod = self.cfg.conf.get('mod', '')
+        if self._mod:
+            self._mod = self._mod.replace('-', '_')
 
         self.cs = cs
         self.cs_data = self.cfg.codestreams[cs]
@@ -100,7 +102,7 @@ class Template:
             return
 
         # Run the template engine for each touched source file.
-        for src_file, funcs in self.files.items():
+        for src_file, funcs in files.items():
             self.__GenerateLivepatchFile('c', None, src_file, 'exts', False)
 
         # One additional file to encapsulate the _init and _clenaup methods
