@@ -86,11 +86,6 @@ class GitHelper:
                                      f'{bname}.patch'])
 
     @staticmethod
-    def verify_func_object(func, obj):
-        nm_out = subprocess.check_output(['nm', obj]).decode().strip()
-        return re.search(r' {}\n'.format(func), nm_out)
-
-    @staticmethod
     def get_commit_subject(cfg, commit):
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
         req.raise_for_status()

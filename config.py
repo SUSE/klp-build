@@ -2,6 +2,8 @@ import json
 import git
 from pathlib import Path
 import os
+import re
+import subprocess
 
 class Config:
     def __init__(self, args):
@@ -106,6 +108,9 @@ class Config:
                 raise RuntimeError('kgraft-patches does not exists in ~/kgr')
             self.kgr_patches = kgr_patches
 
+        # will contain the nm output from the to be livepatched object
+        self.nm_out = {}
+
         # run-ccp and create-lp commands only work if codestreams.json and
         # conf.json files exist
         if args.cmd in ['run-ccp', 'create-lp']:
@@ -208,3 +213,23 @@ class Config:
             cs_new_list = list(set(cs_new_list) - set(filtered))
 
         return cs_new_list
+
+    # Cache the output of nm by using the object path. It differs for each
+    # codestream and architecture
+    def check_symbol(self, symbol, obj):
+        if not self.nm_out.get(obj, ''):
+            self.nm_out[obj] = subprocess.check_output(['nm', obj]).decode().strip()
+        return re.search(r' {}\n'.format(symbol), self.nm_out[obj])
+
+    def check_symbol_archs(self, jcs, symbol):
+        for arch in self.conf['archs']:
+
+            # The livepatch creator usually do it on a x86_64 machine, so the
+            # check for this arch was already done
+            if arch == 'x86_64':
+                continue
+
+            obj_path = jcs['object'].replace('x86_64', arch)
+
+            if not self.check_symbol(symbol, obj_path):
+                raise RuntimeError(f'Error: {jcs["cs"]}: Symbol {symbol} doesn\'t exists on {arch}')

@@ -140,6 +140,11 @@ class CCP:
 
         exts.sort(key=lambda tup : tup[0])
 
+        # Search for the externalized symbols in other architectures, making
+        # sure they are not optimized or inlined without us noticing.
+        for ext in exts:
+            self.cfg.check_symbol_archs(jcs, ext[0])
+
         ext_list = []
         for ext in exts:
             sym, var, mod = ext

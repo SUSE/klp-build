@@ -203,8 +203,8 @@ class Setup:
             # Verify if the functions exist in the specified object
             for f in cs_files.keys():
                 for func in cs_files[f]:
-                    if not GitHelper.verify_func_object(func, str(obj)):
-                        print(f'WARN: {cs}: Function {func} does not exist in {obj}.')
+                    if not self.cfg.check_symbol(func, str(obj)):
+                        print(f'WARN: {cs}: Function {func} does not exist in {obj}')
 
             jcs['object'] = str(obj)
 
