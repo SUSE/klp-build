@@ -25,6 +25,8 @@ class CCP:
         else:
             raise RuntimeError('Only gcc12 is available, and it\'s problematic with kernel sources')
 
+        self.ext_symbols = {}
+
         # the current blacklisted function, more can be added as necessary
         self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen,twaddle,set_geometry,valid_floppy_drive_params"
 
@@ -86,7 +88,9 @@ class CCP:
     def lp_out_file(self, fname):
         return self.cfg.bsc + '_' + PurePath(fname).name
 
-    def execute_ccp(self, jcs, fname, funcs, out_dir, sdir, odir, env):
+    def execute_ccp(self, cs, fname, funcs, out_dir, sdir, odir, env):
+        jcs = self.cfg.codestreams[cs]
+
         lp_out = Path(out_dir, self.lp_out_file(fname))
         ppath = self.cfg.pol_path
 
@@ -140,11 +144,6 @@ class CCP:
 
         exts.sort(key=lambda tup : tup[0])
 
-        # Search for the externalized symbols in other architectures, making
-        # sure they are not optimized or inlined without us noticing.
-        for ext in exts:
-            self.cfg.check_symbol_archs(jcs, ext[0])
-
         ext_list = []
         for ext in exts:
             sym, var, mod = ext
@@ -177,6 +176,9 @@ class CCP:
 
         with open(Path(out_dir, 'exts'), 'w') as f:
             f.write('\n'.join(ext_list))
+
+        # store the externalized symbols used in this codestream file
+        self.ext_symbols[cs] = { fname : [ ext[0] for ext in exts ] }
 
     # Group all codestreams that share code in a format like bellow:
     #   { '15.2u10' : [ 15.2u11 15.3u10 15.3u12 ] }
@@ -343,7 +345,7 @@ class CCP:
             env['KCP_IPA_CLONES_DUMP'] = str(Path(self.cfg.get_ipa_dir(jcs['cs']),
                                                 f'{fname}.000i.ipa-clones'))
 
-            self.execute_ccp(jcs, fname, ','.join(funcs), out_dir, sdir, odir,
+            self.execute_ccp(cs, fname, ','.join(funcs), out_dir, sdir, odir,
                     env)
 
     def run_ccp(self):
@@ -362,3 +364,21 @@ class CCP:
                     print(f'{cs}: {result}')
 
         self.group_equal_files()
+
+        # save the externalized symbols
+        for cs in self.cfg.working_cs:
+            jcs = self.cfg.codestreams[cs]
+
+            jcs['ext_symbols'] = self.ext_symbols[cs]
+
+        with open(self.cfg.cs_file, 'w') as f:
+            f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
+
+        # Iterate over each codestream, getting each file processed, and all
+        # externalized symbols of this file
+        for cs in self.cfg.working_cs:
+            jcs = self.cfg.codestreams[cs]
+
+            for _, exts in jcs['ext_symbols'].items():
+                for ext in exts:
+                    self.cfg.check_symbol_archs(jcs, ext)
