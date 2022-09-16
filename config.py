@@ -222,6 +222,7 @@ class Config:
         return re.search(r' {}\n'.format(symbol), self.nm_out[obj])
 
     def check_symbol_archs(self, jcs, symbol):
+        arch_sym = {}
         for arch in self.conf['archs']:
 
             # The livepatch creator usually do it on a x86_64 machine, so the
@@ -231,5 +232,8 @@ class Config:
 
             obj_path = jcs['object'].replace('x86_64', arch)
 
-            if not self.check_symbol(symbol, obj_path):
-                raise RuntimeError(f'Error: {jcs["cs"]}: Symbol {symbol} doesn\'t exists on {arch}')
+            ret = 'ok' if self.check_symbol(symbol, obj_path) else 'NOT FOUND'
+
+            arch_sym[arch] = ret
+
+        return arch_sym
