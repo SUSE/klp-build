@@ -374,11 +374,15 @@ class CCP:
         with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
 
+        print('Checking the externalized symbols in other architectures...')
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
         for cs in self.cfg.working_cs:
             jcs = self.cfg.codestreams[cs]
 
+            print(f'{cs}')
             for _, exts in jcs['ext_symbols'].items():
                 for ext in exts:
-                    self.cfg.check_symbol_archs(jcs, ext)
+                    print(f'\t{ext}')
+                    for arch, ret in self.cfg.check_symbol_archs(jcs, ext).items():
+                        print(f'\t\t{arch}: {ret}')
