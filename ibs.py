@@ -176,7 +176,8 @@ class IBS:
 
         filtered = []
         for item in item_list:
-            if not re.match(self.cfg.filter, item.replace('_', '.')):
+            cmp_item = item.replace(f'{self.prj_prefix}-', '').replace('_', '.')
+            if not re.match(self.cfg.filter, cmp_item):
                 continue
 
             filtered.append(item)
@@ -213,7 +214,7 @@ class IBS:
 
     def status(self):
         prjs = {}
-        for prj in self.get_project_names():
+        for prj in self.apply_filter(self.get_project_names()):
             prjs[prj] = {}
 
             for res in self.osc.build.get(prj).findall('result'):
