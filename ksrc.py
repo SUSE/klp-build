@@ -166,9 +166,12 @@ class GitHelper:
                 # Link the upstream commit as key asn the suse commit as value
                 commits[bc][commit] = cmt
 
-            # Save the patch for later review from the livepatch developer
-            with open(Path(fixes, bc + '.patch'), 'w') as f:
-                f.write(patches)
+            # Check if the commit was backport/present in the supported kernel
+            # family
+            if patches:
+                # Save the patch for later review from the livepatch developer
+                with open(Path(fixes, bc + '.patch'), 'w') as f:
+                    f.write(patches)
 
         for key, val in commits['upstream'].items():
             print('{}: {}'.format(key, val))
