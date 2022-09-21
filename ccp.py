@@ -248,13 +248,13 @@ class CCP:
 
             for fsrc in Path(self.cfg.bsc_path, 'c').rglob(src_out):
                 with open(fsrc, 'r+') as fi:
-                    buf = fi.read()
+                    src = fi.read()
 
                     # get the cs from the file path
                     # /<rootfs>/.../bsc1197705/c/15.3u4/x86_64/work_cls_api.c/bsc1197705_cls_api.c
                     cs = fsrc.parts[-4]
 
-                    m = re.search('#include "(.+kconfig.h)"', buf)
+                    m = re.search('#include "(.+kconfig.h)"', src)
                     if not m:
                         raise RuntimeError(f'File {str(fsrc)} without an include to kconfig.h')
 
@@ -265,7 +265,9 @@ class CCP:
                         if kconfig == files[c]['kconfig']:
                             raise RuntimeError(f'{cs}\'s kconfig is the same of {c}')
 
-                    src = re.sub('#include ".+kconfig.h"', '', buf)
+                    src = re.sub('#include \".+kconfig\.h\"', '', src)
+                    # Since 15.4 klp-ccp includes a compiler-version.h header
+                    src = re.sub('#include \".+compiler\-version\.h\"', '', src)
 
                     # Remove any mentions to klpr_trace, since it's currently
                     # buggy in klp-ccp
