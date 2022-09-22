@@ -30,7 +30,7 @@ def create_parser() -> argparse.ArgumentParser:
             help='klp-ccp runs automatically on setup. This option disables it')
     setup.add_argument('--cve', type=str, required=True,
             help='The CVE assigned to this livepatch')
-    setup.add_argument('--conf', type=str,
+    setup.add_argument('--conf', type=str, default='',
             help='The kernel CONFIG used to be build the livepatch')
     setup.add_argument('--file-funcs', required=True, action='append', nargs='*',
             help='Codestream, file and functions to be livepatched. Can be set '
