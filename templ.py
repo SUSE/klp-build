@@ -8,11 +8,7 @@ class Template:
         self.cfg = cfg
         self.bsc = cfg.bsc
 
-        # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
-        # and in kallsyms lookup
-        self.mod = self.cfg.conf.get('mod', '').replace('-', '_')
-
-    def GeneratePatchedFuncs(self, cs_data):
+    def GeneratePatchedFuncs(self, cs_data, mod):
         conf = self.cfg.conf['conf']
         if conf:
                 conf = f' IS_ENABLED({conf})'
@@ -20,9 +16,9 @@ class Template:
         with open(Path(self.bsc, 'patched_funcs.csv'), 'w') as f:
             for _, funcs in cs_data['files'].items():
                 for func in funcs:
-                    f.write(f'{self.mod} {func} klpp_{func}{conf}\n')
+                    f.write(f'{mod} {func} klpp_{func}{conf}\n')
 
-    def __GenerateLivepatchFile(self, cs, ext, out_name, src_file, ext_file,
+    def __GenerateLivepatchFile(self, cs, mod, ext, out_name, src_file, ext_file,
             include_header):
         cs_data = self.cfg.codestreams[cs]
         if not out_name and not src_file:
@@ -48,8 +44,8 @@ class Template:
 
         templ = env.get_template('lp-' + ext + '.j2')
         templ.globals['year'] = datetime.today().year
-        if self.mod != 'vmlinux':
-            templ.globals['mod'] = self.mod
+        if mod != 'vmlinux':
+            templ.globals['mod'] = mod
 
         # 15.4 onwards we don't have module_mutex, so template generate
         # different code
@@ -76,6 +72,10 @@ class Template:
     def GenerateLivePatches(self, cs):
         cs_data = self.cfg.codestreams[cs]
 
+        # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
+        # and in kallsyms lookup
+        mod = self.cfg.conf.get('mod', '').replace('-', '_')
+
         # If the livepatch contains only one file, generate only the livepatch
         # one
         bsc = Path(self.bsc)
@@ -84,23 +84,23 @@ class Template:
         # We need at least one header file for the livepatch
         out_name = 'livepatch_' + self.bsc
 
-        self.__GenerateLivepatchFile(cs, 'h', out_name, None, None, False)
+        self.__GenerateLivepatchFile(cs, mod, 'h', out_name, None, None, False)
 
-        self.GeneratePatchedFuncs(cs_data)
+        self.GeneratePatchedFuncs(cs_data, mod)
 
         files = cs_data['files']
         if len(files.keys()) == 1:
-            self.__GenerateLivepatchFile(cs, 'c', out_name, next(iter(files)),
+            self.__GenerateLivepatchFile(cs, mod, 'c', out_name, next(iter(files)),
                                          'exts', True)
             return
 
         # Run the template engine for each touched source file.
         for src_file, funcs in files.items():
-            self.__GenerateLivepatchFile(cs, 'c', None, src_file, 'exts', False)
+            self.__GenerateLivepatchFile(cs, mod, 'c', None, src_file, 'exts', False)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        self.__GenerateLivepatchFile(cs, 'c', out_name, None, None, True)
+        self.__GenerateLivepatchFile(cs, mod, 'c', out_name, None, None, True)
 
     @staticmethod
     def generate_commit_msg_file(cfg):
