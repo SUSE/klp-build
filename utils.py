@@ -183,7 +183,7 @@ class Setup:
             cs_files = jcs['files']
 
             # Check if the files exist in the respective codestream directories
-            sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', f"linux-{jcs['kernel']}")
+            sdir = self.cfg.get_sdir(cs)
             for f in cs_files.keys():
                 fdir = Path(sdir, f)
                 if not fdir.is_file():

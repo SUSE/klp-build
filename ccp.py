@@ -317,7 +317,7 @@ class CCP:
     def process_ccp(self, cs):
         jcs = self.cfg.codestreams[cs]
 
-        sdir = Path(self.cfg.ex_dir, jcs['cs'], 'usr', 'src', 'linux-' + jcs['kernel'])
+        sdir = self.cfg.get_sdir(cs)
         odir = Path(str(sdir) + '-obj', 'x86_64', 'default')
 
         # Needed, otherwise threads would interfere with each other

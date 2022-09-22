@@ -177,6 +177,11 @@ class Config:
             return self.ipa_dir
         return Path(self.ipa_dir, cs, 'x86_64')
 
+    def get_sdir(self, cs):
+        jcs = self.codestreams[cs]
+        return str(Path(self.ex_dir, jcs['cs'], 'usr', 'src',
+                        f"linux-{jcs['kernel']}"))
+
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
     def filter_cs(self, cs_list, check_file_funcs=False):
