@@ -93,8 +93,8 @@ if  __name__ == '__main__':
         ccp.run_ccp()
 
     elif args.cmd == 'create-lp':
-        templ = templ.Template(config, args.codestream)
-        templ.GenerateLivePatches()
+        templ = templ.Template(config)
+        templ.GenerateLivePatches(args.codestream)
 
     elif args.cmd == 'get-patches':
         GitHelper.get_commits(config, args.upstream_commits)

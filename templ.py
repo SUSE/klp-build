@@ -4,7 +4,7 @@ from pathlib import Path
 import os
 
 class Template:
-    def __init__(self, cfg, cs):
+    def __init__(self, cfg):
         self.cfg = cfg
         self.bsc = cfg.bsc
 
@@ -14,29 +14,27 @@ class Template:
         if self._mod:
             self._mod = self._mod.replace('-', '_')
 
-        self.cs = cs
-        self.cs_data = self.cfg.codestreams[cs]
-
-    def GeneratePatchedFuncs(self):
+    def GeneratePatchedFuncs(self, cs_data):
         mod = 'vmlinux' if not self._mod else self._mod
         conf = self.cfg.conf['conf']
         if conf:
                 conf = f' IS_ENABLED({conf})'
 
         with open(Path(self.bsc, 'patched_funcs.csv'), 'w') as f:
-            for _, funcs in self.cs_data['files'].items():
+            for _, funcs in cs_data['files'].items():
                 for func in funcs:
                     f.write(f'{mod} {func} klpp_{func}{conf}\n')
 
-    def __GenerateLivepatchFile(self, ext, out_name, src_file, ext_file,
+    def __GenerateLivepatchFile(self, cs, ext, out_name, src_file, ext_file,
             include_header):
+        cs_data = self.cfg.codestreams[cs]
         if not out_name and not src_file:
             raise RuntimeError('Both out_name and src_file are empty.  Aborting.')
 
         if src_file:
             src_file = str(Path(src_file).name)
 
-            lp_inc_dir = str(Path(self.cfg.get_work_dir(self.cs), 'work_' + src_file))
+            lp_inc_dir = str(Path(self.cfg.get_work_dir(cs), 'work_' + src_file))
             lp_file = self.bsc + '_' + src_file
         else:
             lp_inc_dir = ''
@@ -58,8 +56,8 @@ class Template:
 
         # 15.4 onwards we don't have module_mutex, so template generate
         # different code
-        sle = int(self.cs_data['sle'])
-        sp = int(self.cs_data['sp'])
+        sle = int(cs_data['sle'])
+        sp = int(cs_data['sp'])
         if sle < 15 or (sle == 15 and sp < 4):
                 templ.globals['mod_mutex'] = True
 
@@ -78,7 +76,9 @@ class Template:
                                 email = self.cfg.email,
                                 commits = self.cfg.conf['commits']))
 
-    def GenerateLivePatches(self):
+    def GenerateLivePatches(self, cs):
+        cs_data = self.cfg.codestreams[cs]
+
         # If the livepatch contains only one file, generate only the livepatch
         # one
         bsc = Path(self.bsc)
@@ -87,23 +87,23 @@ class Template:
         # We need at least one header file for the livepatch
         out_name = 'livepatch_' + self.bsc
 
-        self.__GenerateLivepatchFile('h', out_name, None, None, False)
+        self.__GenerateLivepatchFile(cs, 'h', out_name, None, None, False)
 
-        self.GeneratePatchedFuncs()
+        self.GeneratePatchedFuncs(cs_data)
 
-        files = self.cs_data['files']
+        files = cs_data['files']
         if len(files.keys()) == 1:
-            self.__GenerateLivepatchFile('c', out_name, next(iter(files)), 'exts',
-                    True)
+            self.__GenerateLivepatchFile(cs, 'c', out_name, next(iter(files)),
+                                         'exts', True)
             return
 
         # Run the template engine for each touched source file.
         for src_file, funcs in files.items():
-            self.__GenerateLivepatchFile('c', None, src_file, 'exts', False)
+            self.__GenerateLivepatchFile(cs, 'c', None, src_file, 'exts', False)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        self.__GenerateLivepatchFile('c', out_name, None, None, True)
+        self.__GenerateLivepatchFile(cs, 'c', out_name, None, None, True)
 
     @staticmethod
     def generate_commit_msg_file(cfg):
