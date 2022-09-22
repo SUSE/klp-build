@@ -89,6 +89,8 @@ class Template:
 
         self.__GenerateLivepatchFile('h', out_name, None, None, False)
 
+        self.GeneratePatchedFuncs()
+
         files = self.cs_data['files']
         if len(files.keys()) == 1:
             self.__GenerateLivepatchFile('c', out_name, next(iter(files)), 'exts',
