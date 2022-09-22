@@ -18,21 +18,15 @@ class Template:
         self.cs_data = self.cfg.codestreams[cs]
 
     def GeneratePatchedFuncs(self):
-        funcs = []
-        for f, flist in self.cs_data['files'].items():
-            funcs.extend(flist)
+        mod = 'vmlinux' if not self._mod else self._mod
+        conf = self.cfg.conf['conf']
+        if conf:
+                conf = f' IS_ENABLED({conf})'
 
         with open(Path(self.bsc, 'patched_funcs.csv'), 'w') as f:
-            conf = self.cfg.conf['conf']
-            if conf:
-                conf = ' IS_ENABLED({})'.format(conf)
-            else:
-                conf = ''
-
-            for func in funcs:
-                mod = 'vmlinux' if not self._mod else self._mod
-                f.write('{} {} klpp_{} {}\n'.format(mod, func, func,
-                    conf))
+            for _, funcs in self.cs_data['files'].items():
+                for func in funcs:
+                    f.write(f'{mod} {func} klpp_{func}{conf}\n')
 
     def __GenerateLivepatchFile(self, ext, out_name, src_file, ext_file,
             include_header):
