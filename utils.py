@@ -13,19 +13,22 @@ from ksrc import GitHelper
 class Setup:
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
             ups_commits, disable_ccp, archs):
+
+        cfg.conf['bsc'] = str(cfg.bsc_num)
+        cfg.conf['work_dir'] = str(self.cfg.bsc_path)
+        cfg.conf['data'] = str(self.cfg.data)
+        cfg.conf['mod'] = mod
+        cfg.conf['conf'] = conf
+        cfg.conf['archs'] = archs
+        cfg.conf['cve'] = re.search('([0-9]+\-[0-9]+)', cve).group(1)
+
         self.cfg = cfg
 
-        self._cve = re.search('([0-9]+\-[0-9]+)', cve).group(1)
-        self._kernel_conf = conf
-
         self._ups_commits = ups_commits
-        self._mod = mod
         self._redownload = redownload
 
         self._disable_ccp = disable_ccp
         self._file_funcs = {}
-
-        self._archs = archs
 
         self.ibs = None
 
@@ -99,6 +102,10 @@ class Setup:
         # Called at this point because codestreams is populated
         conf['commits'] = GitHelper.get_commits(self.cfg, self._ups_commits)
         conf['patched'] = GitHelper.get_patched_cs(self.cfg)
+
+        # cpp will use this data in the next step
+        with open(self.cfg.conf_file, 'w') as f:
+            f.write(json.dumps(conf, indent=4, sort_keys=True))
 
         # For now let's keep the current format of codestreams.in and
         # codestreams.json
@@ -186,12 +193,12 @@ class Setup:
                     raise RuntimeError(f'File {f} doesn\'t exists in {str(sdir)}')
 
             ex_dir = self.cfg.get_ex_dir(jcs['cs'])
-            if not self._mod:
+            mod = conf['mod']
+            if self.mod == 'vmlinux':
                 obj = Path(ex_dir, 'boot', f"vmlinux-{jcs['kernel']}-default")
             else:
-                mod_file = self._mod + '.ko'
-                obj_path = Path(ex_dir, 'lib', 'modules')
-                obj = glob.glob(str(obj_path) + '/**/' + mod_file, recursive=True)
+                obj_path = str(Path(ex_dir, 'lib', 'modules'))
+                obj = glob.glob(f'{obj_path}/**/{mod}.ko', recursive=True)
 
                 if not obj or len(obj) > 1:
                     print(obj_path)
@@ -213,18 +220,6 @@ class Setup:
         # saving only at this point.
         with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
-
-        # cpp will use this data in the next step
-        conf['bsc'] = str(self.cfg.bsc_num)
-        conf['cve'] = self._cve
-        conf['conf'] = self._kernel_conf
-        conf['mod'] = self._mod
-        conf['work_dir'] = str(self.cfg.bsc_path)
-        conf['data'] = str(self.cfg.data)
-        conf['archs'] = self._archs
-
-        with open(self.cfg.conf_file, 'w') as f:
-            f.write(json.dumps(self.cfg.conf, indent=4, sort_keys=True))
 
     def cs_repo(self, jcs):
         if jcs['update'] == "0":

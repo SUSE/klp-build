@@ -10,12 +10,9 @@ class Template:
 
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
         # and in kallsyms lookup
-        self._mod = self.cfg.conf.get('mod', '')
-        if self._mod:
-            self._mod = self._mod.replace('-', '_')
+        self.mod = self.cfg.conf.get('mod', '').replace('-', '_')
 
     def GeneratePatchedFuncs(self, cs_data):
-        mod = 'vmlinux' if not self._mod else self._mod
         conf = self.cfg.conf['conf']
         if conf:
                 conf = f' IS_ENABLED({conf})'
@@ -23,7 +20,7 @@ class Template:
         with open(Path(self.bsc, 'patched_funcs.csv'), 'w') as f:
             for _, funcs in cs_data['files'].items():
                 for func in funcs:
-                    f.write(f'{mod} {func} klpp_{func}{conf}\n')
+                    f.write(f'{self.mod} {func} klpp_{func}{conf}\n')
 
     def __GenerateLivepatchFile(self, cs, ext, out_name, src_file, ext_file,
             include_header):
@@ -51,8 +48,8 @@ class Template:
 
         templ = env.get_template('lp-' + ext + '.j2')
         templ.globals['year'] = datetime.today().year
-        if self._mod:
-            templ.globals['mod'] = self._mod
+        if self.mod != 'vmlinux':
+            templ.globals['mod'] = self.mod
 
         # 15.4 onwards we don't have module_mutex, so template generate
         # different code
