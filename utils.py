@@ -15,8 +15,8 @@ class Setup:
             ups_commits, disable_ccp, archs):
 
         cfg.conf['bsc'] = str(cfg.bsc_num)
-        cfg.conf['work_dir'] = str(self.cfg.bsc_path)
-        cfg.conf['data'] = str(self.cfg.data)
+        cfg.conf['work_dir'] = str(cfg.bsc_path)
+        cfg.conf['data'] = str(cfg.data)
         cfg.conf['mod'] = mod
         cfg.conf['conf'] = conf
         cfg.conf['archs'] = archs
@@ -26,11 +26,8 @@ class Setup:
 
         self._ups_commits = ups_commits
         self._redownload = redownload
-
         self._disable_ccp = disable_ccp
         self._file_funcs = {}
-
-        self.ibs = None
 
         for f in file_funcs:
             cs = f[0]
@@ -192,25 +189,12 @@ class Setup:
                 if not fdir.is_file():
                     raise RuntimeError(f'File {f} doesn\'t exists in {str(sdir)}')
 
-            ex_dir = self.cfg.get_ex_dir(jcs['cs'])
-            mod = conf['mod']
-            if self.mod == 'vmlinux':
-                obj = Path(ex_dir, 'boot', f"vmlinux-{jcs['kernel']}-default")
-            else:
-                obj_path = str(Path(ex_dir, 'lib', 'modules'))
-                obj = glob.glob(f'{obj_path}/**/{mod}.ko', recursive=True)
-
-                if not obj or len(obj) > 1:
-                    print(obj_path)
-                    raise RuntimeError(f'Module list has none or too much entries: {str(obj)}')
-                # Grab the only value of the list and turn obj into a string to be
-                # used later
-                obj = obj[0]
+            obj = self.get_module_obj(jcs)
 
             # Verify if the functions exist in the specified object
             for f in cs_files.keys():
                 for func in cs_files[f]:
-                    if not self.cfg.check_symbol(func, str(obj)):
+                    if not self.cfg.check_symbol(func, obj):
                         print(f'WARN: {cs}: Function {func} does not exist in {obj}')
 
             jcs['object'] = str(obj)
@@ -220,6 +204,23 @@ class Setup:
         # saving only at this point.
         with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
+
+    def get_module_obj(self, jcs):
+        ex_dir = self.cfg.get_ex_dir(jcs['cs'])
+        mod = self.cfg.conf['mod']
+        if mod == 'vmlinux':
+            return str(Path(ex_dir, 'boot', f"vmlinux-{jcs['kernel']}-default"))
+
+        obj_path = str(Path(ex_dir, 'lib', 'modules'))
+        obj = glob.glob(f'{obj_path}/**/{mod}.ko', recursive=True)
+
+        if not obj or len(obj) > 1:
+            print(obj_path)
+            raise RuntimeError(f'Module list has none or too much entries: {str(obj)}')
+
+        # Grab the only value of the list and turn obj into a string to be
+        # used later
+        return str(obj[0])
 
     def cs_repo(self, jcs):
         if jcs['update'] == "0":
