@@ -29,7 +29,7 @@
 #include "../kallsyms_relocs.h"
 
 static struct klp_kallsyms_reloc klp_funcs[] = {
-{% if inc_exts_file is not none -%}
+{% if inc_exts_file is defined -%}
 {% include inc_exts_file %}
 
 {% elif mod is defined %}
