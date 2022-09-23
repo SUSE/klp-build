@@ -18,8 +18,7 @@ class Template:
                 for func in funcs:
                     f.write(f'{mod} {func} klpp_{func}{conf}\n')
 
-    def __GenerateLivepatchFile(self, cs, mod, ext, out_name, src_file, ext_file,
-            include_header):
+    def __GenerateLivepatchFile(self, cs, mod, ext, out_name, src_file, ext_file):
         cs_data = self.cfg.codestreams[cs]
         if not out_name and not src_file:
             raise RuntimeError('Both out_name and src_file are empty.  Aborting.')
@@ -53,7 +52,7 @@ class Template:
         if sle < 15 or (sle == 15 and cs_data['sp'] < 4):
                 templ.globals['mod_mutex'] = True
 
-        if include_header:
+        if 'livepatch_' in out_name and ext == 'c':
             templ.globals['include_header'] = True
 
         with open(Path(self.bsc, out_name).with_suffix('.' + ext), 'w') as f:
@@ -83,23 +82,23 @@ class Template:
         # We need at least one header file for the livepatch
         out_name = 'livepatch_' + self.bsc
 
-        self.__GenerateLivepatchFile(cs, mod, 'h', out_name, None, None, False)
+        self.__GenerateLivepatchFile(cs, mod, 'h', out_name, None, None)
 
         self.GeneratePatchedFuncs(cs_data, mod)
 
         files = cs_data['files']
         if len(files.keys()) == 1:
             self.__GenerateLivepatchFile(cs, mod, 'c', out_name, next(iter(files)),
-                                         'exts', True)
+                                         'exts')
             return
 
         # Run the template engine for each touched source file.
         for src_file, funcs in files.items():
-            self.__GenerateLivepatchFile(cs, mod, 'c', None, src_file, 'exts', False)
+            self.__GenerateLivepatchFile(cs, mod, 'c', None, src_file, 'exts')
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        self.__GenerateLivepatchFile(cs, mod, 'c', out_name, None, None, True)
+        self.__GenerateLivepatchFile(cs, mod, 'c', out_name, None, None)
 
     @staticmethod
     def generate_commit_msg_file(cfg):
