@@ -18,20 +18,23 @@ class Template:
                 for func in funcs:
                     f.write(f'{mod} {func} klpp_{func}{conf}\n')
 
-    def __GenerateLivepatchFile(self, cs, mod, ext, src_file):
+    def __GenerateLivepatchFile(self, cs, mod, ext, src_file, use_src_name=False):
         cs_data = self.cfg.codestreams[cs]
 
-        # src empty means that we want the final file as:
-        #       livepatch_bscXXXXXXXX.c
-        # if src is not empty
-        #       bscXXXXXXX_{src_name}.c
         if src_file:
             lp_inc_dir = str(Path(self.cfg.get_work_dir(cs), 'work_' + src_file))
             lp_file = f'{self.bsc}_{src_file}'
-            out_name = lp_file
         else:
             lp_inc_dir = ''
             lp_file = None
+
+        # if use_src_name is True, the final file will be:
+        #       bscXXXXXXX_{src_name}.c
+        # else:
+        #       livepatch_bscXXXXXXXX.c
+        if use_src_name:
+            out_name = lp_file
+        else:
             out_name = f'livepatch_{self.bsc}.{ext}'
 
         fname = Path(out_name).with_suffix('')
@@ -93,7 +96,7 @@ class Template:
         # Run the template engine for each touched source file.
         for src_file, _ in files.items():
             src = str(Path(src_file).name)
-            self.__GenerateLivepatchFile(cs, mod, 'c', src)
+            self.__GenerateLivepatchFile(cs, mod, 'c', src, True)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
