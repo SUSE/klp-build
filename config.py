@@ -167,6 +167,9 @@ class Config:
     def get_work_dir(self, cs):
         return Path(self.bsc_path, 'c', cs, 'x86_64')
 
+    def get_cs_lp_dir(self, cs):
+        return Path(self.bsc_path, 'c', cs, 'x86_64', 'lp')
+
     def get_ex_dir(self, cs):
         if not cs:
             return self.ex_dir

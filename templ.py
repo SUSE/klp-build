@@ -8,17 +8,17 @@ class Template:
         self.cfg = cfg
         self.bsc = cfg.bsc
 
-    def GeneratePatchedFuncs(self, cs_data, mod):
+    def GeneratePatchedFuncs(self, lp_path, cs_data, mod):
         conf = self.cfg.conf['conf']
         if conf:
                 conf = f' IS_ENABLED({conf})'
 
-        with open(Path(self.bsc, 'patched_funcs.csv'), 'w') as f:
+        with open(Path(lp_path, 'patched_funcs.csv'), 'w') as f:
             for _, funcs in cs_data['files'].items():
                 for func in funcs:
                     f.write(f'{mod} {func} klpp_{func}{conf}\n')
 
-    def __GenerateLivepatchFile(self, cs, mod, ext, src_file, use_src_name=False):
+    def __GenerateLivepatchFile(self, lp_path, cs, mod, ext, src_file, use_src_name=False):
         cs_data = self.cfg.codestreams[cs]
 
         if src_file:
@@ -60,7 +60,7 @@ class Template:
         if ext == 'c' and src_file:
             templ.globals['inc_exts_file'] = 'exts'
 
-        with open(Path(self.bsc, out_name), 'w') as f:
+        with open(Path(lp_path, out_name), 'w') as f:
             f.write(templ.render(bsc = self.bsc,
                                 bsc_num = self.cfg.bsc_num,
                                 fname = fname,
@@ -80,27 +80,28 @@ class Template:
 
         # If the livepatch contains only one file, generate only the livepatch
         # one
-        bsc = Path(self.bsc)
-        bsc.mkdir(exist_ok=True)
 
-        self.GeneratePatchedFuncs(cs_data, mod)
+        lp_path = self.cfg.get_cs_lp_dir(cs)
+        lp_path.mkdir(exist_ok=True)
 
-        self.__GenerateLivepatchFile(cs, mod, 'h', None)
+        self.GeneratePatchedFuncs(lp_path, cs_data, mod)
+
+        self.__GenerateLivepatchFile(lp_path, cs, mod, 'h', None)
 
         files = cs_data['files']
         if len(files.keys()) == 1:
             src = Path(list(files.keys())[0]).name
-            self.__GenerateLivepatchFile(cs, mod, 'c', src)
+            self.__GenerateLivepatchFile(lp_path, cs, mod, 'c', src)
             return
 
         # Run the template engine for each touched source file.
         for src_file, _ in files.items():
             src = str(Path(src_file).name)
-            self.__GenerateLivepatchFile(cs, mod, 'c', src, True)
+            self.__GenerateLivepatchFile(lp_path, cs, mod, 'c', src, True)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        self.__GenerateLivepatchFile(cs, mod, 'c', None)
+        self.__GenerateLivepatchFile(lp_path, cs, mod, 'c', None)
 
     @staticmethod
     def generate_commit_msg_file(cfg):
