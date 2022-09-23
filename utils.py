@@ -48,7 +48,7 @@ class Setup:
         else:
             sle, sp = sle, '0'
 
-        return sle, sp, u
+        return int(sle), int(sp), int(u)
 
     def setup_project_files(self):
         conf = self.cfg.conf
@@ -81,7 +81,7 @@ class Setup:
 
                 # Fill the majority of possible fields here
                 sle, sp, u = self.parse_cs_line(full_cs)
-                cs_key = sle + '.' + sp + 'u' + u
+                cs_key = f'{sle}.{sp}u{u}'
                 self.cfg.codestreams[cs_key] = {
                         'project' : proj,
                         'kernel' : kernel,
@@ -143,13 +143,11 @@ class Setup:
 
             # Set supported archs for the codestream
             archs = ['x86_64']
-            if self.is_ppc_supported(int(jcs['sle']), int(jcs['sp']),
-                                     int(jcs['update'])):
-                archs.extend(['ppc64le'])
+            if self.is_ppc_supported(jcs['sle'], jcs['sp'], jcs['update']):
+                archs.append('ppc64le')
 
-            if self.is_s390_supported(int(jcs['sle']), int(jcs['sp']),
-                                     int(jcs['update'])):
-                archs.extend(['s390x'])
+            if self.is_s390_supported(jcs['sle'], jcs['sp'], jcs['update']):
+                archs.append('s390x')
 
             jcs['archs'] = archs
 

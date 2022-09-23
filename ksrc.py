@@ -35,13 +35,13 @@ class GitHelper:
                 # the same code
                 for b in branch.replace(cfg.bsc + '_', '').split('_'):
                     sle, u = b.split('u')
-                    if sle != jcs['sle'] + '.' + jcs['sp']:
+                    if sle != f"{jcs['sle']}.{jcs['sp']}":
                         continue
 
                     # Get codestreams interval
                     up = u
                     down = u
-                    cs_update = int(jcs['update'])
+                    cs_update = jcs['update']
                     if '-' in u:
                         down, up = u.split('-')
 

@@ -281,13 +281,13 @@ class IBS:
             # the same code
             for b in branch.replace(cfg.bsc + '_', '').split('_'):
                 sle, u = b.split('u')
-                if sle != jcs['sle'] + '.' + jcs['sp']:
+                if sle != f"{jcs['sle']}.{jcs['sp']}":
                     continue
 
                 # Get codestreams interval
                 up = u
                 down = u
-                cs_update = int(jcs['update'])
+                cs_update = jcs['update']
                 if '-' in u:
                     down, up = u.split('-')
 
@@ -308,7 +308,6 @@ class IBS:
         return branch_name
 
     def create_lp_package(self, cs):
-
         # get the kgraft branch related to this codestream
         branch = self.get_cs_branch(cs)
         if not branch:
@@ -322,8 +321,7 @@ class IBS:
         self.delete_project(prj, verbose=False)
 
         meta = self.create_prj_meta(prj, jcs)
-        prj_desc = 'Development of livepatches for SLE{}-SP{} Update {}' \
-                .format(jcs['sle'], jcs['sp'], jcs['update'])
+        prj_desc = f'Development of livepatches for {cs}'
 
         try:
             self.osc.projects.set_meta(prj, metafile=meta, title='',

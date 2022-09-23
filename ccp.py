@@ -68,7 +68,7 @@ class CCP:
                 '-mindirect-branch-cs-prefix', '-mharden-sls=all']:
             output = output.replace(opt, '')
 
-        if int(sle) >= 15 and int(sp) >= 2:
+        if sle >= 15 and sp >= 2:
             output += ' -D_Static_assert(e,m)='
 
         return output

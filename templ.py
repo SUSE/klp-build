@@ -49,9 +49,8 @@ class Template:
 
         # 15.4 onwards we don't have module_mutex, so template generate
         # different code
-        sle = int(cs_data['sle'])
-        sp = int(cs_data['sp'])
-        if sle < 15 or (sle == 15 and sp < 4):
+        sle = cs_data['sle']
+        if sle < 15 or (sle == 15 and cs_data['sp'] < 4):
                 templ.globals['mod_mutex'] = True
 
         if include_header:
