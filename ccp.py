@@ -6,6 +6,8 @@ import re
 import shutil
 import subprocess
 
+import templ
+
 import concurrent.futures
 
 class CCP:
@@ -14,6 +16,8 @@ class CCP:
         self._proc_files = []
 
         self.env = os.environ
+
+        self.templ = templ.Template(cfg)
 
         gcc_ver = subprocess.check_output(['gcc', '-dumpversion']).decode().strip()
         # gcc12 has a problem with kernel and xrealloc implementation
@@ -377,10 +381,14 @@ class CCP:
             f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
 
         print('Checking the externalized symbols in other architectures...')
+
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
+        # While we are at it, create the livepatches per codestream
         for cs in self.cfg.working_cs:
             jcs = self.cfg.codestreams[cs]
+
+            self.templ.GenerateLivePatches(cs)
 
             print(f'{cs}')
             for _, exts in jcs['ext_symbols'].items():
