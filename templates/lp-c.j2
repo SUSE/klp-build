@@ -1,6 +1,6 @@
 {% include 'header.j2' %}
 
-{% if config is not none %}
+{% if config is defined %}
 #if IS_ENABLED({{ config }})
 
 {% if mod is defined %}
@@ -130,7 +130,7 @@ void {{ fname }}_cleanup(void)
 	unregister_module_notifier(&module_nb);
 }
 {% endif -%}
-{% if config is not none %}
+{% if config is defined %}
 
 #endif /* IS_ENABLED({{ config }}) */
 {% endif -%}

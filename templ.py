@@ -45,8 +45,6 @@ class Template:
 
         templ = env.get_template('lp-' + ext + '.j2')
         templ.globals['year'] = datetime.today().year
-        if mod != 'vmlinux':
-            templ.globals['mod'] = mod
 
         # 15.4 onwards we don't have module_mutex, so template generate
         # different code
@@ -57,8 +55,14 @@ class Template:
         if 'livepatch_' in out_name and ext == 'c':
             templ.globals['include_header'] = True
 
+        if self.cfg.conf['conf']:
+            templ.globals['config'] = self.cfg.conf['conf']
+
         if ext == 'c' and src_file:
             templ.globals['inc_exts_file'] = 'exts'
+
+        if mod != 'vmlinux':
+            templ.globals['mod'] = mod
 
         with open(Path(lp_path, out_name), 'w') as f:
             f.write(templ.render(bsc = self.bsc,
@@ -66,7 +70,6 @@ class Template:
                                 fname = fname,
                                 inc_src_file = lp_file,
                                 cve = self.cfg.conf['cve'],
-                                config = self.cfg.conf['conf'],
                                 user = self.cfg.user,
                                 email = self.cfg.email,
                                 commits = self.cfg.conf['commits']))
