@@ -37,7 +37,7 @@ class CCP:
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
 
-    def process_make_output(self, filename, output, sle, sp):
+    def process_make_output(self, cs, filename, output):
         fname = str(filename)
 
         ofname = '.' + filename.name.replace('.c', '.o.d')
@@ -45,6 +45,7 @@ class CCP:
 
         cmd_args_regex = '(-Wp,{},{}\s+-nostdinc\s+-isystem.*{});'
 
+        sle, sp, _ = self.cfg.get_cs_tuple(cs)
         result = re.search(cmd_args_regex.format('-MD', ofname, fname), str(output).strip())
         if not result:
             # 15.4 onwards changes the regex a little: -MD -> -MMD
@@ -77,7 +78,7 @@ class CCP:
 
         return output
 
-    def get_make_cmd(self, filename, jcs, odir):
+    def get_make_cmd(self, cs, filename, odir):
         filename = PurePath(filename)
         file_ = filename.with_suffix('.o')
         completed = subprocess.run(['make', '-sn', f'CC={self.cc}',
@@ -85,16 +86,13 @@ class CCP:
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, check=True)
 
-        return self.process_make_output(filename, completed.stdout.decode(),
-                                        jcs['sle'], jcs['sp'])
+        return self.process_make_output(cs, filename, completed.stdout.decode())
 
     # extract the last component of the path, like the basename bash # function
     def lp_out_file(self, fname):
         return self.cfg.bsc + '_' + PurePath(fname).name
 
     def execute_ccp(self, cs, fname, funcs, out_dir, sdir, odir, env):
-        jcs = self.cfg.codestreams[cs]
-
         lp_out = Path(out_dir, self.lp_out_file(fname))
         ppath = self.cfg.pol_path
 
@@ -108,7 +106,7 @@ class CCP:
         ccp_args.extend(['--compiler=x86_64-gcc-9.1.0', '-i', f'{funcs}',
                         '-o', f'{str(lp_out)}', '--'])
 
-        ccp_args.extend(self.get_make_cmd(fname, jcs, odir).split(' '))
+        ccp_args.extend(self.get_make_cmd(cs, fname, odir).split(' '))
 
         ccp_args = list(filter(None, ccp_args))
 
@@ -381,6 +379,8 @@ class CCP:
             f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
 
         print('Checking the externalized symbols in other architectures...')
+
+        self.templ.generate_commit_msg_file()
 
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file

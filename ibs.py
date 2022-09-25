@@ -267,7 +267,7 @@ class IBS:
         return ET.tostring(prj).decode()
 
     def get_cs_branch(self, cs):
-        jcs = self.cfg.codestreams[cs]
+        sle, sp, up = self.cfg.get_cs_tuple(cs)
         repo = git.Repo(self.cfg.kgr_patches)
 
         all_branches = git.Repo(cfg.kgr_patches).branches
@@ -281,13 +281,13 @@ class IBS:
             # the same code
             for b in branch.replace(cfg.bsc + '_', '').split('_'):
                 sle, u = b.split('u')
-                if sle != f"{jcs['sle']}.{jcs['sp']}":
+                if sle != f'{sle}.{sp}':
                     continue
 
                 # Get codestreams interval
                 up = u
                 down = u
-                cs_update = jcs['update']
+                cs_update = up
                 if '-' in u:
                     down, up = u.split('-')
 

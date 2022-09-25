@@ -7,7 +7,6 @@ import sys
 
 import ccp
 from ibs import IBS
-from templ import Template
 from ksrc import GitHelper
 
 class Setup:
@@ -139,14 +138,14 @@ class Setup:
                 continue
 
             jcs['files'] = cs_files
-            jcs['repo'] = self.cs_repo(jcs)
+            jcs['repo'] = self.cs_repo(cs)
 
             # Set supported archs for the codestream
             archs = ['x86_64']
-            if self.is_ppc_supported(jcs['sle'], jcs['sp'], jcs['update']):
+            if self.is_ppc_supported(cs):
                 archs.append('ppc64le')
 
-            if self.is_s390_supported(jcs['sle'], jcs['sp'], jcs['update']):
+            if self.is_s390_supported(cs):
                 archs.append('s390x')
 
             jcs['archs'] = archs
@@ -220,20 +219,22 @@ class Setup:
         # used later
         return str(obj[0])
 
-    def cs_repo(self, jcs):
-        if jcs['update'] == "0":
+    def cs_repo(self, cs):
+        sle, sp, up = self.cfg.get_cs_tuple(cs)
+        if up == 0:
             return 'standard'
 
-        repo = f"SUSE_SLE-{jcs['sle']}"
-        if jcs['sp'] != '0':
-            repo = f"{repo}-SP{jcs['sp']}"
+        repo = f"SUSE_SLE-{sle}"
+        if sp != 0:
+            repo = f"{repo}-SP{sp}"
 
         return f'{repo}_Update'
 
     # s390x shall be enabled from SLE12-SP4 update 13 onwards.
     # s390x is supported from 12.5u3 onwards
     # s390x is supported from SLE15-SP2 onwards.
-    def is_s390_supported(self, sle, sp, up):
+    def is_s390_supported(self, cs):
+        sle, sp, up = self.cfg.get_cs_tuple(cs)
         if (sle == 12 and sp == 4 and up >= 13) or \
                 (sle == 12 and sp == 5 and up >= 3) or \
                 (sle == 15 and sp >= 2):
@@ -243,7 +244,8 @@ class Setup:
 
     # ppc64le is supported from 12_3u5 onwards
     # ppc64le is also supported on 12sp2 from u25 onwards
-    def is_ppc_supported(self, sle, sp, up):
+    def is_ppc_supported(self, cs):
+        sle, sp, up = self.cfg.get_cs_tuple(cs)
         if sle > 12:
             return True
         elif sle == 12 and sp > 3:
@@ -256,8 +258,6 @@ class Setup:
 
     def prepare_env(self):
         self.setup_project_files()
-
-        Template.generate_commit_msg_file(self.cfg)
 
         if not self._disable_ccp:
             _ccp = ccp.CCP(self.cfg)
