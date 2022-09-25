@@ -6,26 +6,62 @@ import os
 class Template:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.bsc = cfg.bsc
 
-    def GeneratePatchedFuncs(self, lp_path, cs_data, mod):
+        # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
+        # and in kallsyms lookup
+        self.mod = self.cfg.conf.get('mod', '').replace('-', '_')
+
+    def GeneratePatchedFuncs(self, lp_path, files):
         conf = self.cfg.conf['conf']
         if conf:
-                conf = f' IS_ENABLED({conf})'
+            conf = f' IS_ENABLED({conf})'
 
         with open(Path(lp_path, 'patched_funcs.csv'), 'w') as f:
-            for _, funcs in cs_data['files'].items():
+            for _, funcs in files.items():
                 for func in funcs:
-                    f.write(f'{mod} {func} klpp_{func}{conf}\n')
+                    f.write(f'{self.mod} {func} klpp_{func}{conf}\n')
 
-    def __GenerateLivepatchFile(self, lp_path, cs, mod, ext, src_file, use_src_name=False):
-        cs_data = self.cfg.codestreams[cs]
+    def get_template(self, cs, template, inc_dir):
+        loaddirs = [Path(os.path.dirname(__file__), 'templates')]
+        if inc_dir:
+            loaddirs.append(inc_dir)
 
+        fsloader = jinja2.FileSystemLoader(loaddirs)
+        env = jinja2.Environment(loader=fsloader, trim_blocks=True)
+        templ = env.get_template(template)
+
+        templ.globals['year'] = datetime.today().year
+        templ.globals['bsc'] = self.cfg.bsc
+        templ.globals['bsc_num'] = self.cfg.bsc_num
+        templ.globals['cve'] = self.cfg.conf['cve']
+        templ.globals['commits'] = self.cfg.conf['commits']
+        templ.globals['user'] = self.cfg.user
+        templ.globals['email'] = self.cfg.email
+
+        # We don't have a specific codestreams when creating the commit file
+        if not cs:
+            return templ
+
+        # 15.4 onwards we don't have module_mutex, so template generate
+        # different code
+        sle, sp, _ = self.cfg.get_cs_tuple(cs)
+        if sle < 15 or (sle == 15 and cs_data['sp'] < 4):
+            templ.globals['mod_mutex'] = True
+
+        if self.mod != 'vmlinux':
+            templ.globals['mod'] = mod
+
+        if self.cfg.conf['conf']:
+            templ.globals['config'] = self.cfg.conf['conf']
+
+        return templ
+
+    def __GenerateLivepatchFile(self, lp_path, cs, ext, src_file, use_src_name=False):
         if src_file:
             lp_inc_dir = str(Path(self.cfg.get_work_dir(cs), 'work_' + src_file))
-            lp_file = f'{self.bsc}_{src_file}'
+            lp_file = f'{self.cfg.bsc}_{src_file}'
         else:
-            lp_inc_dir = ''
+            lp_inc_dir = None
             lp_file = None
 
         # if use_src_name is True, the final file will be:
@@ -35,90 +71,49 @@ class Template:
         if use_src_name:
             out_name = lp_file
         else:
-            out_name = f'livepatch_{self.bsc}.{ext}'
+            out_name = f'livepatch_{self.cfg.bsc}.{ext}'
 
         fname = Path(out_name).with_suffix('')
-
-        fsloader = jinja2.FileSystemLoader([Path(os.path.dirname(__file__),
-                                            'templates'), lp_inc_dir])
-        env = jinja2.Environment(loader=fsloader, trim_blocks=True)
-
-        templ = env.get_template('lp-' + ext + '.j2')
-        templ.globals['year'] = datetime.today().year
-
-        # 15.4 onwards we don't have module_mutex, so template generate
-        # different code
-        sle = cs_data['sle']
-        if sle < 15 or (sle == 15 and cs_data['sp'] < 4):
-                templ.globals['mod_mutex'] = True
+        templ = self.get_template(cs, 'lp-' + ext + '.j2', lp_inc_dir)
 
         if 'livepatch_' in out_name and ext == 'c':
             templ.globals['include_header'] = True
 
-        if self.cfg.conf['conf']:
-            templ.globals['config'] = self.cfg.conf['conf']
-
         if ext == 'c' and src_file:
             templ.globals['inc_exts_file'] = 'exts'
 
-        if mod != 'vmlinux':
-            templ.globals['mod'] = mod
-
         with open(Path(lp_path, out_name), 'w') as f:
-            f.write(templ.render(bsc = self.bsc,
-                                bsc_num = self.cfg.bsc_num,
-                                fname = fname,
-                                inc_src_file = lp_file,
-                                cve = self.cfg.conf['cve'],
-                                user = self.cfg.user,
-                                email = self.cfg.email,
-                                commits = self.cfg.conf['commits']))
+            f.write(templ.render(fname = fname, inc_src_file = lp_file))
 
     def GenerateLivePatches(self, cs):
         cs_data = self.cfg.codestreams[cs]
 
-        # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
-        # and in kallsyms lookup
-        mod = self.cfg.conf.get('mod', '').replace('-', '_')
-
-        # If the livepatch contains only one file, generate only the livepatch
-        # one
-
         lp_path = self.cfg.get_cs_lp_dir(cs)
         lp_path.mkdir(exist_ok=True)
 
-        self.GeneratePatchedFuncs(lp_path, cs_data, mod)
-
-        self.__GenerateLivepatchFile(lp_path, cs, mod, 'h', None)
-
         files = cs_data['files']
+        self.GeneratePatchedFuncs(lp_path, files)
+
+        self.__GenerateLivepatchFile(lp_path, cs, 'h', None)
+
+        # If the livepatch touches only one file the final livepatch file will
+        # be names livepatch_XXXX
         if len(files.keys()) == 1:
             src = Path(list(files.keys())[0]).name
-            self.__GenerateLivepatchFile(lp_path, cs, mod, 'c', src)
+            self.__GenerateLivepatchFile(lp_path, cs, 'c', src)
             return
 
         # Run the template engine for each touched source file.
         for src_file, _ in files.items():
             src = str(Path(src_file).name)
-            self.__GenerateLivepatchFile(lp_path, cs, mod, 'c', src, True)
+            self.__GenerateLivepatchFile(lp_path, cs, 'c', src, True)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        self.__GenerateLivepatchFile(lp_path, cs, mod, 'c', None)
+        self.__GenerateLivepatchFile(lp_path, cs, 'c', None)
 
-    @staticmethod
-    def generate_commit_msg_file(cfg):
-        fsloader = jinja2.FileSystemLoader(Path(os.path.dirname(__file__),
-                                            'templates'))
-        env = jinja2.Environment(loader=fsloader, trim_blocks=True)
+    def generate_commit_msg_file(self):
+        templ = self.get_template(None, 'commit.j2', None)
 
-        templ = env.get_template('commit.j2')
-        buf = templ.render(bsc = cfg.bsc,
-                            bsc_num = cfg.bsc_num,
-                            cve = cfg.conf['cve'],
-                            user = cfg.user,
-                            email = cfg.email,
-                            commits = cfg.conf['commits'])
-
-        with open(Path(cfg.bsc_path, 'commit.msg'), 'w') as f:
-            f.write(buf)
+        with open(Path(self.cfg.bsc_path, 'commit.msg'), 'w') as f:
+            f.write(templ.render())

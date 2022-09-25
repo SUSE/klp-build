@@ -185,6 +185,10 @@ class Config:
         return str(Path(self.ex_dir, jcs['cs'], 'usr', 'src',
                         f"linux-{jcs['kernel']}"))
 
+    def get_cs_tuple(self, cs):
+        data = self.codestreams[cs]
+        return (data['sle'], data['sp'], data['update'])
+
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
     def filter_cs(self, cs_list, check_file_funcs=False):
