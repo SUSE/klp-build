@@ -10,6 +10,8 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 
+from ksrc import GitHelper
+
 class IBS:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -183,6 +185,50 @@ class IBS:
             filtered.append(item)
 
         return filtered
+
+    def prepare_tests(self, redownload_rpms):
+        if redownload_rpms:
+            # Remove previously downloaded rpms
+            print('Removing previously downloaded rpms...')
+            for arch in self.cfg.conf['archs']:
+                shutil.rmtree(Path(self.cfg.bsc_download, arch), ignore_errors=True)
+
+            # Download all built rpms
+            self.download()
+
+        config = Path(self.cfg.bsc_path, f'{self.cfg.bsc}_config.in')
+        test_sh = Path(self.cfg.kgraft_tests_path,
+                       f'{self.cfg.bsc}_test_script.sh')
+
+        # Prepare the config file used by kgr-test
+        GitHelper.build(self.cfg)
+
+        for arch in self.cfg.conf['archs']:
+            rpm_dir = Path(self.cfg.bsc_download, arch)
+            dest_dir = Path(rpm_dir, f'{self.cfg.bsc}')
+
+            # Remove previously created directory and archive
+            shutil.rmtree(dest_dir, ignore_errors=True)
+            shutil.rmtree(f'{str(dest_dir)}.tar.xz', ignore_errors=True)
+
+            rpms = os.listdir(rpm_dir)
+            dest_dir.mkdir(exist_ok=True)
+
+            for d in ['built', 'repro', 'tests.out']:
+                Path(dest_dir, d).mkdir(exist_ok=True)
+
+            for rpm in rpms:
+                shutil.copy(Path(rpm_dir, rpm), Path(dest_dir, 'built'))
+
+            shutil.copy(config, Path(dest_dir, 'repro'))
+            shutil.copy(test_sh, Path(dest_dir, 'repro'))
+
+            import sys
+            subprocess.run(['tar', '-cJf', f'{self.cfg.bsc}.tar.xz',
+                            f'{self.cfg.bsc}'], cwd=rpm_dir,
+                                    stdout=sys.stdout,
+                                    stderr=subprocess.PIPE, check=True)
+
 
     def download(self):
         rpms = []
