@@ -64,7 +64,7 @@ class GitHelper:
                 build_cs.append(','.join(entry))
 
         # Save file to be used later by osckgr scripts
-        with open(Path(cfg.bsc_path, 'full_codestreams.in'), 'w') as f:
+        with open(Path(cfg.bsc_path, f'{cfg.bsc}_config.in'), 'w') as f:
             f.write('\n'.join(build_cs))
 
     @staticmethod

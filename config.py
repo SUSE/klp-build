@@ -135,6 +135,12 @@ class Config:
             if not kgraft_path.is_dir():
                 raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches')
 
+        if args.cmd == 'ibs' and args.prepare_tests:
+            self.kgraft_tests_path = Path(Path().home(), 'kgr',
+                                          'kgraft-patches_testscripts')
+            if not self.kgraft_tests_path.is_dir():
+                raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
+
         self.bsc_path.mkdir(exist_ok=True)
 
         self.bsc_download = Path(self.bsc_path, 'downloads')
