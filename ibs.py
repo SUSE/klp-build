@@ -8,6 +8,7 @@ from osctiny import Osc
 import re
 import shutil
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 
 from ksrc import GitHelper
@@ -204,9 +205,10 @@ class IBS:
     def prepare_tests(self, redownload_rpms):
         if redownload_rpms:
             # Remove previously downloaded rpms
-            print('Removing previously downloaded rpms...')
-            for arch in self.cfg.conf['archs']:
-                shutil.rmtree(Path(self.cfg.bsc_download, arch), ignore_errors=True)
+            for cs, data in self.cfg.filtered_cs().items():
+                for arch in data.get('archs', []):
+                    shutil.rmtree(Path(self.cfg.bsc_path, 'c', cs, arch, 'rpm'),
+                                  ignore_errors=True)
 
             # Download all built rpms
             self.download()
@@ -218,32 +220,33 @@ class IBS:
         # Prepare the config file used by kgr-test
         GitHelper.build(self.cfg)
 
-        for arch in self.cfg.conf['archs']:
-            rpm_dir = Path(self.cfg.bsc_download, arch)
-            dest_dir = Path(rpm_dir, f'{self.cfg.bsc}')
+        for arch in self.cfg.conf.get('archs', []):
+            tests_path = Path(self.cfg.bsc_path, 'tests', arch)
+            test_arch_path = Path(tests_path, self.cfg.bsc)
 
             # Remove previously created directory and archive
-            shutil.rmtree(dest_dir, ignore_errors=True)
-            shutil.rmtree(f'{str(dest_dir)}.tar.xz', ignore_errors=True)
+            shutil.rmtree(test_arch_path, ignore_errors=True)
+            shutil.rmtree(f'{str(test_arch_path)}.tar.xz', ignore_errors=True)
 
-            rpms = os.listdir(rpm_dir)
-            dest_dir.mkdir(exist_ok=True)
+            test_arch_path.mkdir(exist_ok=True, parents=True)
 
             for d in ['built', 'repro', 'tests.out']:
-                Path(dest_dir, d).mkdir(exist_ok=True)
+                Path(test_arch_path, d).mkdir(exist_ok=True)
 
-            for rpm in rpms:
-                shutil.copy(Path(rpm_dir, rpm), Path(dest_dir, 'built'))
+            for cs, data in self.cfg.filtered_cs().items():
+                rpm_dir = Path(self.cfg.bsc_path, 'c', cs, arch, 'rpm')
 
-            shutil.copy(config, Path(dest_dir, 'repro'))
-            shutil.copy(test_sh, Path(dest_dir, 'repro'))
+                # TODO: there will be only one rpm, format it directly
+                for rpm in os.listdir(rpm_dir):
+                    shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, 'built'))
 
-            import sys
+            shutil.copy(config, Path(test_arch_path, 'repro'))
+            shutil.copy(test_sh, Path(test_arch_path, 'repro'))
+
             subprocess.run(['tar', '-cJf', f'{self.cfg.bsc}.tar.xz',
-                            f'{self.cfg.bsc}'], cwd=rpm_dir,
-                                    stdout=sys.stdout,
-                                    stderr=subprocess.PIPE, check=True)
-
+                                f'{self.cfg.bsc}'], cwd=tests_path,
+                                        stdout=sys.stdout,
+                                        stderr=subprocess.PIPE, check=True)
 
     def download(self):
         rpms = []
@@ -262,8 +265,9 @@ class IBS:
                         continue
 
                     # Create a directory for each arch supported
-                    dest = Path(self.cfg.bsc_download, str(arch))
-                    dest.mkdir(exist_ok=True)
+                    cs = self.convert_prj_to_cs(prj)
+                    dest = Path(self.cfg.bsc_path, 'c', cs, str(arch), 'rpm')
+                    dest.mkdir(exist_ok=True, parents=True)
 
                     rpms.append( (prj, prj, 'devbuild', arch, 'klp', rpm, dest) )
 
