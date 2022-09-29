@@ -50,11 +50,23 @@ class IBS:
 
     # The projects has different format: 12_5u5 instead of 12.5u5
     def get_projects(self):
-        return self.osc.search.project("starts-with(@name, '{}')".format(self.prj_prefix))
+        prjs = []
+        projects = self.osc.search.project("starts-with(@name, '{}')".format(self.prj_prefix))
+
+        for prj in projects.findall('project'):
+            prj_name = prj.get('name')
+            cs = self.convert_prj_to_cs(prj_name)
+
+            if self.cfg.filter and not re.match(self.cfg.filter, cs):
+                continue
+
+            prjs.append(prj)
+
+        return prjs
 
     def get_project_names(self):
         names = []
-        for result in self.get_projects().findall('project'):
+        for result in self.get_projects():
             names.append(result.get('name'))
 
         return names
@@ -172,13 +184,16 @@ class IBS:
             else:
                 raise RuntimeError('download error on {}: {}'.format(prj, rpm))
 
+    def convert_prj_to_cs(self, prj):
+        return prj.replace(f'{self.prj_prefix}-', '').replace('_', '.')
+
     def apply_filter(self, item_list):
         if not self.cfg.filter:
             return item_list
 
         filtered = []
         for item in item_list:
-            cmp_item = item.replace(f'{self.prj_prefix}-', '').replace('_', '.')
+            cmp_item = convert_prj_to_cs(item)
             if not re.match(self.cfg.filter, cmp_item):
                 continue
 
@@ -232,11 +247,8 @@ class IBS:
 
     def download(self):
         rpms = []
-        for result in self.get_projects().findall('project'):
+        for result in self.get_projects():
             prj = result.get('name')
-
-            if self.cfg.filter and not re.match(self.cfg.filter, prj):
-                continue
 
             archs = result.xpath('repository/arch')
             for arch in archs:
@@ -260,7 +272,7 @@ class IBS:
 
     def status(self):
         prjs = {}
-        for prj in self.apply_filter(self.get_project_names()):
+        for prj in self.get_project_names():
             prjs[prj] = {}
 
             for res in self.osc.build.get(prj).findall('result'):
@@ -277,11 +289,8 @@ class IBS:
         prjs = self.get_project_names()
 
         if len(prjs) == 0:
+            print('No projects found.')
             return
-
-        print('{} projects found.'.format(len(prjs)))
-
-        prjs = self.apply_filter(prjs)
 
         print('Deleting {} projects...'.format(len(prjs)))
 
