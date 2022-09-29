@@ -195,6 +195,18 @@ class Config:
         data = self.codestreams[cs]
         return (data['sle'], data['sp'], data['update'])
 
+    def filtered_cs(self):
+        if not self.filter:
+            return self.codestreams
+
+        result = {}
+        for cs, data in self.codestreams.items():
+            if not re.match(self.filter, cs):
+                continue
+            result[cs] = data
+
+        return result
+
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
     def filter_cs(self, cs_list, check_file_funcs=False):

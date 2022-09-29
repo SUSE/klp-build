@@ -18,10 +18,9 @@ class GitHelper:
         # Filter only the branches related to this BSC
         branches = [ r.name for r in repo.branches if cfg.bsc in r.name ]
 
-        css = cfg.codestreams
-
-        for cs in css.keys():
-            jcs = css[cs]
+        for cs, data in cfg.filtered_cs().items():
+            print(cs)
+            jcs = data
 
             entry = [ jcs['cs'],
                         jcs['project'],
@@ -46,7 +45,7 @@ class GitHelper:
                         down, up = u.split('-')
 
                     # Codestream between the branch codestream interval
-                    if cs_update >= int(down) and cs_update <= int(up):
+                    if int(cs_update) >= int(down) and int(cs_update) <= int(up):
                         # replace the 'change-me' string in entry
                         entry[3] = branch
 
