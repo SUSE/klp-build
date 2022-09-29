@@ -143,9 +143,6 @@ class Config:
 
         self.bsc_path.mkdir(exist_ok=True)
 
-        self.bsc_download = Path(self.bsc_path, 'downloads')
-        self.bsc_download.mkdir(exist_ok=True)
-
     def validate_ccp_args(self, args):
         # Prefer the env var to the HOME directory location
         ccp_path = os.getenv('KLP_CCP_PATH', '')
@@ -176,10 +173,10 @@ class Config:
     def get_cs_lp_dir(self, cs):
         return Path(self.bsc_path, 'c', cs, 'x86_64', 'lp')
 
-    def get_ex_dir(self, cs):
+    def get_ex_dir(self, cs, arch='x86_64'):
         if not cs:
             return self.ex_dir
-        return Path(self.ex_dir, cs, 'x86_64')
+        return Path(self.ex_dir, cs, arch)
 
     def get_ipa_dir(self, cs):
         if not cs:

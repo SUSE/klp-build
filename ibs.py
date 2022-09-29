@@ -202,6 +202,72 @@ class IBS:
 
         return filtered
 
+    def find_missing_symbols(self, cs, arch, lp_mod_path):
+        kernel = self.cfg.codestreams[cs]['kernel']
+        full_cs = self.cfg.codestreams[cs]['cs']
+
+        # TODO: Change ex_dir codestream names to the new format
+        vmlinux_path = Path(self.cfg.get_ex_dir(full_cs, arch), 'boot',
+                            f'vmlinux-{kernel}-default')
+
+        out = subprocess.check_output(['objdump', '-t', str(lp_mod_path)],
+                                      stderr=subprocess.STDOUT).decode()
+
+        # Get list of UNDEFINED symbols from the livepatch module
+        lp_und_symbols = re.findall('\d+\s+\*UND\*\s+\d+\s+([\w]+)', out)
+
+        vmlinux_syms = subprocess.check_output(['objdump', '-t', str(vmlinux_path)],
+                                      stderr=subprocess.STDOUT).decode()
+
+        missing_syms = []
+        # Find all UNDEFINED symbols that exists in the livepatch module that
+        # aren't defined in the vmlinux
+        for sym in lp_und_symbols:
+            if not re.search(f' {sym}', vmlinux_syms):
+                missing_syms.append(sym)
+
+        return missing_syms
+
+    def validate_livepatch_module(self, cs, arch, rpm_dir, rpm):
+        match = re.search('default\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.', rpm)
+        if not match:
+            print(f'ERR: rpm name format unknown {rpm}')
+            print(rpm)
+            sys.exit(1)
+
+        num = match.group(1)
+        sle = match.group(2)
+        build = match.group(3)
+        micro = match.group(4)
+
+        fdest = Path(rpm_dir, rpm)
+        # Extract the livepatch module for later inspection
+        cmd = 'rpm2cpio {} | cpio --quiet -idm'.format(str(fdest))
+        subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
+
+        kernel = self.cfg.codestreams[cs]['kernel']
+        lp_file = f'livepatch-{num}-{sle}_{build}_{micro}.ko'
+        lp_mod_path = Path(rpm_dir, 'lib', 'modules', f'{kernel}-default',
+                           'livepatch', lp_file)
+        out = subprocess.check_output(['/sbin/modinfo', str(lp_mod_path)],
+                                      stderr=subprocess.STDOUT).decode()
+
+        # Check depends field
+        match = re.search('depends: (.+)', out)
+        if match:
+            deps = match.group(1).strip()
+            # At this point we found that our livepatch module depends on
+            # functions that are exported modules.
+
+            # TODO: get the UND symbols from the livepatch and find which
+            # symbols are not defined in the vmlinux. These symbols will need to
+            # be worked in the livepatch.
+            if deps:
+                funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
+                print(f'WARN: {cs}:{arch} has dependencies: {deps}. Functions: {" ".join(funcs)}')
+
+        shutil.rmtree(Path(rpm_dir, 'lib'), ignore_errors=True)
+
     def prepare_tests(self, redownload_rpms):
         if redownload_rpms:
             # Remove previously downloaded rpms
@@ -235,9 +301,13 @@ class IBS:
 
             for cs, data in self.cfg.filtered_cs().items():
                 rpm_dir = Path(self.cfg.bsc_path, 'c', cs, arch, 'rpm')
+                rpm_dir.mkdir(parents=True, exist_ok=True)
 
                 # TODO: there will be only one rpm, format it directly
                 for rpm in os.listdir(rpm_dir):
+                    # Check for dependencies
+                    self.validate_livepatch_module(cs, arch, rpm_dir, rpm)
+
                     shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, 'built'))
 
             shutil.copy(config, Path(test_arch_path, 'repro'))

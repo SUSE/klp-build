@@ -19,7 +19,6 @@ class GitHelper:
         branches = [ r.name for r in repo.branches if cfg.bsc in r.name ]
 
         for cs, data in cfg.filtered_cs().items():
-            print(cs)
             jcs = data
 
             entry = [ jcs['cs'],
