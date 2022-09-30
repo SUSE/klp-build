@@ -84,8 +84,6 @@ class Config:
         if not self.data.is_dir():
             raise RuntimeError('KLP_DATA_DIR does not exists')
 
-        self.kernel_rpms = Path(self.data, 'kernel-rpms')
-        self.kernel_rpms.mkdir(exist_ok=True)
         self.ex_dir = Path(self.data, 'ex-kernels')
         self.ex_dir.mkdir(exist_ok=True)
         self.ipa_dir = Path(self.data, 'ipa-clones')

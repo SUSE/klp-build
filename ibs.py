@@ -21,6 +21,9 @@ class IBS:
         self.ibs_user = re.search('(\w+)@', cfg.email).group(1)
         self.prj_prefix = 'home:{}:klp'.format(self.ibs_user)
 
+        self.kernel_rpms = Path(cfg.data, 'kernel-rpms')
+        self.kernel_rpms.mkdir(exist_ok=True)
+
         # Download all sources for x86
         # For ppc64le and s390x only download vmlinux and the built modules
         self.cs_data = {
@@ -138,7 +141,7 @@ class IBS:
             prj = jcs['project']
             repo = jcs['repo']
 
-            path_dest = Path(self.cfg.kernel_rpms, jcs['cs'])
+            path_dest = Path(self.kernel_rpms, jcs['cs'])
             path_dest.mkdir(exist_ok=True)
 
             for arch, val in self.cs_data.items():
