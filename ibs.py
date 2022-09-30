@@ -395,50 +395,9 @@ class IBS:
 
         return ET.tostring(prj).decode()
 
-    def get_cs_branch(self, cs):
-        sle, sp, up = self.cfg.get_cs_tuple(cs)
-        repo = git.Repo(self.cfg.kgr_patches)
-
-        all_branches = git.Repo(cfg.kgr_patches).branches
-
-        # Filter only the branches related to this BSC
-        branches = [ b for b in all_branches if self.cfg.bsc in b ]
-        branch_name = ''
-
-        for branch in branches:
-            # First check if the branch has more than code stream sharing
-            # the same code
-            for b in branch.replace(cfg.bsc + '_', '').split('_'):
-                sle, u = b.split('u')
-                if sle != f'{sle}.{sp}':
-                    continue
-
-                # Get codestreams interval
-                up = u
-                down = u
-                cs_update = up
-                if '-' in u:
-                    down, up = u.split('-')
-
-                # Codestream between the branch codestream interval
-                if cs_update >= int(down) and cs_update <= int(up):
-                    branch_name = branch
-                    break
-
-                # At this point we found a match for our codestream in
-                # codestreams.json, but we may have a more specialized git
-                # branch later one, like:
-                # bsc1197597_12.4u21-25_15.0u25-28
-                # bsc1197597_15.0u25-28
-                # Since 15.0 SLE uses a different kgraft-patches branch to
-                # be built on. In this case, we continue to loop over the
-                # other branches.
-
-        return branch_name
-
     def create_lp_package(self, cs):
         # get the kgraft branch related to this codestream
-        branch = self.get_cs_branch(cs)
+        branch = GitHelper.get_cs_branch(self.cfg, cs)
         if not branch:
             raise RuntimeError(f'Could not find git branch for {cs}')
 
