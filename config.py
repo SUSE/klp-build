@@ -33,6 +33,7 @@ class Config:
         self.bsc_num = bsc
         self.bsc = 'bsc' + str(bsc)
         self.bsc_path = Path(self.work, self.bsc)
+        self.bsc_path.mkdir(exist_ok=True)
 
         try:
             git_data = git.GitConfigParser()
@@ -71,26 +72,8 @@ class Config:
 
         self.conf['data'] = str(self.data)
 
-        self.ksrc = os.getenv('KLP_KERNEL_SOURCE')
-        if self.ksrc and not Path(self.ksrc).is_dir():
-            raise ValueError('KLP_KERNEL_SOURCE should point to a directory')
-
-        if args.cmd == 'get-patches' and not self.ksrc:
-            raise ValueError('KLP_KERNEL_SOURCE should be defined')
-
-        if args.cmd in ['build', 'format-patches', 'ibs']:
-            if not self.codestreams:
-                raise RuntimeError('codestreams.json doesn\'t exists. Aborting.')
-
-            kgr_patches = Path(Path().home(), 'kgr', 'kgraft-patches')
-            if not kgr_patches.is_dir:
-                raise RuntimeError('kgraft-patches does not exists in ~/kgr')
-            self.kgr_patches = kgr_patches
-
         # will contain the nm output from the to be livepatched object
         self.nm_out = {}
-
-        self.bsc_path.mkdir(exist_ok=True)
 
     def get_work_dir(self, cs):
         return Path(self.bsc_path, 'c', cs, 'x86_64')

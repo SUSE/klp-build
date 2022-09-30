@@ -1,10 +1,20 @@
 from pathlib import Path
 from natsort import natsorted
 import git
+from pathlib import Path
+import os
 import re
 import requests
 import subprocess
 import sys
+
+kern_src = os.getenv('KLP_KERNEL_SOURCE', '')
+if kern_src and not Path(kern_src).is_dir():
+    raise ValueError('KLP_KERNEL_SOURCE should point to a directory')
+
+kgr_patches = Path(Path().home(), 'kgr', 'kgraft-patches')
+if not kgr_patches.is_dir():
+    raise RuntimeError('kgraft-patches does not exists in ~/kgr')
 
 class GitHelper:
     @staticmethod
@@ -142,7 +152,7 @@ class GitHelper:
 
     @staticmethod
     def get_commits(cfg, ups_commits):
-        if not cfg.ksrc:
+        if not kern_src:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
 
@@ -168,7 +178,7 @@ class GitHelper:
             for commit, _ in commits['upstream'].items():
                 try:
                     patch_file = subprocess.check_output(['/usr/bin/git', '-C',
-                                str(cfg.ksrc),
+                                kern_src,
                                 'grep', '-l', f'Git-commit: {commit}',
                                 f'remotes/origin/{mbranch}'],
                                 stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
@@ -188,7 +198,7 @@ class GitHelper:
                 # follow up patches to fix any other previous patch, it will be
                 # the first one listed.
                 full_cmt = subprocess.check_output(['/usr/bin/git', '-C',
-                            str(cfg.ksrc),
+                            kern_src,
                             'log', '--reverse', '--patch', branch, '--', fpath],
                             stderr=subprocess.PIPE).decode(sys.stdout.encoding)
 
@@ -225,7 +235,7 @@ class GitHelper:
     @staticmethod
     def get_patched_cs(cfg):
         conf = cfg.conf
-        if not cfg.ksrc:
+        if not kern_src:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
 
@@ -243,7 +253,7 @@ class GitHelper:
                     continue
 
                 tags = subprocess.check_output(['/usr/bin/git', '-C',
-                            str(cfg.ksrc), 'tag', '--contains=' + suse_commit])
+                            kern_src, 'tag', f'--contains={suse_commit}'])
 
                 for tag in tags.decode().splitlines():
                     tag = tag.strip()
