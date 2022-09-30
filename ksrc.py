@@ -16,6 +16,12 @@ kgr_patches = Path(Path().home(), 'kgr', 'kgraft-patches')
 if not kgr_patches.is_dir():
     raise RuntimeError('kgraft-patches does not exists in ~/kgr')
 
+kernel_branches = {
+                        '4.12' : 'cve/linux-4.12',
+                        '5.3' : 'cve/linux-5.3',
+                        '5.14' : 'SLE15-SP4'
+                    }
+
 class GitHelper:
     @staticmethod
     def build(cfg):
@@ -171,7 +177,7 @@ class GitHelper:
         fixes.mkdir(exist_ok=True)
 
         # Get backported commits from the CVE branches
-        for bc, mbranch in cfg.kernel_branches.items():
+        for bc, mbranch in kernel_branches.items():
             patches = ''
 
             commits[bc] = {}
@@ -225,7 +231,7 @@ class GitHelper:
 
         for key, val in commits['upstream'].items():
             print('{}: {}'.format(key, val))
-            for bc, _ in cfg.kernel_branches.items():
+            for bc, _ in kernel_branches.items():
                 hash_cmt = commits[bc].get(key, 'None yet')
                 print('\t{}\t{}'.format(bc, hash_cmt))
             print('')
@@ -247,7 +253,7 @@ class GitHelper:
         print('Searching for already patched codestreams...')
 
         patched = []
-        for bc, branch in cfg.kernel_branches.items():
+        for bc, branch in kernel_branches.items():
             for up_commit, suse_commit in conf['commits'][bc].items():
                 if suse_commit == '':
                     continue
