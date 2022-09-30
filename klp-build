@@ -2,7 +2,7 @@
 
 import argparse
 
-import ccp
+from ccp import CCP
 from config import Config
 from ksrc import GitHelper
 import utils
@@ -88,11 +88,15 @@ if  __name__ == '__main__':
     if args.cmd == 'setup':
         setup = utils.Setup(config, args.redownload, args.cve, args.conf,
                 args.file_funcs, args.module, args.upstream_commits,
-                args.disable_ccp, args.archs)
-        setup.prepare_env()
+                args.archs)
+        setup.setup_project_files()
+
+        if not args.disable_ccp:
+            ccp = CCP(config)
+            ccp.run_ccp()
 
     elif args.cmd == 'run-ccp':
-        ccp = ccp.CCP(config)
+        ccp = CCP(config)
         ccp.run_ccp()
 
     elif args.cmd == 'get-patches':

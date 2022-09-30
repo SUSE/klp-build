@@ -11,7 +11,7 @@ from ksrc import GitHelper
 
 class Setup:
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
-            ups_commits, disable_ccp, archs):
+            ups_commits, archs):
 
         cfg.conf['bsc'] = str(cfg.bsc_num)
         cfg.conf['work_dir'] = str(cfg.bsc_path)
@@ -25,7 +25,6 @@ class Setup:
 
         self._ups_commits = ups_commits
         self._redownload = redownload
-        self._disable_ccp = disable_ccp
         self._file_funcs = {}
 
         for f in file_funcs:
@@ -255,10 +254,3 @@ class Setup:
            return True
 
         return False
-
-    def prepare_env(self):
-        self.setup_project_files()
-
-        if not self._disable_ccp:
-            _ccp = ccp.CCP(self.cfg)
-            _ccp.run_ccp()
