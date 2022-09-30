@@ -34,8 +34,6 @@ class Config:
         self.bsc = 'bsc' + str(bsc)
         self.bsc_path = Path(self.work, self.bsc)
 
-        self.data = None
-
         try:
             git_data = git.GitConfigParser()
             self.user = git_data.get_value('user', 'name')
@@ -43,20 +41,18 @@ class Config:
         except:
             raise ValueError('Please define name/email in global git config')
 
-        # We'll create the directory on setup, so we require it to now exists
-        if args.cmd == 'setup':
-            # We only require --data for setup, since conf.json will contain all
-            # relevant data for the later steps
-            data = args.data
-            # Prefer the argument over the environment
-            if not data:
-                data = os.getenv('KLP_DATA_DIR', '')
-                if not data:
-                    raise ValueError('--data or KLP_DATA_DIR should be defined')
+        data = os.getenv('KLP_DATA_DIR', '')
+        if not data:
+            raise ValueError('KLP_DATA_DIR should be defined')
 
-            self.data = Path(data)
-            if not self.data.is_dir():
-                raise ValueError('Data dir should be a directory')
+        self.data = Path(data)
+        if not self.data.is_dir():
+            raise ValueError('Data dir should be a directory')
+
+        self.ex_dir = Path(self.data, 'ex-kernels')
+        self.ex_dir.mkdir(exist_ok=True)
+        self.ipa_dir = Path(self.data, 'ipa-clones')
+        self.ipa_dir.mkdir(exist_ok=True)
 
         self.codestreams = {}
         self.cs_file = Path(self.bsc_path, 'codestreams.json')
@@ -73,21 +69,7 @@ class Config:
             with open(self.conf_file, 'r') as f:
                 self.conf = json.loads(f.read())
 
-        # Set self.data from conf.json or from the env var is the args.cmd is
-        # not setup
-        if not self.data:
-            if self.conf.get('data', ''):
-                self.data = Path(self.conf['data'])
-            else:
-                self.data = Path(os.getenv('KLP_DATA_DIR', ''))
-
-        if not self.data.is_dir():
-            raise RuntimeError('KLP_DATA_DIR does not exists')
-
-        self.ex_dir = Path(self.data, 'ex-kernels')
-        self.ex_dir.mkdir(exist_ok=True)
-        self.ipa_dir = Path(self.data, 'ipa-clones')
-        self.ipa_dir.mkdir(exist_ok=True)
+        self.conf['data'] = str(self.data)
 
         self.ksrc = os.getenv('KLP_KERNEL_SOURCE')
         if self.ksrc and not Path(self.ksrc).is_dir():

@@ -13,7 +13,7 @@ class Setup:
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
             ups_commits, archs):
 
-        for arch in args.archs:
+        for arch in archs:
             if arch not in ['x86_64', 's390x', 'ppc64le']:
                 raise ValueError(f'{arch} is not a valid architecture')
 
@@ -22,7 +22,6 @@ class Setup:
 
         cfg.conf['bsc'] = str(cfg.bsc_num)
         cfg.conf['work_dir'] = str(cfg.bsc_path)
-        cfg.conf['data'] = str(cfg.data)
         cfg.conf['mod'] = mod
         cfg.conf['conf'] = conf
         cfg.conf['archs'] = archs

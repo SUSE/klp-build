@@ -22,8 +22,6 @@ def create_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest='cmd')
 
     setup = sub.add_parser('setup', parents = [parentparser])
-    setup.add_argument('--data', type=str, default='',
-            help='Livepatch data directory (kernel-rpms, ex-kernels, ipa-clones). You can omit this argument if KLP_DATA_DIR environment variable is set to a proper directory.')
     setup.add_argument('--redownload', action='store_true',
             help='Replaces the currently used codestream.in file')
     setup.add_argument('--disable-ccp', action='store_true',
