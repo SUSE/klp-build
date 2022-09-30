@@ -1,4 +1,5 @@
 import json
+import git
 from pathlib import Path
 import os
 import re
@@ -34,6 +35,13 @@ class Config:
         self.bsc_path = Path(self.work, self.bsc)
 
         self.data = None
+
+        try:
+            git_data = git.GitConfigParser()
+            self.user = git_data.get_value('user', 'name')
+            self.email = git_data.get_value('user', 'email')
+        except:
+            raise ValueError('Please define name/email in global git config')
 
         # We'll create the directory on setup, so we require it to now exists
         if args.cmd == 'setup':

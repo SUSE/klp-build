@@ -1,5 +1,4 @@
 from datetime import datetime
-import git
 import jinja2
 from pathlib import Path
 import os
@@ -11,13 +10,6 @@ class Template:
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
         # and in kallsyms lookup
         self.mod = self.cfg.conf.get('mod', '').replace('-', '_')
-
-        try:
-            git_data = git.GitConfigParser()
-            self.user = git_data.get_value('user', 'name')
-            self.email = git_data.get_value('user', 'email')
-        except:
-            raise ValueError('Please define name/email in global git config')
 
     def GeneratePatchedFuncs(self, lp_path, files):
         conf = self.cfg.conf['conf']
@@ -43,8 +35,8 @@ class Template:
         templ.globals['bsc_num'] = self.cfg.bsc_num
         templ.globals['cve'] = self.cfg.conf['cve']
         templ.globals['commits'] = self.cfg.conf['commits']
-        templ.globals['user'] = self.user
-        templ.globals['email'] = self.email
+        templ.globals['user'] = self.cfg.user
+        templ.globals['email'] = self.cfg.email
 
         # We don't have a specific codestreams when creating the commit file
         if not cs:
