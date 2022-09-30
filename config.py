@@ -1,5 +1,4 @@
 import json
-import git
 from pathlib import Path
 import os
 import re
@@ -121,13 +120,6 @@ class Config:
 
         if (args.cmd == 'setup' and not args.disable_ccp) or args.cmd == 'run-ccp':
             self.validate_ccp_args(args)
-
-        try:
-            git_data = git.GitConfigParser()
-            self.user = git_data.get_value('user', 'name')
-            self.email = git_data.get_value('user', 'email')
-        except:
-            raise ValueError('Please define name/email in global git config')
 
         # kgraft-patches is only necessary for --push
         if args.cmd == 'ibs' and not args.push:
