@@ -9,15 +9,12 @@ class Config:
     def __init__(self, args):
         self.filter = args.filter
 
-        # Prefer the argument over the environment
-        work_dir = args.work_dir
+        work_dir = os.getenv('KLP_WORK_DIR')
         if not work_dir:
-            work_dir = os.getenv('KLP_WORK_DIR')
-            if not work_dir:
-                raise ValueError('--work-dir or KLP_WORK_DIR should be defined')
+            raise ValueError('KLP_WORK_DIR should be defined')
 
-        self.work = Path(work_dir)
-        if not self.work.is_dir():
+        work = Path(work_dir)
+        if not work.is_dir():
             raise ValueError('Work dir should be a directory')
 
         self.scripts_path = Path(Path().home(), 'kgr', 'scripts')
@@ -27,7 +24,7 @@ class Config:
         bsc = args.bsc
         self.bsc_num = bsc
         self.bsc = 'bsc' + str(bsc)
-        self.bsc_path = Path(self.work, self.bsc)
+        self.bsc_path = Path(work, self.bsc)
         self.bsc_path.mkdir(exist_ok=True)
 
         try:
