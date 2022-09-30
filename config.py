@@ -37,14 +37,6 @@ class Config:
 
         # We'll create the directory on setup, so we require it to now exists
         if args.cmd == 'setup':
-
-            for arch in args.archs:
-                if arch not in ['x86_64', 's390x', 'ppc64le']:
-                    raise ValueError(f'{arch} is not a valid architecture')
-
-            if self.bsc_path.exists() and not self.bsc_path.is_dir():
-                raise ValueError('--bsc needs to be a directory, or not to exist')
-
             # We only require --data for setup, since conf.json will contain all
             # relevant data for the later steps
             data = args.data

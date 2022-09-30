@@ -13,6 +13,13 @@ class Setup:
     def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
             ups_commits, archs):
 
+        for arch in args.archs:
+            if arch not in ['x86_64', 's390x', 'ppc64le']:
+                raise ValueError(f'{arch} is not a valid architecture')
+
+        if cfg.bsc_path.exists() and not cfg.bsc_path.is_dir():
+            raise ValueError('--bsc needs to be a directory, or not to exist')
+
         cfg.conf['bsc'] = str(cfg.bsc_num)
         cfg.conf['work_dir'] = str(cfg.bsc_path)
         cfg.conf['data'] = str(cfg.data)
