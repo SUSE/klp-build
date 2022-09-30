@@ -79,7 +79,7 @@ if  __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
 
-    config = Config(args)
+    config = Config(args.bsc, args.filter)
 
     if args.cmd == 'setup':
         setup = utils.Setup(config, args.redownload, args.cve, args.conf,

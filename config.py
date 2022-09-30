@@ -6,9 +6,7 @@ import re
 import subprocess
 
 class Config:
-    def __init__(self, args):
-        self.filter = args.filter
-
+    def __init__(self, bsc, bsc_filter):
         work_dir = os.getenv('KLP_WORK_DIR')
         if not work_dir:
             raise ValueError('KLP_WORK_DIR should be defined')
@@ -21,11 +19,11 @@ class Config:
         if not self.scripts_path.is_dir():
             raise ValueError('Script dir not found in ~/kgr/scripts')
 
-        bsc = args.bsc
         self.bsc_num = bsc
         self.bsc = 'bsc' + str(bsc)
         self.bsc_path = Path(work, self.bsc)
         self.bsc_path.mkdir(exist_ok=True)
+        self.filter = bsc_filter
 
         try:
             git_data = git.GitConfigParser()
