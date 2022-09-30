@@ -17,7 +17,28 @@ class CCP:
 
         self.env = os.environ
 
-        self.templ = templ.Template(cfg)
+        # Prefer the env var to the HOME directory location
+        ccp_path = os.getenv('KLP_CCP_PATH', '')
+        if ccp_path and not Path(ccp_path).is_file():
+            raise RuntimeError('KLP_CCP_PATH does not point to a file')
+
+        elif not ccp_path:
+            ccp_path = Path(Path().home(), 'kgr', 'ccp', 'build', 'klp-ccp')
+            if not ccp_path.exists():
+                raise RuntimeError('klp-ccp not found in ~/kgr/ccp/build/klp-ccp. Please set KLP_CCP_PATH env var to a valid klp-ccp binary')
+
+        self.ccp_path = str(ccp_path)
+
+        pol_path = os.getenv('KLP_CCP_POL_PATH')
+        if pol_path and not Path(pol_path).is_dir():
+            raise RuntimeError('KLP_CCP_POL_PATH does not point to a directory')
+
+        elif not pol_path:
+            pol_path = Path(Path().home(), 'kgr', 'scripts', 'ccp-pol')
+            if not pol_path.is_dir():
+                raise RuntimeError('ccp-pol not found at ~/kgr/scripts/ccp-pol/.  Please set KLP_CCP_POL_PATH env var to a valid ccp-pol directory')
+
+        self.pol_path = str(pol_path)
 
         gcc_ver = subprocess.check_output(['gcc', '-dumpversion']).decode().strip()
         # gcc12 has a problem with kernel and xrealloc implementation
@@ -94,9 +115,9 @@ class CCP:
 
     def execute_ccp(self, cs, fname, funcs, out_dir, sdir, odir, env):
         lp_out = Path(out_dir, self.lp_out_file(fname))
-        ppath = self.cfg.pol_path
+        ppath = self.pol_path
 
-        ccp_args = [self.cfg.ccp_path]
+        ccp_args = [self.ccp_path]
         for arg in ['may-include-header', 'can-externalize-fun', 'shall-externalize-fun', 'shall-externalize-obj',
                 'modify-externalized-sym', 'rename-rewritten-fun']:
             ccp_args.append(f'--pol-cmd-{arg}={ppath}/kgr-ccp-pol-{arg}.sh')
@@ -380,7 +401,8 @@ class CCP:
 
         print('Checking the externalized symbols in other architectures...')
 
-        self.templ.generate_commit_msg_file()
+        tem = templ.Template(self.cfg)
+        tem.generate_commit_msg_file()
 
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
@@ -388,7 +410,7 @@ class CCP:
         for cs in self.cfg.working_cs:
             jcs = self.cfg.codestreams[cs]
 
-            self.templ.GenerateLivePatches(cs)
+            tem.GenerateLivePatches(cs)
 
             print(f'{cs}')
             for _, exts in jcs['ext_symbols'].items():

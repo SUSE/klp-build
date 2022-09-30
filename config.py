@@ -110,17 +110,6 @@ class Config:
         # will contain the nm output from the to be livepatched object
         self.nm_out = {}
 
-        # run-ccp and create-lp commands only work if codestreams.json and
-        # conf.json files exist
-        if args.cmd in ['run-ccp', 'create-lp']:
-            if not self.codestreams:
-                raise ValueError('codestreams.json file not found.')
-            if not self.conf:
-                raise ValueError('conf.json file not found.')
-
-        if (args.cmd == 'setup' and not args.disable_ccp) or args.cmd == 'run-ccp':
-            self.validate_ccp_args(args)
-
         # kgraft-patches is only necessary for --push
         if args.cmd == 'ibs' and not args.push:
             kgraft_path = Path(Path().home(), 'kgr', 'kgraft-patches')
@@ -134,30 +123,6 @@ class Config:
                 raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
 
         self.bsc_path.mkdir(exist_ok=True)
-
-    def validate_ccp_args(self, args):
-        # Prefer the env var to the HOME directory location
-        ccp_path = os.getenv('KLP_CCP_PATH', '')
-        if ccp_path and not Path(ccp_path).is_file():
-            raise RuntimeError('KLP_CCP_PATH does not point to a file')
-
-        elif not ccp_path:
-            ccp_path = Path(Path().home(), 'kgr', 'ccp', 'build', 'klp-ccp')
-            if not ccp_path.exists():
-                raise RuntimeError('klp-ccp not found in ~/kgr/ccp/build/klp-ccp. Please set KLP_CCP_PATH env var to a valid klp-ccp binary')
-
-        self.ccp_path = str(ccp_path)
-
-        pol_path = os.getenv('KLP_CCP_POL_PATH')
-        if pol_path and not Path(pol_path).is_dir():
-            raise RuntimeError('KLP_CCP_POL_PATH does not point to a directory')
-
-        elif not pol_path:
-            pol_path = Path(Path().home(), 'kgr', 'scripts', 'ccp-pol')
-            if not pol_path.is_dir():
-                raise RuntimeError('ccp-pol not found at ~/kgr/scripts/ccp-pol/.  Please set KLP_CCP_POL_PATH env var to a valid ccp-pol directory')
-
-        self.pol_path = str(pol_path)
 
     def get_work_dir(self, cs):
         return Path(self.bsc_path, 'c', cs, 'x86_64')
