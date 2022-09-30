@@ -45,10 +45,6 @@ def create_parser() -> argparse.ArgumentParser:
 
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
 
-    templ = sub.add_parser('create-lp', parents = [parentparser])
-    templ.add_argument('--codestream', type=str, required=True,
-            help='Codestream to generate the livepatch files to. E.g 15.2u12')
-
     sub.add_parser('build', parents = [parentparser],
             help='Build the specified codestreams using osckgr')
 
@@ -98,10 +94,6 @@ if  __name__ == '__main__':
     elif args.cmd == 'run-ccp':
         ccp = ccp.CCP(config)
         ccp.run_ccp()
-
-    elif args.cmd == 'create-lp':
-        templ = templ.Template(config)
-        templ.GenerateLivePatches(args.codestream)
 
     elif args.cmd == 'get-patches':
         GitHelper.get_commits(config, args.upstream_commits)
