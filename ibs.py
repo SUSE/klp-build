@@ -24,6 +24,16 @@ class IBS:
         self.kernel_rpms = Path(cfg.data, 'kernel-rpms')
         self.kernel_rpms.mkdir(exist_ok=True)
 
+        self.kgraft_path = Path(Path().home(), 'kgr', 'kgraft-patches')
+        if not self.kgraft_path.is_dir():
+            raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches')
+
+        self.kgraft_tests_path = Path(Path().home(), 'kgr',
+                                      'kgraft-patches_testscripts')
+        if not self.kgraft_tests_path.is_dir():
+            raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
+
+
         # Download all sources for x86
         # For ppc64le and s390x only download vmlinux and the built modules
         self.cs_data = {
@@ -283,7 +293,7 @@ class IBS:
             self.download()
 
         config = Path(self.cfg.bsc_path, f'{self.cfg.bsc}_config.in')
-        test_sh = Path(self.cfg.kgraft_tests_path,
+        test_sh = Path(self.kgraft_tests_path,
                        f'{self.cfg.bsc}_test_script.sh')
 
         # Prepare the config file used by kgr-test
@@ -444,7 +454,7 @@ class IBS:
         # Get the code from codestream
         subprocess.check_output(['/usr/bin/git', '-C',
                                  'clone', '--single-branch', '-b', branch,
-                                 str(self.cfg.kgraft_path), str(code_path)],
+                                 str(self.kgraft_path), str(code_path)],
                                 stderr=subprocess.STDOUT)
 
         subprocess.checkout(['./scripts/tar-up.sh', '-d', str(prj_path)],

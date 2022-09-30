@@ -108,18 +108,6 @@ class Config:
         # will contain the nm output from the to be livepatched object
         self.nm_out = {}
 
-        # kgraft-patches is only necessary for --push
-        if args.cmd == 'ibs' and not args.push:
-            kgraft_path = Path(Path().home(), 'kgr', 'kgraft-patches')
-            if not kgraft_path.is_dir():
-                raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches')
-
-        if args.cmd == 'ibs' and args.prepare_tests:
-            self.kgraft_tests_path = Path(Path().home(), 'kgr',
-                                          'kgraft-patches_testscripts')
-            if not self.kgraft_tests_path.is_dir():
-                raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
-
         self.bsc_path.mkdir(exist_ok=True)
 
     def get_work_dir(self, cs):
