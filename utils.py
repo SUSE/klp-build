@@ -5,7 +5,6 @@ import re
 import requests
 import sys
 
-import ccp
 from ibs import IBS
 from ksrc import GitHelper
 
@@ -161,10 +160,9 @@ class Setup:
             print('Skipping codestreams without file-funcs:')
             print(f'\t{" ".join(filter_out)}\n')
 
-        # self.cfg.working_cs will contain the final list of codestreams that
-        # was set by the user, avoid downloading missing codestreams that are
-        # not affected
-        self.cfg.working_cs = list(set(working_cs) - set(filter_out))
+        # working_cs will contain the final list of codestreams that wast set
+        # by the user, avoid downloading missing codestreams that are not affected
+        working_cs = list(set(working_cs) - set(filter_out))
 
         # Save codestreams file before something bad can happen
         with open(self.cfg.cs_file, 'w') as f:
@@ -178,7 +176,7 @@ class Setup:
             ibs.download_cs_data(cs_data_missing)
 
         # Setup the missing codestream info needed
-        for cs in self.cfg.working_cs:
+        for cs in working_cs:
             jcs = self.cfg.codestreams[cs]
             cs_files = jcs['files']
 
@@ -204,6 +202,9 @@ class Setup:
         # saving only at this point.
         with open(self.cfg.cs_file, 'w') as f:
             f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
+
+        # The returned value can be used by ccp
+        return working_cs
 
     def get_module_obj(self, jcs):
         ex_dir = self.cfg.get_ex_dir(jcs['cs'])

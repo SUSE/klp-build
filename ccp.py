@@ -1,3 +1,4 @@
+from config import Config
 import json
 from pathlib import Path, PurePath
 from natsort import natsorted
@@ -10,9 +11,11 @@ import templ
 
 import concurrent.futures
 
-class CCP:
-    def __init__(self, cfg):
-        self.cfg = cfg
+class CCP(Config):
+    def __init__(self, bsc, bsc_filter, working_cs = {}):
+        super().__init__(bsc, bsc_filter)
+
+        self.working_cs = working_cs
         self._proc_files = []
 
         self.env = os.environ
@@ -66,7 +69,7 @@ class CCP:
 
         cmd_args_regex = '(-Wp,{},{}\s+-nostdinc\s+-isystem.*{});'
 
-        sle, sp, _ = self.cfg.get_cs_tuple(cs)
+        sle, sp, _ = self.get_cs_tuple(cs)
         result = re.search(cmd_args_regex.format('-MD', ofname, fname), str(output).strip())
         if not result:
             # 15.4 onwards changes the regex a little: -MD -> -MMD
@@ -111,7 +114,7 @@ class CCP:
 
     # extract the last component of the path, like the basename bash # function
     def lp_out_file(self, fname):
-        return self.cfg.bsc + '_' + PurePath(fname).name
+        return self.bsc + '_' + PurePath(fname).name
 
     def execute_ccp(self, cs, fname, funcs, out_dir, sdir, odir, env):
         lp_out = Path(out_dir, self.lp_out_file(fname))
@@ -269,7 +272,7 @@ class CCP:
         for fname in set(self._proc_files):
             src_out = self.lp_out_file(fname)
 
-            for fsrc in Path(self.cfg.bsc_path, 'c').rglob(src_out):
+            for fsrc in Path(self.bsc_path, 'c').rglob(src_out):
                 with open(fsrc, 'r+') as fi:
                     src = fi.read()
 
@@ -328,7 +331,7 @@ class CCP:
             # values will be a list of codestreams that share the code
             cs_groups[fname] = self.classify_codestreams(members)
 
-        with open(Path(self.cfg.bsc_path, 'groups.json'), 'w') as f:
+        with open(Path(self.bsc_path, 'groups.json'), 'w') as f:
             f.write(json.dumps(cs_groups, indent=4))
 
         for file in cs_groups.keys():
@@ -338,9 +341,9 @@ class CCP:
                 print(f"\t\t{' '.join(css)}")
 
     def process_ccp(self, cs):
-        jcs = self.cfg.codestreams[cs]
+        jcs = self.codestreams[cs]
 
-        sdir = self.cfg.get_sdir(cs)
+        sdir = self.get_sdir(cs)
         odir = Path(str(sdir) + '-obj', 'x86_64', 'default')
 
         # Needed, otherwise threads would interfere with each other
@@ -359,7 +362,7 @@ class CCP:
             self._proc_files.append(fname)
             base_fname = Path(fname).name
 
-            out_dir = Path(self.cfg.get_work_dir(cs), f'work_{base_fname}')
+            out_dir = Path(self.get_work_dir(cs), f'work_{base_fname}')
             # remove any previously generated files
             shutil.rmtree(out_dir, ignore_errors=True)
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -367,23 +370,23 @@ class CCP:
             os.symlink(Path(sdir, fname), Path(out_dir, base_fname))
             env['KCP_WORK_DIR'] = str(out_dir)
 
-            env['KCP_IPA_CLONES_DUMP'] = str(Path(self.cfg.get_ipa_dir(jcs['cs']),
+            env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(jcs['cs']),
                                                 f'{fname}.000i.ipa-clones'))
 
             self.execute_ccp(cs, fname, ','.join(funcs), out_dir, sdir, odir,
                     env)
 
     def run_ccp(self):
-        print(f'Work directory: {self.cfg.bsc_path}')
+        print(f'Work directory: {self.bsc_path}')
 
         # working_cs could be populated by the setup
-        if not self.cfg.working_cs:
-            self.cfg.working_cs = self.cfg.filter_cs(self.cfg.codestreams.keys(), True)
+        if not self.working_cs:
+            self.working_cs = self.filter_cs(self.codestreams.keys(), True)
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-            results = executor.map(self.process_ccp, self.cfg.working_cs)
+            results = executor.map(self.process_ccp, self.working_cs)
             for result in results:
                 if result:
                     print(f'{cs}: {result}')
@@ -391,24 +394,24 @@ class CCP:
         self.group_equal_files()
 
         # save the externalized symbols
-        for cs in self.cfg.working_cs:
-            jcs = self.cfg.codestreams[cs]
+        for cs in self.working_cs:
+            jcs = self.codestreams[cs]
 
             jcs['ext_symbols'] = self.ext_symbols[cs]
 
-        with open(self.cfg.cs_file, 'w') as f:
-            f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
+        with open(self.cs_file, 'w') as f:
+            f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
 
         print('Checking the externalized symbols in other architectures...')
 
-        tem = templ.Template(self.cfg.bsc_num, self.cfg.filter)
+        tem = templ.Template(self.bsc_num, self.filter)
         tem.generate_commit_msg_file()
 
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
         # While we are at it, create the livepatches per codestream
-        for cs in self.cfg.working_cs:
-            jcs = self.cfg.codestreams[cs]
+        for cs in self.working_cs:
+            jcs = self.codestreams[cs]
 
             tem.GenerateLivePatches(cs)
 
@@ -416,5 +419,5 @@ class CCP:
             for _, exts in jcs['ext_symbols'].items():
                 for ext in exts:
                     print(f'\t{ext}')
-                    for arch, ret in self.cfg.check_symbol_archs(jcs, ext).items():
+                    for arch, ret in self.check_symbol_archs(jcs, ext).items():
                         print(f'\t\t{arch}: {ret}')
