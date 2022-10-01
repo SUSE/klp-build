@@ -15,15 +15,13 @@ class Config:
         if not work.is_dir():
             raise ValueError('Work dir should be a directory')
 
-        self.scripts_path = Path(Path().home(), 'kgr', 'scripts')
-        if not self.scripts_path.is_dir():
-            raise ValueError('Script dir not found in ~/kgr/scripts')
+        data = os.getenv('KLP_DATA_DIR', '')
+        if not data:
+            raise ValueError('KLP_DATA_DIR should be defined')
 
-        self.bsc_num = bsc
-        self.bsc = 'bsc' + str(bsc)
-        self.bsc_path = Path(work, self.bsc)
-        self.bsc_path.mkdir(exist_ok=True)
-        self.filter = bsc_filter
+        self.data = Path(data)
+        if not self.data.is_dir():
+            raise ValueError('Data dir should be a directory')
 
         try:
             git_data = git.GitConfigParser()
@@ -32,13 +30,11 @@ class Config:
         except:
             raise ValueError('Please define name/email in global git config')
 
-        data = os.getenv('KLP_DATA_DIR', '')
-        if not data:
-            raise ValueError('KLP_DATA_DIR should be defined')
-
-        self.data = Path(data)
-        if not self.data.is_dir():
-            raise ValueError('Data dir should be a directory')
+        self.bsc_num = bsc
+        self.bsc = 'bsc' + str(bsc)
+        self.bsc_path = Path(work, self.bsc)
+        self.bsc_path.mkdir(exist_ok=True)
+        self.filter = bsc_filter
 
         self.ex_dir = Path(self.data, 'ex-kernels')
         self.ex_dir.mkdir(exist_ok=True)
