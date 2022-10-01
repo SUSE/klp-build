@@ -44,7 +44,7 @@ class Config:
         self.codestreams = {}
         self.cs_file = Path(self.bsc_path, 'codestreams.json')
         if self.cs_file.is_file():
-            with open(self.cs_file, 'r') as f:
+            with open(self.cs_file) as f:
                 self.codestreams = json.loads(f.read())
 
         # Codestreams remaining after applying filter
@@ -57,7 +57,7 @@ class Config:
 
         self.conf_file = Path(self.bsc_path, 'conf.json')
         if self.conf_file.is_file():
-            with open(self.conf_file, 'r') as f:
+            with open(self.conf_file) as f:
                 self.conf = json.loads(f.read())
 
         # will contain the nm output from the to be livepatched object

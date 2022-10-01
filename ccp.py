@@ -401,7 +401,7 @@ class CCP:
 
         print('Checking the externalized symbols in other architectures...')
 
-        tem = templ.Template(self.cfg)
+        tem = templ.Template(self.cfg.bsc_num, self.cfg.filter)
         tem.generate_commit_msg_file()
 
         # Iterate over each codestream, getting each file processed, and all
