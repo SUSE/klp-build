@@ -33,6 +33,7 @@ class IBS:
         if not self.kgraft_tests_path.is_dir():
             raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
 
+        self.ksrc = GitHelper(cfg.bsc_num, cfg.filter)
 
         # Download all sources for x86
         # For ppc64le and s390x only download vmlinux and the built modules
@@ -297,7 +298,7 @@ class IBS:
                        f'{self.cfg.bsc}_test_script.sh')
 
         # Prepare the config file used by kgr-test
-        GitHelper.build(self.cfg)
+        self.ksrc.build()
 
         for arch in self.cfg.conf.get('archs', []):
             tests_path = Path(self.cfg.bsc_path, 'tests', arch)
@@ -410,7 +411,7 @@ class IBS:
 
     def create_lp_package(self, cs):
         # get the kgraft branch related to this codestream
-        branch = GitHelper.get_cs_branch(self.cfg, cs)
+        branch = self.ksrc.get_cs_branch(cs)
         if not branch:
             raise RuntimeError(f'Could not find git branch for {cs}')
 

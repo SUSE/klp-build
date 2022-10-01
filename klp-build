@@ -96,13 +96,13 @@ if  __name__ == '__main__':
         ccp.run_ccp()
 
     elif args.cmd == 'get-patches':
-        GitHelper.get_commits(config, args.upstream_commits)
+        GitHelper(args.bsc, args.filter).get_commits(args.upstream_commits)
 
     elif args.cmd == 'build':
-        GitHelper.build(config)
+        GitHelper(args.bsc, args.filter).build()
 
     elif args.cmd == 'format-patches':
-        GitHelper.format_patches(config)
+        GitHelper(args.bsc, args.filter).format_patches()
 
     elif args.cmd == 'ibs':
         ibs = IBS(config)

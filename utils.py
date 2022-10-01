@@ -24,6 +24,8 @@ class Setup:
         cfg.conf['archs'] = archs
         cfg.conf['cve'] = re.search('([0-9]+\-[0-9]+)', cve).group(1)
 
+        self.ksrc = GitHelper(cfg.bsc_num, cfg.filter)
+
         self.cfg = cfg
 
         self._ups_commits = ups_commits
@@ -98,8 +100,8 @@ class Setup:
         print('Validating codestreams data...')
 
         # Called at this point because codestreams is populated
-        conf['commits'] = GitHelper.get_commits(self.cfg, self._ups_commits)
-        conf['patched'] = GitHelper.get_patched_cs(self.cfg)
+        conf['commits'] = self.ksrc.get_commits(self._ups_commits)
+        conf['patched'] = self.ksrc.get_patched_cs(conf['commits'])
 
         # cpp will use this data in the next step
         with open(self.cfg.conf_file, 'w') as f:
