@@ -49,14 +49,16 @@ class Config:
 
         # Codestreams remaining after applying filter
         self.working_cs = []
+        self.conf = {
+                'bsc' : str(self.bsc_num),
+                'work_dir' : str(self.bsc_path),
+                'data' : str(self.data)
+        }
 
-        self.conf = {}
         self.conf_file = Path(self.bsc_path, 'conf.json')
         if self.conf_file.is_file():
             with open(self.conf_file, 'r') as f:
                 self.conf = json.loads(f.read())
-
-        self.conf['data'] = str(self.data)
 
         # will contain the nm output from the to be livepatched object
         self.nm_out = {}

@@ -20,8 +20,6 @@ class Setup:
         if cfg.bsc_path.exists() and not cfg.bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
-        cfg.conf['bsc'] = str(cfg.bsc_num)
-        cfg.conf['work_dir'] = str(cfg.bsc_path)
         cfg.conf['mod'] = mod
         cfg.conf['conf'] = conf
         cfg.conf['archs'] = archs
