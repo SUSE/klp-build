@@ -152,8 +152,7 @@ class Setup(Config):
 
             jcs['archs'] = archs
 
-            ex_dir = self.get_ex_dir(jcs['cs'])
-            if not ex_dir.is_dir():
+            if not self.get_ex_dir(jcs['cs'], 'x86_64').is_dir():
                 cs_data_missing.append(cs)
 
         if filter_out:
@@ -207,7 +206,7 @@ class Setup(Config):
         return working_cs
 
     def get_module_obj(self, jcs):
-        ex_dir = self.get_ex_dir(jcs['cs'])
+        ex_dir = self.get_ex_dir(jcs['cs'], 'x86_64')
         mod = self.conf['mod']
         if mod == 'vmlinux':
             return str(Path(ex_dir, 'boot', f"vmlinux-{jcs['kernel']}-default"))

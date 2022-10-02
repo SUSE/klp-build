@@ -105,12 +105,12 @@ class IBS(Config):
         kernel = self.codestreams[cs]['kernel']
 
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
-            path_dest = Path(self.ipa_dir, fcs, arch)
+            path_dest = self.get_ipa_dir(fcs, arch)
         elif re.search(   'kernel\-default\-\d+', rpm) or \
                 re.search('kernel\-default\-extra\-\d+', rpm):
-            path_dest = Path(self.ex_dir, fcs, arch)
+            path_dest = self.get_ex_dir(fcs, arch)
         else:
-            path_dest = Path(self.ex_dir, fcs)
+            path_dest = self.get_ex_dir(fcs)
 
         fdest = Path(dest, rpm)
         path_dest.mkdir(exist_ok=True, parents=True)

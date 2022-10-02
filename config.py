@@ -67,15 +67,19 @@ class Config:
     def get_cs_lp_dir(self, cs):
         return Path(self.bsc_path, 'c', cs, 'x86_64', 'lp')
 
-    def get_ex_dir(self, cs, arch='x86_64'):
+    def get_ex_dir(self, cs='', arch=''):
         if not cs:
             return self.ex_dir
+        if not arch:
+            return Path(self.ex_dir, cs)
         return Path(self.ex_dir, cs, arch)
 
-    def get_ipa_dir(self, cs):
+    def get_ipa_dir(self, cs='', arch=''):
         if not cs:
             return self.ipa_dir
-        return Path(self.ipa_dir, cs, 'x86_64')
+        if not arch:
+            return Path(self.ipa_dir, cs)
+        return Path(self.ipa_dir, cs, arch)
 
     def get_sdir(self, cs):
         jcs = self.codestreams[cs]
