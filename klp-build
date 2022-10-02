@@ -74,21 +74,19 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 if  __name__ == '__main__':
-    parser = create_parser()
-    args = parser.parse_args()
+    args = create_parser().parse_args()
 
     if args.cmd == 'setup':
-        setup = Setup(args.bsc, args.filter, args.redownload, args.cve, args.conf,
-                      args.file_funcs, args.module, args.upstream_commits, args.archs)
+        setup = Setup(args.bsc, args.filter, args.redownload,
+                          args.cve, args.conf, args.file_funcs, args.module,
+                          args.upstream_commits, args.archs)
         working_cs = setup.setup_project_files()
 
         if not args.disable_ccp:
-            ccp = CCP(args.bsc, args.filter, working_cs)
-            ccp.run_ccp()
+            CCP(args.bsc, args.filter, working_cs).run_ccp()
 
     elif args.cmd == 'run-ccp':
-        ccp = CCP(args.bsc, args.filter)
-        ccp.run_ccp()
+        CCP(args.bsc, args.filter).run_ccp()
 
     elif args.cmd == 'get-patches':
         GitHelper(args.bsc, args.filter).get_commits(args.upstream_commits)

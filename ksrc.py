@@ -1,4 +1,3 @@
-from config import Config
 from natsort import natsorted
 import git
 from pathlib import Path
@@ -7,6 +6,8 @@ import re
 import requests
 import subprocess
 import sys
+
+from config import Config
 
 class GitHelper(Config):
     def __init__(self, bsc, bsc_filter):

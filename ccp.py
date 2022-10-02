@@ -1,4 +1,4 @@
-from config import Config
+import concurrent.futures
 import json
 from pathlib import Path, PurePath
 from natsort import natsorted
@@ -7,9 +7,8 @@ import re
 import shutil
 import subprocess
 
-import templ
-
-import concurrent.futures
+from config import Config
+from templ import Template
 
 class CCP(Config):
     def __init__(self, bsc, bsc_filter, working_cs = {}):
@@ -404,7 +403,7 @@ class CCP(Config):
 
         print('Checking the externalized symbols in other architectures...')
 
-        tem = templ.Template(self.bsc_num, self.filter)
+        tem = Template(self.bsc_num, self.filter)
         tem.generate_commit_msg_file()
 
         # Iterate over each codestream, getting each file processed, and all

@@ -1,8 +1,9 @@
-from config import Config
 from datetime import datetime
 import jinja2
 from pathlib import Path
 import os
+
+from config import Config
 
 class Template(Config):
     def __init__(self, bsc, bsc_filter):

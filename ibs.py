@@ -1,4 +1,3 @@
-from config import Config
 import concurrent.futures
 import errno
 from lxml import etree
@@ -11,6 +10,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
+from config import Config
 from ksrc import GitHelper
 
 class IBS(Config):
