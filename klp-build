@@ -4,7 +4,7 @@ import argparse
 
 from ccp import CCP
 from ksrc import GitHelper
-import utils
+from lp_setup import Setup
 from ibs import IBS
 
 def create_parser() -> argparse.ArgumentParser:
@@ -78,9 +78,8 @@ if  __name__ == '__main__':
     args = parser.parse_args()
 
     if args.cmd == 'setup':
-        setup = utils.Setup(args.bsc, args.filter,
-                            args.redownload, args.cve, args.conf, args.file_funcs,
-                            args.module, args.upstream_commits, args.archs)
+        setup = Setup(args.bsc, args.filter, args.redownload, args.cve, args.conf,
+                      args.file_funcs, args.module, args.upstream_commits, args.archs)
         working_cs = setup.setup_project_files()
 
         if not args.disable_ccp:
