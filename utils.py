@@ -1,3 +1,4 @@
+from config import Config
 import glob
 import json
 from pathlib import Path
@@ -8,25 +9,24 @@ import sys
 from ibs import IBS
 from ksrc import GitHelper
 
-class Setup:
-    def __init__(self, cfg, redownload, cve, conf, file_funcs, mod,
+class Setup(Config):
+    def __init__(self, bsc, bsc_filter, redownload, cve, conf, file_funcs, mod,
             ups_commits, archs):
+        super().__init__(bsc, bsc_filter)
 
         for arch in archs:
             if arch not in ['x86_64', 's390x', 'ppc64le']:
                 raise ValueError(f'{arch} is not a valid architecture')
 
-        if cfg.bsc_path.exists() and not cfg.bsc_path.is_dir():
+        if self.bsc_path.exists() and not self.bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
-        cfg.conf['mod'] = mod
-        cfg.conf['conf'] = conf
-        cfg.conf['archs'] = archs
-        cfg.conf['cve'] = re.search('([0-9]+\-[0-9]+)', cve).group(1)
+        self.conf['mod'] = mod
+        self.conf['conf'] = conf
+        self.conf['archs'] = archs
+        self.conf['cve'] = re.search('([0-9]+\-[0-9]+)', cve).group(1)
 
-        self.ksrc = GitHelper(cfg.bsc_num, cfg.filter)
-
-        self.cfg = cfg
+        self.ksrc = GitHelper(self.bsc_num, self.filter)
 
         self._ups_commits = ups_commits
         self._redownload = redownload
@@ -54,9 +54,7 @@ class Setup:
         return int(sle), int(sp), int(u)
 
     def setup_project_files(self):
-        conf = self.cfg.conf
-
-        if self.cfg.cs_file.exists() and not self._redownload:
+        if self.cs_file.exists() and not self._redownload:
             print('Found codestreams.json file, loading downloaded file.')
         else:
             print('Downloading codestreams file')
@@ -85,7 +83,7 @@ class Setup:
                 # Fill the majority of possible fields here
                 sle, sp, u = self.parse_cs_line(full_cs)
                 cs_key = f'{sle}.{sp}u{u}'
-                self.cfg.codestreams[cs_key] = {
+                self.codestreams[cs_key] = {
                         'project' : proj,
                         'kernel' : kernel,
                         'build-counter' : kernel_full[-1],
@@ -100,26 +98,26 @@ class Setup:
         print('Validating codestreams data...')
 
         # Called at this point because codestreams is populated
-        conf['commits'] = self.ksrc.get_commits(self._ups_commits)
-        conf['patched'] = self.ksrc.get_patched_cs(conf['commits'])
+        self.conf['commits'] = self.ksrc.get_commits(self._ups_commits)
+        self.conf['patched'] = self.ksrc.get_patched_cs(self.conf['commits'])
 
         # cpp will use this data in the next step
-        with open(self.cfg.conf_file, 'w') as f:
-            f.write(json.dumps(conf, indent=4, sort_keys=True))
+        with open(self.conf_file, 'w') as f:
+            f.write(json.dumps(self.conf, indent=4, sort_keys=True))
 
         # For now let's keep the current format of codestreams.in and
         # codestreams.json
-        if self.cfg.filter:
+        if self.filter:
             print('Applying filter...')
 
         cs_data_missing = []
 
         filter_out = []
-        working_cs = self.cfg.filter_cs(self.cfg.codestreams.keys())
+        working_cs = self.filter_cs(self.codestreams.keys())
 
         # Filter by file-funcs
         for cs in working_cs:
-            jcs = self.cfg.codestreams[cs]
+            jcs = self.codestreams[cs]
             cs_files = {}
 
             for cs_regex in self._file_funcs.keys():
@@ -154,7 +152,7 @@ class Setup:
 
             jcs['archs'] = archs
 
-            ex_dir = self.cfg.get_ex_dir(jcs['cs'])
+            ex_dir = self.get_ex_dir(jcs['cs'])
             if not ex_dir.is_dir():
                 cs_data_missing.append(cs)
 
@@ -167,23 +165,23 @@ class Setup:
         working_cs = list(set(working_cs) - set(filter_out))
 
         # Save codestreams file before something bad can happen
-        with open(self.cfg.cs_file, 'w') as f:
-            f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
+        with open(self.cs_file, 'w') as f:
+            f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
 
         # Found missing cs data, downloading and extract
         if cs_data_missing:
             print('Download the necessary data from the following codestreams:')
             print(f'\t{" ".join(cs_data_missing)}\n')
-            ibs = IBS(self.cfg.bsc_num, self.cfg.filter)
+            ibs = IBS(self.bsc_num, self.filter)
             ibs.download_cs_data(cs_data_missing)
 
         # Setup the missing codestream info needed
         for cs in working_cs:
-            jcs = self.cfg.codestreams[cs]
+            jcs = self.codestreams[cs]
             cs_files = jcs['files']
 
             # Check if the files exist in the respective codestream directories
-            sdir = self.cfg.get_sdir(cs)
+            sdir = self.get_sdir(cs)
             for f in cs_files.keys():
                 fdir = Path(sdir, f)
                 if not fdir.is_file():
@@ -194,7 +192,7 @@ class Setup:
             # Verify if the functions exist in the specified object
             for f in cs_files.keys():
                 for func in cs_files[f]:
-                    if not self.cfg.check_symbol(func, obj):
+                    if not self.check_symbol(func, obj):
                         print(f'WARN: {cs}: Function {func} does not exist in {obj}')
 
             jcs['object'] = str(obj)
@@ -202,15 +200,15 @@ class Setup:
         # Save again to now include object being set.
         # TODO: adapt the code above to be more resilient, so we can rely on
         # saving only at this point.
-        with open(self.cfg.cs_file, 'w') as f:
-            f.write(json.dumps(self.cfg.codestreams, indent=4, sort_keys=True))
+        with open(self.cs_file, 'w') as f:
+            f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
 
         # The returned value can be used by ccp
         return working_cs
 
     def get_module_obj(self, jcs):
-        ex_dir = self.cfg.get_ex_dir(jcs['cs'])
-        mod = self.cfg.conf['mod']
+        ex_dir = self.get_ex_dir(jcs['cs'])
+        mod = self.conf['mod']
         if mod == 'vmlinux':
             return str(Path(ex_dir, 'boot', f"vmlinux-{jcs['kernel']}-default"))
 
@@ -226,7 +224,7 @@ class Setup:
         return str(obj[0])
 
     def cs_repo(self, cs):
-        sle, sp, up = self.cfg.get_cs_tuple(cs)
+        sle, sp, up = self.get_cs_tuple(cs)
         if up == 0:
             return 'standard'
 
@@ -240,7 +238,7 @@ class Setup:
     # s390x is supported from 12.5u3 onwards
     # s390x is supported from SLE15-SP2 onwards.
     def is_s390_supported(self, cs):
-        sle, sp, up = self.cfg.get_cs_tuple(cs)
+        sle, sp, up = self.get_cs_tuple(cs)
         if (sle == 12 and sp == 4 and up >= 13) or \
                 (sle == 12 and sp == 5 and up >= 3) or \
                 (sle == 15 and sp >= 2):
@@ -251,7 +249,7 @@ class Setup:
     # ppc64le is supported from 12_3u5 onwards
     # ppc64le is also supported on 12sp2 from u25 onwards
     def is_ppc_supported(self, cs):
-        sle, sp, up = self.cfg.get_cs_tuple(cs)
+        sle, sp, up = self.get_cs_tuple(cs)
         if sle > 12:
             return True
         elif sle == 12 and sp > 3:
