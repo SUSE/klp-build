@@ -174,7 +174,7 @@ class Setup:
         if cs_data_missing:
             print('Download the necessary data from the following codestreams:')
             print(f'\t{" ".join(cs_data_missing)}\n')
-            ibs = IBS(self.cfg)
+            ibs = IBS(self.cfg.bsc_num, self.cfg.filter)
             ibs.download_cs_data(cs_data_missing)
 
         # Setup the missing codestream info needed

@@ -1,7 +1,7 @@
+from config import Config
 import concurrent.futures
 import errno
 from lxml import etree
-import git
 from pathlib import Path
 import os
 from osctiny import Osc
@@ -13,15 +13,15 @@ import xml.etree.ElementTree as ET
 
 from ksrc import GitHelper
 
-class IBS:
-    def __init__(self, cfg):
-        self.cfg = cfg
+class IBS(Config):
+    def __init__(self, bsc, bsc_filter):
+        super().__init__(bsc, bsc_filter)
         self.osc = Osc(url='https://api.suse.de')
 
-        self.ibs_user = re.search('(\w+)@', cfg.email).group(1)
+        self.ibs_user = re.search('(\w+)@', self.email).group(1)
         self.prj_prefix = 'home:{}:klp'.format(self.ibs_user)
 
-        self.kernel_rpms = Path(cfg.data, 'kernel-rpms')
+        self.kernel_rpms = Path(self.data, 'kernel-rpms')
         self.kernel_rpms.mkdir(exist_ok=True)
 
         self.kgraft_path = Path(Path().home(), 'kgr', 'kgraft-patches')
@@ -33,7 +33,7 @@ class IBS:
         if not self.kgraft_tests_path.is_dir():
             raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
 
-        self.ksrc = GitHelper(cfg.bsc_num, cfg.filter)
+        self.ksrc = GitHelper(self.bsc_num, self.filter)
 
         # Download all sources for x86
         # For ppc64le and s390x only download vmlinux and the built modules
@@ -72,7 +72,7 @@ class IBS:
             prj_name = prj.get('name')
             cs = self.convert_prj_to_cs(prj_name)
 
-            if self.cfg.filter and not re.match(self.cfg.filter, cs):
+            if self.filter and not re.match(self.filter, cs):
                 continue
 
             prjs.append(prj)
@@ -101,16 +101,16 @@ class IBS:
     def extract_rpms(self, args):
         cs, arch, rpm, dest = args
 
-        fcs = self.cfg.codestreams[cs]['cs']
-        kernel = self.cfg.codestreams[cs]['kernel']
+        fcs = self.codestreams[cs]['cs']
+        kernel = self.codestreams[cs]['kernel']
 
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
-            path_dest = Path(self.cfg.ipa_dir, fcs, arch)
+            path_dest = Path(self.ipa_dir, fcs, arch)
         elif re.search(   'kernel\-default\-\d+', rpm) or \
                 re.search('kernel\-default\-extra\-\d+', rpm):
-            path_dest = Path(self.cfg.ex_dir, fcs, arch)
+            path_dest = Path(self.ex_dir, fcs, arch)
         else:
-            path_dest = Path(self.cfg.ex_dir, fcs)
+            path_dest = Path(self.ex_dir, fcs)
 
         fdest = Path(dest, rpm)
         path_dest.mkdir(exist_ok=True, parents=True)
@@ -148,7 +148,7 @@ class IBS:
 
         print('Getting list of files...')
         for cs in cs_list:
-            jcs = self.cfg.codestreams[cs]
+            jcs = self.codestreams[cs]
             prj = jcs['project']
             repo = jcs['repo']
 
@@ -179,10 +179,10 @@ class IBS:
         self.do_work(self.download_and_extract, rpms)
 
         for fext, ecmd in [('zst', 'unzstd --rm -f -d'), ('xz', 'xz -d')]:
-            cmd = f'find {self.cfg.ex_dir} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
+            cmd = f'find {self.ex_dir} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
             subprocess.check_output(cmd, shell=True)
 
-        subprocess.check_output(f'find {self.cfg.ex_dir} -name "vmlinux*default.gz" -exec gzip -d {{}} \;',
+        subprocess.check_output(f'find {self.ex_dir} -name "vmlinux*default.gz" -exec gzip -d {{}} \;',
                                 shell=True)
 
         print('Finished extract vmlinux and modules...')
@@ -203,13 +203,13 @@ class IBS:
         return prj.replace(f'{self.prj_prefix}-', '').replace('_', '.')
 
     def apply_filter(self, item_list):
-        if not self.cfg.filter:
+        if not self.filter:
             return item_list
 
         filtered = []
         for item in item_list:
             cmp_item = convert_prj_to_cs(item)
-            if not re.match(self.cfg.filter, cmp_item):
+            if not re.match(self.filter, cmp_item):
                 continue
 
             filtered.append(item)
@@ -217,11 +217,11 @@ class IBS:
         return filtered
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):
-        kernel = self.cfg.codestreams[cs]['kernel']
-        full_cs = self.cfg.codestreams[cs]['cs']
+        kernel = self.codestreams[cs]['kernel']
+        full_cs = self.codestreams[cs]['cs']
 
         # TODO: Change ex_dir codestream names to the new format
-        vmlinux_path = Path(self.cfg.get_ex_dir(full_cs, arch), 'boot',
+        vmlinux_path = Path(self.get_ex_dir(full_cs, arch), 'boot',
                             f'vmlinux-{kernel}-default')
 
         out = subprocess.check_output(['objdump', '-t', str(lp_mod_path)],
@@ -259,7 +259,7 @@ class IBS:
         cmd = 'rpm2cpio {} | cpio --quiet -idm'.format(str(fdest))
         subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
 
-        kernel = self.cfg.codestreams[cs]['kernel']
+        kernel = self.codestreams[cs]['kernel']
         lp_file = f'livepatch-{num}-{sle}_{build}_{micro}.ko'
         lp_mod_path = Path(rpm_dir, 'lib', 'modules', f'{kernel}-default',
                            'livepatch', lp_file)
@@ -285,24 +285,24 @@ class IBS:
     def prepare_tests(self, redownload_rpms):
         if redownload_rpms:
             # Remove previously downloaded rpms
-            for cs, data in self.cfg.filtered_cs().items():
+            for cs, data in self.filtered_cs().items():
                 for arch in data.get('archs', []):
-                    shutil.rmtree(Path(self.cfg.bsc_path, 'c', cs, arch, 'rpm'),
+                    shutil.rmtree(Path(self.bsc_path, 'c', cs, arch, 'rpm'),
                                   ignore_errors=True)
 
             # Download all built rpms
             self.download()
 
-        config = Path(self.cfg.bsc_path, f'{self.cfg.bsc}_config.in')
+        config = Path(self.bsc_path, f'{self.bsc}_config.in')
         test_sh = Path(self.kgraft_tests_path,
-                       f'{self.cfg.bsc}_test_script.sh')
+                       f'{self.bsc}_test_script.sh')
 
         # Prepare the config file used by kgr-test
         self.ksrc.build()
 
-        for arch in self.cfg.conf.get('archs', []):
-            tests_path = Path(self.cfg.bsc_path, 'tests', arch)
-            test_arch_path = Path(tests_path, self.cfg.bsc)
+        for arch in self.conf.get('archs', []):
+            tests_path = Path(self.bsc_path, 'tests', arch)
+            test_arch_path = Path(tests_path, self.bsc)
 
             # Remove previously created directory and archive
             shutil.rmtree(test_arch_path, ignore_errors=True)
@@ -313,8 +313,8 @@ class IBS:
             for d in ['built', 'repro', 'tests.out']:
                 Path(test_arch_path, d).mkdir(exist_ok=True)
 
-            for cs, data in self.cfg.filtered_cs().items():
-                rpm_dir = Path(self.cfg.bsc_path, 'c', cs, arch, 'rpm')
+            for cs, data in self.filtered_cs().items():
+                rpm_dir = Path(self.bsc_path, 'c', cs, arch, 'rpm')
                 rpm_dir.mkdir(parents=True, exist_ok=True)
 
                 # TODO: there will be only one rpm, format it directly
@@ -327,8 +327,8 @@ class IBS:
             shutil.copy(config, Path(test_arch_path, 'repro'))
             shutil.copy(test_sh, Path(test_arch_path, 'repro'))
 
-            subprocess.run(['tar', '-cJf', f'{self.cfg.bsc}.tar.xz',
-                                f'{self.cfg.bsc}'], cwd=tests_path,
+            subprocess.run(['tar', '-cJf', f'{self.bsc}.tar.xz',
+                                f'{self.bsc}'], cwd=tests_path,
                                         stdout=sys.stdout,
                                         stderr=subprocess.PIPE, check=True)
 
@@ -350,7 +350,7 @@ class IBS:
 
                     # Create a directory for each arch supported
                     cs = self.convert_prj_to_cs(prj)
-                    dest = Path(self.cfg.bsc_path, 'c', cs, str(arch), 'rpm')
+                    dest = Path(self.bsc_path, 'c', cs, str(arch), 'rpm')
                     dest.mkdir(exist_ok=True, parents=True)
 
                     rpms.append( (prj, prj, 'devbuild', arch, 'klp', rpm, dest) )
@@ -415,7 +415,7 @@ class IBS:
         if not branch:
             raise RuntimeError(f'Could not find git branch for {cs}')
 
-        jcs = self.cfg.codestreams[cs]
+        jcs = self.codestreams[cs]
 
         prj = self.cs_to_project(cs)
 
@@ -439,7 +439,7 @@ class IBS:
             print(e, e.response.content)
             raise RuntimeError('')
 
-        base_path = Path(self.cfg.bsc_path, 'c', cs)
+        base_path = Path(self.bsc_path, 'c', cs)
 
         # Remove previously created directories
         prj_path = Path(base_path, 'checkout')
@@ -465,7 +465,7 @@ class IBS:
         # TODO: this isn't supported by osctiny YET.
 
     def push(self):
-        cs_list = self.apply_filter(self.cfg.codestreams.keys())
+        cs_list = self.apply_filter(self.codestreams.keys())
 
         if cs_list:
             print('Pushing projects to IBS...')

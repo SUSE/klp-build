@@ -6,7 +6,6 @@ from ccp import CCP
 from config import Config
 from ksrc import GitHelper
 import utils
-import templ
 from ibs import IBS
 
 def create_parser() -> argparse.ArgumentParser:
@@ -105,7 +104,7 @@ if  __name__ == '__main__':
         GitHelper(args.bsc, args.filter).format_patches()
 
     elif args.cmd == 'ibs':
-        ibs = IBS(config)
+        ibs = IBS(args.bsc, args.filter)
 
         if args.status:
             ibs.status()
