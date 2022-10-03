@@ -36,14 +36,12 @@ class GitHelper(Config):
         # Filter only the branches related to this BSC
         branches = [ r.name for r in repo.branches if self.bsc in r.name ]
 
-        for cs, data in self.filtered_cs().items():
-            jcs = data
-
-            entry = [ jcs['cs'],
-                        jcs['project'],
-                        jcs['kernel'] + '.' + jcs['build-counter'],
+        for cs, data in self.filter_cs(True, False).items():
+            entry = [ data['cs'],
+                        data['project'],
+                        f"{data['kernel']}.{data['build-counter']}",
                         'change-me',
-                        'rpm-' + jcs['kernel']
+                        f"rpm-{data['kernel']}"
                         ]
 
             for branch in branches:
@@ -51,13 +49,13 @@ class GitHelper(Config):
                 # the same code
                 for b in branch.replace(self.bsc + '_', '').split('_'):
                     sle, u = b.split('u')
-                    if sle != f"{jcs['sle']}.{jcs['sp']}":
+                    if sle != f"{data['sle']}.{data['sp']}":
                         continue
 
                     # Get codestreams interval
                     up = u
                     down = u
-                    cs_update = jcs['update']
+                    cs_update = data['update']
                     if '-' in u:
                         down, up = u.split('-')
 

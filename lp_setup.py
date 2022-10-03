@@ -105,19 +105,12 @@ class Setup(Config):
         with open(self.conf_file, 'w') as f:
             f.write(json.dumps(self.conf, indent=4, sort_keys=True))
 
-        # For now let's keep the current format of codestreams.in and
-        # codestreams.json
-        if self.filter:
-            print('Applying filter...')
-
         cs_data_missing = []
 
         filter_out = []
-        working_cs = self.filter_cs(self.codestreams.keys())
 
         # Filter by file-funcs
-        for cs in working_cs:
-            jcs = self.codestreams[cs]
+        for cs, data in self.codestreams.items():
             cs_files = {}
 
             for cs_regex in self._file_funcs.keys():
@@ -139,8 +132,8 @@ class Setup(Config):
                 filter_out.append(cs)
                 continue
 
-            jcs['files'] = cs_files
-            jcs['repo'] = self.cs_repo(cs)
+            data['files'] = cs_files
+            data['repo'] = self.cs_repo(cs)
 
             # Set supported archs for the codestream
             archs = ['x86_64']
@@ -150,18 +143,14 @@ class Setup(Config):
             if self.is_s390_supported(cs):
                 archs.append('s390x')
 
-            jcs['archs'] = archs
+            data['archs'] = archs
 
-            if not self.get_ex_dir(jcs['cs'], 'x86_64').is_dir():
+            if not self.get_ex_dir(data['cs'], 'x86_64').is_dir():
                 cs_data_missing.append(cs)
 
-        if filter_out:
-            print('Skipping codestreams without file-funcs:')
-            print(f'\t{" ".join(filter_out)}\n')
-
-        # working_cs will contain the final list of codestreams that wast set
+        # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
-        working_cs = list(set(working_cs) - set(filter_out))
+        working_cs = self.filter_cs(check_file_funcs=True, verbose=True)
 
         # Save codestreams file before something bad can happen
         with open(self.cs_file, 'w') as f:
@@ -175,9 +164,9 @@ class Setup(Config):
             ibs.download_cs_data(cs_data_missing)
 
         # Setup the missing codestream info needed
-        for cs in working_cs:
-            jcs = self.codestreams[cs]
-            cs_files = jcs['files']
+        for cs, data in working_cs.items():
+            print(cs)
+            cs_files = data['files']
 
             # Check if the files exist in the respective codestream directories
             sdir = self.get_sdir(cs)
@@ -186,7 +175,7 @@ class Setup(Config):
                 if not fdir.is_file():
                     raise RuntimeError(f'File {f} doesn\'t exists in {str(sdir)}')
 
-            obj = self.get_module_obj(jcs)
+            obj = self.get_module_obj(data)
 
             # Verify if the functions exist in the specified object
             for f in cs_files.keys():
@@ -194,7 +183,7 @@ class Setup(Config):
                     if not self.check_symbol(func, obj):
                         print(f'WARN: {cs}: Function {func} does not exist in {obj}')
 
-            jcs['object'] = str(obj)
+            data['object'] = str(obj)
 
         # Save again to now include object being set.
         # TODO: adapt the code above to be more resilient, so we can rely on

@@ -339,9 +339,7 @@ class CCP(Config):
             for css in cs_groups[file]:
                 print(f"\t\t{' '.join(css)}")
 
-    def process_ccp(self, cs):
-        jcs = self.codestreams[cs]
-
+    def process_ccp(self, cs, data):
         sdir = self.get_sdir(cs)
         odir = Path(str(sdir) + '-obj', 'x86_64', 'default')
 
@@ -349,13 +347,13 @@ class CCP(Config):
         env = self.env.copy()
 
         env['KCP_MOD_SYMVERS'] = str(Path(odir, 'Module.symvers'))
-        env['KCP_READELF'] = jcs['readelf']
+        env['KCP_READELF'] = data['readelf']
         env['KCP_KBUILD_ODIR'] = str(odir)
         env['KCP_KBUILD_SDIR'] = str(sdir)
-        env['KCP_PATCHED_OBJ'] = jcs['object']
+        env['KCP_PATCHED_OBJ'] = data['object']
         env['KCP_RENAME_PREFIX'] = 'klp'
 
-        for fname, funcs in jcs['files'].items():
+        for fname, funcs in data['files'].items():
             print(f'\t{cs}\t\t{fname}')
 
             self._proc_files.append(fname)
@@ -369,7 +367,7 @@ class CCP(Config):
             os.symlink(Path(sdir, fname), Path(out_dir, base_fname))
             env['KCP_WORK_DIR'] = str(out_dir)
 
-            env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(jcs['cs'],
+            env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(data['cs'],
                                             'x86_64'), f'{fname}.000i.ipa-clones'))
 
             self.execute_ccp(cs, fname, ','.join(funcs), out_dir, sdir, odir,
@@ -385,7 +383,8 @@ class CCP(Config):
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-            results = executor.map(self.process_ccp, self.working_cs)
+            results = executor.map(self.process_ccp, self.working_cs.keys(),
+                                   self.working_cs.values())
             for result in results:
                 if result:
                     print(f'{cs}: {result}')
@@ -393,10 +392,8 @@ class CCP(Config):
         self.group_equal_files()
 
         # save the externalized symbols
-        for cs in self.working_cs:
-            jcs = self.codestreams[cs]
-
-            jcs['ext_symbols'] = self.ext_symbols[cs]
+        for cs, data in self.working_cs.items():
+            data['ext_symbols'] = self.ext_symbols[cs]
 
         with open(self.cs_file, 'w') as f:
             f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
@@ -409,14 +406,12 @@ class CCP(Config):
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
         # While we are at it, create the livepatches per codestream
-        for cs in self.working_cs:
-            jcs = self.codestreams[cs]
-
+        for cs, data in self.working_cs.items():
             tem.GenerateLivePatches(cs)
 
             print(f'{cs}')
-            for _, exts in jcs['ext_symbols'].items():
+            for _, exts in data['ext_symbols'].items():
                 for ext in exts:
                     print(f'\t{ext}')
-                    for arch, ret in self.check_symbol_archs(jcs, ext).items():
+                    for arch, ret in self.check_symbol_archs(data, ext).items():
                         print(f'\t\t{arch}: {ret}')

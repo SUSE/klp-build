@@ -90,54 +90,49 @@ class Config:
         data = self.codestreams[cs]
         return (data['sle'], data['sp'], data['update'])
 
-    def filtered_cs(self):
-        if not self.filter:
-            return self.codestreams
-
-        result = {}
-        for cs, data in self.codestreams.items():
-            if not re.match(self.filter, cs):
-                continue
-            result[cs] = data
-
-        return result
-
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
-    def filter_cs(self, cs_list, check_file_funcs=False):
-        cs_new_list = []
+    def filter_cs(self, check_file_funcs=False, verbose=True):
+        cs_del_list = []
+        full_cs = self.codestreams.keys()
 
         patched = self.conf.get('patched', [])
-        if patched:
+        if patched and verbose:
             print('Skipping patched codestreams:')
             print(f'\t{" ".join(patched)}')
 
-        cs_new_list = list(set(cs_list) - set(patched))
+        cs_del_list = patched
 
         if self.filter:
-            print('Applying filter...')
+            if verbose:
+                print('Applying filter...')
             filtered = []
-            for cs in cs_new_list:
+            for cs in full_cs:
                 if re.match(self.filter, cs):
                     filtered.append(cs)
 
-            print('Skipping codestreams:')
-            print(f'\t{" ".join(filtered)}')
+            if verbose:
+                print('Skipping codestreams:')
+                print(f'\t{" ".join(filtered)}')
 
-            cs_new_list = list(set(cs_new_list) - set(filtered))
+            cs_del_list.extend(filtered)
 
         if check_file_funcs:
             filtered = []
-            for cs in cs_new_list:
+            for cs in full_cs:
                 if not self.codestreams[cs].get('files', ''):
                     filtered.append(cs)
 
-            print('Skipping codestreams without file-funcs:')
-            print(f'\t{" ".join(filtered)}')
+            if filtered and verbose:
+                print('Skipping codestreams without file-funcs:')
+                print(f'\t{" ".join(filtered)}')
 
-            cs_new_list = list(set(cs_new_list) - set(filtered))
+            cs_del_list.extend(filtered)
 
-        return cs_new_list
+        for cs in cs_del_list:
+            self.codestreams.pop(cs, '')
+
+        return self.codestreams
 
     # Cache the output of nm by using the object path. It differs for each
     # codestream and architecture

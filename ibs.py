@@ -305,8 +305,10 @@ class IBS(Config):
             for d in ['built', 'repro', 'tests.out']:
                 Path(test_arch_path, d).mkdir(exist_ok=True)
 
-        self.filter_cs(check_file_funcs=False, verbose=True)
-            for cs, data in self.filtered_cs().items():
+            for cs, data in self.filter_cs(True, False).items():
+                if arch not in data['archs']:
+                    continue
+
                 rpm_dir = Path(self.bsc_path, 'c', cs, arch, 'rpm')
 
                 # TODO: there will be only one rpm, format it directly
