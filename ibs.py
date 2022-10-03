@@ -243,16 +243,15 @@ class IBS(Config):
         return missing_syms
 
     def validate_livepatch_module(self, cs, arch, rpm_dir, rpm):
-        match = re.search('default\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.', rpm)
-        if not match:
-            print(f'ERR: rpm name format unknown {rpm}')
-            print(rpm)
-            sys.exit(1)
-
-        num = match.group(1)
-        sle = match.group(2)
-        build = match.group(3)
-        micro = match.group(4)
+        match = re.search('(livepatch)-.*default\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.', rpm)
+        if match:
+            dir_path = match.group(1)
+            lp_file = f'livepatch-{match.group(2)}-{match.group(3)}_{match.group(4)}_{match.group(5)}.ko'
+        else:
+            match = re.search('(kgraft)\-patch\-.*default\-(\d+)\-(\d+)\.(\d+)\.', rpm)
+            if match:
+                dir_path = match.group(1)
+                lp_file = f'kgraft-patch-{match.group(2)}-{match.group(3)}_{match.group(4)}.ko'
 
         fdest = Path(rpm_dir, rpm)
         # Extract the livepatch module for later inspection
@@ -260,9 +259,8 @@ class IBS(Config):
         subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
 
         kernel = self.codestreams[cs]['kernel']
-        lp_file = f'livepatch-{num}-{sle}_{build}_{micro}.ko'
         lp_mod_path = Path(rpm_dir, 'lib', 'modules', f'{kernel}-default',
-                           'livepatch', lp_file)
+                           dir_path, lp_file)
         out = subprocess.check_output(['/sbin/modinfo', str(lp_mod_path)],
                                       stderr=subprocess.STDOUT).decode()
 
@@ -284,12 +282,6 @@ class IBS(Config):
 
     def prepare_tests(self, redownload_rpms):
         if redownload_rpms:
-            # Remove previously downloaded rpms
-            for cs, data in self.filtered_cs().items():
-                for arch in data.get('archs', []):
-                    shutil.rmtree(Path(self.bsc_path, 'c', cs, arch, 'rpm'),
-                                  ignore_errors=True)
-
             # Download all built rpms
             self.download()
 
@@ -313,11 +305,15 @@ class IBS(Config):
             for d in ['built', 'repro', 'tests.out']:
                 Path(test_arch_path, d).mkdir(exist_ok=True)
 
+        self.filter_cs(check_file_funcs=False, verbose=True)
             for cs, data in self.filtered_cs().items():
                 rpm_dir = Path(self.bsc_path, 'c', cs, arch, 'rpm')
-                rpm_dir.mkdir(parents=True, exist_ok=True)
 
                 # TODO: there will be only one rpm, format it directly
+                rpm = os.listdir(rpm_dir)
+                if len(rpm) > 1:
+                    raise RuntimeError(f'ERROR: {cs}/{arch}. {len(rpm)} rpms found. Excepting to find only one')
+
                 for rpm in os.listdir(rpm_dir):
                     # Check for dependencies
                     self.validate_livepatch_module(cs, arch, rpm_dir, rpm)
@@ -332,10 +328,20 @@ class IBS(Config):
                                         stdout=sys.stdout,
                                         stderr=subprocess.PIPE, check=True)
 
+    def delete_rpms(self, cs):
+        archs = self.codestreams[cs]['archs']
+        for arch in archs:
+            shutil.rmtree(Path(self.bsc_path, 'c', cs, arch, 'rpm'),
+                          ignore_errors=True)
+
     def download(self):
         rpms = []
         for result in self.get_projects():
             prj = result.get('name')
+            cs = self.convert_prj_to_cs(prj)
+
+            # Remove previously downloaded rpms
+            self.delete_rpms(cs)
 
             archs = result.xpath('repository/arch')
             for arch in archs:
@@ -349,7 +355,6 @@ class IBS(Config):
                         continue
 
                     # Create a directory for each arch supported
-                    cs = self.convert_prj_to_cs(prj)
                     dest = Path(self.bsc_path, 'c', cs, str(arch), 'rpm')
                     dest.mkdir(exist_ok=True, parents=True)
 
