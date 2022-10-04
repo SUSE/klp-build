@@ -108,7 +108,7 @@ class Config:
                 print('Applying filter...')
             filtered = []
             for cs in full_cs:
-                if re.match(self.filter, cs):
+                if not re.match(self.filter, cs):
                     filtered.append(cs)
 
             if verbose:
