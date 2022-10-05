@@ -19,7 +19,7 @@ class IBS(Config):
         self.osc = Osc(url='https://api.suse.de')
 
         self.ibs_user = re.search('(\w+)@', self.email).group(1)
-        self.prj_prefix = 'home:{}:klp'.format(self.ibs_user)
+        self.prj_prefix = f'home:{self.ibs_user}:{self.bsc}-klp'
 
         self.kernel_rpms = Path(self.data, 'kernel-rpms')
         self.kernel_rpms.mkdir(exist_ok=True)
