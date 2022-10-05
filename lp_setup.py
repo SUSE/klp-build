@@ -165,7 +165,6 @@ class Setup(Config):
 
         # Setup the missing codestream info needed
         for cs, data in working_cs.items():
-            print(cs)
             cs_files = data['files']
 
             # Check if the files exist in the respective codestream directories
