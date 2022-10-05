@@ -413,5 +413,5 @@ class CCP(Config):
             for _, exts in data['ext_symbols'].items():
                 for ext in exts:
                     print(f'\t{ext}')
-                    for arch, ret in self.check_symbol_archs(data, ext).items():
+                    for arch, ret in self.check_symbol_archs(data, ext, True).items():
                         print(f'\t\t{arch}: {ret}')

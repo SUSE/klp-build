@@ -146,7 +146,7 @@ class Config:
             self.nm_out[obj] = subprocess.check_output(['nm', '--defined-only', obj]).decode().strip()
         return re.search(r' {}\n'.format(symbol), self.nm_out[obj])
 
-    def check_symbol_archs(self, data, symbol):
+    def check_symbol_archs(self, data, symbol, only_nok):
         arch_sym = {}
         # Validate only architectures supported by the codestream
         for arch in data['archs']:
@@ -161,6 +161,9 @@ class Config:
             obj_path = data['object'].replace('x86_64', arch)
 
             ret = 'ok' if self.check_symbol(symbol, obj_path) else 'NOT FOUND'
+
+            if ret == 'ok' and only_nok:
+                continue
 
             arch_sym[arch] = ret
 
