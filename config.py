@@ -103,6 +103,9 @@ class Config:
 
         cs_del_list = patched
 
+        # Remove the patches codestreams from the full list
+        full_cs = set(full_cs) - set(cs_del_list)
+
         if self.filter:
             if verbose:
                 print('Applying filter...')
@@ -116,6 +119,8 @@ class Config:
                 print(f'\t{" ".join(filtered)}')
 
             cs_del_list.extend(filtered)
+            # Remove the filtered
+            full_cs = set(full_cs) - set(cs_del_list)
 
         if check_file_funcs:
             filtered = []
