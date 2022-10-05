@@ -143,7 +143,7 @@ class Config:
     # codestream and architecture
     def check_symbol(self, symbol, obj):
         if not self.nm_out.get(obj, ''):
-            self.nm_out[obj] = subprocess.check_output(['nm', obj]).decode().strip()
+            self.nm_out[obj] = subprocess.check_output(['nm', '--defined-only', obj]).decode().strip()
         return re.search(r' {}\n'.format(symbol), self.nm_out[obj])
 
     def check_symbol_archs(self, jcs, symbol):
