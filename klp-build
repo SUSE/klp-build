@@ -67,9 +67,8 @@ def create_parser() -> argparse.ArgumentParser:
     ibs.add_argument('--prepare-tests', action='store_true',
             help='Prepare a tarball with the rpms and tests')
 
-    ibs.add_argument('--redownload-rpms', action='store_true',
-            help='Drop and redownload the built rpms')
-
+    ibs.add_argument('--skip-download', action='store_true', default=False,
+            help='Do not drop and redownload the built rpms')
 
     return parser
 
@@ -109,4 +108,4 @@ if  __name__ == '__main__':
         elif args.push:
             ibs.push()
         elif args.prepare_tests:
-            ibs.prepare_tests(args.redownload_rpms)
+            ibs.prepare_tests(args.skip_download)

@@ -280,8 +280,8 @@ class IBS(Config):
 
         shutil.rmtree(Path(rpm_dir, 'lib'), ignore_errors=True)
 
-    def prepare_tests(self, redownload_rpms):
-        if redownload_rpms:
+    def prepare_tests(self, skip_download):
+        if not skip_download:
             # Download all built rpms
             self.download()
 
