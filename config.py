@@ -146,16 +146,19 @@ class Config:
             self.nm_out[obj] = subprocess.check_output(['nm', '--defined-only', obj]).decode().strip()
         return re.search(r' {}\n'.format(symbol), self.nm_out[obj])
 
-    def check_symbol_archs(self, jcs, symbol):
+    def check_symbol_archs(self, data, symbol):
         arch_sym = {}
-        for arch in self.conf['archs']:
+        # Validate only architectures supported by the codestream
+        for arch in data['archs']:
 
             # The livepatch creator usually do it on a x86_64 machine, so the
             # check for this arch was already done
             if arch == 'x86_64':
                 continue
 
-            obj_path = jcs['object'].replace('x86_64', arch)
+            # The stored object attribute will referece x86 path, for the same
+            # reason stated above
+            obj_path = data['object'].replace('x86_64', arch)
 
             ret = 'ok' if self.check_symbol(symbol, obj_path) else 'NOT FOUND'
 
