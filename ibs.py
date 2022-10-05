@@ -224,13 +224,14 @@ class IBS(Config):
         vmlinux_path = Path(self.get_ex_dir(full_cs, arch), 'boot',
                             f'vmlinux-{kernel}-default')
 
-        out = subprocess.check_output(['objdump', '-t', str(lp_mod_path)],
-                                      stderr=subprocess.STDOUT).decode()
-
         # Get list of UNDEFINED symbols from the livepatch module
-        lp_und_symbols = re.findall('\d+\s+\*UND\*\s+\d+\s+([\w]+)', out)
+        out = subprocess.check_output(['nm', '--undefined-only', str(lp_mod_path)],
+                                      stderr=subprocess.STDOUT).decode()
+        # Remove the U flag from every line
+        lp_und_symbols = re.findall('\s+U\s([\w]+)', out)
 
-        vmlinux_syms = subprocess.check_output(['objdump', '-t', str(vmlinux_path)],
+        # vmlinux should have all symbols defined, but let's be safe here too
+        vmlinux_syms = subprocess.check_output(['nm', '--defined-only', str(vmlinux_path)],
                                       stderr=subprocess.STDOUT).decode()
 
         missing_syms = []
