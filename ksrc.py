@@ -122,7 +122,8 @@ class GitHelper(Config):
 
         return branch_name
 
-    def format_patches(self):
+    def format_patches(self, version):
+        ver = f'v{version}'
         repo = git.Repo(self.kgr_patches)
 
         # Filter only the branches related to this BSC
@@ -134,10 +135,13 @@ class GitHelper(Config):
             bs = ' '.join(bname.split('_'))
             bsc = self.bsc.replace('bsc', 'bsc#')
 
+            prefix = f'PATCH {ver} {bsc} {bs}'
+            out = f'{bname}-{ver}.patch'
+
             subprocess.check_output(['/usr/bin/git', '-C', str(self.kgr_patches),
                             'format-patch', '-1', branch,
-                            f'--subject-prefix=PATCH v2 {bsc} {bs}', '--output',
-                                     f'{bname}.patch'])
+                            f'--subject-prefix={prefix}', '--output',
+                                     f'{out}'])
 
     def get_commit_subject(self, commit):
         req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))

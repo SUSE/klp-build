@@ -42,8 +42,10 @@ def create_parser() -> argparse.ArgumentParser:
     sub.add_parser('build', parents = [parentparser],
             help='Build the specified codestreams using osckgr')
 
-    sub.add_parser('format-patches', parents = [parentparser],
+    format = sub.add_parser('format-patches', parents = [parentparser],
             help='Extract patches from kgraft-patches')
+    format.add_argument('-v', '--version', type=int, required=True,
+            help='Version to be added, like vX')
 
     patches = sub.add_parser('get-patches', parents = [parentparser])
     patches.add_argument('-u', '--upstream-commits', required=True,
@@ -94,7 +96,7 @@ if  __name__ == '__main__':
         GitHelper(args.bsc, args.filter).build()
 
     elif args.cmd == 'format-patches':
-        GitHelper(args.bsc, args.filter).format_patches()
+        GitHelper(args.bsc, args.filter).format_patches(args.version)
 
     elif args.cmd == 'ibs':
         ibs = IBS(args.bsc, args.filter)
