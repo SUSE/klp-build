@@ -90,6 +90,10 @@ class Config:
         data = self.codestreams[cs]
         return (data['sle'], data['sp'], data['update'])
 
+    def flush_cs_file(self):
+        with open(self.cs_file, 'w') as f:
+            f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
+
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
     def filter_cs(self, check_file_funcs=False, verbose=True):

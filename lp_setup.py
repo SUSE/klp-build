@@ -153,8 +153,7 @@ class Setup(Config):
         working_cs = self.filter_cs(check_file_funcs=True, verbose=True)
 
         # Save codestreams file before something bad can happen
-        with open(self.cs_file, 'w') as f:
-            f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
+        self.flush_cs_file()
 
         # Found missing cs data, downloading and extract
         if cs_data_missing:
@@ -185,10 +184,7 @@ class Setup(Config):
             data['object'] = str(obj)
 
         # Save again to now include object being set.
-        # TODO: adapt the code above to be more resilient, so we can rely on
-        # saving only at this point.
-        with open(self.cs_file, 'w') as f:
-            f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
+        self.flush_cs_file()
 
         # The returned value can be used by ccp
         return working_cs
