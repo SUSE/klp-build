@@ -35,7 +35,7 @@ class GitHelper(Config):
         build_cs = []
 
         for cs, data in self.filter_cs(True, False).items():
-            entry = [ data['cs'],
+            entry = [ self.get_full_cs(cs),
                         data['project'],
                         f"{data['kernel']}.{data['build-counter']}",
                         'change-me',

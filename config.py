@@ -61,6 +61,20 @@ class Config:
         # will contain the nm output from the to be livepatched object
         self.nm_out = {}
 
+    # Parse 15.2u25 to SLE15-SP2_Update_25
+    def get_full_cs(self, cs):
+        # Convert the string so the final cs is sle_sp_update
+        tmp_cs = cs.replace('.', '_').replace('u', '_')
+        sle, sp, u = tmp_cs.split('_')
+
+        sle = f'SLE{sle}'
+        u = f'Update_{u}'
+
+        if int(sp) > 0:
+            return f'{sle}-SP{sp}_{u}'
+
+        return f'{sle}_{u}'
+
     def get_work_dir(self, cs):
         return Path(self.bsc_path, 'c', cs, 'x86_64')
 
@@ -83,8 +97,8 @@ class Config:
 
     def get_sdir(self, cs):
         jcs = self.codestreams[cs]
-        return str(Path(self.ex_dir, jcs['cs'], 'usr', 'src',
-                        f"linux-{jcs['kernel']}"))
+        return Path(self.ex_dir, cs, 'usr', 'src',
+                        f"linux-{jcs['kernel']}")
 
     def get_cs_tuple(self, cs):
         data = self.codestreams[cs]
