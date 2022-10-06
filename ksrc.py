@@ -27,14 +27,12 @@ class GitHelper(Config):
                                 '5.14' : 'SLE15-SP4'
                             }
 
+        # Filter only the branches related to this BSC
+        repo = git.Repo(self.kgr_patches).branches
+        self.branches = [ r.name for r in repo if self.bsc in r.name ]
+
     def build(self):
         build_cs = []
-        repo = git.Repo(self.kgr_patches)
-
-        # TODO: call osckgr-commit.sh script
-
-        # Filter only the branches related to this BSC
-        branches = [ r.name for r in repo.branches if self.bsc in r.name ]
 
         for cs, data in self.filter_cs(True, False).items():
             entry = [ data['cs'],
@@ -44,7 +42,7 @@ class GitHelper(Config):
                         f"rpm-{data['kernel']}"
                         ]
 
-            for branch in branches:
+            for branch in self.branches:
                 # First check if the branch has more than code stream sharing
                 # the same code
                 for b in branch.replace(self.bsc + '_', '').split('_'):
@@ -83,15 +81,10 @@ class GitHelper(Config):
 
     def get_cs_branch(self, cs):
         sle, sp, up = self.get_cs_tuple(cs)
-        repo = git.Repo(self.kgr_patches)
 
-        all_branches = git.Repo(self.kgr_patches).branches
-
-        # Filter only the branches related to this BSC
-        branches = [ b for b in all_branches if self.bsc in b ]
         branch_name = ''
 
-        for branch in branches:
+        for branch in self.branches:
             # First check if the branch has more than code stream sharing
             # the same code
             for b in branch.replace(self.bsc + '_', '').split('_'):
@@ -124,12 +117,9 @@ class GitHelper(Config):
 
     def format_patches(self, version):
         ver = f'v{version}'
-        repo = git.Repo(self.kgr_patches)
 
         # Filter only the branches related to this BSC
-        branches = [ r.name for r in repo.branches if self.bsc in r.name ]
-
-        for branch in branches:
+        for branch in self.branches:
             print(branch)
             bname = branch.replace(self.bsc + '_', '')
             bs = ' '.join(bname.split('_'))
