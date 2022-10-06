@@ -113,6 +113,10 @@ class Setup(Config):
         for cs, data in self.codestreams.items():
             cs_files = {}
 
+            # Skip patched codestreams
+            if cs in self.conf['patched']:
+                continue
+
             for cs_regex in self._file_funcs.keys():
                 if re.match(cs_regex, cs):
                     # Convert dict to tuples
