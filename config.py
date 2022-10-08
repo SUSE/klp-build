@@ -81,6 +81,9 @@ class Config:
     def get_cs_lp_dir(self, cs):
         return Path(self.bsc_path, 'c', cs, 'x86_64', 'lp')
 
+    def get_cs_archs(self, cs):
+        return self.codestreams[cs]['archs']
+
     def get_ex_dir(self, cs='', arch=''):
         if not cs:
             return self.ex_dir

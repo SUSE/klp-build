@@ -178,12 +178,19 @@ class IBS(Config):
         print('Downloading {} rpms...'.format(len(rpms)))
         self.do_work(self.download_and_extract, rpms)
 
-        for fext, ecmd in [('zst', 'unzstd --rm -f -d'), ('xz', 'xz -d')]:
-            cmd = f'find {self.ex_dir} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
-            subprocess.check_output(cmd, shell=True)
+        # Create a list of paths pointing to lib/modules for each downloaded
+        # codestream
+        for cs in cs_list:
+            for arch in self.get_cs_archs(cs):
+                mod_path= Path(self.get_ex_dir(cs, arch), 'lib', 'modules')
+                vmlinux_path = Path(self.get_ex_dir(cs, arch), 'boot')
 
-        subprocess.check_output(f'find {self.ex_dir} -name "vmlinux*default.gz" -exec gzip -d {{}} \;',
-                                shell=True)
+                for fext, ecmd in [('zst', 'unzstd --rm -f -d'), ('xz', 'xz -d')]:
+                    cmd = f'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
+                    subprocess.check_output(cmd, shell=True)
+
+                subprocess.check_output(f'find {vmlinux_path} -name "vmlinux*default.gz" -exec gzip -d {{}} \;',
+                                        shell=True)
 
         print('Finished extract vmlinux and modules...')
 
