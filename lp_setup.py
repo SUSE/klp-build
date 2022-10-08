@@ -88,7 +88,6 @@ class Setup(Config):
                         'kernel' : kernel,
                         'build-counter' : kernel_full[-1],
                         'branch' : '',
-                        'cs' : full_cs,
                         'sle' : sle,
                         'sp' : sp,
                         'update' : u,
@@ -149,7 +148,7 @@ class Setup(Config):
 
             data['archs'] = archs
 
-            if not self.get_ex_dir(data['cs'], 'x86_64').is_dir():
+            if not self.get_ex_dir(cs, 'x86_64').is_dir():
                 cs_data_missing.append(cs)
 
         # working_cs will contain the final dict of codestreams that wast set
@@ -177,7 +176,7 @@ class Setup(Config):
                 if not fdir.is_file():
                     raise RuntimeError(f'File {f} doesn\'t exists in {str(sdir)}')
 
-            obj = self.get_module_obj(data)
+            obj = self.get_module_obj(cs)
 
             # Verify if the functions exist in the specified object
             for f in cs_files.keys():
@@ -193,11 +192,12 @@ class Setup(Config):
         # The returned value can be used by ccp
         return working_cs
 
-    def get_module_obj(self, jcs):
-        ex_dir = self.get_ex_dir(jcs['cs'], 'x86_64')
+    def get_module_obj(self, cs):
+        kernel = self.codestreams[cs]['kernel']
+        ex_dir = self.get_ex_dir(cs, 'x86_64')
         mod = self.conf['mod']
         if mod == 'vmlinux':
-            return str(Path(ex_dir, 'boot', f"vmlinux-{jcs['kernel']}-default"))
+            return str(Path(ex_dir, 'boot', f"vmlinux-{kernel}-default"))
 
         obj_path = str(Path(ex_dir, 'lib', 'modules'))
         obj = glob.glob(f'{obj_path}/**/{mod}.ko', recursive=True)

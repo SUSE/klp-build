@@ -101,16 +101,15 @@ class IBS(Config):
     def extract_rpms(self, args):
         cs, arch, rpm, dest = args
 
-        fcs = self.codestreams[cs]['cs']
         kernel = self.codestreams[cs]['kernel']
 
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
-            path_dest = self.get_ipa_dir(fcs, arch)
+            path_dest = self.get_ipa_dir(cs, arch)
         elif re.search(   'kernel\-default\-\d+', rpm) or \
                 re.search('kernel\-default\-extra\-\d+', rpm):
-            path_dest = self.get_ex_dir(fcs, arch)
+            path_dest = self.get_ex_dir(cs, arch)
         else:
-            path_dest = self.get_ex_dir(fcs)
+            path_dest = self.get_ex_dir(cs)
 
         fdest = Path(dest, rpm)
         path_dest.mkdir(exist_ok=True, parents=True)
@@ -152,7 +151,7 @@ class IBS(Config):
             prj = jcs['project']
             repo = jcs['repo']
 
-            path_dest = Path(self.kernel_rpms, jcs['cs'])
+            path_dest = Path(self.kernel_rpms, cs)
             path_dest.mkdir(exist_ok=True)
 
             for arch, val in self.cs_data.items():
@@ -225,10 +224,8 @@ class IBS(Config):
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):
         kernel = self.codestreams[cs]['kernel']
-        full_cs = self.codestreams[cs]['cs']
 
-        # TODO: Change ex_dir codestream names to the new format
-        vmlinux_path = Path(self.get_ex_dir(full_cs, arch), 'boot',
+        vmlinux_path = Path(self.get_ex_dir(cs, arch), 'boot',
                             f'vmlinux-{kernel}-default')
 
         # Get list of UNDEFINED symbols from the livepatch module
