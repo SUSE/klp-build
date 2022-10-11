@@ -393,8 +393,7 @@ class CCP(Config):
         for cs, data in self.working_cs.items():
             data['ext_symbols'] = self.ext_symbols[cs]
 
-        with open(self.cs_file, 'w') as f:
-            f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
+        self.flush_cs_file()
 
         print('Checking the externalized symbols in other architectures...')
 
