@@ -104,7 +104,7 @@ class Setup(Config):
         with open(self.conf_file, 'w') as f:
             f.write(json.dumps(self.conf, indent=4, sort_keys=True))
 
-        cs_data_missing = []
+        cs_data_missing = {}
 
         filter_out = []
 
@@ -149,7 +149,7 @@ class Setup(Config):
             data['archs'] = archs
 
             if not self.get_ex_dir(cs, 'x86_64').is_dir():
-                cs_data_missing.append(cs)
+                cs_data_missing[cs] = data
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
@@ -161,7 +161,7 @@ class Setup(Config):
         # Found missing cs data, downloading and extract
         if cs_data_missing:
             print('Download the necessary data from the following codestreams:')
-            print(f'\t{" ".join(cs_data_missing)}\n')
+            print(f'\t{" ".join(cs_data_missing.keys())}\n')
             ibs = IBS(self.bsc_num, self.filter)
             ibs.download_cs_data(cs_data_missing)
 
@@ -193,10 +193,10 @@ class Setup(Config):
         return working_cs
 
     def get_module_obj(self, cs):
-        kernel = self.codestreams[cs]['kernel']
         ex_dir = self.get_ex_dir(cs, 'x86_64')
         mod = self.conf['mod']
         if mod == 'vmlinux':
+            kernel = self.get_cs_kernel(cs)
             return str(Path(ex_dir, 'boot', f"vmlinux-{kernel}-default"))
 
         obj_path = str(Path(ex_dir, 'lib', 'modules'))

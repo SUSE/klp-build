@@ -66,7 +66,7 @@ class IBS(Config):
     # The projects has different format: 12_5u5 instead of 12.5u5
     def get_projects(self):
         prjs = []
-        projects = self.osc.search.project("starts-with(@name, '{}')".format(self.prj_prefix))
+        projects = self.osc.search.project(f"starts-with(@name, '{self.prj_prefix}')")
 
         for prj in projects.findall('project'):
             prj_name = prj.get('name')
@@ -101,8 +101,6 @@ class IBS(Config):
     def extract_rpms(self, args):
         cs, arch, rpm, dest = args
 
-        kernel = self.codestreams[cs]['kernel']
-
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
             path_dest = self.get_ipa_dir(cs, arch)
         elif re.search(   'kernel\-default\-\d+', rpm) or \
@@ -114,13 +112,14 @@ class IBS(Config):
         fdest = Path(dest, rpm)
         path_dest.mkdir(exist_ok=True, parents=True)
 
-        cmd = 'rpm2cpio {} | cpio --quiet -idm'.format(str(fdest))
+        cmd = f'rpm2cpio {fdest} | cpio --quiet -idm'
         subprocess.check_output(cmd, shell=True, cwd=path_dest)
 
         # Move ipa-clone files to path_dest
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
+            kernel = self.get_cs_kernel(cs)
             src_dir = Path(path_dest, 'usr', 'src',
-                                    'linux-{}-obj'.format(kernel),
+                                    f'linux-{kernel}-obj',
                                   arch, 'default')
 
             for f in os.listdir(src_dir):
@@ -130,7 +129,7 @@ class IBS(Config):
             os.remove(Path(path_dest, 'Symbols.list'))
             shutil.rmtree(Path(path_dest, 'usr'))
 
-        print('Extracting {} {}: ok'.format(cs, rpm))
+        print(f'Extracting {cs} {rpm}: ok')
 
     def download_and_extract(self, args):
         cs, prj, repo, arch, pkg, rpm, dest = args
@@ -146,23 +145,22 @@ class IBS(Config):
         extract = []
 
         print('Getting list of files...')
-        for cs in cs_list:
-            jcs = self.codestreams[cs]
-            prj = jcs['project']
-            repo = jcs['repo']
+        for cs, data in cs_list.items():
+            prj = data['project']
+            repo = data['repo']
 
             path_dest = Path(self.kernel_rpms, cs)
             path_dest.mkdir(exist_ok=True)
 
             for arch, val in self.cs_data.items():
-                if arch not in jcs['archs']:
+                if arch not in self.get_cs_archs(cs):
                     continue
 
                 for k, regex in val.items():
                     if repo == 'standard':
                         pkg = k
                     else:
-                        pkg = '{}.{}'.format(k, repo)
+                        pkg = f'{k}.{repo}'
 
                     # arch is fixed for now
                     ret = self.osc.build.get_binary_list(prj, repo, arch, pkg)
@@ -174,7 +172,7 @@ class IBS(Config):
                             rpm = file[0]
                         rpms.append( (cs, prj, repo, arch, pkg, rpm, path_dest) )
 
-        print('Downloading {} rpms...'.format(len(rpms)))
+        print(f'Downloading {len(rpms)} rpms...')
         self.do_work(self.download_and_extract, rpms)
 
         # Create a list of paths pointing to lib/modules for each downloaded
@@ -198,12 +196,12 @@ class IBS(Config):
 
         try:
             self.osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
-            print('{} {}: ok'.format(cs, rpm))
+            print(f'{cs} {rpm}: ok')
         except OSError as e:
             if e.errno == errno.EEXIST:
-                print('{} {}: already downloaded. skipping.'.format(cs, rpm))
+                print(f'{cs} {rpm}: already downloaded. skipping.')
             else:
-                raise RuntimeError('download error on {}: {}'.format(prj, rpm))
+                raise RuntimeError(f'download error on {prj}: {rpm}')
 
     def convert_prj_to_cs(self, prj):
         return prj.replace(f'{self.prj_prefix}-', '').replace('_', '.')
@@ -223,8 +221,7 @@ class IBS(Config):
         return filtered
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):
-        kernel = self.codestreams[cs]['kernel']
-
+        kernel = self.get_cs_kernel(cs)
         vmlinux_path = Path(self.get_ex_dir(cs, arch), 'boot',
                             f'vmlinux-{kernel}-default')
 
@@ -260,10 +257,10 @@ class IBS(Config):
 
         fdest = Path(rpm_dir, rpm)
         # Extract the livepatch module for later inspection
-        cmd = 'rpm2cpio {} | cpio --quiet -idm'.format(str(fdest))
+        cmd = f'rpm2cpio {fdest} | cpio --quiet -idm'
         subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
 
-        kernel = self.codestreams[cs]['kernel']
+        kernel = self.get_cs_kernel(cs)
         lp_mod_path = Path(rpm_dir, 'lib', 'modules', f'{kernel}-default',
                            dir_path, lp_file)
         out = subprocess.check_output(['/sbin/modinfo', str(lp_mod_path)],
@@ -353,7 +350,7 @@ class IBS(Config):
             archs = result.xpath('repository/arch')
             for arch in archs:
                 ret = self.osc.build.get_binary_list(prj, 'devbuild', arch, 'klp')
-                rpm_name = '{}.rpm'.format(arch)
+                rpm_name = f'{arch}.rpm'
                 for rpm in ret.xpath('binary/@filename'):
                     if not rpm.endswith(rpm_name):
                         continue
@@ -382,7 +379,7 @@ class IBS(Config):
         for prj, archs in prjs.items():
             st = []
             for k, v in archs.items():
-                st.append('{}: {}'.format(k, v))
+                st.append(f'{k}: {v}')
             print('{}\t{}'.format(prj, '\t'.join(st)))
 
     def cleanup(self):
@@ -392,7 +389,7 @@ class IBS(Config):
             print('No projects found.')
             return
 
-        print('Deleting {} projects...'.format(len(prjs)))
+        print(f'Deleting {len(prjs)} projects...')
 
         self.do_work(self.delete_project, prjs)
 
@@ -402,7 +399,10 @@ class IBS(Config):
     # Some attributes are set by default on osctiny:
     # build: enable
     # publish: disable
-    def create_prj_meta(self, prj, jcs):
+    def create_prj_meta(self, cs):
+        prj = self.cs_to_project(cs)
+        data = self.get_cs_data(cs)
+
         prj = ET.Element('project', { 'name' : prj})
 
         debug = ET.SubElement(prj, 'debuginfo')
@@ -411,11 +411,11 @@ class IBS(Config):
         ET.SubElement(prj, 'person', { 'userid' : 'mpdesouz', 'role' : 'bugowner'})
 
         repo = ET.SubElement(prj, 'repository', {'name' : 'devbuild'})
-        ET.SubElement(repo, 'path', {'project' : jcs['project'],
-                                     'repository' : jcs['repo']
+        ET.SubElement(repo, 'path', {'project' : data['project'],
+                                     'repository' : data['repo']
                                      })
 
-        for arch in jcs['archs']:
+        for arch in self.get_cs_archs(cs):
             ar = ET.SubElement(repo, 'arch')
             ar.text = arch
 
@@ -427,14 +427,12 @@ class IBS(Config):
         if not branch:
             raise RuntimeError(f'Could not find git branch for {cs}')
 
-        jcs = self.codestreams[cs]
-
         prj = self.cs_to_project(cs)
 
         # If the project exists, drop it first
         self.delete_project(prj, verbose=False)
 
-        meta = self.create_prj_meta(prj, jcs)
+        meta = self.create_prj_meta(cs)
         prj_desc = f'Development of livepatches for {cs}'
 
         try:
@@ -445,7 +443,7 @@ class IBS(Config):
 
             self.osc.packages.set_meta(prj, 'klp', title='', description='Test livepatch')
 
-            print('\t{}: ok'.format(prj))
+            print(f'\t{prj}: ok')
 
         except Exception as e:
             print(e, e.response.content)

@@ -243,18 +243,16 @@ class CCP(Config):
                     # Current one is different, dump what we stored and clean
                     # similars
                     if len(similars) == 1:
-                        cs_list.append('{}u{}'.format(g, similars[0]))
+                        cs_list.append(f'{g}u{similars[0]}')
                     else:
-                        cs_list.append('{}u{}-{}'.format(g, similars[0],
-                            similars[len(similars) - 1]))
+                        cs_list.append(f'{g}u{similars[0]}-{similars[len(similars) - 1]}')
 
                     similars = [r]
 
                 if len(similars) == 1:
-                    cs_list.append('{}u{}'.format(g, similars[0]))
+                    cs_list.append(f'{g}u{similars[0]}')
                 else:
-                    cs_list.append('{}u{}-{}'.format(g, similars[0],
-                                        similars[len(similars) - 1]))
+                    cs_list.append(f'{g}u{similars[0]}-{similars[len(similars) - 1]}')
 
             file_cs_list.append(cs_list)
 

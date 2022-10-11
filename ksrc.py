@@ -134,7 +134,7 @@ class GitHelper(Config):
                                      f'{out}'])
 
     def get_commit_subject(self, commit):
-        req = requests.get('https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={}'.format(commit))
+        req = requests.get(f'https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={commit}')
         req.raise_for_status()
 
         patches = Path(self.bsc_path, 'patches')
@@ -200,8 +200,7 @@ class GitHelper(Config):
 
                 m = re.search('commit (\w+)', full_cmt)
                 if not m:
-                    raise RuntimeError('Commit hash not found in patch:\n{}' \
-                            .format(full_cmt))
+                    raise RuntimeError(f'Commit hash not found in patch:\n{full_cmt}')
 
                 commit_hash = m.group(1)
 
@@ -220,7 +219,7 @@ class GitHelper(Config):
                     f.write(patches)
 
         for key, val in commits['upstream'].items():
-            print('{}: {}'.format(key, val))
+            print(f'{key}: {val}')
             for bc, _ in self.kernel_branches.items():
                 hash_cmt = commits[bc].get(key, 'None yet')
                 print('\t{}\t{}'.format(bc, hash_cmt))
@@ -265,9 +264,9 @@ class GitHelper(Config):
         patched = natsorted(list(set(patched)))
 
         css = []
-        # Find which codestreams are related to each patched kernel
-        for cs in self.codestreams.keys():
-            if self.codestreams[cs]['kernel'] in patched:
+        # Find which codestream is related to each patched kernel
+        for cs, data in self.filter_cs(False, False).items():
+            if data['kernel'] in patched:
                 css.append(cs)
 
         return css

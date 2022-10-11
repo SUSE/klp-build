@@ -84,6 +84,16 @@ class Config:
     def get_cs_archs(self, cs):
         return self.codestreams[cs]['archs']
 
+    def get_cs_data(self, cs):
+        return self.codestreams[cs]
+
+    def get_cs_kernel(self, cs):
+        return self.get_cs_data(cs)['kernel']
+
+    def get_cs_tuple(self, cs):
+        data = self.codestreams[cs]
+        return (data['sle'], data['sp'], data['update'])
+
     def get_ex_dir(self, cs='', arch=''):
         if not cs:
             return self.ex_dir
@@ -99,13 +109,8 @@ class Config:
         return Path(self.ipa_dir, cs, arch)
 
     def get_sdir(self, cs):
-        jcs = self.codestreams[cs]
         return Path(self.ex_dir, cs, 'usr', 'src',
-                        f"linux-{jcs['kernel']}")
-
-    def get_cs_tuple(self, cs):
-        data = self.codestreams[cs]
-        return (data['sle'], data['sp'], data['update'])
+                        f"linux-{self.get_cs_kernel(cs)}")
 
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:
