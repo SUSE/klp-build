@@ -33,13 +33,10 @@ class Config:
         self.bsc_num = bsc
         self.bsc = 'bsc' + str(bsc)
         self.bsc_path = Path(work, self.bsc)
-        self.bsc_path.mkdir(exist_ok=True)
         self.filter = bsc_filter
 
         self.ex_dir = Path(self.data, 'ex-kernels')
-        self.ex_dir.mkdir(exist_ok=True)
         self.ipa_dir = Path(self.data, 'ipa-clones')
-        self.ipa_dir.mkdir(exist_ok=True)
 
         self.codestreams = {}
         self.cs_file = Path(self.bsc_path, 'codestreams.json')

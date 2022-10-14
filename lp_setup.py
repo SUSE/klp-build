@@ -21,6 +21,8 @@ class Setup(Config):
         if self.bsc_path.exists() and not self.bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
+        self.bsc_path.mkdir(exist_ok=True)
+
         self.conf['mod'] = mod
         self.conf['conf'] = conf
         self.conf['archs'] = archs

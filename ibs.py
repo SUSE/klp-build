@@ -21,9 +21,6 @@ class IBS(Config):
         self.ibs_user = re.search('(\w+)@', self.email).group(1)
         self.prj_prefix = f'home:{self.ibs_user}:{self.bsc}-klp'
 
-        self.kernel_rpms = Path(self.data, 'kernel-rpms')
-        self.kernel_rpms.mkdir(exist_ok=True)
-
         self.kgraft_path = Path(Path().home(), 'kgr', 'kgraft-patches')
         if not self.kgraft_path.is_dir():
             raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches')
@@ -149,8 +146,8 @@ class IBS(Config):
             prj = data['project']
             repo = data['repo']
 
-            path_dest = Path(self.kernel_rpms, cs)
-            path_dest.mkdir(exist_ok=True)
+            path_dest = Path(self.data, 'kernel-rpms', cs)
+            path_dest.mkdir(exist_ok=True, parents=True)
 
             for arch, val in self.cs_data.items():
                 if arch not in self.get_cs_archs(cs):

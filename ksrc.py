@@ -138,7 +138,7 @@ class GitHelper(Config):
         req.raise_for_status()
 
         patches = Path(self.bsc_path, 'patches')
-        patches.mkdir(exist_ok=True)
+        patches.mkdir(exist_ok=True, parents=True)
 
         # Save the upstream commit in the bsc directory
         fpath = Path(patches, commit + '.patch')
