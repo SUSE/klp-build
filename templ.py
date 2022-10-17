@@ -51,7 +51,7 @@ class Template(Config):
             templ.globals['mod_mutex'] = True
 
         if self.mod != 'vmlinux':
-            templ.globals['mod'] = mod
+            templ.globals['mod'] = self.mod
 
         if self.conf['conf']:
             templ.globals['config'] = self.conf['conf']
