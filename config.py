@@ -179,6 +179,10 @@ class Config:
             if arch == 'x86_64':
                 continue
 
+            # Skip if the arch is not supported by the livepatch code
+            if not arch in self.conf.get('archs'):
+                continue
+
             # The stored object attribute will referece x86 path, for the same
             # reason stated above
             obj_path = data['object'].replace('x86_64', arch)
