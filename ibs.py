@@ -322,7 +322,11 @@ class IBS(Config):
                     shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, 'built'))
 
             shutil.copy(config, Path(test_arch_path, 'repro'))
-            shutil.copy(test_sh, Path(test_arch_path, 'repro'))
+
+            if test_sh.is_file():
+                shutil.copy(test_sh, Path(test_arch_path, 'repro'))
+            else:
+                print(f'WARN: missing {test_sh}')
 
             subprocess.run(['tar', '-cJf', f'{self.bsc}.tar.xz',
                                 f'{self.bsc}'], cwd=tests_path,
