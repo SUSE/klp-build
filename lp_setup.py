@@ -15,7 +15,7 @@ class Setup(Config):
         super().__init__(bsc, bsc_filter)
 
         for arch in archs:
-            if arch not in ['x86_64', 's390x', 'ppc64le']:
+            if arch not in self.archs:
                 raise ValueError(f'{arch} is not a valid architecture')
 
         if self.bsc_path.exists() and not self.bsc_path.is_dir():

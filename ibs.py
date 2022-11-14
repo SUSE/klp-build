@@ -291,7 +291,7 @@ class IBS(Config):
         # Prepare the config file used by kgr-test
         self.ksrc.build()
 
-        for arch in self.conf.get('archs', []):
+        for arch in self.archs:
             tests_path = Path(self.bsc_path, 'tests', arch)
             test_arch_path = Path(tests_path, self.bsc)
 

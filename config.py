@@ -35,6 +35,8 @@ class Config:
         self.bsc_path = Path(work, self.bsc)
         self.filter = bsc_filter
 
+        self.archs = ['x86_64', 's390x', 'ppc64le']
+
         self.ex_dir = Path(self.data, 'ex-kernels')
         self.ipa_dir = Path(self.data, 'ipa-clones')
 
