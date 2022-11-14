@@ -391,6 +391,7 @@ class CCP(Config):
 
         # save the externalized symbols
         for cs, data in self.working_cs.items():
+            self.codestreams[cs]['ext_symbols'] = self.ext_symbols[cs]
             data['ext_symbols'] = self.ext_symbols[cs]
 
         self.flush_cs_file()
