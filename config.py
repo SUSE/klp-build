@@ -58,6 +58,7 @@ class Config:
                 self.conf = json.loads(f.read())
 
         # will contain the nm output from the to be livepatched object
+        # cache nm calls for the codestream : object
         self.nm_out = {}
 
     # Parse 15.2u25 to SLE15-SP2_Update_25
@@ -82,6 +83,9 @@ class Config:
 
     def get_cs_archs(self, cs):
         return self.codestreams[cs]['archs']
+
+    def get_cs_object(self, cs):
+        return self.codestreams[cs].get('object', '')
 
     def get_cs_data(self, cs):
         return self.codestreams[cs]
@@ -114,6 +118,41 @@ class Config:
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:
             f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
+
+    def get_module_obj(self, arch, cs, module, use_cached_obj=True):
+        ex_dir = self.get_ex_dir(cs, arch)
+
+        # Use the object if it was previously set, and if we are trying to find
+        # symbols for the to be livepatched module. We can also search for
+        # symbols in externalized functions, so this argument checks
+        obj = ''
+        if use_cached_obj:
+            obj = self.get_cs_object(cs)
+
+        if not obj:
+            obj = self.find_module_obj(arch, cs, module)
+
+        mod = self.conf['mod']
+        if mod == 'vmlinux':
+            return str(Path(ex_dir, obj))
+
+        kernel = self.get_cs_kernel(cs)
+        return str(Path(ex_dir, 'lib', 'modules', f'{kernel}-default', obj))
+
+    # Return only the name of the module to be livepatched
+    def find_module_obj(self, arch, cs, mod):
+        kernel = self.get_cs_kernel(cs)
+        if mod == 'vmlinux':
+            return f'boot/vmlinux-{kernel}-default'
+
+        ex_dir = self.get_ex_dir(cs, arch)
+        mod_path = str(Path(ex_dir, 'lib', 'modules', f'{kernel}-default'))
+        with open(Path(mod_path, 'modules.order')) as f:
+            obj = re.search(f'([\w\/]+\/{mod}.ko)', f.read())
+            if not obj:
+                raise RuntimeError(f'Module not found: {mod}')
+
+            return str(obj.group(1))
 
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
@@ -166,13 +205,24 @@ class Config:
 
     # Cache the output of nm by using the object path. It differs for each
     # codestream and architecture
-    def check_symbol(self, symbol, obj):
-        if not self.nm_out.get(obj, ''):
-            self.nm_out[obj] = subprocess.check_output(['nm', '--defined-only', obj]).decode().strip()
-        return re.search(r' {}\n'.format(symbol), self.nm_out[obj])
+    def check_symbol(self, arch, cs, symbol, mod):
+        if not self.nm_out.get(arch, ''):
+            self.nm_out[arch] = {}
 
-    def check_symbol_archs(self, data, symbol, only_nok):
-        arch_sym = {}
+        if not self.nm_out[arch].get(cs, ''):
+            self.nm_out[arch][cs] = {}
+
+        if not self.nm_out[arch][cs].get(mod, ''):
+            obj = self.get_module_obj(arch, cs, mod, use_cached_obj=False)
+            self.nm_out[arch][cs][mod] = subprocess.check_output(['nm',
+                                                                     '--defined-only',
+                                                                     obj]).decode().strip()
+
+        return re.search(r' {}\n'.format(symbol), self.nm_out[arch][cs][mod])
+
+    def check_symbol_archs(self, cs, symbol, mod):
+        data = self.get_cs_data(cs)
+        arch_sym = []
         # Validate only architectures supported by the codestream
         for arch in data['archs']:
 
@@ -185,15 +235,10 @@ class Config:
             if not arch in self.conf.get('archs'):
                 continue
 
-            # The stored object attribute will referece x86 path, for the same
-            # reason stated above
-            obj_path = data['object'].replace('x86_64', arch)
-
-            ret = 'ok' if self.check_symbol(symbol, obj_path) else 'NOT FOUND'
-
-            if ret == 'ok' and only_nok:
+            if self.check_symbol(arch, cs, symbol, mod):
                 continue
 
-            arch_sym[arch] = ret
+            # Add the arch to the dict if the symbol wasn't found
+            arch_sym.append(arch)
 
         return arch_sym

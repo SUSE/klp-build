@@ -1,5 +1,4 @@
 from config import Config
-import glob
 import json
 from pathlib import Path
 import re
@@ -178,39 +177,22 @@ class Setup(Config):
                 if not fdir.is_file():
                     raise RuntimeError(f'File {f} doesn\'t exists in {str(sdir)}')
 
-            obj = self.get_module_obj(cs)
+            mod = self.conf['mod']
+            arch = 'x86_64'
+            obj = self.find_module_obj(arch, cs, mod)
+            data['object'] = obj
 
             # Verify if the functions exist in the specified object
             for f in cs_files.keys():
                 for func in cs_files[f]:
-                    if not self.check_symbol(func, obj):
+                    if not self.check_symbol(arch, cs, func, mod):
                         print(f'WARN: {cs}: Function {func} does not exist in {obj}')
-
-            data['object'] = str(obj)
 
         # Save again to now include object being set.
         self.flush_cs_file()
 
         # The returned value can be used by ccp
         return working_cs
-
-    def get_module_obj(self, cs):
-        ex_dir = self.get_ex_dir(cs, 'x86_64')
-        mod = self.conf['mod']
-        if mod == 'vmlinux':
-            kernel = self.get_cs_kernel(cs)
-            return str(Path(ex_dir, 'boot', f"vmlinux-{kernel}-default"))
-
-        obj_path = str(Path(ex_dir, 'lib', 'modules'))
-        obj = glob.glob(f'{obj_path}/**/{mod}.ko', recursive=True)
-
-        if not obj or len(obj) > 1:
-            print(obj_path)
-            raise RuntimeError(f'Module list has none or too much entries: {str(obj)}')
-
-        # Grab the only value of the list and turn obj into a string to be
-        # used later
-        return str(obj[0])
 
     def cs_repo(self, cs):
         sle, sp, up = self.get_cs_tuple(cs)

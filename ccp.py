@@ -202,8 +202,8 @@ class CCP(Config):
         with open(Path(out_dir, 'exts'), 'w') as f:
             f.write('\n'.join(ext_list))
 
-        # store the externalized symbols used in this codestream file
-        self.ext_symbols[cs] = { fname : [ ext[0] for ext in exts ] }
+        # store the externalized symbols and module used in this codestream file
+        self.ext_symbols[cs] = { fname : [ (ext[0], ext[2]) for ext in exts ] }
 
     # Group all codestreams that share code in a format like bellow:
     #   { '15.2u10' : [ 15.2u11 15.3u10 15.3u12 ] }
@@ -348,7 +348,7 @@ class CCP(Config):
         env['KCP_READELF'] = data['readelf']
         env['KCP_KBUILD_ODIR'] = str(odir)
         env['KCP_KBUILD_SDIR'] = str(sdir)
-        env['KCP_PATCHED_OBJ'] = data['object']
+        env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, self.conf['mod'])
         env['KCP_RENAME_PREFIX'] = 'klp'
 
         for fname, funcs in data['files'].items():
@@ -407,9 +407,16 @@ class CCP(Config):
         for cs, data in self.working_cs.items():
             tem.GenerateLivePatches(cs)
 
-            print(f'{cs}')
             for _, exts in data['ext_symbols'].items():
                 for ext in exts:
-                    print(f'\t{ext}')
-                    for arch, ret in self.check_symbol_archs(data, ext, True).items():
-                        print(f'\t\t{arch}: {ret}')
+                    func = ext[0]
+                    mod = ext[1]
+
+                    archs = self.check_symbol_archs(cs, func, mod)
+
+                    # archs is populated when a symbol wasn't found
+                    if archs:
+                        print(f'{cs}')
+                        print(f'\t{func}')
+                        for arch in archs:
+                            print(f'\t\t{arch}/{mod}: NOT FOUND')
