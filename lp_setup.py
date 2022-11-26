@@ -91,8 +91,7 @@ class Setup(Config):
                         'branch' : '',
                         'sle' : sle,
                         'sp' : sp,
-                        'update' : u,
-                        'readelf' : 'readelf'
+                        'update' : u
                 }
 
         print('Validating codestreams data...')

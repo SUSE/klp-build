@@ -345,7 +345,7 @@ class CCP(Config):
         env = self.env.copy()
 
         env['KCP_MOD_SYMVERS'] = str(Path(odir, 'Module.symvers'))
-        env['KCP_READELF'] = data['readelf']
+        env['KCP_READELF'] = 'readelf'
         env['KCP_KBUILD_ODIR'] = str(odir)
         env['KCP_KBUILD_SDIR'] = str(sdir)
         env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, self.conf['mod'])
