@@ -337,7 +337,9 @@ class CCP(Config):
             for css in cs_groups[file]:
                 print(f"\t\t{' '.join(css)}")
 
-    def process_ccp(self, cs, data):
+    def process_ccp(self, args):
+        cs, fname, funcs = args
+
         sdir = self.get_sdir(cs)
         odir = Path(f'{sdir}-obj', 'x86_64', 'default')
 
@@ -351,25 +353,24 @@ class CCP(Config):
         env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, self.conf['mod'])
         env['KCP_RENAME_PREFIX'] = 'klp'
 
-        for fname, funcs in data['files'].items():
-            print(f'\t{cs}\t\t{fname}')
+        print(f'\t{cs}\t\t{fname}')
 
-            self._proc_files.append(fname)
-            base_fname = Path(fname).name
+        self._proc_files.append(fname)
+        base_fname = Path(fname).name
 
-            out_dir = Path(self.get_work_dir(cs), f'work_{base_fname}')
-            # remove any previously generated files
-            shutil.rmtree(out_dir, ignore_errors=True)
-            out_dir.mkdir(parents=True, exist_ok=True)
-            # create symlink to the respective codestream file
-            os.symlink(Path(sdir, fname), Path(out_dir, base_fname))
-            env['KCP_WORK_DIR'] = str(out_dir)
+        out_dir = Path(self.get_work_dir(cs), f'work_{base_fname}')
+        # remove any previously generated files
+        shutil.rmtree(out_dir, ignore_errors=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        # create symlink to the respective codestream file
+        os.symlink(Path(sdir, fname), Path(out_dir, base_fname))
+        env['KCP_WORK_DIR'] = str(out_dir)
 
-            env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs, 'x86_64'),
-                                                  f'{fname}.000i.ipa-clones'))
+        env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs, 'x86_64'),
+                                              f'{fname}.000i.ipa-clones'))
 
-            self.execute_ccp(cs, fname, ','.join(funcs), out_dir, sdir, odir,
-                    env)
+        self.execute_ccp(cs, fname, ','.join(funcs), out_dir, sdir, odir,
+                env)
 
     def run_ccp(self):
         print(f'Work directory: {self.bsc_path}')
@@ -380,9 +381,16 @@ class CCP(Config):
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')
+
+        # Make it perform better by spawning a process_ccp function per
+        # cs/file/funcs tuple, instead of spawning a thread per codestream
+        args = []
+        for cs, data in self.working_cs.items():
+            for fname, funcs in data['files'].items():
+                args.append((cs, fname, funcs))
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-            results = executor.map(self.process_ccp, self.working_cs.keys(),
-                                   self.working_cs.values())
+            results = executor.map(self.process_ccp, args)
             for result in results:
                 if result:
                     print(f'{cs}: {result}')
