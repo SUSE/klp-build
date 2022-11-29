@@ -20,8 +20,6 @@ def create_parser() -> argparse.ArgumentParser:
     setup = sub.add_parser('setup', parents = [parentparser])
     setup.add_argument('--redownload', action='store_true',
             help='Replaces the currently used codestream.in file')
-    setup.add_argument('--disable-ccp', action='store_true',
-            help='klp-ccp runs automatically on setup. This option disables it')
     setup.add_argument('--cve', type=str, required=True,
             help='The CVE assigned to this livepatch')
     setup.add_argument('--conf', type=str, default='',
@@ -81,10 +79,7 @@ if  __name__ == '__main__':
         setup = Setup(args.bsc, args.filter, args.redownload,
                           args.cve, args.conf, args.file_funcs, args.module,
                           args.upstream_commits, args.archs)
-        working_cs = setup.setup_project_files()
-
-        if not args.disable_ccp:
-            CCP(args.bsc, args.filter, working_cs).run_ccp()
+        setup.setup_project_files()
 
     elif args.cmd == 'run-ccp':
         CCP(args.bsc, args.filter).run_ccp()
