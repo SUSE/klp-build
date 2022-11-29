@@ -1,3 +1,4 @@
+import copy
 import json
 import git
 from pathlib import Path
@@ -40,6 +41,7 @@ class Config:
         self.ex_dir = Path(self.data, 'ex-kernels')
         self.ipa_dir = Path(self.data, 'ipa-clones')
 
+        self.working_cs = {}
         self.codestreams = {}
         self.cs_file = Path(self.bsc_path, 'codestreams.json')
         if self.cs_file.is_file():
@@ -81,21 +83,24 @@ class Config:
     def get_cs_lp_dir(self, cs):
         return Path(self.bsc_path, 'c', cs, 'x86_64', 'lp')
 
+    def get_cs_data(self, cs):
+        if self.working_cs.get(cs, ''):
+            return self.working_cs[cs]
+
+        return self.codestreams[cs]
+
     def get_cs_archs(self, cs):
-        return self.codestreams[cs]['archs']
+        return self.get_cs_data(cs)['archs']
 
     def get_cs_object(self, cs):
-        return self.codestreams[cs].get('object', '')
-
-    def get_cs_data(self, cs):
-        return self.codestreams[cs]
+        return self.get_cs_data(cs).get('object', '')
 
     def get_cs_kernel(self, cs):
         return self.get_cs_data(cs)['kernel']
 
     def get_cs_tuple(self, cs):
-        data = self.codestreams[cs]
-        return (data['sle'], data['sp'], data['update'])
+        match = re.search('(\d+)\.(\d+)u(\d+)', cs)
+        return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
     def get_ex_dir(self, cs='', arch=''):
         if not cs:
@@ -156,25 +161,17 @@ class Config:
 
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
-    def filter_cs(self, check_file_funcs=False, verbose=True):
+    def filter_cs(self, cs_list=None, verbose=True):
         cs_del_list = []
-        full_cs = self.codestreams.keys()
-
-        patched = self.conf.get('patched', [])
-        if patched and verbose:
-            print('Skipping patched codestreams:')
-            print(f'\t{" ".join(patched)}')
-
-        cs_del_list = patched
-
-        # Remove the patches codestreams from the full list
-        full_cs = set(full_cs) - set(cs_del_list)
+        if not cs_list:
+            cs_list = self.codestreams
+        full_cs = copy.deepcopy(cs_list)
 
         if self.filter:
             if verbose:
                 print('Applying filter...')
             filtered = []
-            for cs in full_cs:
+            for cs in full_cs.keys():
                 if not re.match(self.filter, cs):
                     filtered.append(cs)
 
@@ -183,25 +180,11 @@ class Config:
                 print(f'\t{" ".join(filtered)}')
 
             cs_del_list.extend(filtered)
-            # Remove the filtered
-            full_cs = set(full_cs) - set(cs_del_list)
-
-        if check_file_funcs:
-            filtered = []
-            for cs in full_cs:
-                if not self.codestreams[cs].get('files', ''):
-                    filtered.append(cs)
-
-            if filtered and verbose:
-                print('Skipping codestreams without file-funcs:')
-                print(f'\t{" ".join(filtered)}')
-
-            cs_del_list.extend(filtered)
 
         for cs in cs_del_list:
-            self.codestreams.pop(cs, '')
+            full_cs.pop(cs, '')
 
-        return self.codestreams
+        return full_cs
 
     # Cache the output of nm by using the object path. It differs for each
     # codestream and architecture

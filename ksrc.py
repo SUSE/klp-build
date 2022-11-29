@@ -34,7 +34,7 @@ class GitHelper(Config):
     def build(self):
         build_cs = []
 
-        for cs, data in self.filter_cs(True, False).items():
+        for cs, data in self.filter_cs(verbose=False).items():
             entry = [ self.get_full_cs(cs),
                         data['project'],
                         f"{data['kernel']}.{data['build-counter']}",
@@ -155,6 +155,10 @@ class GitHelper(Config):
         # do not get the commits twice
         if self.conf.get('commits', ''):
             return self.conf['commits']
+        # ensure that the user informed the commits at least once per 'project'
+        elif not ups_commits:
+            raise RuntimeError(f'Not upstream commits informed or found. Use '
+                               '--upstream-commits option')
 
         print('Getting suse fixes for upstream commits per CVE branch...')
 
@@ -265,7 +269,7 @@ class GitHelper(Config):
 
         css = []
         # Find which codestream is related to each patched kernel
-        for cs, data in self.filter_cs(False, False).items():
+        for cs, data in self.filter_cs(verbose=False).items():
             if data['kernel'] in patched:
                 css.append(cs)
 

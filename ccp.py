@@ -376,7 +376,7 @@ class CCP(Config):
 
         # working_cs could be populated by the setup
         if not self.working_cs:
-            self.working_cs = self.filter_cs(self.codestreams.keys(), True)
+            self.working_cs = self.filter_cs(verbose=True)
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')

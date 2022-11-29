@@ -54,47 +54,50 @@ class Setup(Config):
 
         return int(sle), int(sp), int(u)
 
+    def download_supported_file(self):
+        print('Downloading codestreams file')
+        req = requests.get('https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv')
+
+        # exit on error
+        req.raise_for_status()
+
+        first_line = True
+        codestreams = {}
+        for line in req.iter_lines():
+            # skip empty lines
+            if not line:
+                continue
+
+            # skip file header
+            if first_line:
+                first_line = False
+                continue
+
+            # remove the last two columns, which are dates of the line
+            # and add a fifth field with the forth one + rpm- prefix, and
+            # remove the build counter number
+            full_cs, proj, kernel_full, _, _= line.decode('utf-8').strip().split(',')
+            kernel = re.sub('\.\d+$', '', kernel_full)
+
+            # Fill the majority of possible fields here
+            sle, sp, u = self.parse_cs_line(full_cs)
+            cs_key = f'{sle}.{sp}u{u}'
+            codestreams[cs_key] = {
+                    'project' : proj,
+                    'kernel' : kernel,
+                    'build-counter' : kernel_full[-1],
+                    'branch' : '',
+                    'sle' : sle,
+                    'sp' : sp,
+                    'update' : u
+            }
+
+        return codestreams
+
     def setup_project_files(self):
-        if self.cs_file.exists() and not self._redownload:
-            print('Found codestreams.json file, loading downloaded file.')
-        else:
-            print('Downloading codestreams file')
-            req = requests.get('https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv')
-
-            # exit on error
-            req.raise_for_status()
-
-            first_line = True
-            for line in req.iter_lines():
-                # skip empty lines
-                if not line:
-                    continue
-
-                # skip file header
-                if first_line:
-                    first_line = False
-                    continue
-
-                # remove the last two columns, which are dates of the line
-                # and add a fifth field with the forth one + rpm- prefix, and
-                # remove the build counter number
-                full_cs, proj, kernel_full, _, _= line.decode('utf-8').strip().split(',')
-                kernel = re.sub('\.\d+$', '', kernel_full)
-
-                # Fill the majority of possible fields here
-                sle, sp, u = self.parse_cs_line(full_cs)
-                cs_key = f'{sle}.{sp}u{u}'
-                self.codestreams[cs_key] = {
-                        'project' : proj,
-                        'kernel' : kernel,
-                        'build-counter' : kernel_full[-1],
-                        'branch' : '',
-                        'sle' : sle,
-                        'sp' : sp,
-                        'update' : u
-                }
-
-        print('Validating codestreams data...')
+        # Always get the latest supported.csv file and check the content
+        # against the codestreams informed by the user
+        all_codestreams = self.download_supported_file()
 
         # Called at this point because codestreams is populated
         self.conf['commits'] = self.ksrc.get_commits(self._ups_commits)
@@ -106,10 +109,11 @@ class Setup(Config):
 
         cs_data_missing = {}
 
-        filter_out = []
+        # list of codestreams that matches the file-funcs argument
+        working_cs = {}
 
         # Filter by file-funcs
-        for cs, data in self.codestreams.items():
+        for cs, data in all_codestreams.items():
             cs_files = {}
 
             # Skip patched codestreams
@@ -131,9 +135,12 @@ class Setup(Config):
                             values.extend(cs_files[k])
                         cs_files[k] = values
 
+            # If not file-funcs, it means that we don't meant to setup the
+            # specific codestream
             if not cs_files:
-                filter_out.append(cs)
                 continue
+
+            working_cs[cs] = data
 
             data['files'] = cs_files
             data['repo'] = self.cs_repo(cs)
@@ -153,10 +160,7 @@ class Setup(Config):
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
-        working_cs = self.filter_cs(check_file_funcs=True, verbose=True)
-
-        # Save codestreams file before something bad can happen
-        self.flush_cs_file()
+        self.working_cs = self.filter_cs(working_cs, verbose=True)
 
         # Found missing cs data, downloading and extract
         if cs_data_missing:
@@ -164,6 +168,8 @@ class Setup(Config):
             print(f'\t{" ".join(cs_data_missing.keys())}\n')
             ibs = IBS(self.bsc_num, self.filter)
             ibs.download_cs_data(cs_data_missing)
+
+        print('Validating codestreams data...')
 
         # Setup the missing codestream info needed
         for cs, data in working_cs.items():
@@ -187,11 +193,11 @@ class Setup(Config):
                     if not self.check_symbol(arch, cs, func, mod):
                         print(f'WARN: {cs}: Function {func} does not exist in {obj}')
 
-        # Save again to now include object being set.
-        self.flush_cs_file()
+        # Update and save codestreams data
+        for cs, data in working_cs.items():
+            self.codestreams[cs] = data
 
-        # The returned value can be used by ccp
-        return working_cs
+        self.flush_cs_file()
 
     def cs_repo(self, cs):
         sle, sp, up = self.get_cs_tuple(cs)

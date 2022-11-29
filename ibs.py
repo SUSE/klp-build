@@ -304,7 +304,7 @@ class IBS(Config):
             for d in ['built', 'repro', 'tests.out']:
                 Path(test_arch_path, d).mkdir(exist_ok=True)
 
-            for cs, data in self.filter_cs(True, False).items():
+            for cs, data in self.filter_cs(verbose=False).items():
                 if arch not in data['archs']:
                     continue
 

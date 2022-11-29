@@ -32,7 +32,7 @@ def create_parser() -> argparse.ArgumentParser:
             'func2 --file-func 12.[45] file/patch2 func1...')
     setup.add_argument('--module', type=str, default='vmlinux',
             help='The module that will be livepatched')
-    setup.add_argument('-u', '--upstream-commits', required=True,
+    setup.add_argument('-u', '--upstream-commits',
             nargs='+', help='Commit hashes used to solve the CVE')
     setup.add_argument('--archs', required=True,
             nargs='+', help='Supported architectures for this livepatch')
