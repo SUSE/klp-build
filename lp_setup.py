@@ -9,7 +9,7 @@ from ibs import IBS
 from ksrc import GitHelper
 
 class Setup(Config):
-    def __init__(self, bsc, bsc_filter, cve, conf, file_funcs, mod,
+    def __init__(self, bsc, bsc_filter, cve, conf, cs_arg, file_funcs, mod,
             ups_commits, archs):
         super().__init__(bsc, bsc_filter)
 
@@ -29,19 +29,14 @@ class Setup(Config):
 
         self.ksrc = GitHelper(self.bsc_num, self.filter)
 
+        self.codestream = cs_arg
         self._ups_commits = ups_commits
-        self._file_funcs = {}
+        self.file_funcs = {}
 
         for f in file_funcs:
-            cs = f[0]
-            filepath = f[1]
-            funcs = f[2:]
-            # We can have multiple files per cs being specified, so do not
-            # remove previously stored file/funcs pairs
-            if not self._file_funcs.get(cs):
-                self._file_funcs[cs] = {}
-
-            self._file_funcs[cs][filepath] = funcs
+            filepath = f[0]
+            funcs = f[1:]
+            self.file_funcs[filepath] = funcs
 
     # Parse SLE15-SP2_Update_25 to 15.2u25
     def parse_cs_line(self, cs):
@@ -111,37 +106,16 @@ class Setup(Config):
         # list of codestreams that matches the file-funcs argument
         working_cs = {}
 
-        # Filter by file-funcs
         for cs, data in all_codestreams.items():
-            cs_files = {}
+            # Only process codestreams that are related to the argument
+            if not re.match(self.codestream, cs):
+                continue
 
             # Skip patched codestreams
             if cs in self.conf['patched']:
                 continue
 
-            for cs_regex in self._file_funcs.keys():
-                if re.match(cs_regex, cs):
-                    # Convert dict to tuples
-                    for k, v in list(self._file_funcs[cs_regex].items()):
-                        # At this point we can have multiple regexes to specify
-                        # different functions per file per codestream. In this case,
-                        # we need to append the new functions to a file that can be
-                        # added in a previous iteration.
-
-                        # Copy the list here to avoid changing the _file_funcs
-                        values = v.copy()
-                        if cs_files.get(k, []):
-                            values.extend(cs_files[k])
-                        cs_files[k] = values
-
-            # If not file-funcs, it means that we don't meant to setup the
-            # specific codestream
-            if not cs_files:
-                continue
-
-            working_cs[cs] = data
-
-            data['files'] = cs_files
+            data['files'] = self.file_funcs
             data['repo'] = self.cs_repo(cs)
 
             # Set supported archs for the codestream
@@ -156,6 +130,8 @@ class Setup(Config):
 
             if not self.get_ex_dir(cs, 'x86_64').is_dir():
                 cs_data_missing[cs] = data
+
+            working_cs[cs] = data
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected

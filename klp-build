@@ -22,6 +22,9 @@ def create_parser() -> argparse.ArgumentParser:
             help='The CVE assigned to this livepatch')
     setup.add_argument('--conf', type=str, default='',
             help='The kernel CONFIG used to be build the livepatch')
+    setup.add_argument('--codestream', type=str, default='',
+            help='Codestream of which the file and functions are related. Can '
+                ' be used a regex, like, 15.u[34]')
     setup.add_argument('--file-funcs', required=True, action='append', nargs='*',
             help='Codestream, file and functions to be livepatched. Can be set '
             'multiple times. The format is --file-funcs 12.3 file/path.c func1 '
@@ -75,8 +78,8 @@ if  __name__ == '__main__':
 
     if args.cmd == 'setup':
         setup = Setup(args.bsc, args.filter, args.cve, args.conf,
-                          args.file_funcs, args.module,
-                          args.upstream_commits, args.archs)
+                      args.codestream, args.file_funcs, args.module,
+                      args.upstream_commits, args.archs)
         setup.setup_project_files()
 
     elif args.cmd == 'run-ccp':
