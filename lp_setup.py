@@ -9,7 +9,7 @@ from ibs import IBS
 from ksrc import GitHelper
 
 class Setup(Config):
-    def __init__(self, bsc, bsc_filter, redownload, cve, conf, file_funcs, mod,
+    def __init__(self, bsc, bsc_filter, cve, conf, file_funcs, mod,
             ups_commits, archs):
         super().__init__(bsc, bsc_filter)
 
@@ -30,7 +30,6 @@ class Setup(Config):
         self.ksrc = GitHelper(self.bsc_num, self.filter)
 
         self._ups_commits = ups_commits
-        self._redownload = redownload
         self._file_funcs = {}
 
         for f in file_funcs:
