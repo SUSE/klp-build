@@ -52,8 +52,6 @@ class CCP(Config):
         else:
             raise RuntimeError('Only gcc12 is available, and it\'s problematic with kernel sources')
 
-        self.ext_symbols = {}
-
         # the current blacklisted function, more can be added as necessary
         self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen,twaddle,set_geometry,valid_floppy_drive_params"
 
@@ -110,10 +108,6 @@ class CCP(Config):
                                     stderr=subprocess.PIPE, check=True)
 
         return self.process_make_output(cs, filename, completed.stdout.decode())
-
-    # extract the last component of the path, like the basename bash # function
-    def lp_out_file(self, fname):
-        return self.bsc + '_' + PurePath(fname).name
 
     def execute_ccp(self, cs, fname, funcs, out_dir, sdir, odir, env):
         lp_out = Path(out_dir, self.lp_out_file(fname))
@@ -203,7 +197,7 @@ class CCP(Config):
             f.write('\n'.join(ext_list))
 
         # store the externalized symbols and module used in this codestream file
-        self.ext_symbols[cs] = { fname : [ (ext[0], ext[2]) for ext in exts ] }
+        self.codestreams[cs]['ext_symbols'][fname] = [ (ext[0], ext[2]) for ext in exts ]
 
     # Group all codestreams that share code in a format like bellow:
     #   { '15.2u10' : [ 15.2u11 15.3u10 15.3u12 ] }
@@ -258,46 +252,37 @@ class CCP(Config):
 
         return natsorted(file_cs_list)
 
-    def group_equal_files(self):
-        codestreams = []
-        files = {}
-        cs_groups = {}
-
+    def group_equal_files(self, args):
         print('\nGrouping codestreams for each file processed by ccp:')
 
-        # Use set to remove duplicated names
-        for fname in set(self._proc_files):
-            src_out = self.lp_out_file(fname)
+        cs_files = {}
+        cs_groups = {}
 
-            for fsrc in Path(self.bsc_path, 'c').rglob(src_out):
-                with open(fsrc, 'r+') as fi:
-                    src = fi.read()
+        # Mount the cs_files dict
+        for arg in args:
+            file, cs, _ = arg
+            if not cs_files.get(file, ''):
+                cs_files[file] = {}
 
-                    # get the cs from the file path
-                    # /<rootfs>/.../bsc1197705/c/15.3u4/x86_64/work_cls_api.c/bsc1197705_cls_api.c
-                    cs = fsrc.parts[-4]
+            fpath = self.get_work_lp_file(cs, file)
+            with open(fpath, 'r+') as fi:
+                src = fi.read()
 
-                    m = re.search('#include "(.+kconfig.h)"', src)
-                    if not m:
-                        raise RuntimeError(f'File {str(fsrc)} without an include to kconfig.h')
+            src = re.sub('#include \".+kconfig\.h\"', '', src)
+            # Since 15.4 klp-ccp includes a compiler-version.h header
+            src = re.sub('#include \".+compiler\-version\.h\"', '', src)
 
-                    kconfig = m.group(1)
+            # Remove any mentions to klpr_trace, since it's currently
+            # buggy in klp-ccp
+            src = re.sub('.+klpr_trace.+', '', src)
 
-                    # check for duplicate kconfig lines
-                    for c in codestreams:
-                        if kconfig == files[c]['kconfig']:
-                            raise RuntimeError(f'{cs}\'s kconfig is the same of {c}')
+            cs_files[file][cs] = { 'src' : src }
 
-                    src = re.sub('#include \".+kconfig\.h\"', '', src)
-                    # Since 15.4 klp-ccp includes a compiler-version.h header
-                    src = re.sub('#include \".+compiler\-version\.h\"', '', src)
-
-                    # Remove any mentions to klpr_trace, since it's currently
-                    # buggy in klp-ccp
-                    src = re.sub('.+klpr_trace.+', '', src)
-
-                    codestreams.append(cs)
-                    files[cs] = { 'kconfig' : kconfig, 'src' : src }
+        # Iterate over files to group them
+        for file, data in cs_files.items():
+            # A list of all codestreams that have the same file
+            codestreams = data.keys()
+            files = data
 
             members = {}
             # rglob can list codestreams unordered
@@ -326,7 +311,7 @@ class CCP(Config):
 
             # members will contain a dict with the key as a codestream and the
             # values will be a list of codestreams that share the code
-            cs_groups[fname] = self.classify_codestreams(members)
+            cs_groups[file] = self.classify_codestreams(members)
 
         with open(Path(self.bsc_path, 'groups.json'), 'w') as f:
             f.write(json.dumps(cs_groups, indent=4))
@@ -338,7 +323,7 @@ class CCP(Config):
                 print(f"\t\t{' '.join(css)}")
 
     def process_ccp(self, args):
-        cs, fname, funcs = args
+        fname, cs, funcs = args
 
         sdir = self.get_sdir(cs)
         odir = Path(f'{sdir}-obj', 'x86_64', 'default')
@@ -358,7 +343,7 @@ class CCP(Config):
         self._proc_files.append(fname)
         base_fname = Path(fname).name
 
-        out_dir = Path(self.get_work_dir(cs), f'work_{base_fname}')
+        out_dir = self.get_work_dir(cs, fname)
         # remove any previously generated files
         shutil.rmtree(out_dir, ignore_errors=True)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -387,7 +372,7 @@ class CCP(Config):
         args = []
         for cs, data in self.working_cs.items():
             for fname, funcs in data['files'].items():
-                args.append((cs, fname, funcs))
+                args.append((fname, cs, funcs))
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
             results = executor.map(self.process_ccp, args)
@@ -395,14 +380,13 @@ class CCP(Config):
                 if result:
                     print(f'{cs}: {result}')
 
-        self.group_equal_files()
-
-        # save the externalized symbols
-        for cs, data in self.working_cs.items():
-            self.codestreams[cs]['ext_symbols'] = self.ext_symbols[cs]
-            data['ext_symbols'] = self.ext_symbols[cs]
-
+        # Save the ext_symbols set by execute_ccp
         self.flush_cs_file()
+
+        self.group_equal_files(args)
+
+        for cs, data in self.working_cs.items():
+            data['ext_symbols'] = self.codestreams[cs]['ext_symbols']
 
         print('Checking the externalized symbols in other architectures...')
 

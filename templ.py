@@ -60,8 +60,8 @@ class Template(Config):
 
     def __GenerateLivepatchFile(self, lp_path, cs, ext, src_file, use_src_name=False):
         if src_file:
-            lp_inc_dir = str(Path(self.get_work_dir(cs), 'work_' + src_file))
-            lp_file = f'{self.bsc}_{src_file}'
+            lp_inc_dir = str(self.get_work_dir(cs, src_file))
+            lp_file = self.lp_out_file(src_file)
         else:
             lp_inc_dir = None
             lp_file = None
@@ -101,14 +101,13 @@ class Template(Config):
         # If the livepatch touches only one file the final livepatch file will
         # be names livepatch_XXXX
         if len(files.keys()) == 1:
-            src = Path(list(files.keys())[0]).name
+            src = Path(list(files.keys())[0])
             self.__GenerateLivepatchFile(lp_path, cs, 'c', src)
             return
 
         # Run the template engine for each touched source file.
         for src_file, _ in files.items():
-            src = str(Path(src_file).name)
-            self.__GenerateLivepatchFile(lp_path, cs, 'c', src, True)
+            self.__GenerateLivepatchFile(lp_path, cs, 'c', src_file, True)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files

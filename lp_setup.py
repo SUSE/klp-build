@@ -118,6 +118,10 @@ class Setup(Config):
             data['files'] = self.file_funcs
             data['repo'] = self.cs_repo(cs)
 
+            # The ext_symbols will be populated by ccp
+            for file in self.file_funcs.keys():
+                data['ext_symbols'] = { file : [] }
+
             # Set supported archs for the codestream
             archs = ['x86_64']
             if self.is_ppc_supported(cs):

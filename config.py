@@ -77,8 +77,16 @@ class Config:
 
         return f'{sle}_{u}'
 
-    def get_work_dir(self, cs):
-        return Path(self.bsc_path, 'c', cs, 'x86_64')
+    def lp_out_file(self, fname):
+        fpath = f'{str(fname).replace("/", "_")}'
+        return f'{self.bsc}_{fpath}'
+
+    def get_work_dir(self, cs, fname):
+        fpath = f'work_{str(fname).replace("/", "_")}'
+        return Path(self.bsc_path, 'c', cs, 'x86_64', fpath)
+
+    def get_work_lp_file(self, cs, fname):
+        return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
 
     def get_cs_lp_dir(self, cs):
         return Path(self.bsc_path, 'c', cs, 'x86_64', 'lp')
