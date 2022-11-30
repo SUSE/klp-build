@@ -106,6 +106,12 @@ class Config:
     def get_cs_kernel(self, cs):
         return self.get_cs_data(cs)['kernel']
 
+    def get_cs_files(self, cs):
+        return self.get_cs_data(cs)['files']
+
+    def get_cs_ext_symbols(self, cs):
+        return self.get_cs_data(cs)['ext_symbols']
+
     def get_cs_tuple(self, cs):
         match = re.search('(\d+)\.(\d+)u(\d+)', cs)
         return (int(match.group(1)), int(match.group(2)), int(match.group(3)))

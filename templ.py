@@ -88,12 +88,10 @@ class Template(Config):
             f.write(templ.render(fname = fname, inc_src_file = lp_file))
 
     def GenerateLivePatches(self, cs):
-        cs_data = self.codestreams[cs]
-
         lp_path = self.get_cs_lp_dir(cs)
         lp_path.mkdir(exist_ok=True)
 
-        files = cs_data['files']
+        files = self.get_cs_files(cs)
         self.GeneratePatchedFuncs(lp_path, files)
 
         self.__GenerateLivepatchFile(lp_path, cs, 'h', None)

@@ -334,8 +334,7 @@ class IBS(Config):
                                         stderr=subprocess.PIPE, check=True)
 
     def delete_rpms(self, cs):
-        archs = self.codestreams[cs]['archs']
-        for arch in archs:
+        for arch in self.get_cs_archs(cs):
             shutil.rmtree(Path(self.bsc_path, 'c', cs, arch, 'rpm'),
                           ignore_errors=True)
 

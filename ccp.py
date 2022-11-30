@@ -11,11 +11,8 @@ from config import Config
 from templ import Template
 
 class CCP(Config):
-    def __init__(self, bsc, bsc_filter, working_cs = {}):
+    def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
-
-        self.working_cs = working_cs
-        self._proc_files = []
 
         self.env = os.environ
 
@@ -340,7 +337,6 @@ class CCP(Config):
 
         print(f'\t{cs}\t\t{fname}')
 
-        self._proc_files.append(fname)
         base_fname = Path(fname).name
 
         out_dir = self.get_work_dir(cs, fname)
@@ -360,9 +356,7 @@ class CCP(Config):
     def run_ccp(self):
         print(f'Work directory: {self.bsc_path}')
 
-        # working_cs could be populated by the setup
-        if not self.working_cs:
-            self.working_cs = self.filter_cs(verbose=True)
+        working_cs = self.filter_cs(verbose=True)
 
         print('\nRunning klp-ccp...')
         print('\tCodestream\tFile')
@@ -370,7 +364,7 @@ class CCP(Config):
         # Make it perform better by spawning a process_ccp function per
         # cs/file/funcs tuple, instead of spawning a thread per codestream
         args = []
-        for cs, data in self.working_cs.items():
+        for cs, data in working_cs.items():
             for fname, funcs in data['files'].items():
                 args.append((fname, cs, funcs))
 
@@ -385,21 +379,18 @@ class CCP(Config):
 
         self.group_equal_files(args)
 
-        for cs, data in self.working_cs.items():
-            data['ext_symbols'] = self.codestreams[cs]['ext_symbols']
-
-        print('Checking the externalized symbols in other architectures...')
-
         tem = Template(self.bsc_num, self.filter)
         tem.generate_commit_msg_file()
+
+        print('Checking the externalized symbols in other architectures...')
 
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
         # While we are at it, create the livepatches per codestream
-        for cs, data in self.working_cs.items():
+        for cs, data in working_cs.items():
             tem.GenerateLivePatches(cs)
 
-            for _, exts in data['ext_symbols'].items():
+            for _, exts in self.get_cs_ext_symbols(cs).items():
                 for ext in exts:
                     func = ext[0]
                     mod = ext[1]
