@@ -29,7 +29,10 @@ class GitHelper(Config):
 
         # Filter only the branches related to this BSC
         repo = git.Repo(self.kgr_patches).branches
-        self.branches = [ r.name for r in repo if self.bsc in r.name ]
+        self.branches = []
+        for r in repo:
+            if r.name.startswith(self.bsc):
+                self.branches.append(r.name)
 
     def build(self):
         build_cs = []
