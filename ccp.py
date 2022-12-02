@@ -197,69 +197,67 @@ class CCP(Config):
         self.codestreams[cs]['ext_symbols'][fname] = [ (ext[0], ext[2]) for ext in exts ]
 
     # Group all codestreams that share code in a format like bellow:
-    #   { '15.2u10' : [ 15.2u11 15.3u10 15.3u12 ] }
+    #   [15.2u10 15.2u11 15.3u10 15.3u12 ]
     # Will be converted to:
     #   15.2u10-11 15.3u10 15.3u12
     # The returned value will be a list of lists, each internal list will
     # contain all codestreams which share the same code
-    def classify_codestreams(self, cs_dict):
-        file_cs_list = []
-        for cs in cs_dict.keys():
+    def classify_codestreams(self, cs_list):
+        # Group all codestreams that share the same codestream by a new dict
+        # divided by the SLE version alone, making it easier to process
+        # later
+        cs_group = {}
+        for cs in cs_list:
+            prefix, up = cs.split('u')
+            if not cs_group.get(prefix, ''):
+                cs_group[prefix] = [int(up)]
+            else:
+                cs_group[prefix].append(int(up))
 
-            # Group all codestreams that share the same codestream by a new dict
-            # divided by the SLE version alone, making it easier to process
-            # later
-            cs_group = {}
-            relatives = [cs] + cs_dict[cs]
-            for l in [cs] + cs_dict[cs]:
-                prefix, up = l.split('u')
-                if not cs_group.get(prefix, ''):
-                    cs_group[prefix] = [up]
+        ret_list = []
+        for cs, ups in cs_group.items():
+            if len(ups) == 1:
+                ret_list.append(f'{cs}u{ups[0]}')
+                continue
+
+            sim = []
+            while len(ups):
+                if not sim:
+                    sim.append(ups.pop(0))
+                    continue
+
+                cur = ups.pop(0)
+                last_item = sim[len(sim) - 1]
+                if last_item + 1 == cur:
+                    sim.append(cur)
+                    continue
+
+                # they are different, print them
+                if len(sim) == 1:
+                    ret_list.append(f'{cs}u{sim[0]}')
                 else:
-                    cs_group[prefix].append(up)
+                    ret_list.append(f'{cs}u{sim[0]}-{last_item}')
 
-            cs_list = []
-            for g in cs_group.keys():
-                similars = [int(cs_group[g].pop(0))]
+                sim = [cur]
 
-                while True:
-                    if not cs_group[g]:
-                        break
+            # Loop finished, check what's in similar list to print
+            if len(sim) == 1:
+                ret_list.append(f'{cs}u{sim[0]}')
+            elif len(sim) > 1:
+                last_item = sim[len(sim) - 1]
+                ret_list.append(f'{cs}u{sim[0]}-{last_item}')
 
-                    r = int(cs_group[g].pop(0))
-                    if r == similars[len(similars) - 1] + 1:
-                        similars.append(r)
-                        continue
-
-                    # Current one is different, dump what we stored and clean
-                    # similars
-                    if len(similars) == 1:
-                        cs_list.append(f'{g}u{similars[0]}')
-                    else:
-                        cs_list.append(f'{g}u{similars[0]}-{similars[len(similars) - 1]}')
-
-                    similars = [r]
-
-                if len(similars) == 1:
-                    cs_list.append(f'{g}u{similars[0]}')
-                else:
-                    cs_list.append(f'{g}u{similars[0]}-{similars[len(similars) - 1]}')
-
-            file_cs_list.append(cs_list)
-
-        return natsorted(file_cs_list)
+        return ' '.join(ret_list)
 
     def group_equal_files(self, args):
-        print('\nGrouping codestreams for each file processed by ccp:')
-
         cs_files = {}
         cs_groups = {}
 
         # Mount the cs_files dict
         for arg in args:
             file, cs, _ = arg
-            if not cs_files.get(file, ''):
-                cs_files[file] = {}
+            if not cs_files.get(cs, ''):
+                cs_files[cs] = []
 
             fpath = self.get_work_lp_file(cs, file)
             with open(fpath, 'r+') as fi:
@@ -273,51 +271,73 @@ class CCP(Config):
             # buggy in klp-ccp
             src = re.sub('.+klpr_trace.+', '', src)
 
-            cs_files[file][cs] = { 'src' : src }
+            cs_files[cs].append((file , src ))
 
-        # Iterate over files to group them
-        for file, data in cs_files.items():
-            # A list of all codestreams that have the same file
-            codestreams = data.keys()
-            files = data
+        cs_equal = []
+        processed = []
 
-            members = {}
-            # rglob can list codestreams unordered
-            codestreams = natsorted(codestreams)
-            toprocess = codestreams.copy()
+        toprocess = list(cs_files.keys())
+        while len(toprocess):
+            current_cs_list = []
 
-            while len(toprocess):
-                # in the second pass processed will contain data
-                if not toprocess:
-                    break
+            # Get an element, and check if it wasn't associated with a previous
+            # codestream
+            cs = toprocess.pop(0)
+            if cs in processed:
+                continue
 
-                codestreams = toprocess.copy()
+            # last element, it's different from all other codestreams, so add it
+            # to the cs_equal alone.
+            if not toprocess:
+                cs_equal.append([cs])
+                break
 
-                c = codestreams.pop(0)
-                toprocess.remove(c)
-                members[c] = []
+            # start a new list with the current element to compare with others
+            current_cs_list.append(cs)
+            data_cs = cs_files[cs]
+            len_data = len(data_cs)
 
-                while True:
-                    if not len(codestreams):
+            # Compare the file names, and file content between codestrams,
+            # trying to find ones that have the same files and contents
+            for cs_proc in toprocess:
+                data_proc = cs_files[cs_proc]
+
+                if len_data != len(data_proc):
+                    continue
+
+                ok = True
+                for i in range(len_data):
+                    file, src = data_cs[i]
+                    file_proc, src_proc = data_proc[i]
+
+                    if file != file_proc or src != src_proc:
+                        #print('NOK', cs, cs_proc, file, file_proc)
+                        ok = False
                         break
 
-                    cs = codestreams.pop(0)
-                    if files[c]['src'] == files[cs]['src']:
-                        members[c].append(cs)
-                        toprocess.remove(cs)
+                # cs is equal to cs_proc, with the same number of files, same
+                # file names, and the files have the same content. So we don't
+                # need to process cs_proc later in the process
+                if ok:
+                    processed.append(cs_proc)
+                    current_cs_list.append(cs_proc)
 
-            # members will contain a dict with the key as a codestream and the
-            # values will be a list of codestreams that share the code
-            cs_groups[file] = self.classify_codestreams(members)
+            # Append the current list of equal codestreams to a global list to
+            # be grouped later
+            cs_equal.append(natsorted(current_cs_list))
 
-        with open(Path(self.bsc_path, 'groups.json'), 'w') as f:
-            f.write(json.dumps(cs_groups, indent=4))
+        # cs_equal will contain a list of lists with codestreams that share the
+        # same code
+        groups = []
+        for cs_list in cs_equal:
+            groups.append(self.classify_codestreams(cs_list))
 
-        for file in cs_groups.keys():
-            print(f'\t{file}')
+        with open(Path(self.bsc_path, 'groups'), 'w') as f:
+            f.write('\n'.join(groups))
 
-            for css in cs_groups[file]:
-                print(f"\t\t{' '.join(css)}")
+        print('\nGrouping codestreams that share the same content and files:')
+        for group in groups:
+            print('\t', group)
 
     def process_ccp(self, args):
         fname, cs, funcs = args
