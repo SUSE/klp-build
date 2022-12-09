@@ -1,9 +1,10 @@
 import concurrent.futures
 import errno
 from lxml import etree
-from pathlib import Path
+from natsort import natsorted
 import os
 from osctiny import Osc
+from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -81,7 +82,7 @@ class IBS(Config):
         for result in self.get_projects():
             names.append(result.get('name'))
 
-        return names
+        return natsorted(names)
 
     def delete_project(self, prj, verbose=True):
         if not self.osc.projects.exists(prj):
