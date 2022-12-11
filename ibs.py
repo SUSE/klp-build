@@ -1,6 +1,7 @@
 import concurrent.futures
 import errno
 from lxml import etree
+from lxml.objectify import fromstring, SubElement
 from natsort import natsorted
 import os
 from osctiny import Osc
@@ -9,7 +10,6 @@ import re
 import shutil
 import subprocess
 import sys
-import xml.etree.ElementTree as ET
 
 from config import Config
 from ksrc import GitHelper
@@ -403,30 +403,24 @@ class IBS(Config):
     def cs_to_project(self, cs):
         return self.prj_prefix + '-' + cs.replace('.', '_')
 
-    # Some attributes are set by default on osctiny:
-    # build: enable
-    # publish: disable
     def create_prj_meta(self, cs):
-        prj = self.cs_to_project(cs)
         data = self.get_cs_data(cs)
 
-        prj = ET.Element('project', { 'name' : prj})
+        prj = fromstring("<project name=''><title></title><description></description>" \
+                "<build><enable/></build><publish><disable/></publish>" \
+                "<debuginfo><disable/></debuginfo>" \
+                "<repository name=\"devbuild\">" \
+                f"<path project=\"{data['project']}\" repository=\"{data['repo']}\"/>" \
+                "</repository>" \
+                "</project>")
 
-        debug = ET.SubElement(prj, 'debuginfo')
-        ET.SubElement(debug, 'disable')
-
-        ET.SubElement(prj, 'person', { 'userid' : 'mpdesouz', 'role' : 'bugowner'})
-
-        repo = ET.SubElement(prj, 'repository', {'name' : 'devbuild'})
-        ET.SubElement(repo, 'path', {'project' : data['project'],
-                                     'repository' : data['repo']
-                                     })
+        repo = prj.find('repository')
 
         for arch in self.get_cs_archs(cs):
-            ar = ET.SubElement(repo, 'arch')
-            ar.text = arch
+            ar = SubElement(repo, 'arch')
+            ar._setText(arch)
 
-        return ET.tostring(prj).decode()
+        return prj
 
     def create_lp_package(self, cs):
         # get the kgraft branch related to this codestream
@@ -446,8 +440,8 @@ class IBS(Config):
 
         try:
             self.osc.projects.set_meta(prj, metafile=meta, title='',
-                                       bugowner='mpdesouza',
-                                       maintainer='mpdesouza',
+                                       bugowner=self.ibs_user,
+                                       maintainer=self.ibs_user,
                                        description=prj_desc)
 
             self.osc.packages.set_meta(prj, 'klp', title='', description='Test livepatch')
