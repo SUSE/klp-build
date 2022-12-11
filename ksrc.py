@@ -83,7 +83,7 @@ class GitHelper(Config):
             f.write('\n'.join(build_cs))
 
     def get_cs_branch(self, cs):
-        sle, sp, up = self.get_cs_tuple(cs)
+        cs_sle, sp, cs_up = self.get_cs_tuple(cs)
 
         branch_name = ''
 
@@ -92,18 +92,17 @@ class GitHelper(Config):
             # the same code
             for b in branch.replace(self.bsc + '_', '').split('_'):
                 sle, u = b.split('u')
-                if sle != f'{sle}.{sp}':
+                if f'{cs_sle}.{sp}' != f'{sle}':
                     continue
 
                 # Get codestreams interval
                 up = u
                 down = u
-                cs_update = up
                 if '-' in u:
                     down, up = u.split('-')
 
                 # Codestream between the branch codestream interval
-                if cs_update >= int(down) and cs_update <= int(up):
+                if cs_up >= int(down) and cs_up <= int(up):
                     branch_name = branch
                     break
 
