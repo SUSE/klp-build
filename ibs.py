@@ -290,7 +290,13 @@ class IBS(Config):
                        f'{self.bsc}_test_script.sh')
 
         # Prepare the config file used by kgr-test
-        self.ksrc.build()
+        build_cs = []
+        for cs, _ in self.filter_cs(verbose=False).items():
+            build_cs.append(self.get_full_cs(cs))
+
+        # Save file to be used later by osckgr scripts
+        with open(Path(self.bsc_path, f'{self.bsc}_config.in'), 'w') as f:
+            f.write('\n'.join(build_cs))
 
         for arch in self.archs:
             tests_path = Path(self.bsc_path, 'tests', arch)

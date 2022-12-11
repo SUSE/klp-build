@@ -34,54 +34,6 @@ class GitHelper(Config):
             if r.name.startswith(self.bsc):
                 self.branches.append(r.name)
 
-    def build(self):
-        build_cs = []
-
-        for cs, data in self.filter_cs(verbose=False).items():
-            entry = [ self.get_full_cs(cs),
-                        data['project'],
-                        f"{data['kernel']}.{data['build-counter']}",
-                        'change-me',
-                        f"rpm-{data['kernel']}"
-                        ]
-
-            for branch in self.branches:
-                # First check if the branch has more than code stream sharing
-                # the same code
-                for b in branch.replace(self.bsc + '_', '').split('_'):
-                    sle, u = b.split('u')
-                    if sle != f"{data['sle']}.{data['sp']}":
-                        continue
-
-                    # Get codestreams interval
-                    up = u
-                    down = u
-                    cs_update = data['update']
-                    if '-' in u:
-                        down, up = u.split('-')
-
-                    # Codestream between the branch codestream interval
-                    if int(cs_update) >= int(down) and int(cs_update) <= int(up):
-                        # replace the 'change-me' string in entry
-                        entry[3] = branch
-
-                    # At this point we found a match for our codestream in
-                    # codestreams.json, but we may have a more specialized git
-                    # branch later one, like:
-                    # bsc1197597_12.4u21-25_15.0u25-28
-                    # bsc1197597_15.0u25-28
-                    # Since 15.0 SLE uses a different kgraft-patches branch to
-                    # be built on. In this case, we continue to loop over the
-                    # other branches.
-
-            # If there was a match in all available branches
-            if entry[3] != 'change-me':
-                build_cs.append(','.join(entry))
-
-        # Save file to be used later by osckgr scripts
-        with open(Path(self.bsc_path, f'{self.bsc}_config.in'), 'w') as f:
-            f.write('\n'.join(build_cs))
-
     def get_cs_branch(self, cs):
         cs_sle, sp, cs_up = self.get_cs_tuple(cs)
 
