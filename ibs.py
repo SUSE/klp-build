@@ -210,7 +210,7 @@ class IBS(Config):
 
         filtered = []
         for item in item_list:
-            cmp_item = convert_prj_to_cs(item)
+            cmp_item = self.convert_prj_to_cs(item)
             if not re.match(self.filter, cmp_item):
                 continue
 
