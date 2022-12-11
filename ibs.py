@@ -430,6 +430,8 @@ class IBS(Config):
 
         prj = self.cs_to_project(cs)
 
+        print(f'Preparing project {prj}...')
+
         # If the project exists, drop it first
         self.delete_project(prj, verbose=False)
 
@@ -444,7 +446,7 @@ class IBS(Config):
 
             self.osc.packages.set_meta(prj, 'klp', title='', description='Test livepatch')
 
-            print(f'\t{prj}: ok')
+            print(f'\tproject created on IBS')
 
         except Exception as e:
             print(e, e.response.content)
@@ -464,16 +466,27 @@ class IBS(Config):
         self.osc.packages.checkout(prj, 'klp', prj_path)
 
         # Get the code from codestream
-        subprocess.check_output(['/usr/bin/git', '-C',
-                                 'clone', '--single-branch', '-b', branch,
+        subprocess.check_output(['/usr/bin/git', 'clone', '--single-branch',
+                                 '-b', branch,
                                  str(self.kgraft_path), str(code_path)],
                                 stderr=subprocess.STDOUT)
 
-        subprocess.checkout(['./scripts/tar-up.sh', '-d', str(prj_path)],
-                            stderr.subprocess.STDOUT)
-
         # Check how to push multiple files
         # TODO: this isn't supported by osctiny YET.
+        subprocess.check_output(['bash', './scripts/tar-up.sh', '-d', str(prj_path)],
+                            stderr=subprocess.STDOUT, cwd=code_path)
+        shutil.rmtree(code_path)
+
+        subprocess.check_output(['osc', '-A', 'https://api.suse.de',
+                                 'addremove'], stderr=subprocess.STDOUT,
+                                cwd=prj_path)
+
+        subprocess.check_output(['osc', '-A', 'https://api.suse.de', 'commit',
+                                '-m', f'Dump {branch}'],
+                                stderr=subprocess.STDOUT, cwd=prj_path)
+        shutil.rmtree(prj_path)
+
+        print(f'\tCode commited')
 
     def push(self):
         cs_list = self.apply_filter(self.codestreams.keys())
