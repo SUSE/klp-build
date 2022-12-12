@@ -471,6 +471,11 @@ class IBS(Config):
                                  str(self.kgraft_path), str(code_path)],
                                 stderr=subprocess.STDOUT)
 
+        # Fix RELEASE version
+        with open(Path(code_path, 'scripts', 'release-version.sh'), 'w') as f:
+            ver = self.get_full_cs(cs).replace('EMBARGO', '')
+            f.write(f'RELEASE={ver}')
+
         # Check how to push multiple files
         # TODO: this isn't supported by osctiny YET.
         subprocess.check_output(['bash', './scripts/tar-up.sh', '-d', str(prj_path)],
