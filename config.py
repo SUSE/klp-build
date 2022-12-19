@@ -38,9 +38,6 @@ class Config:
 
         self.archs = ['x86_64', 's390x', 'ppc64le']
 
-        self.ex_dir = Path(self.data, 'ex-kernels')
-        self.ipa_dir = Path(self.data, 'ipa-clones')
-
         self.working_cs = working_cs
         self.codestreams = {}
         self.cs_file = Path(self.bsc_path, 'codestreams.json')
@@ -116,22 +113,18 @@ class Config:
         match = re.search('(\d+)\.(\d+)u(\d+)', cs)
         return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
-    def get_ex_dir(self, cs='', arch=''):
+    def get_data_dir(self, cs='', arch=''):
         if not cs:
-            return self.ex_dir
+            return self.data
         if not arch:
-            return Path(self.ex_dir, cs)
-        return Path(self.ex_dir, cs, arch)
+            return Path(self.data, cs)
+        return Path(self.data, cs, arch)
 
-    def get_ipa_dir(self, cs='', arch=''):
-        if not cs:
-            return self.ipa_dir
-        if not arch:
-            return Path(self.ipa_dir, cs)
-        return Path(self.ipa_dir, cs, arch)
+    def get_ipa_dir(self, cs, arch='x86_64'):
+        return Path(self.get_data_dir(cs, arch), 'ipa-clones')
 
     def get_sdir(self, cs):
-        return Path(self.ex_dir, cs, 'usr', 'src',
+        return Path(self.data, cs, 'usr', 'src',
                         f"linux-{self.get_cs_kernel(cs)}")
 
     def flush_cs_file(self):
@@ -139,7 +132,7 @@ class Config:
             f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
 
     def get_module_obj(self, arch, cs, module, use_cached_obj=True):
-        ex_dir = self.get_ex_dir(cs, arch)
+        ex_dir = self.get_data_dir(cs, arch)
 
         # Use the object if it was previously set, and if we are trying to find
         # symbols for the to be livepatched module. We can also search for
@@ -164,7 +157,7 @@ class Config:
         if mod == 'vmlinux':
             return f'boot/vmlinux-{kernel}-default'
 
-        ex_dir = self.get_ex_dir(cs, arch)
+        ex_dir = self.get_data_dir(cs, arch)
         mod_path = str(Path(ex_dir, 'lib', 'modules', f'{kernel}-default'))
         with open(Path(mod_path, 'modules.order')) as f:
             obj = re.search(f'([\w\/]+\/{mod}.ko)', f.read())

@@ -132,7 +132,7 @@ class Setup(Config):
 
             data['archs'] = archs
 
-            if not self.get_ex_dir(cs, 'x86_64').is_dir():
+            if not self.get_data_dir(cs, 'x86_64').is_dir():
                 cs_data_missing[cs] = data
 
             working_cs[cs] = data

@@ -367,7 +367,7 @@ class CCP(Config):
         os.symlink(Path(sdir, fname), Path(out_dir, base_fname))
         env['KCP_WORK_DIR'] = str(out_dir)
 
-        env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs, 'x86_64'),
+        env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs),
                                               f'{fname}.000i.ipa-clones'))
 
         self.execute_ccp(cs, fname, ','.join(funcs), out_dir, sdir, odir,

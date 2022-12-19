@@ -103,9 +103,9 @@ class IBS(Config):
             path_dest = self.get_ipa_dir(cs, arch)
         elif re.search(   'kernel\-default\-\d+', rpm) or \
                 re.search('kernel\-default\-extra\-\d+', rpm):
-            path_dest = self.get_ex_dir(cs, arch)
+            path_dest = self.get_data_dir(cs, arch)
         else:
-            path_dest = self.get_ex_dir(cs)
+            path_dest = self.get_data_dir(cs)
 
         fdest = Path(dest, rpm)
         path_dest.mkdir(exist_ok=True, parents=True)
@@ -147,7 +147,7 @@ class IBS(Config):
             prj = data['project']
             repo = data['repo']
 
-            path_dest = Path(self.data, 'kernel-rpms', cs)
+            path_dest = Path(self.data, cs, 'kernel-rpms')
             path_dest.mkdir(exist_ok=True, parents=True)
 
             for arch, val in self.cs_data.items():
@@ -155,9 +155,8 @@ class IBS(Config):
                     continue
 
                 for k, regex in val.items():
-                    if repo == 'standard':
-                        pkg = k
-                    else:
+                    pkg = k
+                    if repo != 'standard':
                         pkg = f'{k}.{repo}'
 
                     # arch is fixed for now
@@ -177,8 +176,8 @@ class IBS(Config):
         # codestream
         for cs in cs_list:
             for arch in self.get_cs_archs(cs):
-                mod_path= Path(self.get_ex_dir(cs, arch), 'lib', 'modules')
-                vmlinux_path = Path(self.get_ex_dir(cs, arch), 'boot')
+                mod_path= Path(self.get_data_dir(cs, arch), 'lib', 'modules')
+                vmlinux_path = Path(self.get_data_dir(cs, arch), 'boot')
 
                 for fext, ecmd in [('zst', 'unzstd --rm -f -d'), ('xz', 'xz -d')]:
                     cmd = f'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
@@ -220,7 +219,7 @@ class IBS(Config):
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):
         kernel = self.get_cs_kernel(cs)
-        vmlinux_path = Path(self.get_ex_dir(cs, arch), 'boot',
+        vmlinux_path = Path(self.get_data_dir(cs, arch), 'boot',
                             f'vmlinux-{kernel}-default')
 
         # Get list of UNDEFINED symbols from the livepatch module
