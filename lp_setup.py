@@ -141,12 +141,20 @@ class Setup(Config):
         # by the user, avoid downloading missing codestreams that are not affected
         self.working_cs = self.filter_cs(working_cs, verbose=True)
 
+        # Remove filtered codestreams from missing data codestreams, as we don't
+        # need to download data from codestreams that we don't need to build
+        # livepatched
+        data_missing = cs_data_missing.copy()
+        for cs in cs_data_missing.keys():
+            if cs not in self.working_cs.keys():
+                data_missing.pop(cs)
+
         # Found missing cs data, downloading and extract
-        if cs_data_missing:
+        if data_missing:
             print('Download the necessary data from the following codestreams:')
-            print(f'\t{" ".join(cs_data_missing.keys())}\n')
+            print(f'\t{" ".join(data_missing.keys())}\n')
             ibs = IBS(self.bsc_num, self.filter, self.working_cs)
-            ibs.download_cs_data(cs_data_missing)
+            ibs.download_cs_data(data_missing)
 
         print('Validating codestreams data...')
 
