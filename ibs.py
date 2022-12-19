@@ -186,6 +186,9 @@ class IBS(Config):
                 subprocess.check_output(f'find {vmlinux_path} -name "vmlinux*default.gz" -exec gzip -d {{}} \;',
                                         shell=True)
 
+            shutil.rmtree(Path(self.get_data_dir(cs), 'boot'), ignore_errors=True)
+            shutil.rmtree(Path(self.get_data_dir(cs), 'lib'), ignore_errors=True)
+
         print('Finished extract vmlinux and modules...')
 
     def download_binary_rpms(self, args):
