@@ -162,7 +162,7 @@ class Config:
         with open(Path(mod_path, 'modules.order')) as f:
             obj = re.search(f'([\w\/]+\/{mod}.ko)', f.read())
             if not obj:
-                raise RuntimeError(f'Module not found: {mod}')
+                raise RuntimeError(f'{cs}: Module not found: {mod}')
 
             return str(obj.group(1))
 
