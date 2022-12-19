@@ -15,8 +15,8 @@ from config import Config
 from ksrc import GitHelper
 
 class IBS(Config):
-    def __init__(self, bsc, bsc_filter):
-        super().__init__(bsc, bsc_filter)
+    def __init__(self, bsc, bsc_filter, working_cs = {}):
+        super().__init__(bsc, bsc_filter, working_cs)
         self.osc = Osc(url='https://api.suse.de')
 
         self.ibs_user = re.search('(\w+)@', self.email).group(1)

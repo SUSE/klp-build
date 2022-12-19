@@ -7,7 +7,7 @@ import re
 import subprocess
 
 class Config:
-    def __init__(self, bsc, bsc_filter):
+    def __init__(self, bsc, bsc_filter, working_cs = {}):
         work_dir = os.getenv('KLP_WORK_DIR')
         if not work_dir:
             raise ValueError('KLP_WORK_DIR should be defined')
@@ -41,7 +41,7 @@ class Config:
         self.ex_dir = Path(self.data, 'ex-kernels')
         self.ipa_dir = Path(self.data, 'ipa-clones')
 
-        self.working_cs = {}
+        self.working_cs = working_cs
         self.codestreams = {}
         self.cs_file = Path(self.bsc_path, 'codestreams.json')
         if self.cs_file.is_file():

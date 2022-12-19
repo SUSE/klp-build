@@ -145,13 +145,13 @@ class Setup(Config):
         if cs_data_missing:
             print('Download the necessary data from the following codestreams:')
             print(f'\t{" ".join(cs_data_missing.keys())}\n')
-            ibs = IBS(self.bsc_num, self.filter)
+            ibs = IBS(self.bsc_num, self.filter, self.working_cs)
             ibs.download_cs_data(cs_data_missing)
 
         print('Validating codestreams data...')
 
         # Setup the missing codestream info needed
-        for cs, data in working_cs.items():
+        for cs, data in self.working_cs.items():
             cs_files = data['files']
 
             # Check if the files exist in the respective codestream directories
@@ -173,7 +173,7 @@ class Setup(Config):
                         print(f'WARN: {cs}: Function {func} does not exist in {obj}')
 
         # Update and save codestreams data
-        for cs, data in working_cs.items():
+        for cs, data in self.working_cs.items():
             self.codestreams[cs] = data
 
         self.flush_cs_file()
