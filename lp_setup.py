@@ -1,5 +1,6 @@
 from config import Config
 import json
+from natsort import natsorted
 from pathlib import Path
 import re
 import requests
@@ -95,16 +96,17 @@ class Setup(Config):
 
         # Called at this point because codestreams is populated
         self.conf['commits'] = self.ksrc.get_commits(self._ups_commits)
-        self.conf['patched'] = self.ksrc.get_patched_cs(self.conf['commits'])
 
-        # cpp will use this data in the next step
-        with open(self.conf_file, 'w') as f:
-            f.write(json.dumps(self.conf, indent=4, sort_keys=True))
+        # do not get the commits twice
+        patched_kernels = self.conf.get('patched_kernels', [])
+        if not patched_kernels:
+            self.conf['patched_kernels'] = self.ksrc.get_patched_kernels(self.conf['commits'])
 
         cs_data_missing = {}
 
         # list of codestreams that matches the file-funcs argument
         working_cs = {}
+        patched_cs = []
 
         for cs, data in all_codestreams.items():
             # Only process codestreams that are related to the argument
@@ -112,7 +114,8 @@ class Setup(Config):
                 continue
 
             # Skip patched codestreams
-            if cs in self.conf['patched']:
+            if data['kernel'] in patched_kernels:
+                patched_cs.append(cs)
                 continue
 
             data['files'] = self.file_funcs
@@ -136,6 +139,18 @@ class Setup(Config):
                 cs_data_missing[cs] = data
 
             working_cs[cs] = data
+
+        if patched_cs:
+            print('Skipping already patched codestreams:')
+            print(f'\t{" ".join(patched_cs)}')
+
+        # Add new codestreams to the already existing list, skipping duplicates
+        self.conf['patched_cs'] = natsorted(list(set(self.conf.get('patched_cs', []) +
+                                      patched_cs)))
+
+        # cpp will use this data in the next step
+        with open(self.conf_file, 'w') as f:
+            f.write(json.dumps(self.conf, indent=4, sort_keys=True))
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
@@ -167,7 +182,7 @@ class Setup(Config):
             for f in cs_files.keys():
                 fdir = Path(sdir, f)
                 if not fdir.is_file():
-                    raise RuntimeError(f'File {f} doesn\'t exists in {str(sdir)}')
+                    raise RuntimeError(f'{cs}: File {f} doesn\'t exists in {str(sdir)}')
 
             mod = self.conf['mod']
             arch = 'x86_64'

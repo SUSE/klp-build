@@ -185,15 +185,10 @@ class GitHelper(Config):
 
         return commits
 
-    def get_patched_cs(self, commits):
+    def get_patched_kernels(self, commits):
         if not self.kern_src:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
-
-        # do not get the commits twice
-        patched = self.conf.get('patched', [])
-        if patched:
-            return patched
 
         print('Searching for already patched codestreams...')
 
@@ -219,12 +214,4 @@ class GitHelper(Config):
                     patched.append(tag)
 
         # remove duplicates
-        patched = natsorted(list(set(patched)))
-
-        css = []
-        # Find which codestream is related to each patched kernel
-        for cs, data in self.filter_cs(verbose=False).items():
-            if data['kernel'] in patched:
-                css.append(cs)
-
-        return css
+        return natsorted(list(set(patched)))
