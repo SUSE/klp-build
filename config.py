@@ -160,7 +160,7 @@ class Config:
         ex_dir = self.get_data_dir(cs, arch)
         mod_path = str(Path(ex_dir, 'lib', 'modules', f'{kernel}-default'))
         with open(Path(mod_path, 'modules.order')) as f:
-            obj = re.search(f'([\w\/]+\/{mod}.ko)', f.read())
+            obj = re.search(f'([\w\/\-]+\/{mod}.ko)', f.read())
             if not obj:
                 raise RuntimeError(f'{cs}: Module not found: {mod}')
 
