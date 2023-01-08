@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+from threading import Lock
 
 from config import Config
 from templ import Template
@@ -52,6 +53,8 @@ class CCP(Config):
         # the current blacklisted function, more can be added as necessary
         self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen,twaddle,set_geometry,valid_floppy_drive_params"
 
+        self.make_lock = Lock()
+
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
 
@@ -96,15 +99,17 @@ class CCP(Config):
 
         return output
 
-    def get_make_cmd(self, cs, filename, odir):
+    def get_make_cmd(self, out_dir, cs, filename, odir):
         filename = PurePath(filename)
         file_ = filename.with_suffix('.o')
-        completed = subprocess.run(['make', '-sn', f'CC={self.cc}',
-                                    f'HOSTCC={self.cc}', file_], cwd=odir,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, check=True)
 
-        return self.process_make_output(cs, filename, completed.stdout.decode())
+        with open(Path(out_dir, 'make.out'), 'w') as f:
+            completed = subprocess.check_output(['make', '-sn', f'CC={self.cc}',
+                                        f'KLP_CS={cs}',
+                                        f'HOSTCC={self.cc}', file_], cwd=odir,
+                                        stderr=f)
+
+        return self.process_make_output(cs, filename, completed.decode())
 
     def execute_ccp(self, cs, fname, funcs, out_dir, sdir, odir, env):
         lp_out = Path(out_dir, self.lp_out_file(fname))
@@ -120,7 +125,11 @@ class CCP(Config):
         ccp_args.extend(['--compiler=x86_64-gcc-9.1.0', '-i', f'{funcs}',
                         '-o', f'{str(lp_out)}', '--'])
 
-        ccp_args.extend(self.get_make_cmd(cs, fname, odir).split(' '))
+        # Make can regenerate fixdep for each file being processed per
+        # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
+        # calls. Make is pretty fast, so there isn't a real slow down here.
+        with self.make_lock:
+            ccp_args.extend(self.get_make_cmd(out_dir, cs, fname, odir).split(' '))
 
         ccp_args = list(filter(None, ccp_args))
 
