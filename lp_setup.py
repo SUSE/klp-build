@@ -41,13 +41,15 @@ class Setup(Config):
 
     # Parse SLE15-SP2_Update_25 to 15.2u25
     def parse_cs_line(self, cs):
-        sle, _, u = cs.replace('SLE', '').split('_')
+        rt = 'rt' if '-RT' in cs else ''
+
+        sle, _, u = cs.replace('SLE', '').replace('-RT', '').split('_')
         if '-SP' in sle:
             sle, sp = sle.split('-SP')
         else:
             sle, sp = sle, '0'
 
-        return int(sle), int(sp), int(u)
+        return int(sle), int(sp), int(u), rt
 
     def download_supported_file(self):
         print('Downloading codestreams file')
@@ -75,8 +77,12 @@ class Setup(Config):
             kernel = re.sub('\.\d+$', '', kernel_full)
 
             # Fill the majority of possible fields here
-            sle, sp, u = self.parse_cs_line(full_cs)
-            cs_key = f'{sle}.{sp}u{u}'
+            sle, sp, u, rt = self.parse_cs_line(full_cs)
+            if rt:
+                cs_key = f'{sle}.{sp}u{u}-{rt}'
+            else:
+                cs_key = f'{sle}.{sp}u{u}'
+
             codestreams[cs_key] = {
                     'project' : proj,
                     'kernel' : kernel,
@@ -84,7 +90,8 @@ class Setup(Config):
                     'branch' : '',
                     'sle' : sle,
                     'sp' : sp,
-                    'update' : u
+                    'update' : u,
+                    'rt' : rt
             }
 
         return codestreams
