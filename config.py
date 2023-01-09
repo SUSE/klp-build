@@ -125,9 +125,35 @@ class Config:
     def get_ipa_dir(self, cs, arch='x86_64'):
         return Path(self.get_data_dir(cs, arch), 'ipa-clones')
 
+    def get_ipa_src_path(self, cs, arch):
+        kernel = self.get_cs_kernel(cs)
+        if self.get_cs_data(cs)['rt']:
+            return Path('usr', 'src', f'linux-{kernel}-rt-obj', arch, 'rt')
+
+        return Path('usr', 'src', f'linux-{kernel}-obj', arch, 'default')
+
     def get_sdir(self, cs):
+        if self.get_cs_data(cs)['rt']:
+            return Path(self.data, cs, 'usr', 'src',
+                        f"linux-{self.get_cs_kernel(cs)}-rt")
+
         return Path(self.data, cs, 'usr', 'src',
                         f"linux-{self.get_cs_kernel(cs)}")
+
+    def get_odir(self, cs):
+        if self.get_cs_data(cs)['rt']:
+            return Path('x86_64', 'rt')
+
+        return Path('x86_64', 'default')
+
+    def get_mod_path(self, cs, arch):
+        kernel = self.get_cs_kernel(cs)
+
+        kernel_dir = f'{kernel}-default'
+        if self.get_cs_data(cs)['rt']:
+            kernel_dir = f'{kernel}-rt'
+
+        return Path(self.get_data_dir(cs, arch), 'lib', 'modules', kernel_dir)
 
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:
@@ -150,8 +176,7 @@ class Config:
         if mod == 'vmlinux':
             return str(Path(ex_dir, obj))
 
-        kernel = self.get_cs_kernel(cs)
-        return str(Path(ex_dir, 'lib', 'modules', f'{kernel}-default', obj))
+        return str(Path(self.get_mod_path(cs, arch), obj))
 
     # Return only the name of the module to be livepatched
     def find_module_obj(self, arch, cs, mod):
@@ -160,7 +185,7 @@ class Config:
             return f'boot/vmlinux-{kernel}-default'
 
         ex_dir = self.get_data_dir(cs, arch)
-        mod_path = str(Path(ex_dir, 'lib', 'modules', f'{kernel}-default'))
+        mod_path = self.get_mod_path(cs, arch)
         with open(Path(mod_path, 'modules.order')) as f:
             obj = re.search(f'([\w\/\-]+\/{mod}.ko)', f.read())
             if not obj:

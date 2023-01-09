@@ -115,10 +115,7 @@ class IBS(Config):
 
         # Move ipa-clone files to path_dest
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
-            kernel = self.get_cs_kernel(cs)
-            src_dir = Path(path_dest, 'usr', 'src',
-                                    f'linux-{kernel}-obj',
-                                  arch, 'default')
+            src_dir = Path(path_dest, self.get_ipa_src_path(cs, arch))
 
             for f in os.listdir(src_dir):
                 shutil.move(Path(src_dir, f), path_dest)
