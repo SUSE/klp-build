@@ -43,8 +43,8 @@ class IBS(Config):
                     'kernel-default' : '(kernel-default-[\d\.\-]+.s390x.rpm)',
                 },
                 'x86_64' : {
-                    'kernel-default' : '(kernel-default\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
-                    'kernel-source' : '(kernel-(source|devel)\-?[\d\.\-]+.noarch.rpm)'
+                    'kernel-default' : '(kernel-(default|rt)\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
+                    'kernel-source' : '(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)'
                 }
         }
 
@@ -101,8 +101,8 @@ class IBS(Config):
 
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
             path_dest = self.get_ipa_dir(cs, arch)
-        elif re.search(   'kernel\-default\-\d+', rpm) or \
-                re.search('kernel\-default\-extra\-\d+', rpm):
+        elif re.search(   'kernel\-(default|rt)\-\d+', rpm) or \
+                re.search('kernel\-(default|rt)\-extra\-\d+', rpm):
             path_dest = self.get_data_dir(cs, arch)
         else:
             path_dest = self.get_data_dir(cs)
@@ -153,8 +153,16 @@ class IBS(Config):
 
                 for k, regex in val.items():
                     pkg = k
+
+                    # RT kernels have different package names
+                    if data['rt']:
+                        if pkg == 'kernel-default':
+                            pkg = 'kernel-rt'
+                        elif pkg == 'kernel-source':
+                            pkg = 'kernel-source-rt'
+
                     if repo != 'standard':
-                        pkg = f'{k}.{repo}'
+                        pkg = f'{pkg}.{repo}'
 
                     # arch is fixed for now
                     ret = self.osc.build.get_binary_list(prj, repo, arch, pkg)
