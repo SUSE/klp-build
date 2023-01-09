@@ -110,8 +110,10 @@ class Config:
         return self.get_cs_data(cs)['ext_symbols']
 
     def get_cs_tuple(self, cs):
-        match = re.search('(\d+)\.(\d+)u(\d+)', cs)
-        return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        match = re.search('(\d+)\.(\d+)u(\d+)(\-rt)?', cs)
+        rt = 'rt' if match.group(4) else ''
+
+        return (int(match.group(1)), int(match.group(2)), int(match.group(3)), rt)
 
     def get_data_dir(self, cs='', arch=''):
         if not cs:

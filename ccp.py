@@ -66,7 +66,7 @@ class CCP(Config):
 
         cmd_args_regex = '(-Wp,{},{}\s+-nostdinc\s+-isystem.*{});'
 
-        sle, sp, _ = self.get_cs_tuple(cs)
+        sle, sp, _, _ = self.get_cs_tuple(cs)
         result = re.search(cmd_args_regex.format('-MD', ofname, fname), str(output).strip())
         if not result:
             # 15.4 onwards changes the regex a little: -MD -> -MMD

@@ -209,7 +209,7 @@ class Setup(Config):
         self.flush_cs_file()
 
     def cs_repo(self, cs):
-        sle, sp, up = self.get_cs_tuple(cs)
+        sle, sp, up, rt = self.get_cs_tuple(cs)
         if up == 0:
             return 'standard'
 
@@ -223,7 +223,12 @@ class Setup(Config):
     # s390x is supported from 12.5u3 onwards
     # s390x is supported from SLE15-SP2 onwards.
     def is_s390_supported(self, cs):
-        sle, sp, up = self.get_cs_tuple(cs)
+        sle, sp, up, rt = self.get_cs_tuple(cs)
+
+        # The only supported RT supported so far is x86_64
+        if rt:
+            return False
+
         if (sle == 12 and sp == 4 and up >= 13) or \
                 (sle == 12 and sp == 5 and up >= 3) or \
                 (sle == 15 and sp >= 2):
@@ -234,7 +239,11 @@ class Setup(Config):
     # ppc64le is supported from 12_3u5 onwards
     # ppc64le is also supported on 12sp2 from u25 onwards
     def is_ppc_supported(self, cs):
-        sle, sp, up = self.get_cs_tuple(cs)
+        sle, sp, up, rt = self.get_cs_tuple(cs)
+        # The only supported RT supported so far is x86_64
+        if rt:
+            return False
+
         if sle > 12:
             return True
         elif sle == 12 and sp > 3:

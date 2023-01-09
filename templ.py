@@ -46,7 +46,7 @@ class Template(Config):
 
         # 15.4 onwards we don't have module_mutex, so template generate
         # different code
-        sle, sp, _ = self.get_cs_tuple(cs)
+        sle, sp, _, _ = self.get_cs_tuple(cs)
         if sle < 15 or (sle == 15 and sp < 4):
             templ.globals['mod_mutex'] = True
 

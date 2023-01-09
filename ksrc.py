@@ -35,7 +35,7 @@ class GitHelper(Config):
                 self.branches.append(r.name)
 
     def get_cs_branch(self, cs):
-        cs_sle, sp, cs_up = self.get_cs_tuple(cs)
+        cs_sle, sp, cs_up, _ = self.get_cs_tuple(cs)
 
         branch_name = ''
 
