@@ -189,6 +189,10 @@ class IBS(Config):
             shutil.rmtree(Path(self.get_data_dir(cs), 'boot'), ignore_errors=True)
             shutil.rmtree(Path(self.get_data_dir(cs), 'lib'), ignore_errors=True)
 
+            # Make sure that we have a proper config file for later executing of ccp
+            odir = Path(f'{self.get_sdir(cs)}-obj', self.get_odir(cs))
+            subprocess.check_output(['make', 'olddefconfig'], cwd=odir)
+
         print('Finished extract vmlinux and modules...')
 
     def download_binary_rpms(self, args):
