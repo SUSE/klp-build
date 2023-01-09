@@ -79,7 +79,7 @@ class Setup(Config):
             # Fill the majority of possible fields here
             sle, sp, u, rt = self.parse_cs_line(full_cs)
             if rt:
-                cs_key = f'{sle}.{sp}u{u}-{rt}'
+                cs_key = f'{sle}.{sp}{rt}u{u}'
             else:
                 cs_key = f'{sle}.{sp}u{u}'
 
