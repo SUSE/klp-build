@@ -217,7 +217,12 @@ class Setup(Config):
         if sp != 0:
             repo = f"{repo}-SP{sp}"
 
-        return f'{repo}_Update'
+        repo = f'{repo}_Update'
+
+        if rt:
+            repo = f'{repo}_Products_SLERT_Update'
+
+        return repo
 
     # s390x shall be enabled from SLE12-SP4 update 13 onwards.
     # s390x is supported from 12.5u3 onwards
