@@ -110,7 +110,7 @@ class IBS(Config):
         fdest = Path(dest, rpm)
         path_dest.mkdir(exist_ok=True, parents=True)
 
-        cmd = f'rpm2cpio {fdest} | cpio --quiet -idm'
+        cmd = f'rpm2cpio {fdest} | cpio --quiet -uidm'
         subprocess.check_output(cmd, shell=True, cwd=path_dest)
 
         # Move ipa-clone files to path_dest
@@ -257,7 +257,7 @@ class IBS(Config):
 
         fdest = Path(rpm_dir, rpm)
         # Extract the livepatch module for later inspection
-        cmd = f'rpm2cpio {fdest} | cpio --quiet -idm'
+        cmd = f'rpm2cpio {fdest} | cpio --quiet -uidm'
         subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
 
         kernel = self.get_cs_kernel(cs)
