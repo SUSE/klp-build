@@ -78,15 +78,20 @@ class Config:
         fpath = f'{str(fname).replace("/", "_")}'
         return f'{self.bsc}_{fpath}'
 
+    def get_cs_dir(self, cs, arch=''):
+        if arch:
+            return Path(self.bsc_path, 'c', cs, arch)
+        return Path(self.bsc_path, 'c', cs)
+
     def get_work_dir(self, cs, fname):
         fpath = f'work_{str(fname).replace("/", "_")}'
-        return Path(self.bsc_path, 'c', cs, 'x86_64', fpath)
+        return Path(self.get_cs_dir(cs), fpath)
 
     def get_work_lp_file(self, cs, fname):
         return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
 
     def get_cs_lp_dir(self, cs):
-        return Path(self.bsc_path, 'c', cs, 'x86_64', 'lp')
+        return Path(self.get_cs_dir(cs), 'lp')
 
     def get_cs_data(self, cs):
         if self.working_cs.get(cs, ''):
@@ -184,7 +189,6 @@ class Config:
         if mod == 'vmlinux':
             return f'boot/vmlinux-{kernel}-default'
 
-        ex_dir = self.get_data_dir(cs, arch)
         mod_path = self.get_mod_path(cs, arch)
         with open(Path(mod_path, 'modules.order')) as f:
             obj = re.search(f'([\w\/\-]+\/{mod}.ko)', f.read())
