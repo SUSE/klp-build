@@ -75,7 +75,7 @@ class Config:
         return f'{sle}_{u}'
 
     def lp_out_file(self, fname):
-        fpath = f'{str(fname).replace("/", "_")}'
+        fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f'{self.bsc}_{fpath}'
 
     def get_cs_dir(self, cs, arch=''):
