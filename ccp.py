@@ -112,7 +112,8 @@ class CCP(Config):
         return self.process_make_output(cs, filename, completed.decode())
 
     def execute_ccp(self, cs, fname, funcs, out_dir, sdir, odir, env):
-        lp_out = Path(out_dir, self.lp_out_file(fname))
+        lp_name = self.lp_out_file(fname)
+        lp_out = Path(out_dir, lp_name)
         ppath = self.pol_path
 
         ccp_args = [self.ccp_path]
@@ -146,6 +147,8 @@ class CCP(Config):
             f.seek(0)
             f.write(file_buf.replace(f'from {str(sdir)}/', 'from '))
             f.truncate()
+
+        os.symlink(lp_out, Path(self.get_cs_dir(cs), lp_name))
 
 		# Generate the list of exported symbols
         exts = []
@@ -369,8 +372,6 @@ class CCP(Config):
         base_fname = Path(fname).name
 
         out_dir = self.get_work_dir(cs, fname)
-        # remove any previously generated files
-        shutil.rmtree(out_dir, ignore_errors=True)
         out_dir.mkdir(parents=True, exist_ok=True)
         # create symlink to the respective codestream file
         os.symlink(Path(sdir, fname), Path(out_dir, base_fname))
@@ -394,6 +395,9 @@ class CCP(Config):
         # cs/file/funcs tuple, instead of spawning a thread per codestream
         args = []
         for cs, data in working_cs.items():
+            # remove any previously generated files
+            shutil.rmtree(self.get_cs_dir(cs), ignore_errors=True)
+
             for fname, funcs in data['files'].items():
                 args.append((fname, cs, funcs))
 
