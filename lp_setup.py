@@ -107,7 +107,9 @@ class Setup(Config):
         # do not get the commits twice
         patched_kernels = self.conf.get('patched_kernels', [])
         if not patched_kernels:
-            self.conf['patched_kernels'] = self.ksrc.get_patched_kernels(self.conf['commits'])
+            patched_kernels = self.ksrc.get_patched_kernels(self.conf['commits'])
+
+        self.conf['patched_kernels'] = patched_kernels
 
         cs_data_missing = {}
 
