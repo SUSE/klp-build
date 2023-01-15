@@ -116,35 +116,38 @@ class Config:
     def get_ipa_dir(self, cs, arch='x86_64'):
         return Path(self.get_data_dir(cs, arch), 'ipa-clones')
 
+    def cs_is_rt(self, cs):
+        return self.get_cs_data(cs).get('rt', False)
+
     def get_ipa_src_path(self, cs, arch):
         kernel = self.get_cs_kernel(cs)
-        if self.get_cs_data(cs)['rt']:
+        if self.cs_is_rt(cs):
             return Path('usr', 'src', f'linux-{kernel}-rt-obj', arch, 'rt')
 
         return Path('usr', 'src', f'linux-{kernel}-obj', arch, 'default')
 
     def get_sdir(self, cs):
-        if self.get_cs_data(cs)['rt']:
-            return Path(self.data, cs, 'usr', 'src',
-                        f"linux-{self.get_cs_kernel(cs)}-rt")
+        kdir = '-rt'
+        if not self.cs_is_rt(cs):
+            kdir = ''
 
         return Path(self.data, cs, 'usr', 'src',
-                        f"linux-{self.get_cs_kernel(cs)}")
+                        f"linux-{self.get_cs_kernel(cs)}{kdir}")
 
     def get_odir(self, cs):
-        if self.get_cs_data(cs)['rt']:
-            return Path('x86_64', 'rt')
+        kdir = 'default'
+        if self.cs_is_rt(cs):
+            kdir = 'rt'
 
-        return Path('x86_64', 'default')
+        return Path('x86_64', kdir)
 
     def get_mod_path(self, cs, arch):
-        kernel = self.get_cs_kernel(cs)
+        kdir = 'default'
+        if self.cs_is_rt(cs):
+            kdir = 'rt'
 
-        kernel_dir = f'{kernel}-default'
-        if self.get_cs_data(cs)['rt']:
-            kernel_dir = f'{kernel}-rt'
-
-        return Path(self.get_data_dir(cs, arch), 'lib', 'modules', kernel_dir)
+        return Path(self.get_data_dir(cs, arch), 'lib', 'modules',
+                    f'{self.get_cs_kernel(cs)}-{kdir}')
 
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:

@@ -91,8 +91,10 @@ class Setup(Config):
                     'sle' : sle,
                     'sp' : sp,
                     'update' : u,
-                    'rt' : rt
             }
+
+            if rt:
+                codestreams[cs_key]['rt'] = True
 
         return codestreams
 
