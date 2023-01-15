@@ -60,20 +60,6 @@ class Config:
         # cache nm calls for the codestream : object
         self.nm_out = {}
 
-    # Parse 15.2u25 to SLE15-SP2_Update_25
-    def get_full_cs(self, cs):
-        # Convert the string so the final cs is sle_sp_update
-        tmp_cs = cs.replace('.', '_').replace('u', '_')
-        sle, sp, u = tmp_cs.split('_')
-
-        sle = f'SLE{sle}'
-        u = f'Update_{u}'
-
-        if int(sp) > 0:
-            return f'{sle}-SP{sp}_{u}'
-
-        return f'{sle}_{u}'
-
     def lp_out_file(self, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f'{self.bsc}_{fpath}'

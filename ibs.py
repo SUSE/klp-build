@@ -291,6 +291,20 @@ class IBS(Config):
 
         shutil.rmtree(Path(rpm_dir, 'lib'), ignore_errors=True)
 
+    # Parse 15.2u25 to SLE15-SP2_Update_25
+    def get_full_cs(self, cs):
+        sle, sp, up, rt = self.get_cs_tuple(cs)
+
+        buf = f'SLE{sle}'
+
+        if int(sp) > 0:
+            buf = f'{buf}-SP{sp}'
+
+        if rt:
+            buf = f'{buf}-RT'
+
+        return f'{buf}_Update_{up}'
+
     def prepare_tests(self, skip_download):
         if not skip_download:
             # Download all built rpms
