@@ -254,11 +254,13 @@ class IBS(Config):
         return missing_syms
 
     def validate_livepatch_module(self, cs, arch, rpm_dir, rpm):
-        match = re.search('(livepatch)-.*default\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.', rpm)
+        match = re.search('(livepatch)-.*(default|rt)\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.', rpm)
         if match:
             dir_path = match.group(1)
-            lp_file = f'livepatch-{match.group(2)}-{match.group(3)}_{match.group(4)}_{match.group(5)}.ko'
+            ktype = match.group(2)
+            lp_file = f'livepatch-{match.group(3)}-{match.group(4)}_{match.group(5)}_{match.group(6)}.ko'
         else:
+            ktype = 'default'
             match = re.search('(kgraft)\-patch\-.*default\-(\d+)\-(\d+)\.(\d+)\.', rpm)
             if match:
                 dir_path = match.group(1)
@@ -269,8 +271,8 @@ class IBS(Config):
         cmd = f'rpm2cpio {fdest} | cpio --quiet -uidm'
         subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
 
-        kernel = self.get_cs_kernel(cs)
-        lp_mod_path = Path(rpm_dir, 'lib', 'modules', f'{kernel}-default',
+        lp_mod_path = Path(rpm_dir, 'lib', 'modules',
+                           f'{self.get_cs_kernel(cs)}-{ktype}',
                            dir_path, lp_file)
         out = subprocess.check_output(['/sbin/modinfo', str(lp_mod_path)],
                                       stderr=subprocess.STDOUT).decode()
