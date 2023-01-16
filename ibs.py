@@ -43,7 +43,7 @@ class IBS(Config):
                     'kernel-default' : '(kernel-default-[\d\.\-]+.s390x.rpm)',
                 },
                 'x86_64' : {
-                    'kernel-default' : '(kernel-(default|rt)\-(extra|(livepatch)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
+                    'kernel-default' : '(kernel-(default|rt)\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
                     'kernel-source' : '(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)'
                 }
         }
@@ -99,7 +99,7 @@ class IBS(Config):
     def extract_rpms(self, args):
         cs, arch, rpm, dest = args
 
-        if 'livepatch' in rpm:
+        if 'livepatch' in rpm or 'kgraft-devel' in rpm:
             path_dest = self.get_ipa_dir(cs, arch)
         elif re.search(   'kernel\-(default|rt)\-\d+', rpm) or \
                 re.search('kernel\-(default|rt)\-extra\-\d+', rpm):
@@ -114,7 +114,7 @@ class IBS(Config):
         subprocess.check_output(cmd, shell=True, cwd=path_dest)
 
         # Move ipa-clone files to path_dest
-        if 'livepatch' in rpm:
+        if 'livepatch' in rpm or 'kgraft-devel' in rpm:
             src_dir = Path(path_dest, self.get_ipa_src_path(cs, arch))
 
             for f in os.listdir(src_dir):
@@ -255,12 +255,16 @@ class IBS(Config):
 
     def validate_livepatch_module(self, cs, arch, rpm_dir, rpm):
         match = re.search('(livepatch)-.*(default|rt)\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.', rpm)
-        if not match:
-            raise RuntimeError(f'ERROR: {cs}. Regex failed to catch lp_file for {rpm}')
-
-        dir_path = match.group(1)
-        ktype = match.group(2)
-        lp_file = f'livepatch-{match.group(3)}-{match.group(4)}_{match.group(5)}_{match.group(6)}.ko'
+        if match:
+            dir_path = match.group(1)
+            ktype = match.group(2)
+            lp_file = f'livepatch-{match.group(3)}-{match.group(4)}_{match.group(5)}_{match.group(6)}.ko'
+        else:
+            ktype = 'default'
+            match = re.search('(kgraft)\-patch\-.*default\-(\d+)\-(\d+)\.(\d+)\.', rpm)
+            if match:
+                dir_path = match.group(1)
+                lp_file = f'kgraft-patch-{match.group(2)}-{match.group(3)}_{match.group(4)}.ko'
 
         fdest = Path(rpm_dir, rpm)
         # Extract the livepatch module for later inspection
