@@ -334,6 +334,8 @@ class IBS(Config):
             shutil.rmtree(f'{str(test_arch_path)}.tar.xz', ignore_errors=True)
 
             test_arch_path.mkdir(exist_ok=True, parents=True)
+            shutil.copy(Path(self.scripts, 'run-kgr-test.sh'),
+                        test_arch_path)
 
             for d in ['built', 'repro', 'tests.out']:
                 Path(test_arch_path, d).mkdir(exist_ok=True)
