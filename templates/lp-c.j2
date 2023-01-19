@@ -40,8 +40,8 @@ static struct klp_kallsyms_reloc klp_funcs[] = {
 };
 
 {% if mod is defined %}
-static int {{ fname }}_module_notify(struct notifier_block *nb,
-					unsigned long action, void *data)
+static int module_notify(struct notifier_block *nb,
+			unsigned long action, void *data)
 {
 	struct module *mod = data;
 	int ret;
@@ -63,7 +63,7 @@ static int {{ fname }}_module_notify(struct notifier_block *nb,
 }
 
 static struct notifier_block module_nb = {
-	.notifier_call = {{ fname }}_module_notify,
+	.notifier_call = module_notify,
 	.priority = INT_MIN+1,
 };
 
