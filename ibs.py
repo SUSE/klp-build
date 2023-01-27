@@ -155,7 +155,7 @@ class IBS(Config):
                     pkg = k
 
                     # RT kernels have different package names
-                    if data['rt']:
+                    if self.cs_is_rt(cs):
                         if pkg == 'kernel-default':
                             pkg = 'kernel-rt'
                         elif pkg == 'kernel-source':
@@ -188,7 +188,7 @@ class IBS(Config):
                     cmd = f'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
-                subprocess.check_output(f'find {vmlinux_path} -name "vmlinux*default.gz" -exec gzip -d {{}} \;',
+                subprocess.check_output(f'find {vmlinux_path} -name "vmlinux*gz" -exec gzip -d {{}} \;',
                                         shell=True)
 
             shutil.rmtree(Path(self.get_data_dir(cs), 'boot'), ignore_errors=True)

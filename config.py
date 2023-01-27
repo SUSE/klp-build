@@ -177,7 +177,10 @@ class Config:
     def find_module_obj(self, arch, cs, mod):
         kernel = self.get_cs_kernel(cs)
         if mod == 'vmlinux':
-            return f'boot/vmlinux-{kernel}-default'
+            ktype = 'default'
+            if self.cs_is_rt(cs):
+                ktype = 'rt'
+            return f'boot/vmlinux-{kernel}-{ktype}'
 
         mod_path = self.get_mod_path(cs, arch)
         with open(Path(mod_path, 'modules.order')) as f:
