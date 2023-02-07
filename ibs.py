@@ -455,7 +455,8 @@ class IBS(Config):
         # get the kgraft branch related to this codestream
         branch = self.ksrc.get_cs_branch(cs)
         if not branch:
-            raise RuntimeError(f'Could not find git branch for {cs}')
+            print(f'Could not find git branch for {cs}. Skipping.')
+            return
 
         prj = self.cs_to_project(cs)
 
