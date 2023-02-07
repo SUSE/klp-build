@@ -182,6 +182,10 @@ class Config:
                 ktype = 'rt'
             return f'boot/vmlinux-{kernel}-{ktype}'
 
+        # mod here can be using _ but the filename can be using -, so replace
+        # the _ cases with a regex like form to check for both _ and -
+        mod = mod.replace('_', '[-_]')
+
         mod_path = self.get_mod_path(cs, arch)
         with open(Path(mod_path, 'modules.order')) as f:
             obj = re.search(f'([\w\/\-]+\/{mod}.ko)', f.read())
