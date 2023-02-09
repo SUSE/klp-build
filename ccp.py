@@ -206,7 +206,15 @@ class CCP(Config):
             f.write('\n'.join(ext_list))
 
         # store the externalized symbols and module used in this codestream file
-        self.codestreams[cs]['ext_symbols'][fname] = [ (ext[0], ext[2]) for ext in exts ]
+        symbols = {}
+        for ext in exts:
+            sym, mod = ext[0], ext[2]
+            if not mod:
+                mod = 'vmlinux'
+
+            symbols[sym] = mod
+
+        self.codestreams[cs]['ext_symbols'][fname] = symbols
 
     # Group all codestreams that share code in a format like bellow:
     #   [15.2u10 15.2u11 15.3u10 15.3u12 ]
@@ -424,10 +432,7 @@ class CCP(Config):
             tem.GenerateLivePatches(cs)
 
             for _, exts in self.get_cs_ext_symbols(cs).items():
-                for ext in exts:
-                    func = ext[0]
-                    mod = ext[1]
-
+                for func, mod in exts.items():
                     archs = self.check_symbol_archs(cs, func, mod)
 
                     # archs is populated when a symbol wasn't found
