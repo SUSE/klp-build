@@ -409,7 +409,7 @@ class CCP(Config):
             for fname, funcs in data['files'].items():
                 args.append((fname, cs, funcs))
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             results = executor.map(self.process_ccp, args)
             for result in results:
                 if result:
