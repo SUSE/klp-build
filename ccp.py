@@ -51,7 +51,7 @@ class CCP(Config):
             raise RuntimeError('Only gcc12 is available, and it\'s problematic with kernel sources')
 
         # the current blacklisted function, more can be added as necessary
-        self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen,twaddle,set_geometry,valid_floppy_drive_params"
+        self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen,twaddle,set_geometry,valid_floppy_drive_params,__real_memchr_inv"
 
         self.make_lock = Lock()
 
