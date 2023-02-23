@@ -425,6 +425,8 @@ class CCP(Config):
 
         print('Checking the externalized symbols in other architectures...')
 
+        missing_syms = {}
+
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
         # While we are at it, create the livepatches per codestream
@@ -437,7 +439,16 @@ class CCP(Config):
 
                     # archs is populated when a symbol wasn't found
                     if archs:
-                        print(f'{cs}')
-                        print(f'\t{func}')
                         for arch in archs:
-                            print(f'\t\t{arch}/{mod}: NOT FOUND')
+                            arch_mod = f'{arch}/{mod}'
+                            missing_syms.setdefault(arch_mod, {})
+                            missing_syms[arch_mod].setdefault(func, [])
+                            missing_syms[arch_mod][func].append(cs)
+
+        if missing_syms:
+            print('Symbols not found:')
+            for arch, func in missing_syms.items():
+                print(arch)
+                for fun, codestreams in func.items():
+                    print(f'\t{fun}')
+                    print(f'\t\t{" ".join(codestreams)}\n')
