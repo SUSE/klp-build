@@ -446,9 +446,8 @@ class CCP(Config):
                             missing_syms[arch_mod][func].append(cs)
 
         if missing_syms:
+            with open(Path(self.bsc_path, 'missing_syms'), 'w') as f:
+                f.write(json.dumps(missing_syms, indent=4, sort_keys=True))
+
             print('Symbols not found:')
-            for arch, func in missing_syms.items():
-                print(arch)
-                for fun, codestreams in func.items():
-                    print(f'\t{fun}')
-                    print(f'\t\t{" ".join(codestreams)}\n')
+            print(json.dumps(missing_syms, indent=4, sort_keys=True))
