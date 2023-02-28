@@ -112,7 +112,21 @@ class Template(Config):
         self.__GenerateLivepatchFile(lp_path, cs, 'c', None)
 
     def generate_commit_msg_file(self):
-        templ = self.get_template(None, 'commit.j2', None)
-
         with open(Path(self.bsc_path, 'commit.msg'), 'w') as f:
-            f.write(templ.render())
+            commits = self.conf['commits']['upstream'].items()
+            commit_str = 'Upstream commit'
+            # add plural when necessary
+            if len(commits) > 1:
+                commit_str = commit_str + 's'
+
+            cve = self.conf['cve']
+            print(f'Fix for CVE-{cve} ("CHANGE ME!")', '',
+                f'Live patch for CVE-{cve}. {commit_str}:', sep='\n',
+                  file=f)
+
+            for commit_hash, msg in commits:
+                print(f'- {commit_hash} ("{msg}")', file=f)
+
+            print('', f'KLP: CVE-{cve}', f'References: bsc#{self.bsc_num} CVE-{cve}',
+                    f'Signed-off-by: {self.user} <{self.email}>', sep='\n',
+                  file=f)

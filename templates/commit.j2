@@ -1,9 +1,0 @@
-{% from 'helper.j2' import get_commits with context -%}
-Fix for CVE-{{ cve }} ("CHANGE ME!")
-
-Live patch for CVE-{{ cve }}. Upstream commit(s):
-{{ get_commits('upstream', '- ') }}
-
-KLP: CVE-{{ cve }}
-References: bsc#{{ bsc_num }} CVE-{{ cve }}
-Signed-off-by: {{ user }} <{{ email }}>
