@@ -204,7 +204,7 @@ class Setup(Config):
             for f in cs_files.keys():
                 for func in cs_files[f]:
                     if not self.check_symbol(arch, cs, func, mod):
-                        print(f'WARN: {cs}: Function {func} does not exist in {obj}')
+                        print(f'WARN: {cs}: Function {f}:{func} doesn\'t exist in {obj}')
 
         # Update and save codestreams data
         for cs, data in self.working_cs.items():
