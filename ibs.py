@@ -85,10 +85,7 @@ class IBS(Config):
         return natsorted(names)
 
     def delete_project(self, prj, verbose=True):
-        if not self.osc.projects.exists(prj):
-            return
-
-        ret = self.osc.projects.delete(prj)
+        ret = self.osc.projects.delete(prj, force=True)
         if type(ret) is not bool:
             print(etree.tostring(ret))
             raise ValueError(prj)
