@@ -318,7 +318,6 @@ class IBS(Config):
         for cs, _ in self.filter_cs(verbose=False).items():
             build_cs.append(self.get_full_cs(cs))
 
-        # Save file to be used later by osckgr scripts
         with open(Path(self.bsc_path, f'{self.bsc}_config.in'), 'w') as f:
             f.write('\n'.join(build_cs))
 
