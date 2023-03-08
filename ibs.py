@@ -7,6 +7,7 @@ import os
 from osctiny import Osc
 from pathlib import Path
 import re
+import requests
 import shutil
 import subprocess
 import sys
@@ -85,10 +86,15 @@ class IBS(Config):
         return natsorted(names)
 
     def delete_project(self, prj, verbose=True):
-        ret = self.osc.projects.delete(prj, force=True)
-        if type(ret) is not bool:
-            print(etree.tostring(ret))
-            raise ValueError(prj)
+        try:
+            ret = self.osc.projects.delete(prj, force=True)
+            if type(ret) is not bool:
+                print(etree.tostring(ret))
+                raise ValueError(prj)
+        except requests.exceptions.HTTPError as e:
+            # project not found, no problem
+            if e.response.status_code == 404:
+                pass
 
         if verbose:
             print('\t' + prj)
