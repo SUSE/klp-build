@@ -315,17 +315,8 @@ class IBS(Config):
             # Download all built rpms
             self.download()
 
-        config = Path(self.bsc_path, f'{self.bsc}_config.in')
         test_sh = Path(self.kgraft_tests_path,
                        f'{self.bsc}_test_script.sh')
-
-        # Prepare the config file used by kgr-test
-        build_cs = []
-        for cs, _ in self.filter_cs(verbose=False).items():
-            build_cs.append(self.get_full_cs(cs))
-
-        with open(Path(self.bsc_path, f'{self.bsc}_config.in'), 'w') as f:
-            f.write('\n'.join(build_cs))
 
         for arch in self.archs:
             tests_path = Path(self.bsc_path, 'tests', arch)
@@ -359,7 +350,17 @@ class IBS(Config):
 
                     shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, 'built'))
 
-            shutil.copy(config, Path(test_arch_path, 'repro'))
+            # Prepare the config file used by kgr-test
+            config = Path(test_arch_path, 'repro', f'{self.bsc}_config.in')
+            build_cs = []
+            for cs, _ in self.filter_cs(verbose=False).items():
+                # RT is enabled only on x86_64
+                if 'rt' in cs and arch != 'x86_64':
+                    continue
+                build_cs.append(self.get_full_cs(cs))
+
+            with open(config, 'w') as f:
+                f.write('\n'.join(build_cs))
 
             if test_sh.is_file():
                 shutil.copy(test_sh, Path(test_arch_path, 'repro'))
