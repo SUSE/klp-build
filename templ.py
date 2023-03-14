@@ -1,6 +1,6 @@
 from datetime import datetime
 import jinja2
-from pathlib import Path
+from pathlib import Path, PurePath
 import os
 
 from config import Config
@@ -110,6 +110,31 @@ class Template(Config):
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
         self.__GenerateLivepatchFile(lp_path, cs, 'c', None)
+
+    # Create Kbuild.inc file adding an entry for all geenerated livepatch files.
+    def CreateKbuildFile(self, cs):
+        cs_, sp, u, _ = self.get_cs_tuple(cs)
+        bscn = self.conf['bsc']
+        lp_dir = self.get_cs_lp_dir(cs)
+
+        with open(Path(lp_dir, 'Kbuild.inc'), 'w') as f:
+            for entry in lp_dir.iterdir():
+                fname = entry.name
+                if not fname.endswith('.c'):
+                    continue
+
+                fname = PurePath(fname).with_suffix('.o')
+
+                # For kernels 5.4 and beyond Kbuild uses relative path to add
+                # CFLAGS to objects
+                if cs_ > 15 or (cs_ == 15 and sp >= 4):
+                    fname = f'bsc{bscn}/{fname}'
+
+                f.write(f'CFLAGS_{fname} += -Werror\n')
+
+            # Files that exist on the top of kgraft-patches repository
+            for fname in ['kallsyms_relocs.o', 'livepatch_main.o']:
+                f.write(f'CFLAGS_{fname} += -Werror\n')
 
     def generate_commit_msg_file(self):
         with open(Path(self.bsc_path, 'commit.msg'), 'w') as f:

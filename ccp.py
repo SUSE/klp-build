@@ -445,6 +445,8 @@ class CCP(Config):
                             missing_syms[arch_mod].setdefault(func, [])
                             missing_syms[arch_mod][func].append(cs)
 
+            tem.CreateKbuildFile(cs)
+
         if missing_syms:
             with open(Path(self.bsc_path, 'missing_syms'), 'w') as f:
                 f.write(json.dumps(missing_syms, indent=4, sort_keys=True))
