@@ -137,12 +137,13 @@ class Setup(Config):
                 data['ext_symbols'] = { file : [] }
 
             # Set supported archs for the codestream
+            # RT is supported only on x86_64 at the moment
             archs = ['x86_64']
-            if self.is_ppc_supported(cs):
+            if not data.get('rt', False):
                 archs.append('ppc64le')
 
-            if self.is_s390_supported(cs):
-                archs.append('s390x')
+                if self.is_s390_supported(cs):
+                    archs.append('s390x')
 
             data['archs'] = archs
 
@@ -228,24 +229,13 @@ class Setup(Config):
 
         return repo
 
-    # s390x shall be enabled from SLE12-SP4 update 13 onwards.
-    # s390x is supported from 12.5u3 onwards
-    # s390x is supported from SLE15-SP2 onwards.
+    # s390x is enabled on 12.4 and 12.5 for all updates.
+    # s390x is not supported on 15.1
+    # s390x is supported from 15.2 onwards.
     def is_s390_supported(self, cs):
         sle, sp, up, rt = self.get_cs_tuple(cs)
-        # The only supported RT codestream so far is x86_64
-        if rt:
-            return False
 
         if (sle == 12 and sp >= 4) or (sle == 15 and sp >= 2):
             return True
 
         return False
-
-    def is_ppc_supported(self, cs):
-        sle, sp, up, rt = self.get_cs_tuple(cs)
-        # The only supported RT codestream so far is x86_64
-        if rt:
-            return False
-
-        return True
