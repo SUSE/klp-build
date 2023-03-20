@@ -1,6 +1,6 @@
 from natsort import natsorted
 import git
-from pathlib import Path
+from pathlib import Path, PurePath
 import os
 import re
 import requests
@@ -22,6 +22,11 @@ class GitHelper(Config):
             raise RuntimeError('kgraft-patches does not exists in ~/kgr')
 
         self.kernel_branches = {
+                                'sle12-sp4-ltss' : 'SLE12-SP4-LTSS',
+                                'sle12-sp5' : 'SLE12-SP5',
+                                'sle15-sp1' : 'SLE15-SP1-LTSS',
+                                'sle15-sp2' : 'SLE15-SP2-LTSS',
+                                'sle15-sp3' : 'SLE15-SP3-LTSS',
                                 '4.12' : 'cve/linux-4.12',
                                 '5.3' : 'cve/linux-5.3',
                                 '5.14' : 'SLE15-SP4'
@@ -114,22 +119,23 @@ class GitHelper(Config):
             raise RuntimeError(f'Not upstream commits informed or found. Use '
                                '--upstream-commits option')
 
-        print('Getting suse fixes for upstream commits per CVE branch...')
+        print('Getting SUSE fixes for upstream commits per CVE branch. It can take some time...')
 
         commits = { 'upstream' : {} }
         for commit in ups_commits:
             commit = commit[:12]
             commits['upstream'][commit] = self.get_commit_subject(commit)
 
-        fixes = Path(self.bsc_path, 'fixes')
-        fixes.mkdir(exist_ok=True)
-
-        # Get backported commits from the CVE branches
+        # Get backported commits from all possible branches, in order to get
+        # different versions of the same backport done in the CVE branches.
+        # Since the CVE branch can be some patches "behind" the LTSS branch,
+        # it's good to have both backports code at hand by the livepatch author
         for bc, mbranch in self.kernel_branches.items():
-            patches = ''
+            patches = []
 
-            commits[bc] = {}
             for commit, _ in commits['upstream'].items():
+                commits[bc] = { commit : [] }
+
                 try:
                     patch_file = subprocess.check_output(['/usr/bin/git', '-C',
                                 self.kern_src,
@@ -141,62 +147,73 @@ class GitHelper(Config):
 
                 # If we don't find any commits, add a note about it
                 if not patch_file:
-                    commits[bc]['None yet'] = ''
+                    commits[bc][commit] = [ 'None yet' ]
                     continue
 
                 # The command above returns a string in the format
-                #   branche:file/path
-                branch, fpath = patch_file.strip().split(':')
+                #   branch:file/path
+                patches.append( (commit, patch_file.strip()) )
 
-                # Get the full patch in reverse order, meaning that if we have
-                # follow up patches to fix any other previous patch, it will be
-                # the first one listed.
-                full_cmt = subprocess.check_output(['/usr/bin/git', '-C',
-                            self.kern_src,
-                            'log', '--reverse', '--patch', branch, '--', fpath],
-                            stderr=subprocess.PIPE).decode(sys.stdout.encoding)
+            hashes = []
+            for patch in patches:
+                commit, p = patch
+                branch_path = Path(self.bsc_path, 'fixes', bc)
+                branch_path.mkdir(exist_ok=True, parents=True)
 
-                m = re.search('commit (\w+)', full_cmt)
-                if not m:
-                    raise RuntimeError(f'Commit hash not found in patch:\n{full_cmt}')
+                pfile = subprocess.check_output(['/usr/bin/git', '-C',
+                                                self.kern_src,
+                                                'show', p],
+                                                stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
 
-                commit_hash = m.group(1)
+                # Split the branch:filepath, and then get the filename only
+                _, fname = p.split(':')
+                # removing the patches.suse dir from the filepath
+                basename = PurePath(fname).name
 
-                patches = patches + full_cmt
-
-                cmt = commit_hash.strip().replace('"', '')
-
-                # Link the upstream commit as key asn the suse commit as value
-                commits[bc][commit] = cmt
-
-            # Check if the commit was backport/present in the supported kernel
-            # family
-            if patches:
                 # Save the patch for later review from the livepatch developer
-                with open(Path(fixes, bc + '.patch'), 'w') as f:
-                    f.write(patches)
+                with open(Path(branch_path, f'{basename}.patch'), 'w') as f:
+                    f.write(pfile)
+
+                # Now get all commits related to that file on that branch,
+                # including the "Refresh" ones.
+                phashes = subprocess.check_output(['/usr/bin/git', '-C',
+                                                   self.kern_src,
+                                                   'log', '--no-merges',
+                                                   '--pretty=format:"%H"',
+                                                   f'remotes/origin/{mbranch}',
+                                                   fname],
+                                                  stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+
+                hash_list = phashes.replace('"', '').split('\n')
+                commits[bc][commit] = hash_list
 
         for key, val in commits['upstream'].items():
             print(f'{key}: {val}')
             for bc, _ in self.kernel_branches.items():
-                hash_cmt = commits[bc].get(key, 'None yet')
-                print('\t{}\t{}'.format(bc, hash_cmt))
+                print(f'{bc}')
+                cmts = commits[bc].get(key, 'None yet')
+                for cmt in cmts:
+                    print(f'\t{cmt}')
             print('')
 
         return commits
 
     def get_patched_kernels(self, commits):
         if not self.kern_src:
-            print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
+            print('WARN: KLP_KERNEL_SOURCE not defined, skip getting SUSE commits')
             return
 
         print('Searching for already patched codestreams...')
 
         patched = []
         for bc, branch in self.kernel_branches.items():
-            for up_commit, suse_commit in commits[bc].items():
-                if suse_commit == '':
+            for _, suse_commits in commits[bc].items():
+                if not suse_commits or 'None yet' in suse_commits:
                     continue
+
+                # Grab only the first commit, since they would be put together
+                # in a release either way
+                suse_commit = suse_commits[0]
 
                 tags = subprocess.check_output(['/usr/bin/git', '-C',
                             self.kern_src, 'tag', f'--contains={suse_commit}'])
