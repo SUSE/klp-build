@@ -40,15 +40,16 @@ class CCP(Config):
 
         self.pol_path = str(pol_path)
 
-        gcc_ver = subprocess.check_output(['gcc', '-dumpversion']).decode().strip()
+        gcc_ver = int(subprocess.check_output(['gcc',
+                                               '-dumpversion']).decode().strip())
         # gcc12 has a problem with kernel and xrealloc implementation
-        if gcc_ver != '12':
+        if gcc_ver < 12:
             self.cc = 'gcc'
         # if gcc12 is the default compiler, check if gcc11 is available
-        elif gcc_ver == '12' and shutil.which('gcc-11'):
+        elif gcc_ver > 11 and shutil.which('gcc-11'):
             self.cc = 'gcc-11'
         else:
-            raise RuntimeError('Only gcc12 is available, and it\'s problematic with kernel sources')
+            raise RuntimeError('Only gcc12 or gcc13 are available, and it\'s problematic with kernel sources')
 
         # the current blacklisted function, more can be added as necessary
         self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen,twaddle,set_geometry,valid_floppy_drive_params,__real_memchr_inv,__real_kmemdup"
