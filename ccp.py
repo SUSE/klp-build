@@ -396,9 +396,6 @@ class CCP(Config):
 
         working_cs = self.filter_cs(verbose=True)
 
-        print('\nRunning klp-ccp...')
-        print('\tCodestream\tFile')
-
         # Make it perform better by spawning a process_ccp function per
         # cs/file/funcs tuple, instead of spawning a thread per codestream
         args = []
@@ -408,6 +405,9 @@ class CCP(Config):
 
             for fname, funcs in data['files'].items():
                 args.append((fname, cs, funcs))
+
+        print(f'\nRunning klp-ccp for {len(args)} file(s)...')
+        print('\tCodestream\tFile')
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             results = executor.map(self.process_ccp, args)
