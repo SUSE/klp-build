@@ -533,4 +533,5 @@ class IBS(Config):
             print('Pushing projects to IBS...')
 
         # More threads makes OBS to return error 500
-        self.do_work(self.create_lp_package, cs_list, 1)
+        for cs in cs_list:
+            self.create_lp_package(cs)
