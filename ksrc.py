@@ -27,9 +27,9 @@ class GitHelper(Config):
                                 'sle15-sp1-ltss' : 'SLE15-SP1-LTSS',
                                 'sle15-sp2-ltss' : 'SLE15-SP2-LTSS',
                                 'sle15-sp3-ltss' : 'SLE15-SP3-LTSS',
+                                'sle15-sp4' : 'SLE15-SP4',
                                 '4.12' : 'cve/linux-4.12',
-                                '5.3' : 'cve/linux-5.3',
-                                '5.14' : 'SLE15-SP4'
+                                '5.3' : 'cve/linux-5.3'
                             }
 
         # Filter only the branches related to this BSC
