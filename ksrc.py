@@ -176,13 +176,19 @@ class GitHelper(Config):
 
                 # Now get all commits related to that file on that branch,
                 # including the "Refresh" ones.
-                phashes = subprocess.check_output(['/usr/bin/git', '-C',
-                                                   self.kern_src,
-                                                   'log', '--no-merges',
-                                                   '--pretty=format:"%H"',
-                                                   f'remotes/origin/{mbranch}',
-                                                   fname],
-                                                  stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+                try:
+                    phashes = subprocess.check_output(['/usr/bin/git', '-C',
+                                                       self.kern_src,
+                                                       'log', '--no-merges',
+                                                       '--pretty=format:"%H"',
+                                                       f'remotes/origin/{mbranch}',
+                                                       fname],
+                                                      stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+                except subprocess.CalledProcessError:
+                    print(f'File {fname} doesn\'t exists {mbranch}. It could '
+                            ' be removed, so the branch is not affected by the issue.')
+                    commits[bc][commit] = [ 'Not affected' ]
+                    continue
 
                 hash_list = phashes.replace('"', '').split('\n')
                 commits[bc][commit] = hash_list
@@ -208,7 +214,7 @@ class GitHelper(Config):
         patched = []
         for bc, branch in self.kernel_branches.items():
             for _, suse_commits in commits[bc].items():
-                if not suse_commits or 'None yet' in suse_commits:
+                if not suse_commits or 'Not affected' in suse_commits or 'None yet' in suse_commits:
                     continue
 
                 # Grab only the first commit, since they would be put together
