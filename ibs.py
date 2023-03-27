@@ -49,14 +49,11 @@ class IBS(Config):
                 }
         }
 
-    def do_work(self, func, args, workers=0):
+    def do_work(self, func, args):
         if len(args) == 0:
             return
 
-        if workers == 0:
-            workers = os.cpu_count()
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
             results = executor.map(func, args)
             for result in results:
                 if result:
