@@ -132,10 +132,6 @@ class Template(Config):
 
                 f.write(f'CFLAGS_{fname} += -Werror\n')
 
-            # Files that exist on the top of kgraft-patches repository
-            for fname in ['kallsyms_relocs.o', 'livepatch_main.o']:
-                f.write(f'CFLAGS_{fname} += -Werror\n')
-
     def generate_commit_msg_file(self):
         with open(Path(self.bsc_path, 'commit.msg'), 'w') as f:
             commits = self.conf['commits']['upstream'].items()
