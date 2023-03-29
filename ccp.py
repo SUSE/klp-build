@@ -434,7 +434,7 @@ class CCP(Config):
         for cs, data in working_cs.items():
             tem.GenerateLivePatches(cs)
 
-            for _, exts in self.get_cs_ext_symbols(cs).items():
+            for file_ext, exts in self.get_cs_ext_symbols(cs).items():
                 for func, mod in exts.items():
                     archs = self.check_symbol_archs(cs, func, mod)
 
@@ -443,8 +443,9 @@ class CCP(Config):
                         for arch in archs:
                             arch_mod = f'{arch}/{mod}'
                             missing_syms.setdefault(arch_mod, {})
-                            missing_syms[arch_mod].setdefault(func, [])
-                            missing_syms[arch_mod][func].append(cs)
+                            missing_syms[arch_mod].setdefault(file_ext, {})
+                            missing_syms[arch_mod][file_ext].setdefault(func, [])
+                            missing_syms[arch_mod][file_ext][func].append(cs)
 
             tem.CreateKbuildFile(cs)
 
