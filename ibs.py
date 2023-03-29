@@ -527,7 +527,7 @@ class IBS(Config):
         cs_list = self.apply_filter(self.codestreams.keys())
 
         if cs_list:
-            print('Pushing projects to IBS...')
+            print(f'Pushing {len(cs_list)} projects to IBS...')
 
         # More threads makes OBS to return error 500
         for cs in cs_list:
