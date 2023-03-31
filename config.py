@@ -224,11 +224,8 @@ class Config:
     # Cache the output of nm by using the object path. It differs for each
     # codestream and architecture
     def check_symbol(self, arch, cs, symbol, mod):
-        if not self.nm_out.get(arch, ''):
-            self.nm_out[arch] = {}
-
-        if not self.nm_out[arch].get(cs, ''):
-            self.nm_out[arch][cs] = {}
+        self.nm_out.setdefault(arch, {})
+        self.nm_out[arch].setdefault(cs, {})
 
         if not self.nm_out[arch][cs].get(mod, ''):
             obj = self.get_module_obj(arch, cs, mod, use_cached_obj=False)
