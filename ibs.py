@@ -460,7 +460,7 @@ class IBS(Config):
 
         prj = self.cs_to_project(cs)
 
-        print(f'Preparing project {prj}...')
+        print(f'Pushing {cs}... ', end='', flush=True)
 
         # If the project exists, drop it first
         self.delete_project(prj, verbose=False)
@@ -475,8 +475,6 @@ class IBS(Config):
                                        description=prj_desc)
 
             self.osc.packages.set_meta(prj, 'klp', title='', description='Test livepatch')
-
-            print(f'\tproject created on IBS')
 
         except Exception as e:
             print(e, e.response.content)
@@ -521,13 +519,13 @@ class IBS(Config):
                                 stderr=subprocess.STDOUT, cwd=prj_path)
         shutil.rmtree(prj_path)
 
-        print(f'\tCode commited')
+        print('done')
 
     def push(self):
         cs_list = self.apply_filter(self.codestreams.keys())
 
         if cs_list:
-            print(f'Pushing {len(cs_list)} projects to IBS...')
+            print(f'Preparing {len(cs_list)} projects on IBS...')
 
         # More threads makes OBS to return error 500
         for cs in cs_list:
