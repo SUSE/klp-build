@@ -369,10 +369,14 @@ class IBS(Config):
                                         stdout=sys.stdout,
                                         stderr=subprocess.PIPE, check=True)
 
+    # We can try delete a project that was removed, so don't bother with errors
     def delete_rpms(self, cs):
-        for arch in self.get_cs_archs(cs):
-            shutil.rmtree(Path(self.bsc_path, 'c', cs, arch, 'rpm'),
-                          ignore_errors=True)
+        try:
+            for arch in self.get_cs_archs(cs):
+                shutil.rmtree(Path(self.bsc_path, 'c', cs, arch, 'rpm'),
+                              ignore_errors=True)
+        except KeyError:
+            pass
 
     def download(self):
         rpms = []
