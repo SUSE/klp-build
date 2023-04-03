@@ -174,7 +174,7 @@ class Config:
         return str(Path(self.get_mod_path(cs, arch), obj))
 
     # Return only the name of the module to be livepatched
-    def find_module_obj(self, arch, cs, mod):
+    def find_module_obj(self, arch, cs, mod, check_support=False):
         kernel = self.get_cs_kernel(cs)
         if mod == 'vmlinux':
             ktype = 'default'
@@ -192,7 +192,18 @@ class Config:
             if not obj:
                 raise RuntimeError(f'{cs}: Module not found: {mod}')
 
-            return str(obj.group(1))
+
+            obj = obj.group(1)
+            obj_path = str(Path(mod_path, obj))
+
+            # Validate if the module being livepatches is supported or not
+            out = subprocess.check_output(['/sbin/modinfo', obj_path],
+                                          stderr=subprocess.STDOUT).decode()
+
+            if re.search('supported:\s+no', out):
+                raise RuntimeError(f'{cs}: Module {mod} is not supported by SLE')
+
+            return obj
 
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter

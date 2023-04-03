@@ -198,7 +198,7 @@ class Setup(Config):
 
             mod = self.conf['mod']
             arch = 'x86_64'
-            obj = self.find_module_obj(arch, cs, mod)
+            obj = self.find_module_obj(arch, cs, mod, check_support=True)
             data['object'] = obj
 
             # Verify if the functions exist in the specified object
