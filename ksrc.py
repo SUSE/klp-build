@@ -76,6 +76,20 @@ class GitHelper(Config):
 
     def format_patches(self, version):
         ver = f'v{version}'
+        # index 1 will be the test file
+        index = 2
+
+        kgraft_tests_path = Path(Path().home(), 'kgr',
+                                      'kgraft-patches_testscripts')
+        if not kgraft_tests_path.is_dir():
+            raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
+
+        # Ensure that a testfile was created before preparing the patches
+        test_sh = Path(kgraft_tests_path, f'{self.bsc}_test_script.sh')
+        if not test_sh.is_file():
+            raise RuntimeError(f'Test file {test_sh} not created.')
+
+        patches_dir = Path(self.kgr_patches, 'patches')
 
         # Filter only the branches related to this BSC
         for branch in self.branches:
@@ -85,12 +99,25 @@ class GitHelper(Config):
             bsc = self.bsc.replace('bsc', 'bsc#')
 
             prefix = f'PATCH {ver} {bsc} {bs}'
-            out = f'{bname}-{ver}.patch'
 
-            subprocess.check_output(['/usr/bin/git', '-C', str(self.kgr_patches),
+            subprocess.check_output(['/usr/bin/git',
+                            '-C', str(self.kgr_patches),
                             'format-patch', '-1', branch,
-                            f'--subject-prefix={prefix}', '--output',
-                                     f'{out}'])
+                            '--start-number', f'{index}',
+                            '--subject-prefix', f'{prefix}',
+                            '--output-directory', f'{patches_dir}'
+                            ])
+
+            index += 1
+
+        subprocess.check_output(['/usr/bin/git',
+                        '-C', str(kgraft_tests_path),
+                        'format-patch','-1', f'{test_sh}',
+                        '--cover-letter',
+                        '--start-number', '1',
+                        '--subject-prefix', f'PATCH {ver}',
+                        '--output-directory', f'{patches_dir}'
+                        ])
 
     def get_commit_subject(self, commit):
         req = requests.get(f'https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={commit}')
