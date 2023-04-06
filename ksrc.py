@@ -40,15 +40,24 @@ class GitHelper(Config):
                 self.branches.append(r.name)
 
     def get_cs_branch(self, cs):
-        cs_sle, sp, cs_up, _ = self.get_cs_tuple(cs)
+        cs_sle, sp, cs_up, rt = self.get_cs_tuple(cs)
 
         branch_name = ''
 
         for branch in self.branches:
+            # Check if the codestream is a rt one, and if yes, apply the correct
+            # separator later on
+            if rt and 'rt' not in branch:
+                continue
+
+            separator = 'u'
+            if rt:
+                separator = 'rtu'
+
             # First check if the branch has more than code stream sharing
             # the same code
             for b in branch.replace(self.bsc + '_', '').split('_'):
-                sle, u = b.split('u')
+                sle, u = b.split(separator)
                 if f'{cs_sle}.{sp}' != f'{sle}':
                     continue
 
