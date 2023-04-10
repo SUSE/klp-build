@@ -57,6 +57,14 @@ class GitHelper(Config):
             # First check if the branch has more than code stream sharing
             # the same code
             for b in branch.replace(self.bsc + '_', '').split('_'):
+                # Only check the branches that are the same type of the branch
+                # being searched. Only check RT branches if the codestream is a
+                # RT one.
+                if rt and 'rtu' not in b:
+                    continue
+                elif not rt and 'rtu' in b:
+                    continue
+
                 sle, u = b.split(separator)
                 if f'{cs_sle}.{sp}' != f'{sle}':
                     continue
