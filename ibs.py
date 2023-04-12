@@ -464,7 +464,7 @@ class IBS(Config):
 
         prj = self.cs_to_project(cs)
 
-        print(f'Pushing {cs}... ', end='', flush=True)
+        print(f'Pushing {cs} using branch {branch}...', end='', flush=True)
 
         # If the project exists, drop it first
         self.delete_project(prj, verbose=False)
