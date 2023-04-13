@@ -163,6 +163,13 @@ class GitHelper(Config):
             raise RuntimeError(f'Not upstream commits informed or found. Use '
                                '--upstream-commits option')
 
+        print('Fetching changes from all supported branches...')
+
+        # Mount the command to fetch all branches for supported codestreams
+        args = ['/usr/bin/git', '-C', self.kern_src, 'fetch', 'origin']
+        args.extend(self.kernel_branches.values())
+        subprocess.check_output(args)
+
         print('Getting SUSE fixes for upstream commits per CVE branch. It can take some time...')
 
         commits = { 'upstream' : {} }
