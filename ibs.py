@@ -11,6 +11,7 @@ import requests
 import shutil
 import subprocess
 import sys
+import time
 
 from config import Config
 from ksrc import GitHelper
@@ -407,20 +408,30 @@ class IBS(Config):
         print(f'Downloading {len(rpms)} packages')
         self.do_work(self.download_binary_rpms, rpms)
 
-    def status(self):
-        prjs = {}
-        for prj in self.get_project_names():
-            prjs[prj] = {}
+    def status(self, wait=False):
+        while True:
+            finished = True
+            prjs = {}
+            for prj in self.get_project_names():
+                prjs[prj] = {}
 
-            for res in self.osc.build.get(prj).findall('result'):
-                code = res.xpath('status/@code')[0]
-                prjs[prj][res.get('arch')] = code
+                for res in self.osc.build.get(prj).findall('result'):
+                    code = res.xpath('status/@code')[0]
+                    prjs[prj][res.get('arch')] = code
 
-        for prj, archs in prjs.items():
-            st = []
-            for k, v in archs.items():
-                st.append(f'{k}: {v}')
-            print('{}\t{}'.format(prj, '\t'.join(st)))
+            for prj, archs in prjs.items():
+                st = []
+                for k, v in archs.items():
+                    st.append(f'{k}: {v}')
+                    if v not in ['succeeded', 'unresolvable', 'failed']:
+                        finished = False
+                print('{}\t{}'.format(prj, '\t'.join(st)))
+
+            if finished or not wait:
+                break
+
+            # Wait 30 seconds before getting status again
+            time.sleep(30)
 
     def cleanup(self):
         prjs = self.get_project_names()
