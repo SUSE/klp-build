@@ -432,6 +432,7 @@ class IBS(Config):
 
             # Wait 30 seconds before getting status again
             time.sleep(30)
+            print('')
 
     def cleanup(self):
         prjs = self.get_project_names()
