@@ -56,9 +56,6 @@ def create_parser() -> argparse.ArgumentParser:
     ibs.add_argument('--cleanup', action='store_true',
             help='Remove livepatch packages from IBS')
 
-    ibs.add_argument('--status', action='store_true',
-            help='Check livepatch build status')
-
     ibs.add_argument('--download', action='store_true',
             help='Download livepatch rpms')
 
@@ -67,6 +64,12 @@ def create_parser() -> argparse.ArgumentParser:
 
     ibs.add_argument('--skip-download', action='store_true', default=False,
             help='Do not drop and redownload the built rpms')
+
+    status = sub.add_parser('status', parents = [parentparser],
+            help='Check livepatch build status on IBS')
+
+    status.add_argument('--wait', action='store_true',
+            help='Wait until all codestreams builds are finished')
 
     return parser
 
@@ -88,12 +91,12 @@ if  __name__ == '__main__':
     elif args.cmd == 'format-patches':
         GitHelper(args.bsc, args.filter).format_patches(args.version)
 
+    elif args.cmd == 'status':
+        IBS(args.bsc, args.filter).status(args.wait)
+
     elif args.cmd == 'ibs':
         ibs = IBS(args.bsc, args.filter)
-
-        if args.status:
-            ibs.status()
-        elif args.cleanup:
+        if args.cleanup:
             ibs.cleanup()
         elif args.download:
             ibs.download()
