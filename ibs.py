@@ -536,7 +536,7 @@ class IBS(Config):
 
         print('done')
 
-    def push(self):
+    def push(self, wait=False):
         cs_list = self.apply_filter(self.codestreams.keys())
 
         if cs_list:
@@ -545,3 +545,9 @@ class IBS(Config):
         # More threads makes OBS to return error 500
         for cs in cs_list:
             self.create_lp_package(cs)
+
+        if wait:
+            # Give some time for IBS to start building the last pushed
+            # codestreams
+            time.sleep(30)
+            self.status(wait)

@@ -50,9 +50,6 @@ def create_parser() -> argparse.ArgumentParser:
     ibs = sub.add_parser('ibs', parents = [parentparser],
             help='Manipulate livepatch packages in IBS')
 
-    ibs.add_argument('--push', action='store_true',
-            help='Push livepatch packages to IBS to be built')
-
     ibs.add_argument('--cleanup', action='store_true',
             help='Remove livepatch packages from IBS')
 
@@ -65,9 +62,13 @@ def create_parser() -> argparse.ArgumentParser:
     ibs.add_argument('--skip-download', action='store_true', default=False,
             help='Do not drop and redownload the built rpms')
 
+    push = sub.add_parser('push', parents = [parentparser],
+            help='Push livepatch packages to IBS to be built')
+    push.add_argument('--wait', action='store_true',
+            help='Wait until all codestreams builds are finished')
+
     status = sub.add_parser('status', parents = [parentparser],
             help='Check livepatch build status on IBS')
-
     status.add_argument('--wait', action='store_true',
             help='Wait until all codestreams builds are finished')
 
@@ -94,13 +95,14 @@ if  __name__ == '__main__':
     elif args.cmd == 'status':
         IBS(args.bsc, args.filter).status(args.wait)
 
+    elif args.cmd == 'push':
+        IBS(args.bsc, args.filter).push(args.wait)
+
     elif args.cmd == 'ibs':
         ibs = IBS(args.bsc, args.filter)
         if args.cleanup:
             ibs.cleanup()
         elif args.download:
             ibs.download()
-        elif args.push:
-            ibs.push()
         elif args.prepare_tests:
             ibs.prepare_tests(args.skip_download)
