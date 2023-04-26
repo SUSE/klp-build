@@ -150,7 +150,7 @@ class GitHelper(Config):
 
         return re.search('Subject: (.*)', req.text).group(1)
 
-    def get_commits(self, ups_commits):
+    def get_commits(self, cve):
         if not self.kern_src:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
             return
@@ -159,9 +159,9 @@ class GitHelper(Config):
         if self.conf.get('commits', ''):
             return self.conf['commits']
         # ensure that the user informed the commits at least once per 'project'
-        elif not ups_commits:
-            raise RuntimeError(f'Not upstream commits informed or found. Use '
-                               '--upstream-commits option')
+        elif not cve:
+            raise RuntimeError(f'No CVE informed or no upstream commits found. Use '
+                               '--cve option')
 
         print('Fetching changes from all supported branches...')
 
@@ -173,9 +173,6 @@ class GitHelper(Config):
         print('Getting SUSE fixes for upstream commits per CVE branch. It can take some time...')
 
         commits = { 'upstream' : {} }
-        for commit in ups_commits:
-            commit = commit[:12]
-            commits['upstream'][commit] = self.get_commit_subject(commit)
 
         # Get backported commits from all possible branches, in order to get
         # different versions of the same backport done in the CVE branches.
@@ -183,47 +180,50 @@ class GitHelper(Config):
         # it's good to have both backports code at hand by the livepatch author
         for bc, mbranch in self.kernel_branches.items():
             patches = []
+            commits[bc] = { 'commits' : [] }
 
-            for commit, _ in commits['upstream'].items():
-                commits[bc] = { commit : [] }
+            try:
+                patch_files = subprocess.check_output(['/usr/bin/git', '-C',
+                            self.kern_src,
+                            'grep', '-l', f'CVE-{cve}',
+                            f'remotes/origin/{mbranch}'],
+                            stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+            except subprocess.CalledProcessError:
+                patch_files = ''
 
-                try:
-                    patch_file = subprocess.check_output(['/usr/bin/git', '-C',
-                                self.kern_src,
-                                'grep', '-l', f'Git-commit: {commit}',
-                                f'remotes/origin/{mbranch}'],
-                                stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
-                except subprocess.CalledProcessError:
-                    patch_file = ''
+            # If we don't find any commits, add a note about it
+            if not patch_files:
+                continue
 
-                # If we don't find any commits, add a note about it
-                if not patch_file:
-                    commits[bc][commit] = [ 'None yet' ]
-                    continue
-
-                # The command above returns a string in the format
-                #   branch:file/path
-                patches.append( (commit, patch_file.strip()) )
-
-            hashes = []
-            for patch in patches:
-                commit, p = patch
+            # The command above returns a list of strings in the format
+            #   branch:file/path
+            for patch in patch_files.splitlines():
                 branch_path = Path(self.bsc_path, 'fixes', bc)
                 branch_path.mkdir(exist_ok=True, parents=True)
 
                 pfile = subprocess.check_output(['/usr/bin/git', '-C',
                                                 self.kern_src,
-                                                'show', p],
+                                                'show', patch],
                                                 stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
 
                 # Split the branch:filepath, and then get the filename only
-                _, fname = p.split(':')
+                _, fname = patch.split(':')
                 # removing the patches.suse dir from the filepath
                 basename = PurePath(fname).name
 
                 # Save the patch for later review from the livepatch developer
                 with open(Path(branch_path, f'{basename}.patch'), 'w') as f:
                     f.write(pfile)
+
+                # Get the upstream commit and save it
+                m = re.search('Git-commit: ([\w]+)', pfile)
+                if not m:
+                    raise RuntimeError(f'No Git-commit found for {bc}:{patch}')
+
+                # Aggregate all upstream fixes found
+                ups = m.group(1)[:12]
+                if ups not in commits['upstream'].keys():
+                    commits['upstream'][ups] = self.get_commit_subject(ups)
 
                 # Now get all commits related to that file on that branch,
                 # including the "Refresh" ones.
@@ -238,19 +238,25 @@ class GitHelper(Config):
                 except subprocess.CalledProcessError:
                     print(f'File {fname} doesn\'t exists {mbranch}. It could '
                             ' be removed, so the branch is not affected by the issue.')
-                    commits[bc][commit] = [ 'Not affected' ]
+                    commits[bc]['commits'] = [ 'Not affected' ]
                     continue
 
                 hash_list = phashes.replace('"', '').split('\n')
-                commits[bc][commit] = hash_list
+                commits[bc]['commits'].extend(hash_list)
 
-        for key, val in commits['upstream'].items():
-            print(f'{key}: {val}')
-            for bc, _ in self.kernel_branches.items():
-                print(f'{bc}')
-                cmts = commits[bc].get(key, 'None yet')
-                for cmt in cmts:
-                    print(f'\t{cmt}')
+        print('')
+
+        for key, val in commits.items():
+            print(f'{key}')
+            if key == 'upstream':
+                for ups_hash, ups_msg in val.items():
+                    print(f'{ups_hash}: {ups_msg}')
+            else:
+                branch_commits = val['commits']
+                if not branch_commits:
+                    print('None')
+                for c in branch_commits:
+                    print(f'{c}')
             print('')
 
         return commits
@@ -263,29 +269,29 @@ class GitHelper(Config):
         print('Searching for already patched codestreams...')
 
         patched = []
-        for bc, branch in self.kernel_branches.items():
-            for _, suse_commits in commits[bc].items():
-                if not suse_commits or 'Not affected' in suse_commits or 'None yet' in suse_commits:
+        for bc, _ in self.kernel_branches.items():
+            suse_commits = commits[bc]['commits']
+            if not suse_commits:
+                continue
+
+            # Grab only the first commit, since they would be put together
+            # in a release either way
+            suse_commit = suse_commits[0]
+
+            tags = subprocess.check_output(['/usr/bin/git', '-C',
+                        self.kern_src, 'tag', f'--contains={suse_commit}'])
+
+            for tag in tags.decode().splitlines():
+                tag = tag.strip()
+                if not tag.startswith('rpm-'):
                     continue
 
-                # Grab only the first commit, since they would be put together
-                # in a release either way
-                suse_commit = suse_commits[0]
+                # Remove noise around the kernel version, like
+                # rpm-5.3.18-150200.24.112--sle15-sp2-ltss-updates
+                tag = tag.replace('rpm-', '')
+                tag = re.sub('--.*', '', tag)
 
-                tags = subprocess.check_output(['/usr/bin/git', '-C',
-                            self.kern_src, 'tag', f'--contains={suse_commit}'])
-
-                for tag in tags.decode().splitlines():
-                    tag = tag.strip()
-                    if not tag.startswith('rpm-'):
-                        continue
-
-                    # Remove noise around the kernel version, like
-                    # rpm-5.3.18-150200.24.112--sle15-sp2-ltss-updates
-                    tag = tag.replace('rpm-', '')
-                    tag = re.sub('--.*', '', tag)
-
-                    patched.append(tag)
+                patched.append(tag)
 
         # remove duplicates
         return natsorted(list(set(patched)))

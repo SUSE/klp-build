@@ -31,8 +31,6 @@ def create_parser() -> argparse.ArgumentParser:
             'func2 --file-func 12.[45] file/patch2 func1...')
     setup.add_argument('--module', type=str, default='vmlinux',
             help='The module that will be livepatched')
-    setup.add_argument('-u', '--upstream-commits',
-            nargs='+', help='Commit hashes used to solve the CVE')
     setup.add_argument('--archs', required=True,
             nargs='+', help='Supported architectures for this livepatch')
 
@@ -44,8 +42,8 @@ def create_parser() -> argparse.ArgumentParser:
             help='Version to be added, like vX')
 
     patches = sub.add_parser('get-patches', parents = [parentparser])
-    patches.add_argument('-u', '--upstream-commits', required=True,
-            nargs='+', help='Commit hashes used to solve the CVE')
+    patches.add_argument('--cve', required=True,
+            help='CVE number to search for related backported patches')
 
     ibs = sub.add_parser('ibs', parents = [parentparser],
             help='Manipulate livepatch packages in IBS')
@@ -80,14 +78,14 @@ if  __name__ == '__main__':
     if args.cmd == 'setup':
         setup = Setup(args.bsc, args.filter, args.cve, args.conf,
                       args.codestream, args.file_funcs, args.module,
-                      args.upstream_commits, args.archs)
+                      args.archs)
         setup.setup_project_files()
 
     elif args.cmd == 'run-ccp':
         CCP(args.bsc, args.filter).run_ccp()
 
     elif args.cmd == 'get-patches':
-        GitHelper(args.bsc, args.filter).get_commits(args.upstream_commits)
+        GitHelper(args.bsc, args.filter).get_commits(args.cve)
 
     elif args.cmd == 'format-patches':
         GitHelper(args.bsc, args.filter).format_patches(args.version)

@@ -11,7 +11,7 @@ from ksrc import GitHelper
 
 class Setup(Config):
     def __init__(self, bsc, bsc_filter, cve, conf, cs_arg, file_funcs, mod,
-            ups_commits, archs):
+            archs):
         super().__init__(bsc, bsc_filter)
 
         for arch in archs:
@@ -31,7 +31,6 @@ class Setup(Config):
         self.ksrc = GitHelper(self.bsc_num, self.filter)
 
         self.codestream = cs_arg
-        self._ups_commits = ups_commits
         self.file_funcs = {}
 
         for f in file_funcs:
@@ -104,7 +103,7 @@ class Setup(Config):
         all_codestreams = self.download_supported_file()
 
         # Called at this point because codestreams is populated
-        self.conf['commits'] = self.ksrc.get_commits(self._ups_commits)
+        self.conf['commits'] = self.ksrc.get_commits(self.conf['cve'])
 
         # do not get the commits twice
         patched_kernels = self.conf.get('patched_kernels', [])

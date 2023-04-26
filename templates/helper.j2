@@ -6,9 +6,13 @@
 {% if codestream == 'upstream' %}
  *  {{ commit }} ("{{ msg }}")
 {% else %}
-{% for cmt in msg %}
- *  {{ cmt }}
+{% if not msg %}
+ *  Not affected
+{% else %}
+{% for m in msg %}
+ *  {{ m }}
 {% endfor %}
+{% endif %}
 {% endif %}
 {% endfor %}
 {% endif %}
