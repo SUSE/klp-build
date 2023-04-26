@@ -136,6 +136,9 @@ class CCP(Config):
         ccp_args = list(filter(None, ccp_args))
 
         with open(Path(out_dir, 'klp-ccp.out'), 'w') as f:
+            # Write the command line used
+            f.write('\n'.join(ccp_args) + '\n')
+            f.flush()
             subprocess.run(ccp_args, cwd=odir, stdout=f, stderr=f, env=env,
                         check=True)
 
