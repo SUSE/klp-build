@@ -231,7 +231,7 @@ class GitHelper(Config):
                     phashes = subprocess.check_output(['/usr/bin/git', '-C',
                                                        self.kern_src,
                                                        'log', '--no-merges',
-                                                       '--pretty=format:"%H"',
+                                                       '--pretty=oneline',
                                                        f'remotes/origin/{mbranch}',
                                                        fname],
                                                       stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
@@ -241,8 +241,13 @@ class GitHelper(Config):
                     commits[bc]['commits'] = [ 'Not affected' ]
                     continue
 
-                hash_list = phashes.replace('"', '').split('\n')
-                commits[bc]['commits'].extend(hash_list)
+                # Skip the Update commits, that only change the References tag
+                for hash_entry in phashes.splitlines():
+                    if 'Update patches.suse' in hash_entry:
+                        continue
+
+                    hash_commit = hash_entry.split(' ')[0]
+                    commits[bc]['commits'].append(hash_commit)
 
         print('')
 
@@ -256,7 +261,7 @@ class GitHelper(Config):
                 if not branch_commits:
                     print('None')
                 for c in branch_commits:
-                    print(f'{c}')
+                    print(c)
             print('')
 
         return commits
