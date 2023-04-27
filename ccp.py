@@ -12,7 +12,7 @@ from config import Config
 from templ import Template
 
 class CCP(Config):
-    def __init__(self, bsc, bsc_filter):
+    def __init__(self, bsc, bsc_filter, avoid_ext):
         super().__init__(bsc, bsc_filter)
 
         self.env = os.environ
@@ -51,8 +51,22 @@ class CCP(Config):
         else:
             raise RuntimeError('Only gcc12 or gcc13 are available, and it\'s problematic with kernel sources')
 
-        # the current blacklisted function, more can be added as necessary
-        self.env['KCP_EXT_BLACKLIST'] = "__xadd_wrong_size,__bad_copy_from,__bad_copy_to,rcu_irq_enter_disabled,rcu_irq_enter_irqson,rcu_irq_exit_irqson,verbose,__write_overflow,__read_overflow,__read_overflow2,__real_strnlen,twaddle,set_geometry,valid_floppy_drive_params,__real_memchr_inv,__real_kmemdup"
+        # List of symbols that are currently problematic for klp-ccp
+        avoid_syms = ['__xadd_wrong_size', '__bad_copy_from', '__bad_copy_to',
+                    'rcu_irq_enter_disabled', 'rcu_irq_enter_irqson',
+                    'rcu_irq_exit_irqson', 'verbose', '__write_overflow',
+                    '__read_overflow', '__read_overflow2', '__real_strnlen',
+                    'twaddle', 'set_geometry', 'valid_floppy_drive_params',
+                    '__real_memchr_inv', '__real_kmemdup'
+                    ]
+        # The backlist tells the klp-ccp to always copy the symbol code,
+        # instead of externalizing. This helps in cases where different archs
+        # have different inline decisions, optimizing and sometimes removing the
+        # symbols.
+        if avoid_ext:
+            avoid_syms.extend(avoid_ext)
+
+        self.env['KCP_EXT_BLACKLIST'] = ','.join(avoid_syms)
 
         self.make_lock = Lock()
 
