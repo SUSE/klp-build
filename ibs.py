@@ -50,6 +50,9 @@ class IBS(Config):
                 }
         }
 
+        # Total number of work items
+        self.total = 0
+
     def do_work(self, func, args):
         if len(args) == 0:
             return
@@ -98,7 +101,7 @@ class IBS(Config):
             print('\t' + prj)
 
     def extract_rpms(self, args):
-        cs, arch, rpm, dest = args
+        i, cs, arch, rpm, dest = args
 
         if 'livepatch' in rpm or 'kgraft-devel' in rpm:
             path_dest = self.get_ipa_dir(cs, arch)
@@ -125,20 +128,21 @@ class IBS(Config):
             os.remove(Path(path_dest, 'Symbols.list'))
             shutil.rmtree(Path(path_dest, 'usr'))
 
-        print(f'Extracting {cs} {rpm}: ok')
+        print(f'({i}/{self.total}) extracted {cs} {rpm}: ok')
 
     def download_and_extract(self, args):
-        cs, prj, repo, arch, pkg, rpm, dest = args
+        i, cs, prj, repo, arch, pkg, rpm, dest = args
 
         self.download_binary_rpms(args)
 
         # Do not extract kernel-macros rpm
         if 'kernel-macros' not in rpm:
-            self.extract_rpms( (cs, arch, rpm, dest) )
+            self.extract_rpms( (i, cs, arch, rpm, dest) )
 
     def download_cs_data(self, cs_list):
         rpms = []
         extract = []
+        i = 1
 
         print('Getting list of files...')
         for cs, data in cs_list.items():
@@ -173,9 +177,11 @@ class IBS(Config):
                             rpm = file
                         else:
                             rpm = file[0]
-                        rpms.append( (cs, prj, repo, arch, pkg, rpm, path_dest) )
+                        rpms.append( (i, cs, prj, repo, arch, pkg, rpm, path_dest) )
+                        i += 1
 
         print(f'Downloading {len(rpms)} rpms...')
+        self.total = len(rpms)
         self.do_work(self.download_and_extract, rpms)
 
         # Create a list of paths pointing to lib/modules for each downloaded
@@ -202,14 +208,14 @@ class IBS(Config):
         print('Finished extract vmlinux and modules...')
 
     def download_binary_rpms(self, args):
-        cs, prj, repo, arch, pkg, rpm, dest = args
+        i, cs, prj, repo, arch, pkg, rpm, dest = args
 
         try:
             self.osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
-            print(f'{cs} {rpm}: ok')
+            print(f'({i}/{self.total}) {cs} {rpm}: ok')
         except OSError as e:
             if e.errno == errno.EEXIST:
-                print(f'{cs} {rpm}: already downloaded. skipping.')
+                print(f'({i}/{self.total}) {cs} {rpm}: already downloaded. skipping.')
             else:
                 raise RuntimeError(f'download error on {prj}: {rpm}')
 
@@ -381,6 +387,7 @@ class IBS(Config):
 
     def download(self):
         rpms = []
+        i = 1
         for result in self.get_projects():
             prj = result.get('name')
             cs = self.convert_prj_to_cs(prj)
@@ -403,9 +410,11 @@ class IBS(Config):
                     dest = Path(self.bsc_path, 'c', cs, str(arch), 'rpm')
                     dest.mkdir(exist_ok=True, parents=True)
 
-                    rpms.append( (prj, prj, 'devbuild', arch, 'klp', rpm, dest) )
+                    rpms.append( (i, prj, prj, 'devbuild', arch, 'klp', rpm, dest) )
+                    i += 1
 
         print(f'Downloading {len(rpms)} packages')
+        self.total = len(rpms)
         self.do_work(self.download_binary_rpms, rpms)
 
     def status(self, wait=False):

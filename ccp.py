@@ -68,6 +68,8 @@ class CCP(Config):
 
         self.env['KCP_EXT_BLACKLIST'] = ','.join(avoid_syms)
 
+        self.total = 0
+
         self.make_lock = Lock()
 
     def unquote_output(self, matchobj):
@@ -296,7 +298,7 @@ class CCP(Config):
 
         # Mount the cs_files dict
         for arg in args:
-            file, cs, _ = arg
+            _, file, cs, _ = arg
             if not cs_files.get(cs, ''):
                 cs_files[cs] = []
 
@@ -381,7 +383,7 @@ class CCP(Config):
             print('\t', group)
 
     def process_ccp(self, args):
-        fname, cs, funcs = args
+        i, fname, cs, funcs = args
 
         sdir = self.get_sdir(cs)
         odir = Path(f'{sdir}-obj', self.get_odir(cs))
@@ -396,7 +398,7 @@ class CCP(Config):
         env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, self.conf['mod'])
         env['KCP_RENAME_PREFIX'] = 'klp'
 
-        print(f'\t{cs}\t\t{fname}')
+        print(f'\t({i}/{self.total})\t{cs}\t\t{fname}')
 
         base_fname = Path(fname).name
 
@@ -420,15 +422,18 @@ class CCP(Config):
         # Make it perform better by spawning a process_ccp function per
         # cs/file/funcs tuple, instead of spawning a thread per codestream
         args = []
+        i = 1
         for cs, data in working_cs.items():
             # remove any previously generated files
             shutil.rmtree(self.get_cs_dir(cs), ignore_errors=True)
 
             for fname, funcs in data['files'].items():
-                args.append((fname, cs, funcs))
+                args.append((i, fname, cs, funcs))
+                i += 1
 
+        self.total = len(args)
         print(f'\nRunning klp-ccp for {len(args)} file(s)...')
-        print('\tCodestream\tFile')
+        print('\t\tCodestream\tFile')
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             results = executor.map(self.process_ccp, args)
