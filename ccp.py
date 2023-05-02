@@ -109,8 +109,11 @@ class CCP(Config):
                 '-mindirect-branch-cs-prefix', '-mharden-sls=all']:
             output = output.replace(opt, '')
 
-        if sle >= 15 and sp >= 2:
-            output += ' -D_Static_assert(e,m)='
+        if sle >= 15:
+            if sp >= 2:
+                output += ' -D_Static_assert(e,m)='
+            if sp >= 4:
+                output += ' -D__auto_type=int'
 
         return output
 
