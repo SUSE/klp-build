@@ -35,7 +35,7 @@ def create_parser() -> argparse.ArgumentParser:
             nargs='+', help='Supported architectures for this livepatch')
 
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
-    ccp_opts.add_argument('--avoid-ext', required=True, nargs='+', type=str, default=[],
+    ccp_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],
             help='Functions to be copied into the LP by klp-ccp instead of externalizing. '
                  'Useful to make sure to include symbols that are optimized in different architectures')
 
