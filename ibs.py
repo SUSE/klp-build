@@ -476,7 +476,7 @@ class IBS(Config):
 
         return prj
 
-    def create_lp_package(self, cs):
+    def create_lp_package(self, i, cs):
         # get the kgraft branch related to this codestream
         branch = self.ksrc.get_cs_branch(cs)
         if not branch:
@@ -485,7 +485,7 @@ class IBS(Config):
 
         prj = self.cs_to_project(cs)
 
-        print(f'Pushing {cs} using branch {branch}...', end='', flush=True)
+        print(f'({i}/{self.total}) pushing {cs} using branch {branch}...', end='', flush=True)
 
         # If the project exists, drop it first
         self.delete_project(prj, verbose=False)
@@ -552,9 +552,12 @@ class IBS(Config):
         if cs_list:
             print(f'Preparing {len(cs_list)} projects on IBS...')
 
+        self.total = len(cs_list)
+        i = 1
         # More threads makes OBS to return error 500
         for cs in cs_list:
-            self.create_lp_package(cs)
+            self.create_lp_package(i, cs)
+            i += 1
 
         if wait:
             # Give some time for IBS to start building the last pushed
