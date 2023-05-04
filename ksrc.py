@@ -106,7 +106,7 @@ class GitHelper(Config):
         if not test_sh.is_file():
             raise RuntimeError(f'Test file {test_sh} not created.')
 
-        patches_dir = Path(self.kgr_patches, 'patches')
+        patches_dir = Path(self.bsc_path, 'patches')
 
         # Filter only the branches related to this BSC
         for branch in self.branches:
@@ -140,7 +140,7 @@ class GitHelper(Config):
         req = requests.get(f'https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={commit}')
         req.raise_for_status()
 
-        patches = Path(self.bsc_path, 'patches')
+        patches = Path(self.bsc_path, 'upstream')
         patches.mkdir(exist_ok=True, parents=True)
 
         # Save the upstream commit in the bsc directory
