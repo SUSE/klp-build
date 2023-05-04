@@ -215,14 +215,19 @@ class GitHelper(Config):
                 with open(Path(branch_path, f'{basename}.patch'), 'w') as f:
                     f.write(pfile)
 
-                # Get the upstream commit and save it
+                # Get the upstream commit and save it. The Git-commit can be
+                # missing from the patch if the commit is not backporting the
+                # upstream fix, and is using a different way to mimic the fix.
+                # In this case add a note for the livepatch author to fill the
+                # blank when finishing the livepatch
                 m = re.search('Git-commit: ([\w]+)', pfile)
-                if not m:
-                    raise RuntimeError(f'No Git-commit found for {bc}:{patch}')
+                if m:
+                    ups = m.group(1)[:12]
+                else:
+                    commits['upstream']['Not found'] = 'Not found'
 
                 # Aggregate all upstream fixes found
-                ups = m.group(1)[:12]
-                if ups not in commits['upstream'].keys():
+                if ups and ups not in commits['upstream'].keys():
                     commits['upstream'][ups] = self.get_commit_subject(ups)
 
                 # Now get all commits related to that file on that branch,
