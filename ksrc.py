@@ -255,7 +255,7 @@ class GitHelper(Config):
             print(f'{key}')
             if key == 'upstream':
                 for ups_hash, ups_msg in val.items():
-                    print(f'{ups_hash}: {ups_msg}')
+                    print(f'{ups_hash}: "{ups_msg}"')
             else:
                 branch_commits = val['commits']
                 if not branch_commits:
