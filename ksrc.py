@@ -198,6 +198,9 @@ class GitHelper(Config):
             # The command above returns a list of strings in the format
             #   branch:file/path
             for patch in patch_files.splitlines():
+                if not patch.endswith('.patch'):
+                    continue
+
                 branch_path = Path(self.bsc_path, 'fixes', bc)
                 branch_path.mkdir(exist_ok=True, parents=True)
 
