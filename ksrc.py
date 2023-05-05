@@ -220,6 +220,7 @@ class GitHelper(Config):
                 # upstream fix, and is using a different way to mimic the fix.
                 # In this case add a note for the livepatch author to fill the
                 # blank when finishing the livepatch
+                ups = ''
                 m = re.search('Git-commit: ([\w]+)', pfile)
                 if m:
                     ups = m.group(1)[:12]
@@ -239,7 +240,7 @@ class GitHelper(Config):
                                                        '--pretty=oneline',
                                                        f'remotes/origin/{mbranch}',
                                                        fname],
-                                                      stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+                                                      stderr=subprocess.STDOUT).decode('ISO-8859-1')
                 except subprocess.CalledProcessError:
                     print(f'File {fname} doesn\'t exists {mbranch}. It could '
                             ' be removed, so the branch is not affected by the issue.')
