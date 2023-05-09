@@ -242,6 +242,7 @@ class GitHelper(Config):
                                                        'log', '--no-merges',
                                                        '--pretty=oneline',
                                                        f'remotes/origin/{mbranch}',
+                                                       '--',
                                                        fname],
                                                       stderr=subprocess.STDOUT).decode('ISO-8859-1')
                 except subprocess.CalledProcessError:
