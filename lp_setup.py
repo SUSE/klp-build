@@ -25,6 +25,9 @@ class Setup(Config):
         if archs != self.archs and not conf:
             raise ValueError('Please specify a --conf when not all architectures are supported')
 
+        if mod and not conf:
+            raise ValueError('Please specify a --conf when a module is specified')
+
         if self.bsc_path.exists() and not self.bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
