@@ -337,11 +337,15 @@ class IBS(Config):
             for d in ['built', 'repro', 'tests.out']:
                 Path(test_arch_path, d).mkdir(exist_ok=True)
 
+            build_cs = []
             for cs, data in self.filter_cs(verbose=False).items():
                 if arch not in data['archs']:
                     continue
 
                 rpm_dir = Path(self.bsc_path, 'c', cs, arch, 'rpm')
+                if not rpm_dir.exists():
+                    print(f'{cs}/{arch}: rpm dir not found. Skipping.')
+                    continue
 
                 # TODO: there will be only one rpm, format it directly
                 rpm = os.listdir(rpm_dir)
@@ -354,15 +358,14 @@ class IBS(Config):
 
                     shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, 'built'))
 
-            # Prepare the config file used by kgr-test
-            config = Path(test_arch_path, 'repro', f'{self.bsc}_config.in')
-            build_cs = []
-            for cs, _ in self.filter_cs(verbose=False).items():
-                # RT is enabled only on x86_64
                 if 'rt' in cs and arch != 'x86_64':
                     continue
+
                 build_cs.append(self.get_full_cs(cs))
 
+            # Prepare the config file used by kgr-test, use a set to remove
+            # duplicated entries 
+            config = Path(test_arch_path, 'repro', f'{self.bsc}_config.in')
             with open(config, 'w') as f:
                 f.write('\n'.join(build_cs))
 
