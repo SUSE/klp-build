@@ -18,6 +18,13 @@ class Setup(Config):
             if arch not in self.archs:
                 raise ValueError(f'{arch} is not a valid architecture')
 
+        archs.sort()
+
+        # Check if the livepatch isn't enabled on some architectures, and so
+        # require conf to be set, otherwise it can be a problem later
+        if archs != self.archs and not conf:
+            raise ValueError('Please specify a --conf when not all architectures are supported')
+
         if self.bsc_path.exists() and not self.bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 

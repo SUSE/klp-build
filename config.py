@@ -37,7 +37,7 @@ class Config:
         self.scripts = Path(os.path.dirname(__file__), 'scripts')
         self.filter = bsc_filter
 
-        self.archs = ['x86_64', 's390x', 'ppc64le']
+        self.archs = ['ppc64le', 's390x', 'x86_64']
 
         self.working_cs = working_cs
         self.codestreams = {}
