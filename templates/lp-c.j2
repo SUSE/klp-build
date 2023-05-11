@@ -1,13 +1,13 @@
 {% include 'header.j2' %}
 
-{% if config is defined %}
+{% if check_enabled is defined %}
 #if IS_ENABLED({{ config }})
+{% endif %}
 
 {% if mod is defined %}
 #if !IS_MODULE({{ config }})
 #error "Live patch supports only CONFIG=m"
 #endif
-{% endif %}
 {% endif %}
 
 {% if inc_src_file is not none -%}
@@ -130,7 +130,7 @@ void {{ fname }}_cleanup(void)
 	unregister_module_notifier(&module_nb);
 }
 {% endif -%}
-{% if config is defined %}
+{% if check_enabled is defined %}
 
 #endif /* IS_ENABLED({{ config }}) */
 {% endif -%}

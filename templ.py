@@ -13,9 +13,11 @@ class Template(Config):
         # and in kallsyms lookup
         self.mod = self.conf.get('mod', '').replace('-', '_')
 
+        self.check_enabled = self.conf['archs'] != self.archs
+
     def GeneratePatchedFuncs(self, lp_path, files):
         conf = self.conf['conf']
-        if conf:
+        if conf and self.check_enabled:
             conf = f' IS_ENABLED({conf})'
 
         with open(Path(lp_path, 'patched_funcs.csv'), 'w') as f:
@@ -37,6 +39,7 @@ class Template(Config):
         templ.globals['bsc_num'] = self.bsc_num
         templ.globals['cve'] = self.conf['cve']
         templ.globals['commits'] = self.conf['commits']
+        templ.globals['config'] = self.conf['conf']
         templ.globals['user'] = self.user
         templ.globals['email'] = self.email
 
@@ -53,8 +56,10 @@ class Template(Config):
         if self.mod != 'vmlinux':
             templ.globals['mod'] = self.mod
 
-        if self.conf['conf']:
-            templ.globals['config'] = self.conf['conf']
+        # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
+        # is not enabled on all architectures
+        if self.check_enabled:
+            templ.globals['check_enabled'] = True
 
         return templ
 

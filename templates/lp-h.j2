@@ -1,7 +1,7 @@
 #ifndef _{{ fname | upper }}_H
 #define _{{ fname | upper }}_H
 
-{% if config is defined %}
+{% if check_enabled is defined %}
 #if IS_ENABLED({{ config }})
 {% endif %}
 
@@ -12,14 +12,14 @@ void {{ fname }}_cleanup(void);
 static inline void {{ fname }}_cleanup(void) {}
 {% endif %}
 
-{% if config is defined %}
+{% if check_enabled is defined %}
 #else /* !IS_ENABLED({{ config }}) */
 {% endif %}
 
 static inline int {{ fname }}_init(void) { return 0; }
 static inline void {{ fname }}_cleanup(void) {}
 
-{% if config is defined %}
+{% if check_enabled is defined %}
 #endif /* IS_ENABLED({{ config }}) */
 {% endif %}
 
