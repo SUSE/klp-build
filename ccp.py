@@ -188,7 +188,7 @@ class CCP(Config):
                         continue
 
                     _, sym, var, mod = l.split(' ')
-                    if mod == 'vmlinux':
+                    if self.is_mod(mod):
                         mod = ''
 
                     exts.append( (sym, var, mod) )

@@ -53,7 +53,7 @@ class Template(Config):
         if sle < 15 or (sle == 15 and sp < 4):
             templ.globals['mod_mutex'] = True
 
-        if self.mod != 'vmlinux':
+        if self.is_mod(self.mod):
             templ.globals['mod'] = self.mod
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that

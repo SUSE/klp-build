@@ -154,6 +154,9 @@ class Config:
         with open(self.cs_file, 'w') as f:
             f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
 
+    def is_mod(self, mod):
+        return mod != 'vmlinux'
+
     def get_module_obj(self, arch, cs, module, use_cached_obj=True):
         ex_dir = self.get_data_dir(cs, arch)
 
@@ -167,7 +170,7 @@ class Config:
         if not obj:
             obj = self.find_module_obj(arch, cs, module)
 
-        if module == 'vmlinux':
+        if self.is_mod(module):
             return str(Path(ex_dir, obj))
 
         return str(Path(self.get_mod_path(cs, arch), obj))
@@ -175,7 +178,7 @@ class Config:
     # Return only the name of the module to be livepatched
     def find_module_obj(self, arch, cs, mod, check_support=False):
         kernel = self.get_cs_kernel(cs)
-        if mod == 'vmlinux':
+        if self.is_mod(mod):
             ktype = 'default'
             if self.cs_is_rt(cs):
                 ktype = 'rt'
