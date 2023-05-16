@@ -246,7 +246,14 @@ class Config:
                                                                      '--defined-only',
                                                                      obj]).decode().strip()
 
-        return re.search(r' {}\n'.format(symbol), self.nm_out[arch][cs][mod])
+        symbols = re.findall(r'[\d]+ \w {}\n'.format(symbol), self.nm_out[arch][cs][mod])
+        if len(symbols) == 0:
+            return ''
+
+        if len(symbol) > 1:
+            print(f'WARNING: {cs}: symbol {symbol} duplicated on {str(obj)}')
+
+        return symbols[0]
 
     def check_symbol_archs(self, cs, symbol, mod):
         data = self.get_cs_data(cs)
