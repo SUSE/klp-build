@@ -10,8 +10,9 @@ from ibs import IBS
 from ksrc import GitHelper
 
 class Setup(Config):
-    def __init__(self, bsc, bsc_filter, cve, conf, cs_arg, file_funcs, mod,
-            archs):
+    def __init__(self, bsc, bsc_filter, cve, cs_arg,
+                 file_funcs, mod_file_funcs, conf_mod_file_funcs,
+                 mod_arg, conf, archs):
         super().__init__(bsc, bsc_filter)
 
         for arch in archs:
@@ -25,16 +26,17 @@ class Setup(Config):
         if archs != self.archs and not conf:
             raise ValueError('Please specify a --conf when not all architectures are supported')
 
-        if mod and not conf:
+        if self.is_mod(mod_arg) and not conf:
             raise ValueError('Please specify a --conf when a module is specified')
 
         if self.bsc_path.exists() and not self.bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
+        if not self.file_funcs and not self.mod_file_funcs and not self.conf_mod_file_funcs:
+            raise ValueError('You need to specify at least one of the file-funcs variants!')
+
         self.bsc_path.mkdir(exist_ok=True)
 
-        self.conf['mod'] = mod
-        self.conf['conf'] = conf
         self.conf['archs'] = archs
         self.conf['cve'] = re.search('([0-9]+\-[0-9]+)', cve).group(1)
 
@@ -46,7 +48,35 @@ class Setup(Config):
         for f in file_funcs:
             filepath = f[0]
             funcs = f[1:]
-            self.file_funcs[filepath] = funcs
+
+            self.file_funcs[filepath] = {
+                    'module' : mod_arg,
+                    'conf' : conf,
+                    'symbols' : funcs
+            }
+
+        for f in mod_file_funcs:
+            fmod = f[0]
+            filepath = f[1]
+            funcs = f[2:]
+
+            self.file_funcs[filepath] = {
+                    'module' : fmod,
+                    'conf' : conf,
+                    'symbols' : funcs
+            }
+
+        for f in conf_mod_file_funcs:
+            fconf = f[0]
+            fmod = f[1]
+            filepath = f[2]
+            funcs = f[3:]
+
+            self.file_funcs[filepath] = {
+                    'module' : fmod,
+                    'conf' : fconf,
+                    'symbols' : funcs
+            }
 
     # Parse SLE15-SP2_Update_25 to 15.2u25
     def parse_cs_line(self, cs):
@@ -196,23 +226,20 @@ class Setup(Config):
 
         # Setup the missing codestream info needed
         for cs, data in self.working_cs.items():
-            cs_files = data['files']
-
             # Check if the files exist in the respective codestream directories
             sdir = self.get_sdir(cs)
-            for f in cs_files.keys():
+            for f, fdata in data['files'].items():
                 fdir = Path(sdir, f)
                 if not fdir.is_file():
-                    raise RuntimeError(f'{cs}: File {f} doesn\'t exists in {str(sdir)}')
+                    raise RuntimeError(f'{cs}: File {fdir} doesn\'t exists in {str(sdir)}')
 
-            mod = self.conf['mod']
-            arch = 'x86_64'
-            obj = self.find_module_obj(arch, cs, mod, check_support=True)
-            data['object'] = obj
+                mod = fdata['module']
+                arch = 'x86_64'
+                obj = self.find_module_obj(arch, cs, mod, check_support=True)
+                data['object'] = obj
 
-            # Verify if the functions exist in the specified object
-            for f in cs_files.keys():
-                for func in cs_files[f]:
+                # Verify if the functions exist in the specified object
+                for func in fdata['symbols']:
                     if not self.check_symbol(arch, cs, func, mod):
                         print(f'WARN: {cs}: Function {f}:{func} doesn\'t exist in {obj}')
 

@@ -385,7 +385,7 @@ class CCP(Config):
             print('\t', group)
 
     def process_ccp(self, args):
-        i, fname, cs, funcs = args
+        i, fname, cs, fdata = args
 
         sdir = self.get_sdir(cs)
         odir = Path(f'{sdir}-obj', self.get_odir(cs))
@@ -397,7 +397,7 @@ class CCP(Config):
         env['KCP_READELF'] = 'readelf'
         env['KCP_KBUILD_ODIR'] = str(odir)
         env['KCP_KBUILD_SDIR'] = str(sdir)
-        env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, self.conf['mod'])
+        env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
         env['KCP_RENAME_PREFIX'] = 'klp'
 
         print(f'\t({i}/{self.total})\t{cs}\t\t{fname}')
@@ -413,7 +413,7 @@ class CCP(Config):
         env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs),
                                               f'{fname}.000i.ipa-clones'))
 
-        self.execute_ccp(cs, fname, ','.join(funcs), out_dir, sdir, odir,
+        self.execute_ccp(cs, fname, ','.join(fdata['symbols']), out_dir, sdir, odir,
                 env)
 
     def run_ccp(self):
@@ -429,8 +429,8 @@ class CCP(Config):
             # remove any previously generated files
             shutil.rmtree(self.get_cs_dir(cs), ignore_errors=True)
 
-            for fname, funcs in data['files'].items():
-                args.append((i, fname, cs, funcs))
+            for fname, fdata in data['files'].items():
+                args.append((i, fname, cs, fdata))
                 i += 1
 
         self.total = len(args)

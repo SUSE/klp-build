@@ -9,23 +9,27 @@ class Template(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
 
-        # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
-        # and in kallsyms lookup
-        self.mod = self.conf.get('mod', '').replace('-', '_')
-
         self.check_enabled = self.conf['archs'] != self.archs
 
-    def GeneratePatchedFuncs(self, lp_path, files):
-        conf = self.conf['conf']
-        if conf and self.check_enabled:
-            conf = f' IS_ENABLED({conf})'
+    def fix_mod_string(self, mod):
+        # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
+        # and in kallsyms lookup
+        return mod.replace('-', '_')
 
+    def GeneratePatchedFuncs(self, lp_path, cs_files):
         with open(Path(lp_path, 'patched_funcs.csv'), 'w') as f:
-            for _, funcs in files.items():
-                for func in funcs:
-                    f.write(f'{self.mod} {func} klpp_{func}{conf}\n')
+            for ffile, fdata in cs_files.items():
+                conf = fdata['conf']
+                if conf and self.check_enabled:
+                    conf = f' IS_ENABLED({conf})'
+                else:
+                    conf = ''
 
-    def get_template(self, cs, template, inc_dir):
+                mod = self.fix_mod_string(fdata['module'])
+                for func in fdata['symbols']:
+                    f.write(f'{mod} {func} klpp_{func}{conf}\n')
+
+    def get_template(self, cs, src_file, template, inc_dir):
         loaddirs = [Path(os.path.dirname(__file__), 'templates')]
         if inc_dir:
             loaddirs.append(inc_dir)
@@ -39,7 +43,6 @@ class Template(Config):
         templ.globals['bsc_num'] = self.bsc_num
         templ.globals['cve'] = self.conf['cve']
         templ.globals['commits'] = self.conf['commits']
-        templ.globals['config'] = self.conf['conf']
         templ.globals['user'] = self.user
         templ.globals['email'] = self.email
 
@@ -53,8 +56,12 @@ class Template(Config):
         if sle < 15 or (sle == 15 and sp < 4):
             templ.globals['mod_mutex'] = True
 
-        if self.is_mod(self.mod):
-            templ.globals['mod'] = self.mod
+        if src_file:
+            fdata = self.get_cs_files(cs)[str(src_file)]
+            templ.globals['config'] = fdata['conf']
+            mod = self.fix_mod_string(fdata['module'])
+            if self.is_mod(mod):
+                templ.globals['mod'] = mod
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
@@ -81,7 +88,7 @@ class Template(Config):
             out_name = f'livepatch_{self.bsc}.{ext}'
 
         fname = Path(out_name).with_suffix('')
-        templ = self.get_template(cs, 'lp-' + ext + '.j2', lp_inc_dir)
+        templ = self.get_template(cs, src_file, 'lp-' + ext + '.j2', lp_inc_dir)
 
         if 'livepatch_' in out_name and ext == 'c':
             templ.globals['include_header'] = True

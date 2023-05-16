@@ -25,10 +25,22 @@ def create_parser() -> argparse.ArgumentParser:
     setup.add_argument('--codestream', type=str, default='',
             help='Codestream of which the file and functions are related. Can '
                 ' be used a regex, like, 15.u[34]')
-    setup.add_argument('--file-funcs', required=True, action='append', nargs='*',
+    setup.add_argument('--file-funcs', required=False, action='append',
+                       nargs='*', default=[],
             help='File and functions to be livepatched. Can be set '
             'multiple times. The format is --file-funcs file/path.c func1 '
             'func2 --file-func file/patch2 func1...')
+    setup.add_argument('--mod-file-funcs', required=False, action='append',
+                       nargs='*', default=[],
+            help='Module, file and functions to be livepatched. Can be set '
+            'multiple times. The format is --file-funcs module1 file/path.c func1 '
+            'func2 --file-func module2 file/patch2 func1...')
+    setup.add_argument('--conf-mod-file-funcs', required=False, action='append', nargs='*',
+                       default=[],
+            help='Conf, module, file and functions to be livepatched. Can be set '
+            'multiple times. The format is --file-funcs conf1 module1 file/path.c func1 '
+            'func2 --file-func conf2 module2 file/patch2 func1...')
+
     setup.add_argument('--module', type=str, default='vmlinux',
             help='The module that will be livepatched for all files')
     setup.add_argument('--archs', required=True,
@@ -79,9 +91,9 @@ if  __name__ == '__main__':
     args = create_parser().parse_args()
 
     if args.cmd == 'setup':
-        setup = Setup(args.bsc, args.filter, args.cve, args.conf,
-                      args.codestream, args.file_funcs, args.module,
-                      args.archs)
+        setup = Setup(args.bsc, args.filter, args.cve, args.codestream,
+                      args.file_funcs, args.mod_file_funcs, args.conf_mod_file_funcs,
+                      args.module, args.conf, args.archs)
         setup.setup_project_files()
 
     elif args.cmd == 'run-ccp':
