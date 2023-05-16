@@ -167,8 +167,7 @@ class Config:
         if not obj:
             obj = self.find_module_obj(arch, cs, module)
 
-        mod = self.conf['mod']
-        if mod == 'vmlinux':
+        if module == 'vmlinux':
             return str(Path(ex_dir, obj))
 
         return str(Path(self.get_mod_path(cs, arch), obj))
