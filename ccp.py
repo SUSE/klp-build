@@ -57,7 +57,9 @@ class CCP(Config):
                     'rcu_irq_exit_irqson', 'verbose', '__write_overflow',
                     '__read_overflow', '__read_overflow2', '__real_strnlen',
                     'twaddle', 'set_geometry', 'valid_floppy_drive_params',
-                    '__real_memchr_inv', '__real_kmemdup'
+                    '__real_memchr_inv', '__real_kmemdup',
+                    'nfnetlink_has_listeners', 'nfnetlink_send',
+                    'nfnetlink_set_err'
                     ]
         # The backlist tells the klp-ccp to always copy the symbol code,
         # instead of externalizing. This helps in cases where different archs
