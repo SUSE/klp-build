@@ -32,7 +32,7 @@ class Setup(Config):
         if self.bsc_path.exists() and not self.bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 
-        if not self.file_funcs and not self.mod_file_funcs and not self.conf_mod_file_funcs:
+        if not file_funcs and not mod_file_funcs and not conf_mod_file_funcs:
             raise ValueError('You need to specify at least one of the file-funcs variants!')
 
         self.bsc_path.mkdir(exist_ok=True)
