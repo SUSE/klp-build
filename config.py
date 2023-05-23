@@ -170,7 +170,7 @@ class Config:
         if not obj:
             obj = self.find_module_obj(arch, cs, module)
 
-        if self.is_mod(module):
+        if not self.is_mod(module):
             return str(Path(ex_dir, obj))
 
         return str(Path(self.get_mod_path(cs, arch), obj))
@@ -178,7 +178,7 @@ class Config:
     # Return only the name of the module to be livepatched
     def find_module_obj(self, arch, cs, mod, check_support=False):
         kernel = self.get_cs_kernel(cs)
-        if self.is_mod(mod):
+        if not self.is_mod(mod):
             ktype = 'default'
             if self.cs_is_rt(cs):
                 ktype = 'rt'
