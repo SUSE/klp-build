@@ -250,7 +250,7 @@ class Config:
         if len(symbols) == 0:
             return ''
 
-        if len(symbol) > 1:
+        if len(symbols) > 1:
             print(f'WARNING: {cs}: symbol {symbol} duplicated on {mod}')
 
         return symbols[0]
