@@ -190,7 +190,7 @@ class CCP(Config):
                         continue
 
                     _, sym, var, mod = l.split(' ')
-                    if self.is_mod(mod):
+                    if not self.is_mod(mod):
                         mod = ''
 
                     exts.append( (sym, var, mod) )
