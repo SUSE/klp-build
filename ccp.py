@@ -131,7 +131,16 @@ class CCP(Config):
                                         f'HOSTCC={self.cc}', file_], cwd=odir,
                                         stderr=f)
 
-        return self.process_make_output(cs, filename, completed.decode())
+            ret = self.process_make_output(cs, filename, completed.decode())
+            # save the cmdline
+            f.write(ret)
+
+            if not ' -pg ' in ret:
+                raise RuntimeError(f'{cs}:{file_} is not compiled with livepatch support (-pg flag)')
+
+            return ret
+
+        return None
 
     def execute_ccp(self, cs, fname, funcs, out_dir, sdir, odir, env):
         lp_name = self.lp_out_file(fname)
