@@ -7,6 +7,8 @@ from ksrc import GitHelper
 from lp_setup import Setup
 from ibs import IBS
 
+import sys
+
 def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=False)
     parentparser.add_argument('-b', '--bsc', type=int, required=True,
@@ -88,6 +90,9 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 if  __name__ == '__main__':
+
+    sys.tracebacklimit = 0
+
     args = create_parser().parse_args()
 
     if args.cmd == 'setup':
