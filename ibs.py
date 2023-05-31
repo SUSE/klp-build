@@ -552,8 +552,10 @@ class IBS(Config):
     def push(self, wait=False):
         cs_list = self.apply_filter(self.codestreams.keys())
 
-        if cs_list:
-            print(f'Preparing {len(cs_list)} projects on IBS...')
+        if not cs_list:
+            raise RuntimeError(f'push: No codestreams found for {self.bsc}')
+
+        print(f'Preparing {len(cs_list)} projects on IBS...')
 
         self.total = len(cs_list)
         i = 1
