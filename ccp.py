@@ -42,14 +42,14 @@ class CCP(Config):
 
         gcc_ver = int(subprocess.check_output(['gcc',
                                                '-dumpversion']).decode().strip())
-        # gcc12 has a problem with kernel and xrealloc implementation
+        # gcc12 and higher have a problem with kernel and xrealloc implementation
         if gcc_ver < 12:
             self.cc = 'gcc'
-        # if gcc12 is the default compiler, check if gcc11 is available
-        elif gcc_ver > 11 and shutil.which('gcc-11'):
-            self.cc = 'gcc-11'
+        # if gcc12 or higher is the default compiler, check if gcc7 is available
+        elif shutil.which('gcc-7'):
+            self.cc = 'gcc-7'
         else:
-            raise RuntimeError('Only gcc12 or gcc13 are available, and it\'s problematic with kernel sources')
+            raise RuntimeError('Only gcc12 or higher are available, and it\'s problematic with kernel sources')
 
         # List of symbols that are currently problematic for klp-ccp
         avoid_syms = ['__xadd_wrong_size', '__bad_copy_from', '__bad_copy_to',
