@@ -1,4 +1,6 @@
 import unittest
+import sys
+sys.path.append('..')
 from ksrc import GitHelper
 
 class GitHelperTesting(unittest.TestCase):
