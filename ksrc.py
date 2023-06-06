@@ -137,17 +137,14 @@ class GitHelper(Config):
                         '--output-directory', f'{patches_dir}'
                         ])
 
-    def get_commit_subject(self, commit):
+    def get_commit_subject(commit, savedir=None):
         req = requests.get(f'https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={commit}')
         req.raise_for_status()
 
-        patches = Path(self.bsc_path, 'upstream')
-        patches.mkdir(exist_ok=True, parents=True)
-
-        # Save the upstream commit in the bsc directory
-        fpath = Path(patches, commit + '.patch')
-        with open(fpath, 'w') as f:
-            f.write(req.text)
+        # Save the upstream commit if requested
+        if savedir:
+            with open(Path(savedir, f'{commit}.patch') , 'w') as f:
+                f.write(req.text)
 
         # Search for Subject until a blank line, since commit messages can be
         # seen in multiple lines.
@@ -177,6 +174,9 @@ class GitHelper(Config):
         print('Getting SUSE fixes for upstream commits per CVE branch. It can take some time...')
 
         commits = { 'upstream' : {} }
+
+        upatches = Path(self.bsc_path, 'upstream')
+        upatches.mkdir(exist_ok=True, parents=True)
 
         # Get backported commits from all possible branches, in order to get
         # different versions of the same backport done in the CVE branches.
@@ -236,7 +236,7 @@ class GitHelper(Config):
 
                 # Aggregate all upstream fixes found
                 if ups and ups not in commits['upstream'].keys():
-                    commits['upstream'][ups] = self.get_commit_subject(ups)
+                    commits['upstream'][ups] = GitHelper.get_commit_subject(ups, upatches)
 
                 # Now get all commits related to that file on that branch,
                 # including the "Refresh" ones.
