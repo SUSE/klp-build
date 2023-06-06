@@ -149,7 +149,10 @@ class GitHelper(Config):
         with open(fpath, 'w') as f:
             f.write(req.text)
 
-        return re.search('Subject: (.*)', req.text).group(1)
+        # Search for Subject until a blank line, since commit messages can be
+        # seen in multiple lines.
+        return re.search('Subject: (.*?)(?:(\n\n))', req.text,
+                         re.DOTALL).group(1).replace('\n', '')
 
     def get_commits(self, cve):
         if not self.kern_src:
