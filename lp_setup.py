@@ -234,14 +234,16 @@ class Setup(Config):
                     raise RuntimeError(f'{cs}: File {fdir} doesn\'t exists in {str(sdir)}')
 
                 mod = fdata['module']
-                arch = 'x86_64'
-                obj = self.find_module_obj(arch, cs, mod, check_support=True)
+                # Use x86_64 to find the module, as it is be the same path for other archs
+                obj = self.find_module_obj('x86_64', cs, mod, check_support=True)
                 data['object'] = obj
 
                 # Verify if the functions exist in the specified object
                 for func in fdata['symbols']:
-                    if not self.check_symbol(arch, cs, func, mod):
-                        print(f'WARN: {cs}: Function {f}:{func} doesn\'t exist in {obj}')
+                    archs = self.check_symbol_archs(cs, func, mod)
+                    if archs:
+                        archs_str = ','.join(archs)
+                        print(f'WARN: {cs}({archs_str}): Function {f}:{func} doesn\'t exist in {obj}')
 
         # Update and save codestreams data
         for cs, data in self.working_cs.items():
