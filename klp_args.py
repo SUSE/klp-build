@@ -44,7 +44,8 @@ def create_parser() -> argparse.ArgumentParser:
     setup.add_argument('--module', type=str, default='vmlinux',
             help='The module that will be livepatched for all files')
     setup.add_argument('--archs', required=True,
-            nargs='+', help='Supported architectures for this livepatch')
+                       choices=['ppc64le', 's390x', 'x86_64'],
+                       nargs='+', help='Supported architectures for this livepatch')
 
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
     ccp_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],

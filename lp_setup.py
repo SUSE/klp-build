@@ -15,10 +15,6 @@ class Setup(Config):
                  mod_arg, conf, archs):
         super().__init__(bsc, bsc_filter)
 
-        for arch in archs:
-            if arch not in self.archs:
-                raise ValueError(f'{arch} is not a valid architecture')
-
         archs.sort()
 
         # Check if the livepatch isn't enabled on some architectures, and so
