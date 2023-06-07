@@ -113,5 +113,29 @@ class LpSetupTest(unittest.TestCase):
 
         self.assertRegex(str(ar.exception), 'File drivers/net/tuna.c not found')
 
+    def test_existent_file(self):
+        v = self.d.copy()
+        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v['module'] = 'tun'
+        v['conf'] = 'CONFIG_TUN'
+        v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctl',
+                            'tun_free_netdev']]
+        s = self.ok(v)
+        s.setup_project_files()
+
+    def test_non_existent_module(self):
+        v = self.d.copy()
+        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v['module'] = 'tuna'
+        v['conf'] = 'CONFIG_TUN'
+        v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctl',
+                            'tun_free_netdev']]
+        s = self.ok(v)
+
+        with self.assertRaises(RuntimeError) as ar:
+            s.setup_project_files()
+
+        self.assertRegex(str(ar.exception), 'Module not found: tuna')
+
 if __name__ == '__main__':
     unittest.main()
