@@ -246,7 +246,7 @@ class Config:
                                                                      '--defined-only',
                                                                      obj]).decode().strip()
 
-        symbols = re.findall(r'[\d]+ \w {}\n'.format(symbol), self.nm_out[arch][cs][mod])
+        symbols = re.findall(r'[\w]+ \w {}\n'.format(symbol), self.nm_out[arch][cs][mod])
         if len(symbols) == 0:
             return ''
 
