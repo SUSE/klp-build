@@ -1,5 +1,7 @@
+from pathlib import Path
+import os
+import shutil
 import unittest
-unittest.TestLoader.sortTestMethodUsing = None
 
 import sys
 sys.path.append('..')
@@ -11,7 +13,7 @@ class LpSetupTest(unittest.TestCase):
     def setUp(self):
         # Default arguments of Setup
         self.d = {
-            'bsc' : '12345',
+            'bsc' : '9999999',
             'filter' : '',
             'cve' : '1234-5678',
             'cs' : '',
@@ -22,6 +24,13 @@ class LpSetupTest(unittest.TestCase):
             'conf' : '',
             'archs': []
         }
+
+        # Erase any previously created test
+        basedir = Path(os.getenv('KLP_WORK_DIR', ''), 'bsc9999999')
+        shutil.rmtree(basedir, ignore_errors=True)
+
+        # Avoid searching for patches kernels
+        os.environ['KLP_KERNEL_SOURCE'] = ''
 
     def exec_assert_check_msg(self, dargs, exc, msg):
         targs = tuple(dargs.values())
