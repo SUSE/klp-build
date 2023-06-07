@@ -137,5 +137,21 @@ class LpSetupTest(unittest.TestCase):
 
         self.assertRegex(str(ar.exception), 'Module not found: tuna')
 
+    def test_check_symbol_addr_s390(self):
+        v = self.d.copy()
+        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v['filter'] = '12.4u35'
+        v['module'] = 'sch_qfq'
+        v['conf'] = 'CONFIG_NET_SCH_QFQ'
+        v['file_funcs'] = [['net/sched/sch_qfq.c', 'qfq_change_class']]
+        s = self.ok(v)
+        s.setup_project_files()
+
+        # The address of qfq_policy on s390x ends with a character, a bug that
+        # was fixed by checking for \w instead of \d.
+        # With the fix in place, check_symbol_archs should return an empty list
+        self.assertFalse(s.check_symbol_archs('12.4u35', 'qfq_policy',
+                                              'sch_qfq'))
+
 if __name__ == '__main__':
     unittest.main()
