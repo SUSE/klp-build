@@ -1,13 +1,14 @@
+import contextlib
+from io import StringIO
 from pathlib import Path
 import os
 import shutil
 import unittest
+from unittest.mock import patch
 
 import sys
 sys.path.append('..')
 from lp_setup import Setup
-
-#--module tls --conf CONFIG_TLS --file-funcs net/tls/tls_main.c do_tls_getsockopt_conf --archs x86_64
 
 class LpSetupTest(unittest.TestCase):
     def setUp(self):
@@ -33,11 +34,10 @@ class LpSetupTest(unittest.TestCase):
         os.environ['KLP_KERNEL_SOURCE'] = ''
 
     def exec_assert_check_msg(self, dargs, exc, msg):
-        targs = tuple(dargs.values())
         with self.assertRaises(exc) as ar:
             # The * operator expands the tuple into the argument of the
             # constructor
-            Setup(*targs)
+            Setup(*tuple(dargs.values()))
 
         self.assertEqual(str(ar.exception), msg)
 
@@ -99,7 +99,8 @@ class LpSetupTest(unittest.TestCase):
                                      'tun_chr_ioctl', 'tun_free_netdev']]
         self.ok(v)
 
-    def test_non_existent_file(self):
+    @patch('sys.stdout', new_callable = StringIO)
+    def test_non_existent_file(self, stdout):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['module'] = 'tun'
@@ -113,7 +114,8 @@ class LpSetupTest(unittest.TestCase):
 
         self.assertRegex(str(ar.exception), 'File drivers/net/tuna.c not found')
 
-    def test_existent_file(self):
+    @patch('sys.stdout', new_callable = StringIO)
+    def test_existent_file(self, stdout):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['module'] = 'tun'
@@ -123,7 +125,21 @@ class LpSetupTest(unittest.TestCase):
         s = self.ok(v)
         s.setup_project_files()
 
-    def test_non_existent_module(self):
+    @patch('sys.stdout', new_callable = StringIO)
+    def test_invalid_sym(self, stdout):
+        v = self.d.copy()
+        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v['module'] = 'tun'
+        v['conf'] = 'CONFIG_TUN'
+        v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctll',
+                            'tun_free_netdev']]
+        s = self.ok(v)
+        s.setup_project_files()
+        self.assertRegex(stdout.getvalue(), 'Function drivers/net/tun.c:tun_chr_ioctll '
+                          'doesn\'t exist in kernel/drivers/net/tun.ko')
+
+    @patch('sys.stdout', new_callable = StringIO)
+    def test_non_existent_module(self, stdout):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['module'] = 'tuna'
@@ -137,7 +153,8 @@ class LpSetupTest(unittest.TestCase):
 
         self.assertRegex(str(ar.exception), 'Module not found: tuna')
 
-    def test_check_symbol_addr_s390(self):
+    @patch('sys.stdout', new_callable = StringIO)
+    def test_check_symbol_addr_s390(self, stdout):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['filter'] = '12.4u35'
