@@ -31,8 +31,6 @@ class Setup(Config):
         if not file_funcs and not mod_file_funcs and not conf_mod_file_funcs:
             raise ValueError('You need to specify at least one of the file-funcs variants!')
 
-        self.bsc_path.mkdir(exist_ok=True)
-
         self.conf['archs'] = archs
         self.conf['cve'] = re.search('([0-9]+\-[0-9]+)', cve).group(1)
 
@@ -134,6 +132,8 @@ class Setup(Config):
         return codestreams
 
     def setup_project_files(self):
+        self.bsc_path.mkdir(exist_ok=True)
+
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
         all_codestreams = self.download_supported_file()
