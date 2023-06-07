@@ -79,5 +79,14 @@ class LpSetupTest(unittest.TestCase):
         v['file_funcs'] = ['drivers/net/tun.c', 'tun_chr_ioctl', 'tun_free_netdev']
         self.ok(v)
 
+        # Checks if the variants of file-funcs also work
+        v['file_funcs'] = []
+        v['mod_file_funcs'] = ['tun', 'drivers/net/tun.c', 'tun_chr_ioctl', 'tun_free_netdev']
+        self.ok(v)
+
+        v['mod_file_funcs'] = []
+        v['conf_mod_file_funcs'] = ['CONFIG_TUN', 'tun', 'drivers/net/tun.c', 'tun_chr_ioctl', 'tun_free_netdev']
+        self.ok(v)
+
 if __name__ == '__main__':
     unittest.main()
