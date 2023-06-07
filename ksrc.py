@@ -153,7 +153,7 @@ class GitHelper(Config):
 
     def get_commits(self, cve):
         if not self.kern_src:
-            print('WARN: KLP_KERNEL_SOURCE not defined, skip getting suse commits')
+            print('WARN: KLP_KERNEL_SOURCE not defined, skip getting SUSE commits')
             return
 
         # do not get the commits twice
@@ -281,9 +281,12 @@ class GitHelper(Config):
         return commits
 
     def get_patched_kernels(self, commits):
+        if not commits:
+            return []
+
         if not self.kern_src:
             print('WARN: KLP_KERNEL_SOURCE not defined, skip getting SUSE commits')
-            return
+            return []
 
         print('Searching for already patched codestreams...')
 
