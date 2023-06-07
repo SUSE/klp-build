@@ -227,7 +227,7 @@ class Setup(Config):
             for f, fdata in data['files'].items():
                 fdir = Path(sdir, f)
                 if not fdir.is_file():
-                    raise RuntimeError(f'{cs}: File {fdir} doesn\'t exists in {str(sdir)}')
+                    raise RuntimeError(f'{cs}: File {f} not found')
 
                 mod = fdata['module']
                 # Use x86_64 to find the module, as it is be the same path for other archs
