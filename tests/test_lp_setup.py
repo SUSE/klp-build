@@ -42,7 +42,7 @@ class LpSetupTest(unittest.TestCase):
         self.assertEqual(str(ar.exception), msg)
 
     def ok(self, dargs):
-        Setup(*tuple(dargs.values()))
+        return Setup(*tuple(dargs.values()))
 
     def test_missing_conf_archs(self):
         v = self.d.copy()
@@ -90,12 +90,28 @@ class LpSetupTest(unittest.TestCase):
 
         # Checks if the variants of file-funcs also work
         v['file_funcs'] = []
-        v['mod_file_funcs'] = ['tun', 'drivers/net/tun.c', 'tun_chr_ioctl', 'tun_free_netdev']
+        v['mod_file_funcs'] = [['tun', 'drivers/net/tun.c', 'tun_chr_ioctl',
+                                'tun_free_netdev']]
         self.ok(v)
 
         v['mod_file_funcs'] = []
-        v['conf_mod_file_funcs'] = ['CONFIG_TUN', 'tun', 'drivers/net/tun.c', 'tun_chr_ioctl', 'tun_free_netdev']
+        v['conf_mod_file_funcs'] = [['CONFIG_TUN', 'tun', 'drivers/net/tun.c',
+                                     'tun_chr_ioctl', 'tun_free_netdev']]
         self.ok(v)
+
+    def test_non_existent_file(self):
+        v = self.d.copy()
+        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v['module'] = 'tun'
+        v['conf'] = 'CONFIG_TUN'
+        v['file_funcs'] = [['drivers/net/tuna.c', 'tun_chr_ioctl',
+                            'tun_free_netdev']]
+        s = self.ok(v)
+
+        with self.assertRaises(RuntimeError) as ar:
+            s.setup_project_files()
+
+        self.assertRegex(str(ar.exception), 'File drivers/net/tuna.c not found')
 
 if __name__ == '__main__':
     unittest.main()
