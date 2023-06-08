@@ -320,6 +320,8 @@ class CCP(Config):
             src = re.sub('#include \".+kconfig\.h\"', '', src)
             # Since 15.4 klp-ccp includes a compiler-version.h header
             src = re.sub('#include \".+compiler\-version\.h\"', '', src)
+            # Since RT variants, there is now an definition for auto_type
+            src = src.replace('#define __auto_type int\n', '')
 
             # Remove any mentions to klpr_trace, since it's currently
             # buggy in klp-ccp
