@@ -1,5 +1,6 @@
 import concurrent.futures
 import errno
+import logging
 from lxml import etree
 from lxml.objectify import fromstring, SubElement
 from natsort import natsorted
@@ -52,6 +53,9 @@ class IBS(Config):
 
         # Total number of work items
         self.total = 0
+
+        # Skip osctiny INFO messages
+        logging.getLogger('osctiny').setLevel(logging.WARNING)
 
     def do_work(self, func, args):
         if len(args) == 0:
