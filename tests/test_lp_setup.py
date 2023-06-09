@@ -1,5 +1,4 @@
-import contextlib
-from io import StringIO
+import logging
 from pathlib import Path
 import os
 import shutil
@@ -33,43 +32,45 @@ class LpSetupTest(unittest.TestCase):
         # Avoid searching for patches kernels
         os.environ['KLP_KERNEL_SOURCE'] = ''
 
-    def exec_assert_check_msg(self, dargs, exc, msg):
-        with self.assertRaises(exc) as ar:
-            # The * operator expands the tuple into the argument of the
-            # constructor
-            Setup(*tuple(dargs.values()))
+        logging.disable(logging.INFO)
 
-        self.assertEqual(str(ar.exception), msg)
+    def setup_and_assert(self, dargs, exc, msg = None):
+        with self.assertRaises(exc) as ar:
+            s = Setup(*tuple(dargs.values()))
+            return s.setup_project_files()
+
+        if not msg:
+            self.assertEqual(str(ar.exception), msg)
 
     def ok(self, dargs):
         return Setup(*tuple(dargs.values()))
 
     def test_missing_conf_archs(self):
         v = self.d.copy()
-        self.exec_assert_check_msg(v, ValueError,
+        self.setup_and_assert(v, ValueError,
                 'Please specify --conf when not all architectures are supported')
 
         # All archs supported, complain about file-funcs
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
-        self.exec_assert_check_msg(v, ValueError,
+        self.setup_and_assert(v, ValueError,
                 'You need to specify at least one of the file-funcs variants!')
 
         # Only one arch supported, but conf informed, complain about file-funcs
         v['archs'] = ['x86_64']
         v['conf'] = 'CONFIG_TUN'
-        self.exec_assert_check_msg(v, ValueError,
+        self.setup_and_assert(v, ValueError,
                 'You need to specify at least one of the file-funcs variants!')
 
     def test_missing_conf_mod(self):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['module'] = 'tun'
-        self.exec_assert_check_msg(v, ValueError,
+        self.setup_and_assert(v, ValueError,
                 'Please specify --conf when a module is specified')
 
         # if module is vmlinux it should only complains about file-funcs
         v['module'] = 'vmlinux'
-        self.exec_assert_check_msg(v, ValueError,
+        self.setup_and_assert(v, ValueError,
                 'You need to specify at least one of the file-funcs variants!')
 
     def test_missing_file_funcs(self):
@@ -77,7 +78,7 @@ class LpSetupTest(unittest.TestCase):
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
-        self.exec_assert_check_msg(v, ValueError,
+        self.setup_and_assert(v, ValueError,
                 'You need to specify at least one of the file-funcs variants!')
 
     def test_file_funcs_ok(self):
@@ -99,23 +100,17 @@ class LpSetupTest(unittest.TestCase):
                                      'tun_chr_ioctl', 'tun_free_netdev']]
         self.ok(v)
 
-    @patch('sys.stdout', new_callable = StringIO)
-    def test_non_existent_file(self, stdout):
+    def test_non_existent_file(self):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tuna.c', 'tun_chr_ioctl',
                             'tun_free_netdev']]
-        s = self.ok(v)
 
-        with self.assertRaises(RuntimeError) as ar:
-            s.setup_project_files()
+        self.setup_and_assert(v, RuntimeError, 'File drivers/net/tuna.c not found')
 
-        self.assertRegex(str(ar.exception), 'File drivers/net/tuna.c not found')
-
-    @patch('sys.stdout', new_callable = StringIO)
-    def test_existent_file(self, stdout):
+    def test_existent_file(self):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['module'] = 'tun'
@@ -125,36 +120,32 @@ class LpSetupTest(unittest.TestCase):
         s = self.ok(v)
         s.setup_project_files()
 
-    @patch('sys.stdout', new_callable = StringIO)
-    def test_invalid_sym(self, stdout):
+    def test_invalid_sym(self):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctll',
                             'tun_free_netdev']]
-        s = self.ok(v)
-        s.setup_project_files()
-        self.assertRegex(stdout.getvalue(), 'Function drivers/net/tun.c:tun_chr_ioctll '
+
+        with self.assertLogs(level='WARNING') as logs:
+            s = self.ok(v)
+            s.setup_project_files()
+
+        self.assertRegex(logs.output[0], 'Function drivers/net/tun.c:tun_chr_ioctll '
                           'doesn\'t exist in kernel/drivers/net/tun.ko')
 
-    @patch('sys.stdout', new_callable = StringIO)
-    def test_non_existent_module(self, stdout):
+    def test_non_existent_module(self):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['module'] = 'tuna'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctl',
                             'tun_free_netdev']]
-        s = self.ok(v)
 
-        with self.assertRaises(RuntimeError) as ar:
-            s.setup_project_files()
+        self.setup_and_assert(v, RuntimeError, 'Module not found: tuna')
 
-        self.assertRegex(str(ar.exception), 'Module not found: tuna')
-
-    @patch('sys.stdout', new_callable = StringIO)
-    def test_check_symbol_addr_s390(self, stdout):
+    def test_check_symbol_addr_s390(self):
         v = self.d.copy()
         v['archs'] = ['x86_64', 'ppc64le', 's390x']
         v['filter'] = '12.4u35'

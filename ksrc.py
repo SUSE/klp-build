@@ -1,3 +1,4 @@
+import logging
 from natsort import natsorted
 import git
 from pathlib import Path, PurePath
@@ -153,7 +154,7 @@ class GitHelper(Config):
 
     def get_commits(self, cve):
         if not self.kern_src:
-            print('WARN: KLP_KERNEL_SOURCE not defined, skip getting SUSE commits')
+            logging.info('KLP_KERNEL_SOURCE not defined, skip getting SUSE commits')
             return
 
         # do not get the commits twice
@@ -285,7 +286,7 @@ class GitHelper(Config):
             return []
 
         if not self.kern_src:
-            print('WARN: KLP_KERNEL_SOURCE not defined, skip getting SUSE commits')
+            logging.info('KLP_KERNEL_SOURCE not defined, skip getting SUSE commits')
             return []
 
         print('Searching for already patched codestreams...')

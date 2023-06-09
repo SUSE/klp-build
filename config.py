@@ -1,6 +1,7 @@
 import copy
 import json
 import git
+import logging
 from pathlib import Path
 import os
 import re
@@ -60,6 +61,8 @@ class Config:
         # will contain the nm output from the to be livepatched object
         # cache nm calls for the codestream : object
         self.nm_out = {}
+
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
 
     def lp_out_file(self, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
@@ -217,15 +220,15 @@ class Config:
 
         if self.filter:
             if verbose:
-                print('Applying filter...')
+                logging.info('Applying filter...')
             filtered = []
             for cs in full_cs.keys():
                 if not re.match(self.filter, cs):
                     filtered.append(cs)
 
             if verbose:
-                print('Skipping codestreams:')
-                print(f'\t{" ".join(filtered)}')
+                logging.info('Skipping codestreams:')
+                logging.info(f'\t{" ".join(filtered)}')
 
             cs_del_list.extend(filtered)
 

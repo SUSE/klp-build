@@ -1,5 +1,6 @@
 from config import Config
 import json
+import logging
 from natsort import natsorted
 from pathlib import Path
 import re
@@ -85,7 +86,7 @@ class Setup(Config):
         return int(sle), int(sp), int(u), rt
 
     def download_supported_file(self):
-        print('Downloading codestreams file')
+        logging.info('Downloading codestreams file')
         req = requests.get('https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv')
 
         # exit on error
@@ -188,8 +189,8 @@ class Setup(Config):
             working_cs[cs] = data
 
         if patched_cs:
-            print('Skipping already patched codestreams:')
-            print(f'\t{" ".join(patched_cs)}')
+            logging.info('Skipping already patched codestreams:')
+            logging.info(f'\t{" ".join(patched_cs)}')
 
         # Add new codestreams to the already existing list, skipping duplicates
         self.conf['patched_cs'] = natsorted(list(set(self.conf.get('patched_cs', []) +
@@ -213,12 +214,12 @@ class Setup(Config):
 
         # Found missing cs data, downloading and extract
         if data_missing:
-            print('Download the necessary data from the following codestreams:')
-            print(f'\t{" ".join(data_missing.keys())}\n')
+            logging.info('Download the necessary data from the following codestreams:')
+            logging.info(f'\t{" ".join(data_missing.keys())}\n')
             ibs = IBS(self.bsc_num, self.filter, self.working_cs)
             ibs.download_cs_data(data_missing)
 
-        print('Validating codestreams data...')
+        logging.info('Validating codestreams data...')
 
         # Setup the missing codestream info needed
         for cs, data in self.working_cs.items():
@@ -239,7 +240,7 @@ class Setup(Config):
                     archs = self.check_symbol_archs(cs, func, mod)
                     if archs:
                         archs_str = ','.join(archs)
-                        print(f'WARN: {cs}({archs_str}): Function {f}:{func} doesn\'t exist in {obj}')
+                        logging.warning(f'{cs}({archs_str}): Function {f}:{func} doesn\'t exist in {obj}')
 
         # Update and save codestreams data
         for cs, data in self.working_cs.items():
