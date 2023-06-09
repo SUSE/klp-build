@@ -25,25 +25,39 @@ class LpSetupTest(unittest.TestCase):
             'archs': []
         }
 
-        # Erase any previously created test
-        basedir = Path(os.getenv('KLP_WORK_DIR', ''), 'bsc9999999')
-        shutil.rmtree(basedir, ignore_errors=True)
+        # To be used later before calling setup, erasing any previously created
+        # project
+        self.basedir = Path(os.getenv('KLP_WORK_DIR', ''), 'bsc9999999')
 
         # Avoid searching for patches kernels
         os.environ['KLP_KERNEL_SOURCE'] = ''
 
         logging.disable(logging.INFO)
 
+    def setup(self, dargs):
+        shutil.rmtree(self.basedir, ignore_errors=True)
+
+        with self.assertNoLogs(level='WARNING') as anl:
+            return Setup(*tuple(dargs.values()))
+
+    def setup_assert_logs(self, dargs, alevel, msg):
+        shutil.rmtree(self.basedir, ignore_errors=True)
+
+        with self.assertLogs(level=alevel) as logs:
+            s = Setup(*tuple(dargs.values()))
+            s.setup_project_files()
+
+        self.assertRegex(logs.output[0], msg)
+
     def setup_and_assert(self, dargs, exc, msg = None):
+        shutil.rmtree(self.basedir, ignore_errors=True)
+
         with self.assertRaises(exc) as ar:
             s = Setup(*tuple(dargs.values()))
             return s.setup_project_files()
 
         if not msg:
             self.assertEqual(str(ar.exception), msg)
-
-    def ok(self, dargs):
-        return Setup(*tuple(dargs.values()))
 
     def test_missing_conf_archs(self):
         v = self.d.copy()
@@ -87,18 +101,18 @@ class LpSetupTest(unittest.TestCase):
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = ['drivers/net/tun.c', 'tun_chr_ioctl', 'tun_free_netdev']
-        self.ok(v)
+        self.setup(v)
 
         # Checks if the variants of file-funcs also work
         v['file_funcs'] = []
         v['mod_file_funcs'] = [['tun', 'drivers/net/tun.c', 'tun_chr_ioctl',
                                 'tun_free_netdev']]
-        self.ok(v)
+        self.setup(v)
 
         v['mod_file_funcs'] = []
         v['conf_mod_file_funcs'] = [['CONFIG_TUN', 'tun', 'drivers/net/tun.c',
                                      'tun_chr_ioctl', 'tun_free_netdev']]
-        self.ok(v)
+        self.setup(v)
 
     def test_non_existent_file(self):
         v = self.d.copy()
@@ -117,7 +131,7 @@ class LpSetupTest(unittest.TestCase):
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctl',
                             'tun_free_netdev']]
-        s = self.ok(v)
+        s = self.setup(v)
         s.setup_project_files()
 
     def test_invalid_sym(self):
@@ -128,12 +142,9 @@ class LpSetupTest(unittest.TestCase):
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctll',
                             'tun_free_netdev']]
 
-        with self.assertLogs(level='WARNING') as logs:
-            s = self.ok(v)
-            s.setup_project_files()
-
-        self.assertRegex(logs.output[0], 'Function drivers/net/tun.c:tun_chr_ioctll '
-                          'doesn\'t exist in kernel/drivers/net/tun.ko')
+        self.setup_assert_logs(v, 'WARNING',
+                'Function drivers/net/tun.c:tun_chr_ioctll doesn\'t exist in '
+                'kernel/drivers/net/tun.ko')
 
     def test_non_existent_module(self):
         v = self.d.copy()
@@ -152,7 +163,7 @@ class LpSetupTest(unittest.TestCase):
         v['module'] = 'sch_qfq'
         v['conf'] = 'CONFIG_NET_SCH_QFQ'
         v['file_funcs'] = [['net/sched/sch_qfq.c', 'qfq_change_class']]
-        s = self.ok(v)
+        s = self.setup(v)
         s.setup_project_files()
 
         # The address of qfq_policy on s390x ends with a character, a bug that
