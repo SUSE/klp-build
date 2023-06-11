@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 import os
@@ -34,11 +35,18 @@ class LpSetupTest(unittest.TestCase):
 
         logging.disable(logging.INFO)
 
-    def setup(self, dargs):
+    def setup(self, dargs, init = False):
         shutil.rmtree(self.basedir, ignore_errors=True)
 
         with self.assertNoLogs(level='WARNING') as anl:
-            return Setup(*tuple(dargs.values()))
+            try:
+                s = Setup(*tuple(dargs.values()))
+                if init:
+                    s.setup_project_files()
+
+                return s
+            except:
+                self.fail('Exception found')
 
     def setup_assert_logs(self, dargs, alevel, msg):
         shutil.rmtree(self.basedir, ignore_errors=True)
@@ -54,7 +62,7 @@ class LpSetupTest(unittest.TestCase):
 
         with self.assertRaises(exc) as ar:
             s = Setup(*tuple(dargs.values()))
-            return s.setup_project_files()
+            s.setup_project_files()
 
         if not msg:
             self.assertEqual(str(ar.exception), msg)
@@ -131,8 +139,7 @@ class LpSetupTest(unittest.TestCase):
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctl',
                             'tun_free_netdev']]
-        s = self.setup(v)
-        s.setup_project_files()
+        self.setup(v, True)
 
     def test_invalid_sym(self):
         v = self.d.copy()
@@ -163,14 +170,55 @@ class LpSetupTest(unittest.TestCase):
         v['module'] = 'sch_qfq'
         v['conf'] = 'CONFIG_NET_SCH_QFQ'
         v['file_funcs'] = [['net/sched/sch_qfq.c', 'qfq_change_class']]
-        s = self.setup(v)
-        s.setup_project_files()
+        s = self.setup(v, True)
 
         # The address of qfq_policy on s390x ends with a character, a bug that
         # was fixed by checking for \w instead of \d.
         # With the fix in place, check_symbol_archs should return an empty list
         self.assertFalse(s.check_symbol_archs('12.4u35', 'qfq_policy',
                                               'sch_qfq'))
+
+    def test_check_conf_mod_file_funcs(self):
+        cs = '15.4u12'
+        v = self.d.copy()
+        v['archs'] = ['x86_64']
+        v['filter'] = cs
+        v['module'] = 'sch_qfq'
+        v['conf'] = 'CONFIG_NET_SCH_QFQ'
+        v['file_funcs'] = [['net/sched/sch_qfq.c', 'qfq_change_class']]
+        v['mod_file_funcs'] = [[ 'btsdio',
+                                 'drivers/bluetooth/btsdio.c',
+                                 'btsdio_probe', 'btsdio_remove' ]]
+
+        # CONF should be same, but mod doesn't
+        self.setup(v, True)
+
+        with open(Path(self.basedir, 'codestreams.json')) as f:
+            data = json.loads(f.read())[cs]['files']
+
+        sch = data['net/sched/sch_qfq.c']
+        bts = data['drivers/bluetooth/btsdio.c']
+        self.assertEqual(sch['conf'], bts['conf'])
+        self.assertEqual(sch['module'], 'sch_qfq')
+        self.assertEqual(bts['module'], 'btsdio')
+
+        v['conf_mod_file_funcs'] = [[ 'CONFIG_BT_HCIBTSDIO',
+                                     'btsdio',
+                                     'drivers/bluetooth/btsdio.c',
+                                     'btsdio_probe', 'btsdio_remove' ]]
+
+        # Now, conf and module should be different
+        s = self.setup(v, True)
+
+        with open(Path(self.basedir, 'codestreams.json')) as f:
+            data = json.loads(f.read())[cs]['files']
+
+        sch = data['net/sched/sch_qfq.c']
+        bts = data['drivers/bluetooth/btsdio.c']
+        self.assertEqual(sch['conf'], 'CONFIG_NET_SCH_QFQ')
+        self.assertEqual(sch['module'], 'sch_qfq')
+        self.assertEqual(bts['conf'], 'CONFIG_BT_HCIBTSDIO')
+        self.assertEqual(bts['module'], 'btsdio')
 
 if __name__ == '__main__':
     unittest.main()
