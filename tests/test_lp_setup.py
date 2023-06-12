@@ -3,72 +3,42 @@ import logging
 from pathlib import Path
 import os
 import shutil
+import sys
 import unittest
 from unittest.mock import patch
 
-import sys
+from tests import utils
+
 sys.path.append('..')
 from lp_setup import Setup
 
 class LpSetupTest(unittest.TestCase):
     def setUp(self):
-        # Default arguments of Setup
-        self.d = {
-            'bsc' : '9999999',
-            'filter' : '',
-            'cve' : '1234-5678',
-            'cs' : '',
-            'file_funcs' : [],
-            'mod_file_funcs' : [],
-            'conf_mod_file_funcs' : [],
-            'module' : 'vmlinux',
-            'conf' : '',
-            'archs': []
-        }
-
-        # To be used later before calling setup, erasing any previously created
-        # project
-        self.basedir = Path(os.getenv('KLP_WORK_DIR', ''), 'bsc9999999')
-
         # Avoid searching for patches kernels
         os.environ['KLP_KERNEL_SOURCE'] = ''
 
         logging.disable(logging.INFO)
 
     def setup(self, dargs, init = False):
-        shutil.rmtree(self.basedir, ignore_errors=True)
-
         with self.assertNoLogs(level='WARNING') as anl:
-            try:
-                s = Setup(*tuple(dargs.values()))
-                if init:
-                    s.setup_project_files()
-
-                return s
-            except:
-                self.fail('Exception found')
+            return utils.setup(dargs, init)
 
     def setup_assert_logs(self, dargs, alevel, msg):
-        shutil.rmtree(self.basedir, ignore_errors=True)
-
         with self.assertLogs(level=alevel) as logs:
-            s = Setup(*tuple(dargs.values()))
-            s.setup_project_files()
+            utils.setup(dargs, True)
 
         self.assertRegex(logs.output[0], msg)
 
     def setup_and_assert(self, dargs, exc, msg = None):
-        shutil.rmtree(self.basedir, ignore_errors=True)
-
         with self.assertRaises(exc) as ar:
-            s = Setup(*tuple(dargs.values()))
-            s.setup_project_files()
+            utils.setup(dargs, True)
 
         if not msg:
             self.assertEqual(str(ar.exception), msg)
 
     def test_missing_conf_archs(self):
-        v = self.d.copy()
+        v = utils.sargs()
+        v['archs'] = []
         self.setup_and_assert(v, ValueError,
                 'Please specify --conf when not all architectures are supported')
 
@@ -84,8 +54,7 @@ class LpSetupTest(unittest.TestCase):
                 'You need to specify at least one of the file-funcs variants!')
 
     def test_missing_conf_mod(self):
-        v = self.d.copy()
-        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v = utils.sargs()
         v['module'] = 'tun'
         self.setup_and_assert(v, ValueError,
                 'Please specify --conf when a module is specified')
@@ -96,16 +65,14 @@ class LpSetupTest(unittest.TestCase):
                 'You need to specify at least one of the file-funcs variants!')
 
     def test_missing_file_funcs(self):
-        v = self.d.copy()
-        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v = utils.sargs()
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         self.setup_and_assert(v, ValueError,
                 'You need to specify at least one of the file-funcs variants!')
 
     def test_file_funcs_ok(self):
-        v = self.d.copy()
-        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v = utils.sargs()
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = ['drivers/net/tun.c', 'tun_chr_ioctl', 'tun_free_netdev']
@@ -123,8 +90,7 @@ class LpSetupTest(unittest.TestCase):
         self.setup(v)
 
     def test_non_existent_file(self):
-        v = self.d.copy()
-        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v = utils.sargs()
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tuna.c', 'tun_chr_ioctl',
@@ -133,8 +99,7 @@ class LpSetupTest(unittest.TestCase):
         self.setup_and_assert(v, RuntimeError, 'File drivers/net/tuna.c not found')
 
     def test_existent_file(self):
-        v = self.d.copy()
-        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v = utils.sargs()
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctl',
@@ -142,8 +107,7 @@ class LpSetupTest(unittest.TestCase):
         self.setup(v, True)
 
     def test_invalid_sym(self):
-        v = self.d.copy()
-        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v = utils.sargs()
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctll',
@@ -153,8 +117,7 @@ class LpSetupTest(unittest.TestCase):
                 'Symbols tun_chr_ioctll not found on tun')
 
     def test_non_existent_module(self):
-        v = self.d.copy()
-        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v = utils.sargs()
         v['module'] = 'tuna'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctl',
@@ -163,8 +126,7 @@ class LpSetupTest(unittest.TestCase):
         self.setup_and_assert(v, RuntimeError, 'Module not found: tuna')
 
     def test_check_symbol_addr_s390(self):
-        v = self.d.copy()
-        v['archs'] = ['x86_64', 'ppc64le', 's390x']
+        v = utils.sargs()
         v['filter'] = '12.4u35'
         v['module'] = 'sch_qfq'
         v['conf'] = 'CONFIG_NET_SCH_QFQ'
@@ -178,8 +140,8 @@ class LpSetupTest(unittest.TestCase):
                                               ['qfq_policy']))
 
     def test_check_conf_mod_file_funcs(self):
+        v = utils.sargs()
         cs = '15.4u12'
-        v = self.d.copy()
         v['archs'] = ['x86_64']
         v['filter'] = cs
         v['module'] = 'sch_qfq'
@@ -192,7 +154,7 @@ class LpSetupTest(unittest.TestCase):
         # CONF should be same, but mod doesn't
         self.setup(v, True)
 
-        with open(Path(self.basedir, 'codestreams.json')) as f:
+        with open(Path(utils.basedir(v), 'codestreams.json')) as f:
             data = json.loads(f.read())[cs]['files']
 
         sch = data['net/sched/sch_qfq.c']
@@ -209,7 +171,7 @@ class LpSetupTest(unittest.TestCase):
         # Now, conf and module should be different
         s = self.setup(v, True)
 
-        with open(Path(self.basedir, 'codestreams.json')) as f:
+        with open(Path(utils.basedir(v), 'codestreams.json')) as f:
             data = json.loads(f.read())[cs]['files']
 
         sch = data['net/sched/sch_qfq.c']
