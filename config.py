@@ -250,7 +250,7 @@ class Config:
         ret = []
 
         for symbol in symbols:
-            syms = re.findall(r'[\d]+ \w {}\n'.format(symbol), self.nm_out[arch][cs][mod])
+            syms = re.findall(r'[\w]+ \w {}\n'.format(symbol), self.nm_out[arch][cs][mod])
             if len(syms) == 0:
                 ret.append(symbol)
 
