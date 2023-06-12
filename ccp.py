@@ -70,6 +70,8 @@ class CCP(Config):
             avoid_syms.extend(avoid_ext)
 
         self.env['KCP_EXT_BLACKLIST'] = ','.join(avoid_syms)
+        self.env['KCP_READELF'] = 'readelf'
+        self.env['KCP_RENAME_PREFIX'] = 'klp'
 
         self.total = 0
 
@@ -406,11 +408,9 @@ class CCP(Config):
         env = self.env.copy()
 
         env['KCP_MOD_SYMVERS'] = str(Path(odir, 'Module.symvers'))
-        env['KCP_READELF'] = 'readelf'
         env['KCP_KBUILD_ODIR'] = str(odir)
         env['KCP_KBUILD_SDIR'] = str(sdir)
         env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
-        env['KCP_RENAME_PREFIX'] = 'klp'
 
         logging.info(f'\t({i}/{self.total})\t{cs}\t\t{fname}')
 
