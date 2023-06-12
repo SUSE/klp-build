@@ -1,8 +1,9 @@
 import concurrent.futures
 import json
+import logging
+import os
 from pathlib import Path, PurePath
 from natsort import natsorted
-import os
 import re
 import shutil
 import subprocess
@@ -368,7 +369,6 @@ class CCP(Config):
                     file_proc, src_proc = data_proc[i]
 
                     if file != file_proc or src != src_proc:
-                        #print('NOK', cs, cs_proc, file, file_proc)
                         ok = False
                         break
 
@@ -392,9 +392,9 @@ class CCP(Config):
         with open(Path(self.bsc_path, 'groups'), 'w') as f:
             f.write('\n'.join(groups))
 
-        print('\nGrouping codestreams that share the same content and files:')
+        logging.info('\nGrouping codestreams that share the same content and files:')
         for group in groups:
-            print('\t', group)
+            logging.info('\t', group)
 
     def process_ccp(self, args):
         i, fname, cs, fdata = args
@@ -412,7 +412,7 @@ class CCP(Config):
         env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
         env['KCP_RENAME_PREFIX'] = 'klp'
 
-        print(f'\t({i}/{self.total})\t{cs}\t\t{fname}')
+        logging.info(f'\t({i}/{self.total})\t{cs}\t\t{fname}')
 
         base_fname = Path(fname).name
 
@@ -429,7 +429,7 @@ class CCP(Config):
                 env)
 
     def run_ccp(self):
-        print(f'Work directory: {self.bsc_path}')
+        logging.info(f'Work directory: {self.bsc_path}')
 
         working_cs = self.filter_cs(verbose=True)
 
@@ -446,14 +446,14 @@ class CCP(Config):
                 i += 1
 
         self.total = len(args)
-        print(f'\nRunning klp-ccp for {len(args)} file(s)...')
-        print('\t\tCodestream\tFile')
+        logging.info(f'\nRunning klp-ccp for {len(args)} file(s)...')
+        logging.info('\t\tCodestream\tFile')
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             results = executor.map(self.process_ccp, args)
             for result in results:
                 if result:
-                    print(f'{cs}: {result}')
+                    logging.error(f'{cs}: {result}')
 
         # Save the ext_symbols set by execute_ccp
         self.flush_cs_file()
@@ -463,7 +463,7 @@ class CCP(Config):
         tem = Template(self.bsc_num, self.filter)
         tem.generate_commit_msg_file()
 
-        print('Checking the externalized symbols in other architectures...')
+        logging.info('Checking the externalized symbols in other architectures...')
 
         missing_syms = {}
 
@@ -496,5 +496,5 @@ class CCP(Config):
             with open(Path(self.bsc_path, 'missing_syms'), 'w') as f:
                 f.write(json.dumps(missing_syms, indent=4, sort_keys=True))
 
-            print('Symbols not found:')
-            print(json.dumps(missing_syms, indent=4, sort_keys=True))
+            logging.warning('Symbols not found:')
+            logging.warn(json.dumps(missing_syms, indent=4, sort_keys=True))
