@@ -168,10 +168,6 @@ class Setup(Config):
             data['files'] = self.file_funcs
             data['repo'] = self.cs_repo(cs)
 
-            # The ext_symbols will be populated by ccp
-            for file in self.file_funcs.keys():
-                data['ext_symbols'] = { file : [] }
-
             # Set supported archs for the codestream
             # RT is supported only on x86_64 at the moment
             archs = ['x86_64']
@@ -225,6 +221,7 @@ class Setup(Config):
         for cs, data in self.working_cs.items():
             # Check if the files exist in the respective codestream directories
             sdir = self.get_sdir(cs)
+            mod_syms = {}
             for f, fdata in data['files'].items():
                 fdir = Path(sdir, f)
                 if not fdir.is_file():
@@ -235,12 +232,15 @@ class Setup(Config):
                 obj = self.find_module_obj('x86_64', cs, mod, check_support=True)
                 data['object'] = obj
 
-                # Verify if the functions exist in the specified object
-                for func in fdata['symbols']:
-                    archs = self.check_symbol_archs(cs, func, mod)
-                    if archs:
-                        archs_str = ','.join(archs)
-                        logging.warning(f'{cs}({archs_str}): Function {f}:{func} doesn\'t exist in {obj}')
+                mod_syms.setdefault(mod, [])
+                mod_syms[mod].extend(fdata['symbols'])
+
+            # Verify if the functions exist in the specified object
+            for obj, syms in mod_syms.items():
+                arch_syms = self.check_symbol_archs(cs, mod, syms)
+                if arch_syms:
+                    for arch, syms in arch_syms.items():
+                        logging.warning(f'{cs}({arch}): Symbols {",".join(syms)} not found on {mod} object')
 
         # Update and save codestreams data
         for cs, data in self.working_cs.items():

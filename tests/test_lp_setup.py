@@ -150,8 +150,7 @@ class LpSetupTest(unittest.TestCase):
                             'tun_free_netdev']]
 
         self.setup_assert_logs(v, 'WARNING',
-                'Function drivers/net/tun.c:tun_chr_ioctll doesn\'t exist in '
-                'kernel/drivers/net/tun.ko')
+                'Symbols tun_chr_ioctll not found on tun')
 
     def test_non_existent_module(self):
         v = self.d.copy()
@@ -175,8 +174,8 @@ class LpSetupTest(unittest.TestCase):
         # The address of qfq_policy on s390x ends with a character, a bug that
         # was fixed by checking for \w instead of \d.
         # With the fix in place, check_symbol_archs should return an empty list
-        self.assertFalse(s.check_symbol_archs('12.4u35', 'qfq_policy',
-                                              'sch_qfq'))
+        self.assertFalse(s.check_symbol_archs('12.4u35', 'sch_qfq',
+                                              ['qfq_policy']))
 
     def test_check_conf_mod_file_funcs(self):
         cs = '15.4u12'

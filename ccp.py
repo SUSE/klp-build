@@ -246,9 +246,10 @@ class CCP(Config):
             if not mod:
                 mod = 'vmlinux'
 
-            symbols[sym] = mod
+            symbols.setdefault(mod, [])
+            symbols[mod].append(sym)
 
-        self.codestreams[cs]['ext_symbols'][fname] = symbols
+        self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
 
     # Group all codestreams that share code in a format like bellow:
     #   [15.2u10 15.2u11 15.3u10 15.3u12 ]
@@ -469,21 +470,25 @@ class CCP(Config):
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
         # While we are at it, create the livepatches per codestream
-        for cs, data in working_cs.items():
+        for cs, _ in working_cs.items():
             tem.GenerateLivePatches(cs)
 
-            for file_ext, exts in self.get_cs_ext_symbols(cs).items():
-                for func, mod in exts.items():
-                    archs = self.check_symbol_archs(cs, func, mod)
+            # Map all symbols related to each obj, to make it check the output
+            # of nm only once per object
+            obj_syms = {}
+            for f, fdata in self.get_cs_files(cs).items():
+                for obj, syms in fdata['ext_symbols'].items():
+                    obj_syms.setdefault(obj, [])
+                    obj_syms[obj].extend(syms)
 
-                    # archs is populated when a symbol wasn't found
-                    if archs:
-                        for arch in archs:
-                            arch_mod = f'{arch}/{mod}'
-                            missing_syms.setdefault(arch_mod, {})
-                            missing_syms[arch_mod].setdefault(file_ext, {})
-                            missing_syms[arch_mod][file_ext].setdefault(func, [])
-                            missing_syms[arch_mod][file_ext][func].append(cs)
+            for obj, syms in obj_syms.items():
+                missing = self.check_symbol_archs(cs, obj, syms)
+                if missing:
+                    for arch, arch_syms in missing.items():
+                        missing_syms.setdefault(arch, {})
+                        missing_syms[arch].setdefault(obj, {})
+                        missing_syms[arch][obj].setdefault(cs, [])
+                        missing_syms[arch][obj][cs].extend(arch_syms)
 
             tem.CreateKbuildFile(cs)
 

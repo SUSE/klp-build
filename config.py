@@ -101,9 +101,6 @@ class Config:
     def get_cs_files(self, cs):
         return self.get_cs_data(cs)['files']
 
-    def get_cs_ext_symbols(self, cs):
-        return self.get_cs_data(cs)['ext_symbols']
-
     def get_cs_tuple(self, cs):
         match = re.search('(\d+)\.(\d+)(rt)?u(\d+)', cs)
 
@@ -239,7 +236,8 @@ class Config:
 
     # Cache the output of nm by using the object path. It differs for each
     # codestream and architecture
-    def check_symbol(self, arch, cs, symbol, mod):
+    # Return all the symbols not found per arch/obj
+    def check_symbol(self, arch, cs, mod, symbols):
         self.nm_out.setdefault(arch, {})
         self.nm_out[arch].setdefault(cs, {})
 
@@ -249,18 +247,24 @@ class Config:
                                                                      '--defined-only',
                                                                      obj]).decode().strip()
 
-        symbols = re.findall(r'[\w]+ \w {}\n'.format(symbol), self.nm_out[arch][cs][mod])
-        if len(symbols) == 0:
-            return ''
+        ret = []
 
-        if len(symbols) > 1:
-            print(f'WARNING: {cs}: symbol {symbol} duplicated on {mod}')
+        for symbol in symbols:
+            syms = re.findall(r'[\d]+ \w {}\n'.format(symbol), self.nm_out[arch][cs][mod])
+            if len(syms) == 0:
+                ret.append(symbol)
 
-        return symbols[0]
+            elif len(syms) > 1:
+                print(f'WARNING: {cs}: symbol {symbol} duplicated on {mod}')
 
-    def check_symbol_archs(self, cs, symbol, mod):
+            # If len(syms) == 1 means that we found a unique symbol, which is
+            # what we expect, and nothing need to be done.
+
+        return ret
+
+    def check_symbol_archs(self, cs, mod, symbols):
         data = self.get_cs_data(cs)
-        arch_sym = []
+        arch_sym = {}
         # Validate only architectures supported by the codestream
         for arch in data['archs']:
 
@@ -273,10 +277,9 @@ class Config:
             if not arch in self.conf.get('archs'):
                 continue
 
-            if self.check_symbol(arch, cs, symbol, mod):
-                continue
-
-            # Add the arch to the dict if the symbol wasn't found
-            arch_sym.append(arch)
+            # Assign the not found symbols on arch
+            syms = self.check_symbol(arch, cs, mod, symbols)
+            if syms:
+                arch_sym[arch] = syms
 
         return arch_sym
