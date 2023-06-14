@@ -155,7 +155,7 @@ class GitHelper(Config):
     def get_commits(self, cve):
         if not self.kern_src:
             logging.info('KLP_KERNEL_SOURCE not defined, skip getting SUSE commits')
-            return
+            return {}
 
         # do not get the commits twice
         if self.conf.get('commits', ''):
