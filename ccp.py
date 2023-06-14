@@ -396,7 +396,7 @@ class CCP(Config):
 
         logging.info('\nGrouping codestreams that share the same content and files:')
         for group in groups:
-            logging.info('\t', group)
+            logging.info(f'\t{group}')
 
     def process_ccp(self, args):
         i, fname, cs, fdata = args
