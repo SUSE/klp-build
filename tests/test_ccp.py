@@ -21,15 +21,13 @@ class CcpTesting(utils.TestUtils):
         v['module'] = 'vmlinux'
         v['file_funcs'] = [['lib/seq_buf.c', 'seq_buf_putmem_hex']]
 
-        #self.setup_and_assert(v, RuntimeError, 'File drivers/net/tuna.c not found')
-
-        with self.assertRaises(RuntimeError) as ar:
+        with self.assertLogs(level='WARNING') as logs:
             self.setup(v, True)
             ccp = CCP(v['bsc'], cs, [])
             ccp.run_ccp()
 
-        self.assertEqual(str(ar.exception),
-            '15.3u32:lib/seq_buf.o is not compiled with livepatch support (-pg flag)')
+        self.assertRegex(logs.output[0],
+            'lib/seq_buf.o is not compiled with livepatch support \(\-pg flag\)')
 
 if __name__ == '__main__':
     unittest.main()

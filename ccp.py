@@ -139,7 +139,7 @@ class CCP(Config):
             f.write(ret)
 
             if not ' -pg ' in ret:
-                raise RuntimeError(f'{cs}:{file_} is not compiled with livepatch support (-pg flag)')
+                logging.warning(f'{cs}:{file_} is not compiled with livepatch support (-pg flag)')
 
             return ret
 
