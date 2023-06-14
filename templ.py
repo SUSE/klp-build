@@ -146,7 +146,7 @@ class Template(Config):
 
     def generate_commit_msg_file(self):
         with open(Path(self.bsc_path, 'commit.msg'), 'w') as f:
-            commits = self.conf['commits']['upstream'].items()
+            commits = self.conf['commits'].get('upstream', {})
             commit_str = 'Upstream commit'
             # add plural when necessary
             if len(commits) > 1:
@@ -157,7 +157,7 @@ class Template(Config):
                 f'Live patch for CVE-{cve}. {commit_str}:', sep='\n',
                   file=f)
 
-            for commit_hash, msg in commits:
+            for commit_hash, msg in commits.items():
                 print(f'- {commit_hash} ("{msg}")', file=f)
 
             print('', f'KLP: CVE-{cve}', f'References: bsc#{self.bsc_num} CVE-{cve}',
