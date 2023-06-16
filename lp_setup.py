@@ -236,7 +236,7 @@ class Setup(Config):
                 mod_syms[mod].extend(fdata['symbols'])
 
             # Verify if the functions exist in the specified object
-            for obj, syms in mod_syms.items():
+            for mod, syms in mod_syms.items():
                 arch_syms = self.check_symbol_archs(cs, mod, syms)
                 if arch_syms:
                     for arch, syms in arch_syms.items():
