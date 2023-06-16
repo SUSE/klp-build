@@ -92,8 +92,8 @@ class Config:
     def get_cs_archs(self, cs):
         return self.get_cs_data(cs)['archs']
 
-    def get_cs_object(self, cs):
-        return self.get_cs_data(cs).get('object', '')
+    def get_cs_modules(self, cs):
+        return self.get_cs_data(cs)['modules']
 
     def get_cs_kernel(self, cs):
         return self.get_cs_data(cs)['kernel']
@@ -157,16 +157,12 @@ class Config:
     def is_mod(self, mod):
         return mod != 'vmlinux'
 
-    def get_module_obj(self, arch, cs, module, use_cached_obj=True):
+    def get_module_obj(self, arch, cs, module):
         ex_dir = self.get_data_dir(cs, arch)
 
-        # Use the object if it was previously set, and if we are trying to find
-        # symbols for the to be livepatched module. We can also search for
-        # symbols in externalized functions, so this argument checks
-        obj = ''
-        if use_cached_obj:
-            obj = self.get_cs_object(cs)
-
+        # We already search if the module exists on setup phase, so only search
+        # for the module when looking for externalized symbols
+        obj = self.get_cs_modules(cs).get(module, '')
         if not obj:
             obj = self.find_module_obj(arch, cs, module)
 
@@ -242,7 +238,7 @@ class Config:
         self.nm_out[arch].setdefault(cs, {})
 
         if not self.nm_out[arch][cs].get(mod, ''):
-            obj = self.get_module_obj(arch, cs, mod, use_cached_obj=False)
+            obj = self.get_module_obj(arch, cs, mod)
             self.nm_out[arch][cs][mod] = subprocess.check_output(['nm',
                                                                      '--defined-only',
                                                                      obj]).decode().strip()

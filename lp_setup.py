@@ -125,6 +125,7 @@ class Setup(Config):
                     'sle' : sle,
                     'sp' : sp,
                     'update' : u,
+                    'modules' : {}
             }
 
             if rt:
@@ -228,9 +229,9 @@ class Setup(Config):
                     raise RuntimeError(f'{cs}: File {f} not found')
 
                 mod = fdata['module']
-                # Use x86_64 to find the module, as it is be the same path for other archs
-                obj = self.find_module_obj('x86_64', cs, mod, check_support=True)
-                data['object'] = obj
+                if not data['modules'].get(mod, ''):
+                    # Use x86_64 to find the module, as it is be the same path for other archs
+                    data['modules'][mod] = self.find_module_obj('x86_64', cs, mod, check_support=True)
 
                 mod_syms.setdefault(mod, [])
                 mod_syms[mod].extend(fdata['symbols'])
