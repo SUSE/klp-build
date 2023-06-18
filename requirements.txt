@@ -1,4 +1,6 @@
 GitPython
 jinja2
-python3-requests
+requests
 natsort
+lxml
+osc-tiny
