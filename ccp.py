@@ -121,6 +121,7 @@ class CCP(Config):
                 output += ' -D_Static_assert(e,m)='
             if sp >= 4:
                 output += ' -D__auto_type=int'
+                output += ' -D__has_attribute(x)=0'
 
         return output
 
