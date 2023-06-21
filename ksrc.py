@@ -260,7 +260,7 @@ class GitHelper(Config):
 
                 # Skip the Update commits, that only change the References tag
                 for hash_entry in phashes.splitlines():
-                    if 'Update patches.suse' in hash_entry:
+                    if 'Update' in hash_entry and 'patches.suse' in hash_entry:
                         continue
 
                     hash_commit = hash_entry.split(' ')[0]
