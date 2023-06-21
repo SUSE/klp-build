@@ -10,7 +10,7 @@ import subprocess
 from threading import Lock
 
 from config import Config
-from templ import Template
+from templ import TemplateGen
 
 class CCP(Config):
     def __init__(self, bsc, bsc_filter, avoid_ext):
@@ -461,7 +461,7 @@ class CCP(Config):
 
         self.group_equal_files(args)
 
-        tem = Template(self.bsc_num, self.filter)
+        tem = TemplateGen(self.bsc_num, self.filter)
         tem.generate_commit_msg_file()
 
         logging.info('Checking the externalized symbols in other architectures...')

@@ -1,15 +1,73 @@
 from datetime import datetime
 import jinja2
+from mako.template import Template
 from pathlib import Path, PurePath
 import os
 
 from config import Config
 
-class Template(Config):
+TEMPL_HEADER = '''\
+/*
+ * ${fname}
+ *
+ * Fix for CVE-${cve}, bsc#${bsc_num}
+ *
+% if include_header:
+ *  Upstream commit:
+${get_commits(commits, 'upstream')}
+ *
+ *  SLE12-SP4, SLE12-SP5 and SLE15-SP1 commit:
+${get_commits(commits, '4.12')}
+ *
+ *  SLE15-SP2 and -SP3 commit:
+${get_commits(commits, '5.3')}
+ *
+ *  SLE15-SP4 and -SP5 commit:
+${get_commits(commits, 'sle15-sp4')}
+ *
+% endif
+ *  Copyright (c) ${year} SUSE
+ *  Author: ${ user } <${ email }>
+ *
+ *  Based on the original Linux kernel code. Other copyrights apply.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ */
+'''
+
+class TemplateGen(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
 
         self.check_enabled = self.conf['archs'] != self.archs
+
+    def get_commits(self, commits, cs):
+        ret = []
+
+        if not commits[cs]:
+            ret.append(' *  Not affected')
+        else:
+            for commit, msg in commits[cs].items():
+                if cs == 'upstream':
+                    ret.append(f' *  {commit} ("{msg}")')
+                elif not msg:
+                    ret.append(' *  Not affected')
+                else:
+                    for m in msg:
+                        ret.append(f' *  {m}')
+
+        return '\n'.join(ret)
 
     def fix_mod_string(self, mod):
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
@@ -90,13 +148,29 @@ class Template(Config):
         fname = Path(out_name).with_suffix('')
         templ = self.get_template(cs, src_file, 'lp-' + ext + '.j2', lp_inc_dir)
 
+        include_header = False
         if 'livepatch_' in out_name and ext == 'c':
-            templ.globals['include_header'] = True
+            include_header = True
 
         if ext == 'c' and src_file:
             templ.globals['inc_exts_file'] = 'exts'
 
+        render_vars = {
+                'commits' : self.conf['commits'],
+                'include_header' : include_header,
+                'cve' : self.conf['cve'],
+                'bsc_num' : self.bsc_num,
+                'fname' : fname,
+                'year' : datetime.today().year,
+                'user' : self.user,
+                'email' : self.email,
+                'get_commits' : self.get_commits
+        }
+
         with open(Path(lp_path, out_name), 'w') as f:
+            if ext == 'c':
+                f.write(Template(TEMPL_HEADER).render(**render_vars))
+
             f.write(templ.render(fname = fname, inc_src_file = lp_file))
 
     def GenerateLivePatches(self, cs):
