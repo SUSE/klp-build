@@ -1,6 +1,7 @@
 GitPython
 jinja2
-requests
-natsort
 lxml
+mako
+natsort
 osc-tiny
+requests
