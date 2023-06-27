@@ -8,6 +8,8 @@ from lp_setup import Setup
 from ibs import IBS
 
 def create_parser() -> argparse.ArgumentParser:
+    archs = ['ppc64le', 's390x', 'x86_64']
+
     parentparser = argparse.ArgumentParser(add_help=False)
     parentparser.add_argument('-b', '--bsc', type=int, required=True,
             help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
@@ -43,9 +45,8 @@ def create_parser() -> argparse.ArgumentParser:
 
     setup.add_argument('--module', type=str, default='vmlinux',
             help='The module that will be livepatched for all files')
-    setup.add_argument('--archs', required=True,
-                       choices=['ppc64le', 's390x', 'x86_64'],
-                       nargs='+', help='Supported architectures for this livepatch')
+    setup.add_argument('--archs', required=True, choices=archs, nargs='+',
+                       help='Supported architectures for this livepatch')
 
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
     ccp_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],
@@ -90,8 +91,8 @@ def create_parser() -> argparse.ArgumentParser:
             help='Get build log from IBS')
     log.add_argument('--cs', type=str, required=True,
             help='The codestream to get the log from')
-    log.add_argument('--arch', type=str, default='x86_64',
-            help='Build architecture')
+    log.add_argument('--arch', type=str, default='x86_64', choices=archs,
+                     help='Build architecture')
 
     return parser
 
