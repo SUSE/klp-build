@@ -46,6 +46,35 @@ ${get_commits(commits, 'sle15-sp4')}
  */
 '''
 
+TEMPL_H = '''\
+#ifndef _${ fname.upper() }_H
+#define _${ fname.upper() }_H
+
+% if check_enabled:
+#if IS_ENABLED(${ config })
+% endif
+
+int ${ fname }_init(void);
+% if mod is UNDEFINED:
+void ${ fname }_cleanup(void);
+% else:
+static inline void ${ fname }_cleanup(void) {}
+% endif %
+
+% if check_enabled:
+#else /* !IS_ENABLED(${ config }) */
+% endif
+
+static inline int ${ fname }_init(void) { return 0; }
+static inline void ${ fname }_cleanup(void) {}
+
+% if check_enabled:
+#endif /* IS_ENABLED(${ config }) */
+% endif
+
+#endif /* _${ fname.upper() }_H */
+'''
+
 class TemplateGen(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
@@ -132,9 +161,17 @@ class TemplateGen(Config):
         if src_file:
             lp_inc_dir = str(self.get_work_dir(cs, src_file))
             lp_file = self.lp_out_file(src_file)
+            fdata = self.get_cs_files(cs)[str(src_file)]
+            mod = self.fix_mod_string(fdata['module'])
+            if not self.is_mod(mod):
+                mod = ''
+            fconf = fdata['conf']
+
         else:
             lp_inc_dir = None
             lp_file = None
+            mod = ''
+            fconf = ''
 
         # if use_src_name is True, the final file will be:
         #       bscXXXXXXX_{src_name}.c
@@ -160,18 +197,21 @@ class TemplateGen(Config):
                 'include_header' : include_header,
                 'cve' : self.conf['cve'],
                 'bsc_num' : self.bsc_num,
-                'fname' : fname,
+                'fname' : str(fname),
                 'year' : datetime.today().year,
                 'user' : self.user,
                 'email' : self.email,
-                'get_commits' : self.get_commits
+                'get_commits' : self.get_commits,
+                'config' : fconf,
+                'mod' : mod
         }
 
         with open(Path(lp_path, out_name), 'w') as f:
             if ext == 'c':
                 f.write(Template(TEMPL_HEADER).render(**render_vars))
-
-            f.write(templ.render(fname = fname, inc_src_file = lp_file))
+                f.write(templ.render(fname = fname, inc_src_file = lp_file))
+            else:
+                f.write(Template(TEMPL_H).render(**render_vars))
 
     def GenerateLivePatches(self, cs):
         lp_path = self.get_cs_lp_dir(cs)
