@@ -86,6 +86,13 @@ def create_parser() -> argparse.ArgumentParser:
     status.add_argument('--wait', action='store_true',
             help='Wait until all codestreams builds are finished')
 
+    log = sub.add_parser('log', parents = [parentparser],
+            help='Get build log from IBS')
+    log.add_argument('--cs', type=str, required=True,
+            help='The codestream to get the log from')
+    log.add_argument('--arch', type=str, default='x86_64',
+            help='Build architecture')
+
     return parser
 
 def main_func(main_args):
@@ -111,6 +118,9 @@ def main_func(main_args):
 
     elif args.cmd == 'push':
         IBS(args.bsc, args.filter).push(args.wait)
+
+    elif args.cmd == 'log':
+        IBS(args.bsc, args.filter).log(args.cs, args.arch)
 
     elif args.cmd == 'ibs':
         ibs = IBS(args.bsc, args.filter)

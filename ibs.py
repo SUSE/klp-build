@@ -553,6 +553,10 @@ class IBS(Config):
 
         print('done')
 
+    def log(self, cs, arch):
+        print(self.osc.build.get_log(self.cs_to_project(cs), 'devbuild', arch,
+                                     'klp'))
+
     def push(self, wait=False):
         cs_list = self.apply_filter(self.codestreams.keys())
 
