@@ -27,6 +27,10 @@ class TestUtils(unittest.TestCase):
     def basedir(self, v):
         return Path(os.getenv('KLP_WORK_DIR', ''), f'bsc{v["bsc"]}')
 
+    def lpdir(self, v, cs):
+        return Path(os.getenv('KLP_WORK_DIR', ''), f'bsc{v["bsc"]}', 'c', cs,
+        'lp')
+
     def setup(self, dargs, init = False):
         shutil.rmtree(self.basedir(dargs), ignore_errors=True)
 

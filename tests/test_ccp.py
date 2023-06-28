@@ -1,3 +1,4 @@
+from pathlib import Path
 import logging
 import os
 import unittest
@@ -28,6 +29,21 @@ class CcpTesting(utils.TestUtils):
 
         self.assertRegex(logs.output[0],
             'lib/seq_buf.o is not compiled with livepatch support \(\-pg flag\)')
+
+        # Check the generated LP files
+        path = self.lpdir(v, cs)
+        with open(Path(path, 'livepatch_bsc9999999.c')) as f:
+            buf = f.read()
+
+        # As we passed vmlinux as module, we don't have the module notifier and
+        # LP_MODULE, linux/module.h is not included
+        self.assertTrue('LP_MODULE' not in buf)
+        self.assertTrue('module_notify' not in buf)
+        self.assertTrue('linux/module.h' not in buf)
+
+        # As the code is using the default archs, which is all of them, the
+        # IS_ENABLED macro shouldn't exist
+        self.assertTrue('#if IS_ENABLED' not in buf)
 
 if __name__ == '__main__':
     unittest.main()
