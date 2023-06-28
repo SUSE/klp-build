@@ -65,7 +65,7 @@ class IBS(Config):
             results = executor.map(func, args)
             for result in results:
                 if result:
-                    print(result)
+                    logging.error(result)
 
     # The projects has different format: 12_5u5 instead of 12.5u5
     def get_projects(self):
@@ -94,7 +94,7 @@ class IBS(Config):
         try:
             ret = self.osc.projects.delete(prj, force=True)
             if type(ret) is not bool:
-                print(etree.tostring(ret))
+                logging.error(etree.tostring(ret))
                 raise ValueError(prj)
         except requests.exceptions.HTTPError as e:
             # project not found, no problem
@@ -102,7 +102,7 @@ class IBS(Config):
                 pass
 
         if verbose:
-            print('\t' + prj)
+            logging.info('\t' + prj)
 
     def extract_rpms(self, args):
         i, cs, arch, rpm, dest = args
@@ -132,7 +132,7 @@ class IBS(Config):
             os.remove(Path(path_dest, 'Symbols.list'))
             shutil.rmtree(Path(path_dest, 'usr'))
 
-        print(f'({i}/{self.total}) extracted {cs} {rpm}: ok')
+        logging.info(f'({i}/{self.total}) extracted {cs} {rpm}: ok')
 
     def download_and_extract(self, args):
         i, cs, prj, repo, arch, pkg, rpm, dest = args
@@ -148,7 +148,7 @@ class IBS(Config):
         extract = []
         i = 1
 
-        print('Getting list of files...')
+        logging.info('Getting list of files...')
         for cs, data in cs_list.items():
             prj = data['project']
             repo = data['repo']
@@ -184,7 +184,7 @@ class IBS(Config):
                         rpms.append( (i, cs, prj, repo, arch, pkg, rpm, path_dest) )
                         i += 1
 
-        print(f'Downloading {len(rpms)} rpms...')
+        logging.info(f'Downloading {len(rpms)} rpms...')
         self.total = len(rpms)
         self.do_work(self.download_and_extract, rpms)
 
@@ -209,17 +209,17 @@ class IBS(Config):
             odir = Path(f'{self.get_sdir(cs)}-obj', self.get_odir(cs))
             subprocess.check_output(['make', 'olddefconfig'], cwd=odir)
 
-        print('Finished extract vmlinux and modules...')
+        logging.info('Finished extract vmlinux and modules...')
 
     def download_binary_rpms(self, args):
         i, cs, prj, repo, arch, pkg, rpm, dest = args
 
         try:
             self.osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
-            print(f'({i}/{self.total}) {cs} {rpm}: ok')
+            logging.info(f'({i}/{self.total}) {cs} {rpm}: ok')
         except OSError as e:
             if e.errno == errno.EEXIST:
-                print(f'({i}/{self.total}) {cs} {rpm}: already downloaded. skipping.')
+                logging.info(f'({i}/{self.total}) {cs} {rpm}: already downloaded. skipping.')
             else:
                 raise RuntimeError(f'download error on {prj}: {rpm}')
 
@@ -300,7 +300,7 @@ class IBS(Config):
             # be worked in the livepatch.
             if deps:
                 funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
-                print(f'WARN: {cs}:{arch} has dependencies: {deps}. Functions: {" ".join(funcs)}')
+                logging.warning(f'{cs}:{arch} has dependencies: {deps}. Functions: {" ".join(funcs)}')
 
         shutil.rmtree(Path(rpm_dir, 'lib'), ignore_errors=True)
 
@@ -348,7 +348,7 @@ class IBS(Config):
 
                 rpm_dir = Path(self.bsc_path, 'c', cs, arch, 'rpm')
                 if not rpm_dir.exists():
-                    print(f'{cs}/{arch}: rpm dir not found. Skipping.')
+                    logging.info(f'{cs}/{arch}: rpm dir not found. Skipping.')
                     continue
 
                 # TODO: there will be only one rpm, format it directly
@@ -368,7 +368,7 @@ class IBS(Config):
                 build_cs.append(self.get_full_cs(cs))
 
             # Prepare the config file used by kgr-test, use a set to remove
-            # duplicated entries 
+            # duplicated entries
             config = Path(test_arch_path, 'repro', f'{self.bsc}_config.in')
             with open(config, 'w') as f:
                 f.write('\n'.join(build_cs))
@@ -376,7 +376,7 @@ class IBS(Config):
             if test_sh.is_file():
                 shutil.copy(test_sh, Path(test_arch_path, 'repro'))
             else:
-                print(f'WARN: missing {test_sh}')
+                logging.warning(f'missing {test_sh}')
 
             subprocess.run(['tar', '-cJf', f'{self.bsc}.tar.xz',
                                 f'{self.bsc}'], cwd=tests_path,
@@ -420,7 +420,7 @@ class IBS(Config):
                     rpms.append( (i, prj, prj, 'devbuild', arch, 'klp', rpm, dest) )
                     i += 1
 
-        print(f'Downloading {len(rpms)} packages')
+        logging.info(f'Downloading {len(rpms)} packages')
         self.total = len(rpms)
         self.do_work(self.download_binary_rpms, rpms)
 
@@ -441,23 +441,23 @@ class IBS(Config):
                     st.append(f'{k}: {v}')
                     if v not in ['succeeded', 'unresolvable', 'failed']:
                         finished = False
-                print('{}\t{}'.format(prj, '\t'.join(st)))
+                logging.info('{}\t{}'.format(prj, '\t'.join(st)))
 
             if finished or not wait:
                 break
 
             # Wait 30 seconds before getting status again
             time.sleep(30)
-            print('')
+            logging.info('')
 
     def cleanup(self):
         prjs = self.get_project_names()
 
         if len(prjs) == 0:
-            print('No projects found.')
+            logging.info('No projects found.')
             return
 
-        print(f'Deleting {len(prjs)} projects...')
+        logging.info(f'Deleting {len(prjs)} projects...')
 
         self.do_work(self.delete_project, prjs)
 
@@ -487,12 +487,12 @@ class IBS(Config):
         # get the kgraft branch related to this codestream
         branch = self.ksrc.get_cs_branch(cs)
         if not branch:
-            print(f'Could not find git branch for {cs}. Skipping.')
+            logging.info(f'Could not find git branch for {cs}. Skipping.')
             return
 
         prj = self.cs_to_project(cs)
 
-        print(f'({i}/{self.total}) pushing {cs} using branch {branch}...', end='', flush=True)
+        logging.info(f'({i}/{self.total}) pushing {cs} using branch {branch}...')
 
         # If the project exists, drop it first
         self.delete_project(prj, verbose=False)
@@ -509,7 +509,7 @@ class IBS(Config):
             self.osc.packages.set_meta(prj, 'klp', title='', description='Test livepatch')
 
         except Exception as e:
-            print(e, e.response.content)
+            logging.error(e, e.response.content)
             raise RuntimeError('')
 
         base_path = Path(self.bsc_path, 'c', cs)
@@ -551,10 +551,10 @@ class IBS(Config):
                                 stderr=subprocess.STDOUT, cwd=prj_path)
         shutil.rmtree(prj_path)
 
-        print('done')
+        logging.info(f'({i}/{self.total}) {cs} done')
 
     def log(self, cs, arch):
-        print(self.osc.build.get_log(self.cs_to_project(cs), 'devbuild', arch,
+        logging.info(self.osc.build.get_log(self.cs_to_project(cs), 'devbuild', arch,
                                      'klp'))
 
     def push(self, wait=False):
@@ -563,7 +563,7 @@ class IBS(Config):
         if not cs_list:
             raise RuntimeError(f'push: No codestreams found for {self.bsc}')
 
-        print(f'Preparing {len(cs_list)} projects on IBS...')
+        logging.info(f'Preparing {len(cs_list)} projects on IBS...')
 
         self.total = len(cs_list)
         i = 1
