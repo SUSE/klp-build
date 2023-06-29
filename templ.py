@@ -7,7 +7,36 @@ import os
 
 from config import Config
 
-TEMPL_HEADER = '''\
+TEMPL_H = '''\
+#ifndef _${ fname.upper() }_H
+#define _${ fname.upper() }_H
+
+% if check_enabled:
+#if IS_ENABLED(${ config })
+% endif
+
+int ${ fname }_init(void);
+% if mod is UNDEFINED:
+void ${ fname }_cleanup(void);
+% else:
+static inline void ${ fname }_cleanup(void) {}
+% endif %
+
+% if check_enabled:
+#else /* !IS_ENABLED(${ config }) */
+% endif
+
+static inline int ${ fname }_init(void) { return 0; }
+static inline void ${ fname }_cleanup(void) {}
+
+% if check_enabled:
+#endif /* IS_ENABLED(${ config }) */
+% endif
+
+#endif /* _${ fname.upper() }_H */
+'''
+
+TEMPL_C = '''\
 /*
  * ${fname}
  *
@@ -45,38 +74,6 @@ ${get_commits(commits, 'sle15-sp4')}
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
-'''
-
-TEMPL_H = '''\
-#ifndef _${ fname.upper() }_H
-#define _${ fname.upper() }_H
-
-% if check_enabled:
-#if IS_ENABLED(${ config })
-% endif
-
-int ${ fname }_init(void);
-% if mod is UNDEFINED:
-void ${ fname }_cleanup(void);
-% else:
-static inline void ${ fname }_cleanup(void) {}
-% endif %
-
-% if check_enabled:
-#else /* !IS_ENABLED(${ config }) */
-% endif
-
-static inline int ${ fname }_init(void) { return 0; }
-static inline void ${ fname }_cleanup(void) {}
-
-% if check_enabled:
-#endif /* IS_ENABLED(${ config }) */
-% endif
-
-#endif /* _${ fname.upper() }_H */
-'''
-
-TEMPL_C = '''\
 
 % if check_enabled:
 #if IS_ENABLED(${ config })
@@ -315,12 +312,12 @@ class TemplateGen(Config):
         }
 
         with open(Path(lp_path, out_name), 'w') as f:
+            lpdir = TemplateLookup(directories=[lp_inc_dir])
+            temp_str = TEMPL_H
             if ext == 'c':
-                lpdir = TemplateLookup(directories=[lp_inc_dir])
-                f.write(Template(TEMPL_HEADER).render(**render_vars))
-                f.write(Template(TEMPL_C, lookup=lpdir).render(**render_vars))
-            else:
-                f.write(Template(TEMPL_H).render(**render_vars))
+                temp_str = TEMPL_C
+
+            f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
 
     def GenerateLivePatches(self, cs):
         lp_path = self.get_cs_lp_dir(cs)
