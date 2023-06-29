@@ -258,15 +258,14 @@ class Config:
 
         return ret
 
-    def check_symbol_archs(self, cs, mod, symbols):
+    def check_symbol_archs(self, cs, mod, symbols, x86=False):
         data = self.get_cs_data(cs)
         arch_sym = {}
         # Validate only architectures supported by the codestream
         for arch in data['archs']:
 
-            # The livepatch creator usually do it on a x86_64 machine, so the
-            # check for this arch was already done
-            if arch == 'x86_64':
+            # Avoid rechecking on checking for externalized symbols
+            if arch == 'x86_64' and not x86:
                 continue
 
             # Skip if the arch is not supported by the livepatch code
