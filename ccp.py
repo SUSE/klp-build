@@ -240,8 +240,9 @@ class CCP(Config):
                     if mod:
                         ext_list.append(f'\t {mod}')
 
-        with open(Path(out_dir, 'exts'), 'w') as f:
-            f.write('\n'.join(ext_list))
+        if ext_list:
+            with open(Path(out_dir, 'exts'), 'w') as f:
+                f.write('\n'.join(ext_list))
 
         # store the externalized symbols and module used in this codestream file
         symbols = {}
