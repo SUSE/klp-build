@@ -37,6 +37,23 @@ static inline void ${ fname }_cleanup(void) {}
 '''
 
 TEMPL_C = '''\
+<%
+def get_commits(cmts, cs):
+    if not cmts.get(cs, ''):
+        return ' *  Not affected'
+
+    ret = []
+    for commit, msg in cmts[cs].items():
+        if cs == 'upstream':
+            ret.append(f' *  {commit} ("{msg}")')
+        elif not msg:
+            ret.append(' *  Not affected')
+        else:
+            for m in msg:
+                ret.append(f' *  {m}')
+
+    return "\\n".join(ret)
+%> \
 /*
  * ${fname}
  *
@@ -221,23 +238,6 @@ class TemplateGen(Config):
         # is not enabled on all architectures
         self.check_enabled = self.conf['archs'] != self.archs
 
-    def get_commits(self, commits, cs):
-        ret = []
-
-        if not commits.get(cs, ''):
-            ret.append(' *  Not affected')
-        else:
-            for commit, msg in commits[cs].items():
-                if cs == 'upstream':
-                    ret.append(f' *  {commit} ("{msg}")')
-                elif not msg:
-                    ret.append(' *  Not affected')
-                else:
-                    for m in msg:
-                        ret.append(f' *  {m}')
-
-        return '\n'.join(ret)
-
     def fix_mod_string(self, mod):
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
         # and in kallsyms lookup
@@ -283,10 +283,6 @@ class TemplateGen(Config):
         else:
             out_name = f'livepatch_{self.bsc}.{ext}'
 
-        include_header = False
-        if 'livepatch_' in out_name and ext == 'c':
-            include_header = True
-
         # 15.4 onwards we don't have module_mutex, so template generate
         # different code
         sle, sp, _, _ = self.get_cs_tuple(cs)
@@ -294,14 +290,13 @@ class TemplateGen(Config):
 
         render_vars = {
                 'commits' : self.conf['commits'],
-                'include_header' : include_header,
+                'include_header' : 'livepatch_' in out_name and ext == 'c',
                 'cve' : self.conf['cve'],
                 'bsc_num' : self.bsc_num,
                 'fname' : str(Path(out_name).with_suffix('')),
                 'year' : datetime.today().year,
                 'user' : self.user,
                 'email' : self.email,
-                'get_commits' : self.get_commits,
                 'config' : fconf,
                 'mod' : mod,
                 'mod_mutex' : mod_mutex,
