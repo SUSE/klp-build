@@ -15,27 +15,21 @@
 
 
 
+#include "livepatch_bsc{{ bsc_num }}.h"
+{% if inc_exts_file is defined -%}
+#include <linux/kernel.h>
+{% if mod is defined %}
+#include <linux/module.h>
+{% endif %}
+#include "../kallsyms_relocs.h"
 
 {% if mod is defined %}
 #define LP_MODULE "{{ mod }}"
 {% endif %}
 
-#include <linux/kernel.h>
-{% if mod is defined %}
-#include <linux/module.h>
-{% endif %}
-#include "livepatch_bsc{{ bsc_num }}.h"
-#include "../kallsyms_relocs.h"
 
 static struct klp_kallsyms_reloc klp_funcs[] = {
-{% if inc_exts_file is defined -%}
-{% include inc_exts_file %}
-
-{% elif mod is defined %}
-	{ "", (void *)&, LP_MODULE },
-{% else %}
-	{ "", (void *)&},
-{% endif %}
+{% include "exts" %}
 };
 
 {% if mod is defined %}
@@ -129,6 +123,7 @@ void {{ fname }}_cleanup(void)
 	unregister_module_notifier(&module_nb);
 }
 {% endif -%}
+{% endif %}
 {% if check_enabled is defined %}
 
 #endif /* IS_ENABLED({{ config }}) */
