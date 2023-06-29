@@ -79,12 +79,14 @@ class TemplateGen(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
 
+        # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
+        # is not enabled on all architectures
         self.check_enabled = self.conf['archs'] != self.archs
 
     def get_commits(self, commits, cs):
         ret = []
 
-        if not commits[cs]:
+        if not commits.get(cs, ''):
             ret.append(' *  Not affected')
         else:
             for commit, msg in commits[cs].items():
@@ -125,35 +127,9 @@ class TemplateGen(Config):
         env = jinja2.Environment(loader=fsloader, trim_blocks=True)
         templ = env.get_template(template)
 
-        templ.globals['year'] = datetime.today().year
-        templ.globals['bsc'] = self.bsc
-        templ.globals['bsc_num'] = self.bsc_num
-        templ.globals['cve'] = self.conf['cve']
-        templ.globals['commits'] = self.conf['commits']
-        templ.globals['user'] = self.user
-        templ.globals['email'] = self.email
-
         # We don't have a specific codestreams when creating the commit file
         if not cs:
             return templ
-
-        # 15.4 onwards we don't have module_mutex, so template generate
-        # different code
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        if sle < 15 or (sle == 15 and sp < 4):
-            templ.globals['mod_mutex'] = True
-
-        if src_file:
-            fdata = self.get_cs_files(cs)[str(src_file)]
-            templ.globals['config'] = fdata['conf']
-            mod = self.fix_mod_string(fdata['module'])
-            if self.is_mod(mod):
-                templ.globals['mod'] = mod
-
-        # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
-        # is not enabled on all architectures
-        if self.check_enabled:
-            templ.globals['check_enabled'] = True
 
         return templ
 
@@ -166,12 +142,14 @@ class TemplateGen(Config):
             if not self.is_mod(mod):
                 mod = ''
             fconf = fdata['conf']
+            exts = fdata['ext_symbols']
 
         else:
             lp_inc_dir = None
             lp_file = None
             mod = ''
             fconf = ''
+            exts = false
 
         # if use_src_name is True, the final file will be:
         #       bscXXXXXXX_{src_name}.c
@@ -183,14 +161,17 @@ class TemplateGen(Config):
             out_name = f'livepatch_{self.bsc}.{ext}'
 
         fname = Path(out_name).with_suffix('')
-        templ = self.get_template(cs, src_file, 'lp-' + ext + '.j2', lp_inc_dir)
+        if ext == 'c':
+            templ = self.get_template(cs, src_file, 'lp-' + ext + '.j2', lp_inc_dir)
 
         include_header = False
         if 'livepatch_' in out_name and ext == 'c':
             include_header = True
 
-        if ext == 'c' and src_file:
-            templ.globals['inc_exts_file'] = 'exts'
+        # 15.4 onwards we don't have module_mutex, so template generate
+        # different code
+        sle, sp, _, _ = self.get_cs_tuple(cs)
+        mod_mutex = sle < 15 or (sle == 15 and sp < 4)
 
         render_vars = {
                 'commits' : self.conf['commits'],
@@ -203,11 +184,25 @@ class TemplateGen(Config):
                 'email' : self.email,
                 'get_commits' : self.get_commits,
                 'config' : fconf,
-                'mod' : mod
+                'mod' : mod,
+                'mod_mutex' : mod_mutex,
+                'check_enabled' : self.check_enabled,
+                'inc_exts_file' : ext == 'c' and exts
         }
 
         with open(Path(lp_path, out_name), 'w') as f:
             if ext == 'c':
+                templ.globals['bsc_num'] = self.bsc_num
+                templ.globals['config'] = fconf
+                if exts:
+                    templ.globals['inc_exts_file'] = True
+                if mod:
+                    templ.globals['mod'] = mod
+                if self.check_enabled:
+                    templ.globals['check_enabled'] = self.check_enabled
+                if mod_mutex:
+                    templ.globals['mod_mutex'] = True
+
                 f.write(Template(TEMPL_HEADER).render(**render_vars))
                 f.write(templ.render(fname = fname, inc_src_file = lp_file))
             else:
@@ -220,14 +215,18 @@ class TemplateGen(Config):
         files = self.get_cs_files(cs)
         self.GeneratePatchedFuncs(lp_path, files)
 
-        self.__GenerateLivepatchFile(lp_path, cs, 'h', None)
-
         # If the livepatch touches only one file the final livepatch file will
         # be names livepatch_XXXX
         if len(files.keys()) == 1:
             src = Path(list(files.keys())[0])
             self.__GenerateLivepatchFile(lp_path, cs, 'c', src)
+            self.__GenerateLivepatchFile(lp_path, cs, 'h', src)
             return
+
+        # If there are more then one source file, we cannot fully infer what are
+        # the correct configs and mods to be livepatched, so leave the mod and
+        # config entries empty
+        self.__GenerateLivepatchFile(lp_path, cs, 'h', None)
 
         # Run the template engine for each touched source file.
         for src_file, _ in files.items():
