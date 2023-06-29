@@ -210,40 +210,6 @@ class CCP(Config):
 
         exts.sort(key=lambda tup : tup[0])
 
-        ext_list = []
-        for ext in exts:
-            sym, var, mod = ext
-
-            sym = f'\t{{ "{sym}",'
-            if not mod:
-                var = f' (void *)&{var} }},'
-            else:
-                var = f' (void *)&{var},'
-                mod = f' "{mod}" }},'
-
-            # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
-            # our goal when splitting these lines
-            if len(sym + var + mod) < 73:
-                ext_list.append(sym + var + mod)
-
-            elif len(sym + var) < 73:
-                ext_list.append(sym + var)
-                if mod:
-                    ext_list.append('\t ' + mod)
-
-            else:
-                ext_list.append(sym)
-                if len(var + mod) < 73:
-                    ext_list.append(f'\t {var}{mod}')
-                else:
-                    ext_list.append(f'\t {var}')
-                    if mod:
-                        ext_list.append(f'\t {mod}')
-
-        if ext_list:
-            with open(Path(out_dir, 'exts'), 'w') as f:
-                f.write('\n'.join(ext_list))
-
         # store the externalized symbols and module used in this codestream file
         symbols = {}
         for ext in exts:

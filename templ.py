@@ -53,7 +53,45 @@ def get_commits(cmts, cs):
                 ret.append(f' *  {m}')
 
     return "\\n".join(ret)
-%> \
+%>\
+<%
+def get_exts(ext_vars):
+        ext_list = []
+        for obj, syms in ext_vars.items():
+            if obj == 'vmlinux':
+                mod = ''
+            else:
+                mod = obj
+
+            for sym in syms:
+                lsym = f'\\t{{ "{sym}",'
+                prefix_var = f'klpe_{sym}'
+                if not mod:
+                    var = f' (void *)&{prefix_var} }},'
+                else:
+                    var = f' (void *)&{prefix_var},'
+                    mod = f' "{obj}" }},'
+
+                # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
+                # our goal when splitting these lines
+                if len(lsym + var + mod) < 73:
+                    ext_list.append(lsym + var + mod)
+
+                elif len(lsym + var) < 73:
+                    ext_list.append(lsym + var)
+                    if mod:
+                        ext_list.append('\\t ' + mod)
+
+                else:
+                    ext_list.append(lsym)
+                    if len(var + mod) < 73:
+                        ext_list.append(f'\\t {var}{mod}')
+                    else:
+                        ext_list.append(f'\\t {var}')
+                        if mod:
+                            ext_list.append(f'\\t {mod}')
+        return '\\n'.join(ext_list)
+%>\
 /*
  * ${fname}
  *
@@ -117,7 +155,7 @@ void ${ fname }_cleanup(void)
 {
 }
 % else: # hollow_c
-% if inc_exts_file:
+% if ext_vars:
 #include <linux/kernel.h>
 % if mod:
 #include <linux/module.h>
@@ -129,7 +167,7 @@ void ${ fname }_cleanup(void)
 % endif # mod
 
 static struct klp_kallsyms_reloc klp_funcs[] = {
-<%include file="exts"/>
+${get_exts(ext_vars)}
 };
 
 % if mod:
@@ -222,7 +260,7 @@ void ${ fname }_cleanup(void)
 	unregister_module_notifier(&module_nb);
 }
 % endif # mod
-% endif # inc_exts_file
+% endif # ext_vars
 % endif # hollow_c
 % if check_enabled:
 
@@ -265,14 +303,14 @@ class TemplateGen(Config):
             if not self.is_mod(mod):
                 mod = ''
             fconf = fdata['conf']
+            exts = fdata['ext_symbols']
 
         else:
             lp_inc_dir = Path('non-existent')
             lp_file = None
             mod = ''
             fconf = ''
-
-        exts = Path(lp_inc_dir, 'exts')
+            exts = {}
 
         # if use_src_name is True, the final file will be:
         #       bscXXXXXXX_{src_name}.c
@@ -301,7 +339,7 @@ class TemplateGen(Config):
                 'mod' : mod,
                 'mod_mutex' : mod_mutex,
                 'check_enabled' : self.check_enabled,
-                'inc_exts_file' : exts.exists(),
+                'ext_vars' : exts,
                 'inc_src_file' : lp_file,
                 'hollow_c' : ext == 'c' and not src_file
         }
