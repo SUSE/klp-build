@@ -56,3 +56,11 @@ class TestUtils(unittest.TestCase):
 
         if not msg:
             self.assertEqual(str(ar.exception), msg)
+
+    def output_contains(self, buf, msgs):
+        for msg in msgs:
+            self.assertTrue(msg in buf)
+
+    def output_contains_not(self, buf, msgs):
+        for msg in msgs:
+            self.assertTrue(msg not in buf)
