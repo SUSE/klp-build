@@ -6,3 +6,6 @@ setup:
 
 ccp:
 	python3 -m unittest tests.test_ccp.CcpTesting
+
+templ:
+	python3 -m unittest tests.test_templ.TemplTesting

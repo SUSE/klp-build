@@ -41,7 +41,7 @@ class TestUtils(unittest.TestCase):
         return s
 
     def setup_nologs(self, dargs, init = False):
-        with self.assertNoLogs(level='WARNING') as anl:
+        with self.assertNoLogs(level='WARNING'):
             return self.setup(dargs, init)
 
     def setup_assert_logs(self, dargs, alevel, msg):
@@ -57,10 +57,22 @@ class TestUtils(unittest.TestCase):
         if not msg:
             self.assertEqual(str(ar.exception), msg)
 
-    def output_contains(self, buf, msgs):
+    def get_file_content(self, v, cs, fname=None):
+        # Check the generated LP files
+        path = self.lpdir(v, cs)
+
+        if not fname:
+            fname = f'livepatch_bsc{v["bsc"]}.c'
+
+        with open(Path(path, fname)) as f:
+            return f.read()
+
+    def output_contains(self, v, cs, msgs, fname=None):
+        buf = self.get_file_content(v, cs, fname)
         for msg in msgs:
             self.assertTrue(msg in buf)
 
-    def output_contains_not(self, buf, msgs):
+    def output_contains_not(self, v, cs, msgs, fname=None):
+        buf = self.get_file_content(v, cs, fname)
         for msg in msgs:
             self.assertTrue(msg not in buf)
