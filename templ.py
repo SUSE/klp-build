@@ -1,5 +1,6 @@
 from datetime import datetime
 import jinja2
+from mako.lookup import TemplateLookup
 from mako.template import Template
 from pathlib import Path, PurePath
 import os
@@ -75,6 +76,146 @@ static inline void ${ fname }_cleanup(void) {}
 #endif /* _${ fname.upper() }_H */
 '''
 
+TEMPL_C = '''\
+
+% if check_enabled:
+#if IS_ENABLED(${ config })
+% endif # check_enabled
+
+% if mod:
+#if !IS_MODULE(${ config })
+#error "Live patch supports only CONFIG=m"
+#endif
+% endif # mod
+
+% if inc_src_file:
+<%include file="${ inc_src_file }"/>
+% endif # inc_src_file
+
+#include "livepatch_bsc${ bsc_num }.h"
+% if hollow_c:
+int ${ fname }_init(void)
+{
+    return 0;
+}
+
+void ${ fname }_cleanup(void)
+{
+}
+% else: # hollow_c
+% if inc_exts_file:
+#include <linux/kernel.h>
+% if mod:
+#include <linux/module.h>
+% endif # mod
+#include "../kallsyms_relocs.h"
+
+% if mod:
+#define LP_MODULE "${ mod }"
+% endif # mod
+
+static struct klp_kallsyms_reloc klp_funcs[] = {
+<%include file="exts"/>
+};
+
+% if mod:
+static int module_notify(struct notifier_block *nb,
+			unsigned long action, void *data)
+{
+	struct module *mod = data;
+	int ret;
+
+	if (action != MODULE_STATE_COMING || strcmp(mod->name, LP_MODULE))
+		return 0;
+% if mod_mutex:
+	mutex_lock(&module_mutex);
+	ret = __klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
+	mutex_unlock(&module_mutex);
+% else: # mod_mutex
+	ret = klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
+% endif # mod_mutex
+
+	WARN(ret, "%s: delayed kallsyms lookup failed. System is broken and can crash.\\n",
+		__func__);
+
+	return ret;
+}
+
+static struct notifier_block module_nb = {
+	.notifier_call = module_notify,
+	.priority = INT_MIN+1,
+};
+% endif # mod
+
+int ${ fname }_init(void)
+{
+% if mod:
+	int ret;
+% if mod_mutex:
+
+	mutex_lock(&module_mutex);
+	if (find_module(LP_MODULE)) {
+		ret = __klp_resolve_kallsyms_relocs(klp_funcs,
+						    ARRAY_SIZE(klp_funcs));
+		if (ret)
+			goto out;
+	}
+
+	ret = register_module_notifier(&module_nb);
+out:
+	mutex_unlock(&module_mutex);
+	return ret;
+% else: # mod_mutex
+	struct module *mod;
+
+	ret = klp_kallsyms_relocs_init();
+	if (ret)
+		return ret;
+
+	ret = register_module_notifier(&module_nb);
+	if (ret)
+		return ret;
+
+	rcu_read_lock_sched();
+	mod = (*klpe_find_module)(LP_MODULE);
+	if (!try_module_get(mod))
+		mod = NULL;
+	rcu_read_unlock_sched();
+
+	if (mod) {
+		ret = klp_resolve_kallsyms_relocs(klp_funcs,
+						ARRAY_SIZE(klp_funcs));
+	}
+
+	if (ret)
+		unregister_module_notifier(&module_nb);
+	module_put(mod);
+
+	return ret;
+% endif # mod_mutex
+% else: # mod
+% if mod_mutex:
+	return __klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
+% else: # mod_mutex
+	return klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
+% endif # mod_mutex
+% endif # mod
+}
+
+% if mod:
+void ${ fname }_cleanup(void)
+{
+	unregister_module_notifier(&module_nb);
+}
+% endif # mod
+% endif # inc_exts_file
+% endif # hollow_c
+% if check_enabled:
+
+#endif /* IS_ENABLED(${ config }) */
+% endif check_enabled
+'''
+
 class TemplateGen(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
@@ -118,21 +259,6 @@ class TemplateGen(Config):
                 for func in fdata['symbols']:
                     f.write(f'{mod} {func} klpp_{func}{conf}\n')
 
-    def get_template(self, cs, src_file, template, inc_dir):
-        loaddirs = [Path(os.path.dirname(__file__), 'templates')]
-        if inc_dir:
-            loaddirs.append(inc_dir)
-
-        fsloader = jinja2.FileSystemLoader(loaddirs)
-        env = jinja2.Environment(loader=fsloader, trim_blocks=True)
-        templ = env.get_template(template)
-
-        # We don't have a specific codestreams when creating the commit file
-        if not cs:
-            return templ
-
-        return templ
-
     def __GenerateLivepatchFile(self, lp_path, cs, ext, src_file, use_src_name=False):
         if src_file:
             lp_inc_dir = str(self.get_work_dir(cs, src_file))
@@ -142,14 +268,14 @@ class TemplateGen(Config):
             if not self.is_mod(mod):
                 mod = ''
             fconf = fdata['conf']
-            exts = fdata['ext_symbols']
 
         else:
-            lp_inc_dir = None
+            lp_inc_dir = Path('non-existent')
             lp_file = None
             mod = ''
             fconf = ''
-            exts = false
+
+        exts = Path(lp_inc_dir, 'exts')
 
         # if use_src_name is True, the final file will be:
         #       bscXXXXXXX_{src_name}.c
@@ -159,10 +285,6 @@ class TemplateGen(Config):
             out_name = lp_file
         else:
             out_name = f'livepatch_{self.bsc}.{ext}'
-
-        fname = Path(out_name).with_suffix('')
-        if ext == 'c':
-            templ = self.get_template(cs, src_file, 'lp-' + ext + '.j2', lp_inc_dir)
 
         include_header = False
         if 'livepatch_' in out_name and ext == 'c':
@@ -178,7 +300,7 @@ class TemplateGen(Config):
                 'include_header' : include_header,
                 'cve' : self.conf['cve'],
                 'bsc_num' : self.bsc_num,
-                'fname' : str(fname),
+                'fname' : str(Path(out_name).with_suffix('')),
                 'year' : datetime.today().year,
                 'user' : self.user,
                 'email' : self.email,
@@ -187,24 +309,16 @@ class TemplateGen(Config):
                 'mod' : mod,
                 'mod_mutex' : mod_mutex,
                 'check_enabled' : self.check_enabled,
-                'inc_exts_file' : ext == 'c' and exts
+                'inc_exts_file' : exts.exists(),
+                'inc_src_file' : lp_file,
+                'hollow_c' : ext == 'c' and not src_file
         }
 
         with open(Path(lp_path, out_name), 'w') as f:
             if ext == 'c':
-                templ.globals['bsc_num'] = self.bsc_num
-                templ.globals['config'] = fconf
-                if exts:
-                    templ.globals['inc_exts_file'] = True
-                if mod:
-                    templ.globals['mod'] = mod
-                if self.check_enabled:
-                    templ.globals['check_enabled'] = self.check_enabled
-                if mod_mutex:
-                    templ.globals['mod_mutex'] = True
-
+                lpdir = TemplateLookup(directories=[lp_inc_dir])
                 f.write(Template(TEMPL_HEADER).render(**render_vars))
-                f.write(templ.render(fname = fname, inc_src_file = lp_file))
+                f.write(Template(TEMPL_C, lookup=lpdir).render(**render_vars))
             else:
                 f.write(Template(TEMPL_H).render(**render_vars))
 
