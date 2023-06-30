@@ -260,10 +260,11 @@ class Setup(Config):
 
         repo = f'{repo}_Update'
 
-        if rt:
-            repo = f'{repo}_Products_SLERT_Update'
+        if not rt:
+            return repo
 
-        return repo
+        return f'{repo}_Products_SLERT_Update'
+
 
     # s390x is enabled on 12.4 and 12.5 for all updates.
     # s390x is not supported on 15.1
