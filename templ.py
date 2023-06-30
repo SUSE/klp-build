@@ -281,6 +281,27 @@ References: bsc#${bsc_num} CVE-${cve}
 Signed-off-by: ${user} <${email}>
 '''
 
+TEMPL_KBUILD = '''\
+<%
+from pathlib import PurePath
+def get_entries(lpdir, bsc, cs):
+    ret = []
+    for entry in lpdir.iterdir():
+        fname = entry.name
+        if not fname.endswith('.c'):
+            continue
+
+        fname = PurePath(fname).with_suffix('.o')
+        if is_kbuild_rel_path(cs):
+            fname = f'bsc{bsc}/{fname}'
+
+        ret.append(f'CFLAGS_{fname} += -Werror')
+
+    return "\\n".join(ret)
+%>\
+${get_entries(lpdir, bsc, cs)}
+'''
+
 class TemplateGen(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
@@ -388,22 +409,17 @@ class TemplateGen(Config):
         # of the other source files
         self.__GenerateLivepatchFile(lp_path, cs, 'c', None)
 
-    # Create Kbuild.inc file adding an entry for all geenerated livepatch files.
+    # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
-        bscn = self.conf['bsc']
-        lp_dir = self.get_cs_lp_dir(cs)
-
-        with open(Path(lp_dir, 'Kbuild.inc'), 'w') as f:
-            for entry in lp_dir.iterdir():
-                fname = entry.name
-                if not fname.endswith('.c'):
-                    continue
-
-                fname = PurePath(fname).with_suffix('.o')
-                if self.is_kbuild_rel_path(cs):
-                    fname = f'bsc{bscn}/{fname}'
-
-                f.write(f'CFLAGS_{fname} += -Werror\n')
+        lpdir = self.get_cs_lp_dir(cs)
+        render_vars = {
+            'bsc' : self.bsc_num,
+            'cs' : cs,
+            'lpdir' : lpdir,
+            'is_kbuild_rel_path' : self.is_kbuild_rel_path
+        }
+        with open(Path(lpdir, 'Kbuild.inc'), 'w') as f:
+            f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
     def generate_commit_msg_file(self):
         cmts = self.conf['commits'].get('upstream', {})
