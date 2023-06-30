@@ -107,7 +107,8 @@ class LpSetupTest(utils.TestUtils):
 
     def test_check_symbol_addr_s390(self):
         v = self.sargs()
-        v['filter'] = '12.4u35'
+        cs = '12.5u44'
+        v['filter'] = cs
         v['module'] = 'sch_qfq'
         v['conf'] = 'CONFIG_NET_SCH_QFQ'
         v['file_funcs'] = [['net/sched/sch_qfq.c', 'qfq_change_class']]
@@ -116,8 +117,7 @@ class LpSetupTest(utils.TestUtils):
         # The address of qfq_policy on s390x ends with a character, a bug that
         # was fixed by checking for \w instead of \d.
         # With the fix in place, check_symbol_archs should return an empty list
-        self.assertFalse(s.check_symbol_archs('12.4u35', 'sch_qfq',
-                                              ['qfq_policy']))
+        self.assertFalse(s.check_symbol_archs(cs, 'sch_qfq', ['qfq_policy']))
 
     def test_check_conf_mod_file_funcs(self):
         v = self.sargs()
