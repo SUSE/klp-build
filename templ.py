@@ -321,8 +321,6 @@ class TemplateGen(Config):
                 conf = fdata['conf']
                 if conf and self.check_enabled:
                     conf = f' IS_ENABLED({conf})'
-                else:
-                    conf = ''
 
                 mod = self.fix_mod_string(fdata['module'])
                 for func in fdata['symbols']:
