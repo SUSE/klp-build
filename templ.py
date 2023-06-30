@@ -268,6 +268,19 @@ void ${ fname }_cleanup(void)
 % endif check_enabled
 '''
 
+TEMPL_COMMIT = '''\
+Fix for CVE-${cve} ("CHANGE ME!")
+
+Live patch for CVE-${cve}. ${msg}:
+% for commit_hash, cmsg in commits.items():
+- ${commit_hash} ("${cmsg}")
+% endfor
+
+KLP: CVE-${cve}
+References: bsc#${bsc_num} CVE-${cve}
+Signed-off-by: ${user} <${email}>
+'''
+
 class TemplateGen(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
@@ -402,21 +415,15 @@ class TemplateGen(Config):
                 f.write(f'CFLAGS_{fname} += -Werror\n')
 
     def generate_commit_msg_file(self):
+        cmts = self.conf['commits'].get('upstream', {})
+        render_vars = {
+            'bsc_num' : self.bsc_num,
+            'user' : self.user,
+            'email' : self.email,
+            'cve' : self.conf['cve'],
+            'commits' : cmts,
+            'msg' : 'Upstream commits' if len(cmts) > 1 else 'Upstream commit'
+        }
         with open(Path(self.bsc_path, 'commit.msg'), 'w') as f:
-            commits = self.conf['commits'].get('upstream', {})
-            commit_str = 'Upstream commit'
-            # add plural when necessary
-            if len(commits) > 1:
-                commit_str = commit_str + 's'
+            f.write(Template(TEMPL_COMMIT).render(**render_vars))
 
-            cve = self.conf['cve']
-            print(f'Fix for CVE-{cve} ("CHANGE ME!")', '',
-                f'Live patch for CVE-{cve}. {commit_str}:', sep='\n',
-                  file=f)
-
-            for commit_hash, msg in commits.items():
-                print(f'- {commit_hash} ("{msg}")', file=f)
-
-            print('', f'KLP: CVE-{cve}', f'References: bsc#{self.bsc_num} CVE-{cve}',
-                    f'Signed-off-by: {self.user} <{self.email}>', sep='\n',
-                  file=f)
