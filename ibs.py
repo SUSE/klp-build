@@ -85,24 +85,27 @@ class IBS(Config):
 
     def get_project_names(self):
         names = []
+        i = 1
         for result in self.get_projects():
-            names.append(result.get('name'))
+            names.append((i, result.get('name')))
+            i += 1
 
         return natsorted(names)
 
     def delete_project(self, prj, verbose=True):
         try:
-            ret = self.osc.projects.delete(prj, force=True)
+            i, n = prj
+            ret = self.osc.projects.delete(n, force=True)
             if type(ret) is not bool:
                 logging.error(etree.tostring(ret))
-                raise ValueError(prj)
+                raise ValueError(n)
         except requests.exceptions.HTTPError as e:
             # project not found, no problem
             if e.response.status_code == 404:
                 pass
 
         if verbose:
-            logging.info('\t' + prj)
+            logging.info(f'({i}/{self.total}) {n} deleted')
 
     def extract_rpms(self, args):
         i, cs, arch, rpm, dest = args
@@ -428,7 +431,7 @@ class IBS(Config):
         while True:
             finished = True
             prjs = {}
-            for prj in self.get_project_names():
+            for _, prj in self.get_project_names():
                 prjs[prj] = {}
 
                 for res in self.osc.build.get(prj).findall('result'):
@@ -453,11 +456,12 @@ class IBS(Config):
     def cleanup(self):
         prjs = self.get_project_names()
 
-        if len(prjs) == 0:
+        self.total = len(prjs)
+        if self.total == 0:
             logging.info('No projects found.')
             return
 
-        logging.info(f'Deleting {len(prjs)} projects...')
+        logging.info(f'Deleting {self.total} projects...')
 
         self.do_work(self.delete_project, prjs)
 
