@@ -334,11 +334,6 @@ class TemplateGen(Config):
         else:
             out_name = f'livepatch_{self.bsc}.{ext}'
 
-        # 15.4 onwards we don't have module_mutex, so template generate
-        # different code
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        mod_mutex = sle < 15 or (sle == 15 and sp < 4)
-
         render_vars = {
                 'commits' : self.conf['commits'],
                 'include_header' : 'livepatch_' in out_name and ext == 'c',
@@ -350,7 +345,7 @@ class TemplateGen(Config):
                 'email' : self.email,
                 'config' : fconf,
                 'mod' : mod,
-                'mod_mutex' : mod_mutex,
+                'mod_mutex' : self.is_mod_mutex(cs),
                 'check_enabled' : self.check_enabled,
                 'ext_vars' : exts,
                 'inc_src_file' : lp_file,
@@ -395,7 +390,6 @@ class TemplateGen(Config):
 
     # Create Kbuild.inc file adding an entry for all geenerated livepatch files.
     def CreateKbuildFile(self, cs):
-        cs_, sp, u, _ = self.get_cs_tuple(cs)
         bscn = self.conf['bsc']
         lp_dir = self.get_cs_lp_dir(cs)
 
@@ -406,10 +400,7 @@ class TemplateGen(Config):
                     continue
 
                 fname = PurePath(fname).with_suffix('.o')
-
-                # For kernels 5.4 and beyond Kbuild uses relative path to add
-                # CFLAGS to objects
-                if cs_ > 15 or (cs_ == 15 and sp >= 4):
+                if self.is_kbuild_rel_path(cs):
                     fname = f'bsc{bscn}/{fname}'
 
                 f.write(f'CFLAGS_{fname} += -Werror\n')

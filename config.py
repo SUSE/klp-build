@@ -107,6 +107,18 @@ class Config:
         return (int(match.group(1)), int(match.group(2)), int(match.group(4)),
                 match.group(3))
 
+   # 15.4 onwards we don't have module_mutex, so template generates
+   # different code
+    def is_mod_mutex(self, cs):
+        sle, sp, _, _ = self.get_cs_tuple(cs)
+        return sle < 15 or (sle == 15 and sp < 4)
+
+    # For kernels 5.4 and beyond Kbuild uses relative path to add
+    # CFLAGS to objects
+    def is_kbuild_rel_path(self, cs):
+        sle, sp, _, _ = self.get_cs_tuple(cs)
+        return sle > 15 or (sle == 15 and sp >= 4)
+
     def get_data_dir(self, cs='', arch=''):
         if not cs:
             return self.data

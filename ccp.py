@@ -88,14 +88,13 @@ class CCP(Config):
 
         cmd_args_regex = '(-Wp,{},{}\s+-nostdinc\s+-isystem.*{});'
 
-        sle, sp, _, _ = self.get_cs_tuple(cs)
         result = re.search(cmd_args_regex.format('-MD', ofname, fname), str(output).strip())
         if not result:
             # 15.4 onwards changes the regex a little: -MD -> -MMD
             result = re.search(cmd_args_regex.format('-MMD', ofname, fname), str(output).strip())
 
         if not result:
-            raise RuntimeError(f'Failed to get the kernel cmdline for file {str(ofname)} in {sle}{sp}')
+            raise RuntimeError(f'Failed to get the kernel cmdline for file {str(ofname)} in {cs}')
 
         # some strings  have single quotes around double quotes, so remove the
         # outer quotes
@@ -116,6 +115,7 @@ class CCP(Config):
                 '-mindirect-branch-cs-prefix', '-mharden-sls=all']:
             output = output.replace(opt, '')
 
+        sle, sp, _, _ = self.get_cs_tuple(cs)
         if sle >= 15:
             if sp >= 2:
                 output += ' -D_Static_assert(e,m)='

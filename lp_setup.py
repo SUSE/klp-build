@@ -269,9 +269,5 @@ class Setup(Config):
     # s390x is not supported on 15.1
     # s390x is supported from 15.2 onwards.
     def is_s390_supported(self, cs):
-        sle, sp, up, rt = self.get_cs_tuple(cs)
-
-        if (sle == 12 and sp >= 4) or (sle == 15 and sp >= 2):
-            return True
-
-        return False
+        sle, sp, _, _ = self.get_cs_tuple(cs)
+        return (sle == 12 and sp >= 4) or (sle == 15 and sp >= 2)
