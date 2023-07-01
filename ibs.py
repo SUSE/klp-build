@@ -92,20 +92,25 @@ class IBS(Config):
 
         return natsorted(names)
 
-    def delete_project(self, prj, verbose=True):
+    def delete_project(self, i, prj, verbose=True):
         try:
-            i, n = prj
-            ret = self.osc.projects.delete(n, force=True)
+            ret = self.osc.projects.delete(prj, force=True)
             if type(ret) is not bool:
                 logging.error(etree.tostring(ret))
-                raise ValueError(n)
+                raise ValueError(prj)
         except requests.exceptions.HTTPError as e:
             # project not found, no problem
             if e.response.status_code == 404:
                 pass
 
         if verbose:
-            logging.info(f'({i}/{self.total}) {n} deleted')
+            logging.info(f'({i}/{self.total}) {prj} deleted')
+
+    def delete_projects(self, prjs, verbose=True):
+        i = 1
+        for prj in prjs:
+            self.delete_project(i, prj, verbose)
+            i += 1
 
     def extract_rpms(self, args):
         i, cs, arch, rpm, dest = args
@@ -463,7 +468,7 @@ class IBS(Config):
 
         logging.info(f'Deleting {self.total} projects...')
 
-        self.do_work(self.delete_project, prjs)
+        self.delete_projects(prjs, True)
 
     def cs_to_project(self, cs):
         return self.prj_prefix + '-' + cs.replace('.', '_')
@@ -494,12 +499,11 @@ class IBS(Config):
             logging.info(f'Could not find git branch for {cs}. Skipping.')
             return
 
-        prj = self.cs_to_project(cs)
-
         logging.info(f'({i}/{self.total}) pushing {cs} using branch {branch}...')
 
         # If the project exists, drop it first
-        self.delete_project(prj, verbose=False)
+        prj = self.cs_to_project(cs)
+        self.delete_project(i, prj, verbose=False)
 
         meta = self.create_prj_meta(cs)
         prj_desc = f'Development of livepatches for {cs}'
