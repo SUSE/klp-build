@@ -23,7 +23,6 @@ class GitHelper(Config):
             raise RuntimeError('kgraft-patches does not exists in ~/kgr')
 
         self.kernel_branches = {
-                                'sle12-sp4-ltss' : 'SLE12-SP4-LTSS',
                                 'sle12-sp5' : 'SLE12-SP5',
                                 'sle15-sp1-ltss' : 'SLE15-SP1-LTSS',
                                 'sle15-sp2-ltss' : 'SLE15-SP2-LTSS',

@@ -265,10 +265,9 @@ class Setup(Config):
 
         return f'{repo}_Products_SLERT_Update'
 
-
-    # s390x is enabled on 12.4 and 12.5 for all updates.
+    # s390x is enabled on 12.5 for all updates.
     # s390x is not supported on 15.1
     # s390x is supported from 15.2 onwards.
     def is_s390_supported(self, cs):
         sle, sp, _, _ = self.get_cs_tuple(cs)
-        return (sle == 12 and sp >= 4) or (sle == 15 and sp >= 2)
+        return (sle == 12 and sp == 5) or (sle == 15 and sp >= 2)

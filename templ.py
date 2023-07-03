@@ -101,7 +101,7 @@ def get_exts(ext_vars):
  *  Upstream commit:
 ${get_commits(commits, 'upstream')}
  *
- *  SLE12-SP4, SLE12-SP5 and SLE15-SP1 commit:
+ *  SLE12-SP5 and SLE15-SP1 commit:
 ${get_commits(commits, '4.12')}
  *
  *  SLE15-SP2 and -SP3 commit:
