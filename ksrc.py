@@ -300,8 +300,9 @@ class GitHelper(Config):
                 continue
 
             # Grab only the first commit, since they would be put together
-            # in a release either way
-            suse_commit = suse_commits[0]
+            # in a release either way. The order of the array is backards, the
+            # first entry will be the last patch found.
+            suse_commit = suse_commits[-1]
 
             tags = subprocess.check_output(['/usr/bin/git', '-C',
                         self.kern_src, 'tag', f'--contains={suse_commit}'])
