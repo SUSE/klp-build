@@ -318,9 +318,9 @@ class TemplateGen(Config):
     def GeneratePatchedFuncs(self, lp_path, cs_files):
         with open(Path(lp_path, 'patched_funcs.csv'), 'w') as f:
             for ffile, fdata in cs_files.items():
-                conf = fdata['conf']
-                if conf and self.check_enabled:
-                    conf = f' IS_ENABLED({conf})'
+                conf = ''
+                if self.check_enabled and fdata['conf']:
+                    conf = f' IS_ENABLED({fdata["conf"]})'
 
                 mod = self.fix_mod_string(fdata['module'])
                 for func in fdata['symbols']:

@@ -26,6 +26,9 @@ class Setup(Config):
         if self.is_mod(mod_arg) and not conf:
             raise ValueError('Please specify --conf when a module is specified')
 
+        if conf and not conf.startswith('CONFIG_'):
+           raise ValueError('Please specify --conf with CONFIG_ prefix')
+
         if self.bsc_path.exists() and not self.bsc_path.is_dir():
             raise ValueError('--bsc needs to be a directory, or not to exist')
 

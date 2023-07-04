@@ -44,6 +44,12 @@ class LpSetupTest(utils.TestUtils):
         self.setup_and_assert(v, ValueError,
                 'You need to specify at least one of the file-funcs variants!')
 
+    def test_missing_conf_prefix(self):
+        v = self.sargs()
+        v['module'] = 'tun'
+        v['conf'] = 'TUN'
+        self.setup_and_assert(v, ValueError, 'Please specify --conf with CONFIG_ prefix')
+
     def test_missing_file_funcs(self):
         v = self.sargs()
         v['module'] = 'tun'
