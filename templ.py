@@ -302,6 +302,24 @@ def get_entries(lpdir, bsc, cs):
 ${get_entries(lpdir, bsc, cs)}
 '''
 
+TEMPL_PATCHED = '''\
+<%
+def get_patched(cs_files, check_enabled):
+    ret = []
+    for ffile, fdata in cs_files.items():
+        conf = ''
+        if check_enabled and fdata['conf']:
+            conf = f' IS_ENABLED({fdata["conf"]})'
+
+        mod = fdata['module'].replace('-', '_')
+        for func in fdata['symbols']:
+            ret.append(f'{mod} {func} klpp_{func}{conf}')
+
+    return "\\n".join(ret)
+%>\
+${get_patched(cs_files, check_enabled)}
+'''
+
 class TemplateGen(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
@@ -316,15 +334,12 @@ class TemplateGen(Config):
         return mod.replace('-', '_')
 
     def GeneratePatchedFuncs(self, lp_path, cs_files):
+        render_vars = {
+                'cs_files' : cs_files,
+                'check_enabled' : self.check_enabled
+        }
         with open(Path(lp_path, 'patched_funcs.csv'), 'w') as f:
-            for ffile, fdata in cs_files.items():
-                conf = ''
-                if self.check_enabled and fdata['conf']:
-                    conf = f' IS_ENABLED({fdata["conf"]})'
-
-                mod = self.fix_mod_string(fdata['module'])
-                for func in fdata['symbols']:
-                    f.write(f'{mod} {func} klpp_{func}{conf}\n')
+            f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
     def __GenerateLivepatchFile(self, lp_path, cs, ext, src_file, use_src_name=False):
         if src_file:
