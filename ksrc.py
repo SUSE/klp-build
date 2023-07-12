@@ -201,27 +201,43 @@ class GitHelper(Config):
             if not patch_files:
                 continue
 
+            # Prepare command to extract correct ordering of patches
+            cmd = ['/usr/bin/git', '-C', self.kern_src, 'grep', '-o', '-h']
+            for patch in patch_files.splitlines():
+                _, fname = patch.split(':')
+                cmd.append('-e')
+                cmd.append(fname)
+            cmd += [f'remotes/origin/{mbranch}:series.conf']
+
+            # Now execute the command
+            try:
+                patch_files = subprocess.check_output(
+                        cmd, stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+            except subprocess.CalledProcessError:
+                patch_files = ''
+
+
             # The command above returns a list of strings in the format
             #   branch:file/path
+            idx = 0
             for patch in patch_files.splitlines():
                 if not patch.endswith('.patch'):
                     continue
 
+                idx += 1
                 branch_path = Path(self.bsc_path, 'fixes', bc)
                 branch_path.mkdir(exist_ok=True, parents=True)
 
                 pfile = subprocess.check_output(['/usr/bin/git', '-C',
                                                 self.kern_src,
-                                                'show', patch],
+                                                 'show', f'remotes/origin/{mbranch}:{patch}'],
                                                 stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
 
-                # Split the branch:filepath, and then get the filename only
-                _, fname = patch.split(':')
                 # removing the patches.suse dir from the filepath
-                basename = PurePath(fname).name
+                basename = PurePath(patch).name.removesuffix('.patch')
 
                 # Save the patch for later review from the livepatch developer
-                with open(Path(branch_path, f'{basename}.patch'), 'w') as f:
+                with open(Path(branch_path, f'{idx:02d}-{basename}.patch'), 'w') as f:
                     f.write(pfile)
 
                 # Get the upstream commit and save it. The Git-commit can be
