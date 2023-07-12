@@ -301,9 +301,6 @@ class GitHelper(Config):
         for d, c, msg in ucommits_sort:
             commits['upstream']['commits'].append(f'{c} ("{msg}")')
 
-        import json
-        print(json.dumps(commits, indent=4))
-
         print('')
 
         for key, val in commits.items():
