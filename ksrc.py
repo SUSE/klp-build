@@ -265,7 +265,7 @@ class GitHelper(Config):
                                                        '--pretty=oneline',
                                                        f'remotes/origin/{mbranch}',
                                                        '--',
-                                                       fname],
+                                                       patch],
                                                       stderr=subprocess.STDOUT).decode('ISO-8859-1')
                 except subprocess.CalledProcessError:
                     print(f'File {fname} doesn\'t exists {mbranch}. It could '
