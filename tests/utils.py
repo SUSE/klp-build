@@ -21,7 +21,8 @@ class TestUtils(unittest.TestCase):
             'conf_mod_file_funcs' : [],
             'module' : 'vmlinux',
             'conf' : '',
-            'archs': ['x86_64', 'ppc64le', 's390x']
+            'archs': ['x86_64', 'ppc64le', 's390x'],
+            'skips' : ''
         }
 
     def basedir(self, v):

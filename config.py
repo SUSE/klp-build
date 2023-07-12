@@ -8,7 +8,7 @@ import re
 import subprocess
 
 class Config:
-    def __init__(self, bsc, bsc_filter, working_cs = {}):
+    def __init__(self, bsc, bsc_filter, skips = '', working_cs = {}):
         work_dir = os.getenv('KLP_WORK_DIR')
         if not work_dir:
             raise ValueError('KLP_WORK_DIR should be defined')
@@ -37,6 +37,7 @@ class Config:
         self.bsc_path = Path(work, self.bsc)
         self.scripts = Path(os.path.dirname(__file__), 'scripts')
         self.filter = bsc_filter
+        self.skips = skips
 
         self.archs = ['ppc64le', 's390x', 'x86_64']
 
@@ -223,19 +224,20 @@ class Config:
             cs_list = self.codestreams
         full_cs = copy.deepcopy(cs_list)
 
-        if self.filter:
-            if verbose:
-                logging.info('Applying filter...')
-            filtered = []
-            for cs in full_cs.keys():
-                if not re.match(self.filter, cs):
-                    filtered.append(cs)
+        if verbose:
+            logging.info('Checking filter and skips...')
+        filtered = []
+        for cs in full_cs.keys():
+            if self.filter and not re.match(self.filter, cs):
+                filtered.append(cs)
+            elif self.skips and re.match(self.skips, cs):
+                filtered.append(cs)
 
-            if verbose:
-                logging.info('Skipping codestreams:')
-                logging.info(f'\t{" ".join(filtered)}')
+        if verbose:
+            logging.info('Skipping codestreams:')
+            logging.info(f'\t{" ".join(filtered)}')
 
-            cs_del_list.extend(filtered)
+        cs_del_list.extend(filtered)
 
         for cs in cs_del_list:
             full_cs.pop(cs, '')

@@ -42,11 +42,11 @@ def create_parser() -> argparse.ArgumentParser:
             help='Conf, module, file and functions to be livepatched. Can be set '
             'multiple times. The format is --file-funcs conf1 module1 file/path.c func1 '
             'func2 --file-func conf2 module2 file/patch2 func1...')
-
     setup.add_argument('--module', type=str, default='vmlinux',
             help='The module that will be livepatched for all files')
     setup.add_argument('--archs', required=True, choices=archs, nargs='+',
                        help='Supported architectures for this livepatch')
+    setup.add_argument('--skips', help='List of codestreams to filter out')
 
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
     ccp_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],
@@ -102,7 +102,7 @@ def main_func(main_args):
     if args.cmd == 'setup':
         setup = Setup(args.bsc, args.filter, args.cve, args.codestream,
                       args.file_funcs, args.mod_file_funcs, args.conf_mod_file_funcs,
-                      args.module, args.conf, args.archs)
+                      args.module, args.conf, args.archs, args.skips)
         setup.setup_project_files()
 
     elif args.cmd == 'run-ccp':
