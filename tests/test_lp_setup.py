@@ -77,6 +77,7 @@ class LpSetupTest(utils.TestUtils):
 
     def test_non_existent_file(self):
         v = self.sargs()
+        v['filter'] = '15.4u12'
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tuna.c', 'tun_chr_ioctl',
@@ -86,6 +87,7 @@ class LpSetupTest(utils.TestUtils):
 
     def test_existent_file(self):
         v = self.sargs()
+        v['filter'] = '15.4u12'
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctl',
@@ -94,6 +96,7 @@ class LpSetupTest(utils.TestUtils):
 
     def test_invalid_sym(self):
         v = self.sargs()
+        v['filter'] = '15.4u12'
         v['module'] = 'tun'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctll',
@@ -104,6 +107,7 @@ class LpSetupTest(utils.TestUtils):
 
     def test_non_existent_module(self):
         v = self.sargs()
+        v['filter'] = '15.4u12'
         v['module'] = 'tuna'
         v['conf'] = 'CONFIG_TUN'
         v['file_funcs'] = [['drivers/net/tun.c', 'tun_chr_ioctl',
