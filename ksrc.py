@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 from natsort import natsorted
 import git
@@ -139,7 +140,8 @@ class GitHelper(Config):
                         '--output-directory', f'{patches_dir}'
                         ])
 
-    def get_commit_subject(commit, savedir=None):
+    # Currently this function returns the date of the patch and it's subject
+    def get_commit_data(commit, savedir=None):
         req = requests.get(f'https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={commit}')
         req.raise_for_status()
 
@@ -150,8 +152,12 @@ class GitHelper(Config):
 
         # Search for Subject until a blank line, since commit messages can be
         # seen in multiple lines.
-        return re.search('Subject: (.*?)(?:(\n\n))', req.text,
+        msg = re.search('Subject: (.*?)(?:(\n\n))', req.text,
                          re.DOTALL).group(1).replace('\n', '')
+        dstr = re.search('Date: ([\w\s,:]+)', req.text).group(1)
+        d = datetime.strptime(dstr.strip(), '%a, %d %b %Y %H:%M:%S')
+
+        return d, msg
 
     def get_commits(self, cve):
         if not self.kern_src:
@@ -175,7 +181,10 @@ class GitHelper(Config):
 
         print('Getting SUSE fixes for upstream commits per CVE branch. It can take some time...')
 
-        commits = { 'upstream' : {} }
+        # Store all commits from each branch and upstream
+        commits = {}
+        # List of upstream commits, in creation date order
+        ucommits = []
 
         upatches = Path(self.bsc_path, 'upstream')
         upatches.mkdir(exist_ok=True, parents=True)
@@ -249,12 +258,10 @@ class GitHelper(Config):
                 m = re.search('Git-commit: ([\w]+)', pfile)
                 if m:
                     ups = m.group(1)[:12]
-                else:
-                    commits['upstream']['Not found'] = 'Not found'
 
                 # Aggregate all upstream fixes found
-                if ups and ups not in commits['upstream'].keys():
-                    commits['upstream'][ups] = GitHelper.get_commit_subject(ups, upatches)
+                if ups and ups not in ucommits:
+                    ucommits.append(ups)
 
                 # Now get all commits related to that file on that branch,
                 # including the "Refresh" ones.
@@ -281,19 +288,31 @@ class GitHelper(Config):
                     hash_commit = hash_entry.split(' ')[0]
                     commits[bc]['commits'].append(hash_commit)
 
+        # Grab each commits subject and date for each commit. The commit dates
+        # will be used to sort the patches in the order they were
+        # created/merged.
+        ucommits_sort = []
+        for c in ucommits:
+            d, msg = GitHelper.get_commit_data(c, upatches)
+            ucommits_sort.append( (d, c, msg) )
+
+        ucommits_sort.sort()
+        commits['upstream'] = { 'commits' : [] }
+        for d, c, msg in ucommits_sort:
+            commits['upstream']['commits'].append(f'{c} ("{msg}")')
+
+        import json
+        print(json.dumps(commits, indent=4))
+
         print('')
 
         for key, val in commits.items():
             print(f'{key}')
-            if key == 'upstream':
-                for ups_hash, ups_msg in val.items():
-                    print(f'{ups_hash}: "{ups_msg}"')
-            else:
-                branch_commits = val['commits']
-                if not branch_commits:
-                    print('None')
-                for c in branch_commits:
-                    print(c)
+            branch_commits = val['commits']
+            if not branch_commits:
+                print('None')
+            for c in branch_commits:
+                print(c)
             print('')
 
         return commits

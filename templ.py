@@ -44,9 +44,7 @@ def get_commits(cmts, cs):
 
     ret = []
     for commit, msg in cmts[cs].items():
-        if cs == 'upstream':
-            ret.append(f' *  {commit} ("{msg}")')
-        elif not msg:
+        if not msg:
             ret.append(' *  Not affected')
         else:
             for m in msg:
@@ -272,8 +270,8 @@ TEMPL_COMMIT = '''\
 Fix for CVE-${cve} ("CHANGE ME!")
 
 Live patch for CVE-${cve}. ${msg}:
-% for commit_hash, cmsg in commits.items():
-- ${commit_hash} ("${cmsg}")
+% for cmsg in commits:
+- ${cmsg}
 % endfor
 
 KLP: CVE-${cve}
@@ -436,6 +434,8 @@ class TemplateGen(Config):
 
     def generate_commit_msg_file(self):
         cmts = self.conf['commits'].get('upstream', {})
+        if cmts:
+            cmts = cmts['commits']
         render_vars = {
             'bsc_num' : self.bsc_num,
             'user' : self.user,
