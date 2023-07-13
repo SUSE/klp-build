@@ -14,7 +14,7 @@ class Setup(Config):
     def __init__(self, bsc, bsc_filter, cve, cs_arg,
                  file_funcs, mod_file_funcs, conf_mod_file_funcs,
                  mod_arg, conf, archs, skips):
-        super().__init__(bsc, bsc_filter, skips)
+        super().__init__(bsc, bsc_filter, skips=skips)
 
         archs.sort()
 
