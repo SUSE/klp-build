@@ -105,12 +105,21 @@ class GitHelper(Config):
         if not kgraft_tests_path.is_dir():
             raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
 
+        patches_dir = Path(self.bsc_path, 'patches')
+
         # Ensure that a testfile was created before preparing the patches
         test_sh = Path(kgraft_tests_path, f'{self.bsc}_test_script.sh')
         if not test_sh.is_file():
-            raise RuntimeError(f'Test file {test_sh} not created.')
-
-        patches_dir = Path(self.bsc_path, 'patches')
+            logging.warning(f'Test file {test_sh} not created.')
+        else:
+            subprocess.check_output(['/usr/bin/git',
+                        '-C', str(kgraft_tests_path),
+                        'format-patch','-1', f'{test_sh}',
+                        '--cover-letter',
+                        '--start-number', '1',
+                        '--subject-prefix', f'PATCH {ver}',
+                        '--output-directory', f'{patches_dir}'
+                        ])
 
         # Filter only the branches related to this BSC
         for branch in self.branches:
@@ -130,15 +139,6 @@ class GitHelper(Config):
                             ])
 
             index += 1
-
-        subprocess.check_output(['/usr/bin/git',
-                        '-C', str(kgraft_tests_path),
-                        'format-patch','-1', f'{test_sh}',
-                        '--cover-letter',
-                        '--start-number', '1',
-                        '--subject-prefix', f'PATCH {ver}',
-                        '--output-directory', f'{patches_dir}'
-                        ])
 
     # Currently this function returns the date of the patch and it's subject
     def get_commit_data(commit, savedir=None):
