@@ -163,6 +163,15 @@ class Config:
         return Path(self.get_data_dir(cs, arch), 'lib', 'modules',
                     f'{self.get_cs_kernel(cs)}-{kdir}')
 
+    def get_kernel_path(self, cs, arch):
+        kdir = 'default'
+        if self.cs_is_rt(cs):
+            kdir = 'rt'
+
+        kernel = self.get_cs_kernel(cs)
+        return Path(self.get_data_dir(cs, arch), 'boot',
+                            f'vmlinux-{kernel}-{kdir}')
+
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:
             f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
