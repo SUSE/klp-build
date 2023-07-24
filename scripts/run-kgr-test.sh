@@ -1,5 +1,11 @@
 #!/bin/bash
 
+LPS=" -r built "
+
+if [ "$1" == "--no-lp" ]; then
+	LPS=""
+fi
+
 # This script is bundled together in the directory of tests, so the parent
 # directory of the current script is the bsc number
 bsc=$(basename "$(pwd)")
@@ -30,7 +36,7 @@ done
 JOBS=4
 
 ~/kgr-test/kgr-test/kgr-test.py -s ~/scratch/ \
-					-r built \
+					$LPS \
 					-o tests.out \
 					-t repro \
 					$xmls \
