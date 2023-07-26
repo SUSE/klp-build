@@ -60,7 +60,9 @@ class CCP(Config):
                     'twaddle', 'set_geometry', 'valid_floppy_drive_params',
                     '__real_memchr_inv', '__real_kmemdup',
                     'nfnetlink_has_listeners', 'nfnetlink_send',
-                    'nfnetlink_set_err'
+                    'nfnetlink_set_err', 'lockdep_rtnl_is_held',
+                    'debug_lockdep_rcu_enabled', 'lockdep_rcu_suspicious',
+                    'rcu_read_lock_bh_held'
                     ]
         # The backlist tells the klp-ccp to always copy the symbol code,
         # instead of externalizing. This helps in cases where different archs
