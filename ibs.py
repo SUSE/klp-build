@@ -107,10 +107,8 @@ class IBS(Config):
             logging.info(f'({i}/{self.total}) {prj} deleted')
 
     def delete_projects(self, prjs, verbose=True):
-        i = 1
-        for prj in prjs:
+        for i, prj in prjs:
             self.delete_project(i, prj, verbose)
-            i += 1
 
     def extract_rpms(self, args):
         i, cs, arch, rpm, dest = args
