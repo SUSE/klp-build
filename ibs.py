@@ -429,10 +429,13 @@ class IBS(Config):
         self.do_work(self.download_binary_rpms, rpms)
 
     def status(self, wait=False):
+        finished_prj = []
         while True:
-            finished = True
             prjs = {}
             for _, prj in self.get_project_names():
+                if prj in finished_prj:
+                    continue
+
                 prjs[prj] = {}
 
                 for res in self.osc.build.get(prj).findall('result'):
@@ -441,13 +444,21 @@ class IBS(Config):
 
             for prj, archs in prjs.items():
                 st = []
+                # Check each arch build results and if all of them are finished,
+                # add the prj to the finished_prj list to avoid showing it again
+                # in the next round.
+                finished = True
                 for k, v in archs.items():
                     st.append(f'{k}: {v}')
                     if v not in ['succeeded', 'unresolvable', 'failed']:
                         finished = False
+
+                if finished:
+                    finished_prj.append(prj)
+
                 logging.info('{}\t{}'.format(prj, '\t'.join(st)))
 
-            if finished or not wait:
+            if not wait or not prjs:
                 break
 
             # Wait 30 seconds before getting status again
@@ -581,3 +592,7 @@ class IBS(Config):
             # codestreams
             time.sleep(30)
             self.status(wait)
+
+            # One more status after everything finished, since we remove
+            # finished builds on each iteration
+            self.status(False)
