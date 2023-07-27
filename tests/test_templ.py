@@ -58,7 +58,7 @@ class TemplTesting(utils.TestUtils):
                                        ])
 
 
-        # As the config ionly targets x86_64, IS_ENABLED should be set
+        # As the config only targets x86_64, IS_ENABLED should be set
         self.output_contains(v, cs, ['#if IS_ENABLED'])
 
     def test_check_header_file_included(self):

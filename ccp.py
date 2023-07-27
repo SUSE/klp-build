@@ -62,7 +62,12 @@ class CCP(Config):
                     'nfnetlink_has_listeners', 'nfnetlink_send',
                     'nfnetlink_set_err', 'lockdep_rtnl_is_held',
                     'debug_lockdep_rcu_enabled', 'lockdep_rcu_suspicious',
-                    'rcu_read_lock_bh_held'
+                    'rcu_read_lock_bh_held', 'lock_acquire',
+                    'preempt_count_add', 'rcu_read_lock_any_held',
+                    'preempt_count_sub', 'lock_release',
+                    'trace_hardirqs_off', 'trace_hardirqs_on',
+                    'debug_smp_processor_id', 'lock_is_held_type',
+                    'mutex_lock_nested', 'rcu_read_lock_held'
                     ]
         # The backlist tells the klp-ccp to always copy the symbol code,
         # instead of externalizing. This helps in cases where different archs
