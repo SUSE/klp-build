@@ -387,7 +387,10 @@ class CCP(Config):
         env['KCP_KBUILD_SDIR'] = str(sdir)
         env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
 
-        logging.info(f'\t({i}/{self.total})\t{cs}\t\t{fname}')
+        # The header text has two tabs
+        cs_info = cs.ljust(16, ' ')
+
+        logging.info(f'\t({i}/{self.total})\t{cs_info}{fname}')
 
         base_fname = Path(fname).name
 
