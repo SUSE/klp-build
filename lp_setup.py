@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from config import Config
 import json
 import logging
@@ -96,7 +97,7 @@ class Setup(Config):
         req.raise_for_status()
 
         first_line = True
-        codestreams = {}
+        codestreams = OrderedDict()
         for line in req.iter_lines():
             # skip empty lines
             if not line:
@@ -156,7 +157,7 @@ class Setup(Config):
         cs_data_missing = {}
 
         # list of codestreams that matches the file-funcs argument
-        working_cs = {}
+        working_cs = OrderedDict()
         patched_cs = []
 
         for cs, data in all_codestreams.items():
@@ -198,7 +199,7 @@ class Setup(Config):
 
         # cpp will use this data in the next step
         with open(self.conf_file, 'w') as f:
-            f.write(json.dumps(self.conf, indent=4, sort_keys=True))
+            f.write(json.dumps(self.conf, indent=4))
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected

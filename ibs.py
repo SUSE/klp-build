@@ -4,6 +4,7 @@ import logging
 from lxml import etree
 from lxml.objectify import fromstring, SubElement
 from natsort import natsorted
+from operator import itemgetter
 import os
 from osctiny import Osc
 from pathlib import Path
@@ -90,7 +91,7 @@ class IBS(Config):
             names.append((i, result.get('name')))
             i += 1
 
-        return natsorted(names)
+        return natsorted(names, key=itemgetter(1))
 
     def delete_project(self, i, prj, verbose=True):
         try:

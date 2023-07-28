@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import copy
 import json
 import git
@@ -41,23 +42,24 @@ class Config:
 
         self.archs = ['ppc64le', 's390x', 'x86_64']
 
-        self.working_cs = working_cs
-        self.codestreams = {}
+        self.working_cs = OrderedDict(working_cs)
+        self.codestreams = OrderedDict()
         self.cs_file = Path(self.bsc_path, 'codestreams.json')
         if self.cs_file.is_file():
             with open(self.cs_file) as f:
-                self.codestreams = json.loads(f.read())
+                self.codestreams = json.loads(f.read(),
+                                              object_pairs_hook=OrderedDict)
 
-        self.conf = {
+        self.conf = OrderedDict({
                 'bsc' : str(self.bsc_num),
                 'work_dir' : str(self.bsc_path),
                 'data' : str(self.data)
-        }
+        })
 
         self.conf_file = Path(self.bsc_path, 'conf.json')
         if self.conf_file.is_file():
             with open(self.conf_file) as f:
-                self.conf = json.loads(f.read())
+                self.conf = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
         # will contain the nm output from the to be livepatched object
         # cache nm calls for the codestream : object
@@ -174,7 +176,7 @@ class Config:
 
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:
-            f.write(json.dumps(self.codestreams, indent=4, sort_keys=True))
+            f.write(json.dumps(self.codestreams, indent=4))
 
     def is_mod(self, mod):
         return mod != 'vmlinux'

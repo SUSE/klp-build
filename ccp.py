@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import concurrent.futures
 import json
 import logging
@@ -443,7 +444,7 @@ class CCP(Config):
 
         logging.info('Checking the externalized symbols in other architectures...')
 
-        missing_syms = {}
+        missing_syms = OrderedDict()
 
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
@@ -472,7 +473,7 @@ class CCP(Config):
 
         if missing_syms:
             with open(Path(self.bsc_path, 'missing_syms'), 'w') as f:
-                f.write(json.dumps(missing_syms, indent=4, sort_keys=True))
+                f.write(json.dumps(missing_syms, indent=4))
 
             logging.warning('Symbols not found:')
-            logging.warn(json.dumps(missing_syms, indent=4, sort_keys=True))
+            logging.warn(json.dumps(missing_syms, indent=4))
