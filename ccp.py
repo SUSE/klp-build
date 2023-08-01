@@ -62,6 +62,7 @@ class CCP(Config):
                     '__real_memchr_inv', '__real_kmemdup',
                     'nfnetlink_has_listeners', 'nfnetlink_send',
                     'nfnetlink_set_err', 'lockdep_rtnl_is_held',
+                    'lockdep_rht_mutex_is_held',
                     'debug_lockdep_rcu_enabled', 'lockdep_rcu_suspicious',
                     'rcu_read_lock_bh_held', 'lock_acquire',
                     'preempt_count_add', 'rcu_read_lock_any_held',
