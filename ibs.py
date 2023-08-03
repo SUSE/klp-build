@@ -113,31 +113,17 @@ class IBS(Config):
 
     def extract_rpms(self, args):
         i, cs, arch, rpm, dest = args
-
-        if 'livepatch' in rpm or 'kgraft-devel' in rpm:
-            path_dest = self.get_ipa_dir(cs, arch)
-        elif re.search(   'kernel\-(default|rt)\-\d+', rpm) or \
+        if re.search('kernel\-(default|rt)\-\d+', rpm) or \
                 re.search('kernel\-(default|rt)\-extra\-\d+', rpm):
             path_dest = self.get_data_dir(cs, arch)
         else:
             path_dest = self.get_data_dir(cs)
 
-        fdest = Path(dest, rpm)
+        rpm_file = Path(dest, rpm)
         path_dest.mkdir(exist_ok=True, parents=True)
 
-        cmd = f'rpm2cpio {fdest} | cpio --quiet -uidm'
+        cmd = f'rpm2cpio {rpm_file} | cpio --quiet -uidm'
         subprocess.check_output(cmd, shell=True, cwd=path_dest)
-
-        # Move ipa-clone files to path_dest
-        if 'livepatch' in rpm or 'kgraft-devel' in rpm:
-            src_dir = Path(path_dest, self.get_ipa_src_path(cs, arch))
-
-            for f in os.listdir(src_dir):
-                shutil.move(Path(src_dir, f), path_dest)
-
-            # remove leftovers
-            os.remove(Path(path_dest, 'Symbols.list'))
-            shutil.rmtree(Path(path_dest, 'usr'))
 
         logging.info(f'({i}/{self.total}) extracted {cs} {rpm}: ok')
 

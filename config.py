@@ -116,12 +116,6 @@ class Config:
         sle, sp, _, _ = self.get_cs_tuple(cs)
         return sle < 15 or (sle == 15 and sp < 4)
 
-    # For kernels 5.4 and beyond Kbuild uses relative path to add
-    # CFLAGS to objects
-    def is_kbuild_rel_path(self, cs):
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        return sle > 15 or (sle == 15 and sp >= 4)
-
     def get_data_dir(self, cs='', arch=''):
         if not cs:
             return self.data
@@ -130,7 +124,13 @@ class Config:
         return Path(self.data, cs, arch)
 
     def get_ipa_dir(self, cs, arch='x86_64'):
-        return Path(self.get_data_dir(cs, arch), 'ipa-clones')
+        kernel = self.get_cs_kernel(cs)
+        if self.cs_is_rt(cs):
+            return Path(self.get_data_dir(cs), 'usr', 'src',
+                        f'linux-{kernel}-rt-obj', arch, 'rt')
+
+        return Path(self.get_data_dir(cs), 'usr', 'src', f'linux-{kernel}-obj',
+                    arch, 'default')
 
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get('rt', False)
