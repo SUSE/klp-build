@@ -289,10 +289,10 @@ def get_entries(lpdir, bsc, cs):
         if not fname.endswith('.c'):
             continue
 
+        # Add both the older and the new format to apply flags to objects
         fname = PurePath(fname).with_suffix('.o')
-        if is_kbuild_rel_path(cs):
-            fname = f'bsc{bsc}/{fname}'
-
+        ret.append(f'CFLAGS_{fname} += -Werror')
+        fname = f'bsc{bsc}/{fname}'
         ret.append(f'CFLAGS_{fname} += -Werror')
 
     return "\\n".join(ret)
@@ -426,8 +426,7 @@ class TemplateGen(Config):
         render_vars = {
             'bsc' : self.bsc_num,
             'cs' : cs,
-            'lpdir' : lpdir,
-            'is_kbuild_rel_path' : self.is_kbuild_rel_path
+            'lpdir' : lpdir
         }
         with open(Path(lpdir, 'Kbuild.inc'), 'w') as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
