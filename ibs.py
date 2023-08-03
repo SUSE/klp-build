@@ -202,11 +202,11 @@ class IBS(Config):
                 mod_path= Path(self.get_data_dir(cs, arch), 'lib', 'modules')
                 vmlinux_path = Path(self.get_data_dir(cs, arch), 'boot')
 
-                for fext, ecmd in [('zst', 'unzstd --rm -f -d'), ('xz', 'xz -d')]:
+                for fext, ecmd in [('zst', 'unzstd --rm -f -d'), ('xz', 'xz --quiet -d')]:
                     cmd = f'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
-                subprocess.check_output(f'find {vmlinux_path} -name "vmlinux*gz" -exec gzip -d {{}} \;',
+                subprocess.check_output(f'find {vmlinux_path} -name "vmlinux*gz" -exec gzip -d -f {{}} \;',
                                         shell=True)
 
             shutil.rmtree(Path(self.get_data_dir(cs), 'boot'), ignore_errors=True)
