@@ -390,9 +390,10 @@ class CCP(Config):
         env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
 
         # The header text has two tabs
-        cs_info = cs.ljust(16, ' ')
+        cs_info = cs.ljust(15, ' ')
+        idx = f'({i}/{self.total})'.rjust(15, ' ')
 
-        logging.info(f'\t({i}/{self.total})\t{cs_info}{fname}')
+        logging.info(f'{idx} {cs_info} {fname}')
 
         base_fname = Path(fname).name
 
