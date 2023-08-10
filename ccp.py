@@ -53,7 +53,7 @@ class CCP(Config):
         else:
             raise RuntimeError('Only gcc12 or higher are available, and it\'s problematic with kernel sources')
 
-        # List of symbols that are currently problematic for klp-ccp
+        # List of symbols that are currently not resolvable for klp-ccp
         avoid_syms = ['__xadd_wrong_size', '__bad_copy_from', '__bad_copy_to',
                     'rcu_irq_enter_disabled', 'rcu_irq_enter_irqson',
                     'rcu_irq_exit_irqson', 'verbose', '__write_overflow',
@@ -69,7 +69,8 @@ class CCP(Config):
                     'preempt_count_sub', 'lock_release',
                     'trace_hardirqs_off', 'trace_hardirqs_on',
                     'debug_smp_processor_id', 'lock_is_held_type',
-                    'mutex_lock_nested', 'rcu_read_lock_held'
+                    'mutex_lock_nested', 'rcu_read_lock_held',
+                    '__bad_unaligned_access_size'
                     ]
         # The backlist tells the klp-ccp to always copy the symbol code,
         # instead of externalizing. This helps in cases where different archs
