@@ -41,10 +41,10 @@ class IBS(Config):
         # For ppc64le and s390x only download vmlinux and the built modules
         self.cs_data = {
                 'ppc64le' : {
-                    'kernel-default' : '(kernel-default-[\d\.\-]+.ppc64le.rpm)',
+                    'kernel-default' : '(kernel-default-(extra-)?[\d\.\-]+.ppc64le.rpm)',
                 },
                 's390x' : {
-                    'kernel-default' : '(kernel-default-[\d\.\-]+.s390x.rpm)',
+                    'kernel-default' : '(kernel-default-(extra-)?[\d\.\-]+.s390x.rpm)',
                 },
                 'x86_64' : {
                     'kernel-default' : '(kernel-(default|rt)\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
@@ -113,6 +113,13 @@ class IBS(Config):
 
     def extract_rpms(self, args):
         i, cs, arch, rpm, dest = args
+
+        # We don't need to extract the -extra packages for non x86_64 archs.
+        # These packages are only needed to be uploaded to the kgr-test
+        # repos, since they aren't published, but we need them for testing.
+        if arch != 'x86_64' and '-extra' in rpm:
+            return
+
         if re.search('kernel\-(default|rt)\-\d+', rpm) or \
                 re.search('kernel\-(default|rt)\-extra\-\d+', rpm):
             path_dest = self.get_data_dir(cs, arch)
