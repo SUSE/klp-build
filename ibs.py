@@ -62,7 +62,7 @@ class IBS(Config):
         if len(args) == 0:
             return
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             results = executor.map(func, args)
             for result in results:
                 if result:
