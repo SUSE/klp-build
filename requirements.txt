@@ -4,3 +4,5 @@ mako
 natsort
 osc-tiny
 requests
+cached_property
+markupsafe
