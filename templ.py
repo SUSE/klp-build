@@ -1,5 +1,4 @@
 from datetime import datetime
-import jinja2
 from mako.lookup import TemplateLookup
 from mako.template import Template
 from pathlib import Path, PurePath

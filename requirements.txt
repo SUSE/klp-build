@@ -1,5 +1,4 @@
 GitPython
-jinja2
 lxml
 mako
 natsort
