@@ -243,7 +243,7 @@ class GitHelper(Config):
                                                 stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
 
                 # removing the patches.suse dir from the filepath
-                basename = PurePath(patch).name.removesuffix('.patch')
+                basename = PurePath(patch).name.replace('.patch', '')
 
                 # Save the patch for later review from the livepatch developer
                 with open(Path(branch_path, f'{idx:02d}-{basename}.patch'), 'w') as f:
