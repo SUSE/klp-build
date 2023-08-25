@@ -2,7 +2,7 @@ GitPython
 lxml
 mako
 natsort
-osc-tiny
+git+https://github.com/crazyscientist/osc-tiny.git
 requests
 cached_property
 markupsafe
