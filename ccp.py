@@ -141,8 +141,11 @@ class CCP(Config):
 
         with open(Path(out_dir, 'make.out'), 'w') as f:
             completed = subprocess.check_output(['make', '-sn', f'CC={self.cc}',
-                                        f'KLP_CS={cs}',
-                                        f'HOSTCC={self.cc}', file_], cwd=odir,
+                                                 f'KLP_CS={cs}',
+                                                 f'HOSTCC={self.cc}',
+                                                 'WERROR=0',
+                                                 'CFLAGS_REMOVE_objtool=-Werror',
+                                                 file_], cwd=odir,
                                         stderr=f)
 
             ret = self.process_make_output(cs, filename, completed.decode())
