@@ -33,7 +33,13 @@ for cs in $codestreams; do
 	xmls="$xmls -q $VMSDIR/$cs.xml"
 done
 
-JOBS=4
+# ppc64 and s390 can be flaky if too many processes are triggered
+ARCH=$(uname -m)
+if [ "$ARCH" = "x86_64" ]; then
+	JOBS=6
+else
+	JOBS=1
+fi
 
 ~/kgr-test/kgr-test/kgr-test.py -s ~/scratch/ \
 					$LPS \
