@@ -365,11 +365,10 @@ class IBS(Config):
 
                 build_cs.append(self.get_full_cs(cs))
 
-            # Prepare the config file used by kgr-test, use a set to remove
-            # duplicated entries
+            # Prepare the config file used by kgr-test
             config = Path(test_arch_path, 'repro', f'{self.bsc}_config.in')
             with open(config, 'w') as f:
-                f.write('\n'.join(build_cs))
+                f.write('\n'.join(natsorted(build_cs)))
 
             if test_sh.is_file():
                 shutil.copy(test_sh, Path(test_arch_path, 'repro'))
