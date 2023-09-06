@@ -62,11 +62,11 @@ def create_parser() -> argparse.ArgumentParser:
     patches.add_argument('--cve', required=True,
             help='CVE number to search for related backported patches')
 
+    cleanup = sub.add_parser('cleanup', parents = [parentparser],
+                             help='Remove livepatch packages from IBS')
+
     ibs = sub.add_parser('ibs', parents = [parentparser],
             help='Manipulate livepatch packages in IBS')
-
-    ibs.add_argument('--cleanup', action='store_true',
-            help='Remove livepatch packages from IBS')
 
     ibs.add_argument('--download', action='store_true',
             help='Download livepatch rpms')
@@ -123,11 +123,12 @@ def main_func(main_args):
     elif args.cmd == 'log':
         IBS(args.bsc, args.filter).log(args.cs, args.arch)
 
+    elif args.cmd == 'cleanup':
+        IBS(args.bsc, args.filter).cleanup()
+
     elif args.cmd == 'ibs':
         ibs = IBS(args.bsc, args.filter)
-        if args.cleanup:
-            ibs.cleanup()
-        elif args.download:
+        if args.download:
             ibs.download()
         elif args.prepare_tests:
             ibs.prepare_tests(args.skip_download)
