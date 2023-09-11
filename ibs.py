@@ -435,6 +435,8 @@ class IBS(Config):
                     code = res.xpath('status/@code')[0]
                     prjs[prj][res.get('arch')] = code
 
+            print(f'{len(prjs)} codestreams to finish')
+
             for prj, archs in prjs.items():
                 st = []
                 # Check each arch build results and if all of them are finished,
