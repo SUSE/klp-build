@@ -10,6 +10,12 @@ fi
 # directory of the current script is the bsc number
 bsc=$(basename "$(pwd)")
 
+TEST_SCRIPT="repro/${bsc}_test_script.sh"
+if [ ! -f "$TEST_SCRIPT" ]; then
+	echo "Missing $TEST_SCRIPT. Aborting."
+	exit 1
+fi
+
 # Remove any previous test output
 rm -rf tests.out/*
 
