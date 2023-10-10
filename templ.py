@@ -338,6 +338,12 @@ class TemplateGen(Config):
         with open(Path(lp_path, 'patched_funcs.csv'), 'w') as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
+   # 15.4 onwards we don't have module_mutex, so template generates
+   # different code
+    def is_mod_mutex(self, cs):
+        sle, sp, _, _ = self.get_cs_tuple(cs)
+        return sle < 15 or (sle == 15 and sp < 4)
+
     def __GenerateLivepatchFile(self, lp_path, cs, ext, src_file, use_src_name=False):
         if src_file:
             lp_inc_dir = str(self.get_work_dir(cs, src_file))
@@ -390,6 +396,9 @@ class TemplateGen(Config):
                 temp_str = TEMPL_C
 
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
+
+    def get_cs_lp_dir(self, cs):
+        return Path(self.get_cs_dir(cs), 'lp')
 
     def GenerateLivePatches(self, cs):
         lp_path = self.get_cs_lp_dir(cs)

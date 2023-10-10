@@ -287,6 +287,9 @@ class CCP(Config):
 
         return ' '.join(ret_list)
 
+    def get_work_lp_file(self, cs, fname):
+        return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
+
     def group_equal_files(self, args):
         cs_files = {}
         cs_groups = {}

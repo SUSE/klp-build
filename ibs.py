@@ -143,6 +143,9 @@ class IBS(Config):
         if 'kernel-macros' not in rpm:
             self.extract_rpms( (i, cs, arch, rpm, dest) )
 
+    def get_cs_archs(self, cs):
+        return self.get_cs_data(cs)['archs']
+
     def download_cs_data(self, cs_list):
         rpms = []
         extract = []
@@ -239,6 +242,15 @@ class IBS(Config):
             filtered.append(item)
 
         return filtered
+
+    def get_kernel_path(self, cs, arch):
+        kdir = 'default'
+        if self.cs_is_rt(cs):
+            kdir = 'rt'
+
+        kernel = self.get_cs_kernel(cs)
+        return Path(self.get_data_dir(cs, arch), 'boot',
+                            f'vmlinux-{kernel}-{kdir}')
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):
         vmlinux_path = self.get_kernel_path(cs, arch)

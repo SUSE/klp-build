@@ -80,20 +80,11 @@ class Config:
         fpath = f'work_{str(fname).replace("/", "_")}'
         return Path(self.get_cs_dir(cs), fpath)
 
-    def get_work_lp_file(self, cs, fname):
-        return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
-
-    def get_cs_lp_dir(self, cs):
-        return Path(self.get_cs_dir(cs), 'lp')
-
     def get_cs_data(self, cs):
         if self.working_cs.get(cs, ''):
             return self.working_cs[cs]
 
         return self.codestreams[cs]
-
-    def get_cs_archs(self, cs):
-        return self.get_cs_data(cs)['archs']
 
     def get_cs_modules(self, cs):
         return self.get_cs_data(cs)['modules']
@@ -109,12 +100,6 @@ class Config:
 
         return (int(match.group(1)), int(match.group(2)), int(match.group(4)),
                 match.group(3))
-
-   # 15.4 onwards we don't have module_mutex, so template generates
-   # different code
-    def is_mod_mutex(self, cs):
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        return sle < 15 or (sle == 15 and sp < 4)
 
     def get_data_dir(self, cs='', arch=''):
         if not cs:
@@ -148,15 +133,6 @@ class Config:
 
         return Path(self.get_data_dir(cs, arch), 'lib', 'modules',
                     f'{self.get_cs_kernel(cs)}-{kdir}')
-
-    def get_kernel_path(self, cs, arch):
-        kdir = 'default'
-        if self.cs_is_rt(cs):
-            kdir = 'rt'
-
-        kernel = self.get_cs_kernel(cs)
-        return Path(self.get_data_dir(cs, arch), 'boot',
-                            f'vmlinux-{kernel}-{kdir}')
 
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:
