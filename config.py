@@ -123,24 +123,8 @@ class Config:
             return Path(self.data, cs)
         return Path(self.data, cs, arch)
 
-    def get_ipa_dir(self, cs, arch='x86_64'):
-        kernel = self.get_cs_kernel(cs)
-        if self.cs_is_rt(cs):
-            return Path(self.get_data_dir(cs), 'usr', 'src',
-                        f'linux-{kernel}-rt-obj', arch, 'rt')
-
-        return Path(self.get_data_dir(cs), 'usr', 'src', f'linux-{kernel}-obj',
-                    arch, 'default')
-
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get('rt', False)
-
-    def get_ipa_src_path(self, cs, arch):
-        kernel = self.get_cs_kernel(cs)
-        if self.cs_is_rt(cs):
-            return Path('usr', 'src', f'linux-{kernel}-rt-obj', arch, 'rt')
-
-        return Path('usr', 'src', f'linux-{kernel}-obj', arch, 'default')
 
     def get_sdir(self, cs):
         kdir = '-rt'
