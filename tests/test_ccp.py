@@ -30,5 +30,10 @@ class CcpTesting(utils.TestUtils):
         self.assertRegex(logs.output[0],
             'lib/seq_buf.o is not compiled with livepatch support \(\-pg flag\)')
 
+    def test_group_classify(self):
+        group = CCP.classify_codestreams(['15.2u10', '15.2u11', '15.3u10',
+                                          '15.3u12'])
+        self.assertEqual(group, '15.2u10-11 15.3u10-12')
+
 if __name__ == '__main__':
     unittest.main()

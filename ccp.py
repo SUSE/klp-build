@@ -240,7 +240,7 @@ class CCP(Config):
     #   15.2u10-11 15.3u10 15.3u12
     # The returned value will be a list of lists, each internal list will
     # contain all codestreams which share the same code
-    def classify_codestreams(self, cs_list):
+    def classify_codestreams(cs_list):
         # Group all codestreams that share the same codestream by a new dict
         # divided by the SLE version alone, making it easier to process
         # later
@@ -266,7 +266,7 @@ class CCP(Config):
 
                 cur = ups.pop(0)
                 last_item = sim[len(sim) - 1]
-                if last_item + 1 == cur:
+                if last_item + 1 <= cur:
                     sim.append(cur)
                     continue
 
@@ -372,7 +372,7 @@ class CCP(Config):
         # same code
         groups = []
         for cs_list in cs_equal:
-            groups.append(self.classify_codestreams(cs_list))
+            groups.append(CCP.classify_codestreams(cs_list))
 
         with open(Path(self.bsc_path, 'groups'), 'w') as f:
             f.write('\n'.join(groups))
