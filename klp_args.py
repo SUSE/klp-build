@@ -53,6 +53,10 @@ def create_parser() -> argparse.ArgumentParser:
             help='Functions to be copied into the LP by klp-ccp instead of externalizing. '
                  'Useful to make sure to include symbols that are optimized in different architectures')
 
+    diff_opts = sub.add_parser('cs-diff', parents = [parentparser])
+    diff_opts.add_argument('--codestreams', nargs=2, type=str, required=True,
+            help='Apply diff on two different codestreams')
+
     format = sub.add_parser('format-patches', parents = [parentparser],
             help='Extract patches from kgraft-patches')
     format.add_argument('-v', '--version', type=int, required=True,
@@ -107,6 +111,9 @@ def main_func(main_args):
 
     elif args.cmd == 'run-ccp':
         CCP(args.bsc, args.filter, args.avoid_ext).run_ccp()
+
+    elif args.cmd == 'cs-diff':
+        CCP(args.bsc, [], []).diff_cs(args.codestreams)
 
     elif args.cmd == 'get-patches':
         GitHelper(args.bsc, args.filter).get_commits(args.cve)

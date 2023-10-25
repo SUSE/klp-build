@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import concurrent.futures
+import difflib as dl
 import json
 import logging
 import os
@@ -290,39 +291,65 @@ class CCP(Config):
     def get_work_lp_file(self, cs, fname):
         return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
 
-    def group_equal_files(self, args):
+    def get_cs_code(self, args):
         cs_files = {}
-        cs_groups = {}
 
         # Mount the cs_files dict
         for arg in args:
             _, file, cs, _ = arg
-            if not cs_files.get(cs, ''):
-                cs_files[cs] = []
+            cs_files.setdefault(cs, [])
 
             fpath = self.get_work_lp_file(cs, file)
             with open(fpath, 'r+') as fi:
                 src = fi.read()
 
-            src = re.sub('#include \".+kconfig\.h\"', '', src)
-            # Since 15.4 klp-ccp includes a compiler-version.h header
-            src = re.sub('#include \".+compiler\-version\.h\"', '', src)
-            # Since RT variants, there is now an definition for auto_type
-            src = src.replace('#define __auto_type int\n', '')
-            # We have problems with externalized symbols on macros. Ignore
-            # codestream names specified on paths that are placed on the
-            # expanded macros
-            src = re.sub(f'{self.data}.+{file}', '', src)
+                src = re.sub('#include \".+kconfig\.h\"', '', src)
+                # Since 15.4 klp-ccp includes a compiler-version.h header
+                src = re.sub('#include \".+compiler\-version\.h\"', '', src)
+                # Since RT variants, there is now an definition for auto_type
+                src = src.replace('#define __auto_type int\n', '')
+                # We have problems with externalized symbols on macros. Ignore
+                # codestream names specified on paths that are placed on the
+                # expanded macros
+                src = re.sub(f'{self.data}.+{file}', '', src)
 
-            # Remove any mentions to klpr_trace, since it's currently
-            # buggy in klp-ccp
-            src = re.sub('.+klpr_trace.+', '', src)
+                # Remove any mentions to klpr_trace, since it's currently
+                # buggy in klp-ccp
+                src = re.sub('.+klpr_trace.+', '', src)
 
-            cs_files[cs].append((file , src ))
+                cs_files[cs].append((file , src ))
 
+        return cs_files
+
+    # cs_list should be only two entries
+    def diff_cs(self, cs_list):
+        args = []
+        f1 = {}
+        f2 = {}
+        for cs in cs_list:
+            for fname, _ in self.get_cs_files(cs).items():
+                args.append((_, fname, cs, _))
+
+        cs_code = self.get_cs_code(args)
+        f1 = cs_code.get(cs_list[0])
+        f2 = cs_code.get(cs_list[1])
+
+        assert(len(f1) == len(f2))
+
+        for i in range(len(f1)):
+            content1 = f1[i][1].splitlines()
+            content2 = f2[i][1].splitlines()
+
+            for l in dl.unified_diff(content1, content2, fromfile=f1[i][0],
+                                     tofile=f2[i][0]):
+                print(l)
+
+    # Get the code for each codestream, removing boilerplate code
+    def group_equal_files(self, args):
         cs_equal = []
         processed = []
 
+        cs_files = self.get_cs_code(args)
         toprocess = list(cs_files.keys())
         while len(toprocess):
             current_cs_list = []
