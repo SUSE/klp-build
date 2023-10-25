@@ -309,6 +309,10 @@ class CCP(Config):
             src = re.sub('#include \".+compiler\-version\.h\"', '', src)
             # Since RT variants, there is now an definition for auto_type
             src = src.replace('#define __auto_type int\n', '')
+            # We have problems with externalized symbols on macros. Ignore
+            # codestream names specified on paths that are placed on the
+            # expanded macros
+            src = re.sub(f'{self.data}.+{file}', '', src)
 
             # Remove any mentions to klpr_trace, since it's currently
             # buggy in klp-ccp
