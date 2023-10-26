@@ -312,6 +312,9 @@ class CCP(Config):
                 # codestream names specified on paths that are placed on the
                 # expanded macros
                 src = re.sub(f'{self.data}.+{file}', '', src)
+                # We can have more details that can differ for long expanded
+                # macros, like the patterns bellow
+                src = re.sub(f'\.lineno = \d+,', '', src)
 
                 # Remove any mentions to klpr_trace, since it's currently
                 # buggy in klp-ccp
