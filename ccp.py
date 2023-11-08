@@ -90,6 +90,10 @@ class CCP(Config):
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
 
+    # Check if the extract command line is compilable with gcc
+    def test_gcc_cmd(self, cmd):
+        subprocess.check_output(self.cc + ' ' + cmd)
+
     def process_make_output(self, cs, filename, output):
         fname = str(filename)
 
@@ -132,6 +136,8 @@ class CCP(Config):
             if sp >= 4:
                 output += ' -D__auto_type=int'
                 output += ' -D__has_attribute(x)=0'
+
+        self.test_gcc_cmd(output)
 
         return output
 
