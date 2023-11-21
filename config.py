@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 import os
 import re
+import shutil
 import subprocess
 
 class Config:
@@ -66,6 +67,17 @@ class Config:
         self.nm_out = {}
 
         logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+        gcc_ver = int(subprocess.check_output(['gcc',
+                                               '-dumpversion']).decode().strip())
+        # gcc12 and higher have a problem with kernel and xrealloc implementation
+        if gcc_ver < 12:
+            self.cc = 'gcc'
+        # if gcc12 or higher is the default compiler, check if gcc7 is available
+        elif shutil.which('gcc-7'):
+            self.cc = 'gcc-7'
+        else:
+            raise RuntimeError('Only gcc12 or higher are available, and it\'s problematic with kernel sources')
 
     def lp_out_file(self, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
