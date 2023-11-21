@@ -3,6 +3,7 @@
 import argparse
 
 from ccp import CCP
+from ce import CE
 from ksrc import GitHelper
 from lp_setup import Setup
 from ibs import IBS
@@ -52,6 +53,8 @@ def create_parser() -> argparse.ArgumentParser:
     ccp_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],
             help='Functions to be copied into the LP by klp-ccp instead of externalizing. '
                  'Useful to make sure to include symbols that are optimized in different architectures')
+
+    sub.add_parser('run-ce', parents = [parentparser])
 
     diff_opts = sub.add_parser('cs-diff', parents = [parentparser])
     diff_opts.add_argument('--codestreams', nargs=2, type=str, required=True,
@@ -111,6 +114,9 @@ def main_func(main_args):
 
     elif args.cmd == 'run-ccp':
         CCP(args.bsc, args.filter, args.avoid_ext).run_ccp()
+
+    elif args.cmd == 'run-ce':
+        CE(args.bsc, args.filter).run_ce()
 
     elif args.cmd == 'cs-diff':
         CCP(args.bsc, [], []).diff_cs(args.codestreams)
