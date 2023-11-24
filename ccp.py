@@ -136,7 +136,7 @@ class CCP(Config):
         filename = PurePath(filename)
         file_ = filename.with_suffix('.o')
 
-        with open(Path(out_dir, 'make.out'), 'w') as f:
+        with open(Path(out_dir, 'make.out.txt'), 'w') as f:
             completed = subprocess.check_output(['make', '-sn', f'CC={self.cc}',
                                                  f'KLP_CS={cs}',
                                                  f'HOSTCC={self.cc}',
@@ -179,7 +179,7 @@ class CCP(Config):
 
         ccp_args = list(filter(None, ccp_args))
 
-        with open(Path(out_dir, 'klp-ccp.out'), 'w') as f:
+        with open(Path(out_dir, 'klp-ccp.out.txt'), 'w') as f:
             # Write the command line used
             f.write('\n'.join(ccp_args) + '\n')
             f.flush()

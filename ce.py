@@ -66,7 +66,7 @@ class CE(Config):
         filename = PurePath(filename)
         file_ = filename.with_suffix('.o')
 
-        with open(Path(out_dir, 'make.out'), 'w') as f:
+        with open(Path(out_dir, 'make.out.txt'), 'w') as f:
             completed = subprocess.check_output(['make', '-sn', f'CC={self.cc}',
                                                  f'KLP_CS={cs}',
                                                  f'HOSTCC={self.cc}',
@@ -118,7 +118,7 @@ class CE(Config):
                         f'-DCE_KEEP_INCLUDES',
                         f'-U__OPTIMIZE__'])
 
-        with open(Path(out_dir, 'klp-ce.out'), 'w') as f:
+        with open(Path(out_dir, 'klp-ce.out.txt'), 'w') as f:
             # Write the command line used
             f.write('\n'.join(ce_args) + '\n')
             f.flush()
