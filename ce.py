@@ -92,6 +92,7 @@ class CE(Config):
         ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
 
         lp_name = self.lp_out_file(fname)
+        dsc_out = Path(out_dir, 'lp.dsc')
         lp_out = Path(out_dir, lp_name)
 
         ce_args = [self.ce_path]
@@ -109,7 +110,8 @@ class CE(Config):
                         f'-DCE_IPACLONES_PATH={ipa}',
                         f'-DCE_SYMVERS_PATH={symvers}',
                         f'-DCE_EXTRACT_FUNCTIONS={funcs}',
-                        f'-DCE_OUTPUT_FILE={lp_out}'])
+                        f'-DCE_OUTPUT_FILE={lp_out}',
+                        f'-DCE_DSC_OUTPUT={dsc_out}'])
 
         # FIXME: DEBUG
         # The __OPTIMIZE__ is necessary due to problem on compiletime_error
