@@ -1,4 +1,6 @@
+from collections import OrderedDict
 import concurrent.futures
+import json
 import logging
 import os
 from pathlib import Path, PurePath
@@ -8,6 +10,7 @@ import subprocess
 from threading import Lock
 
 from config import Config
+from templ import TemplateGen
 
 # clang-extract executer
 class CE(Config):
@@ -86,6 +89,163 @@ class CE(Config):
 
         return None
 
+    # Group all codestreams that share code in a format like bellow:
+    #   [15.2u10 15.2u11 15.3u10 15.3u12 ]
+    # Will be converted to:
+    #   15.2u10-11 15.3u10 15.3u12
+    # The returned value will be a list of lists, each internal list will
+    # contain all codestreams which share the same code
+    def classify_codestreams(cs_list):
+        # Group all codestreams that share the same codestream by a new dict
+        # divided by the SLE version alone, making it easier to process
+        # later
+        cs_group = {}
+        for cs in cs_list:
+            prefix, up = cs.split('u')
+            if not cs_group.get(prefix, ''):
+                cs_group[prefix] = [int(up)]
+            else:
+                cs_group[prefix].append(int(up))
+
+        ret_list = []
+        for cs, ups in cs_group.items():
+            if len(ups) == 1:
+                ret_list.append(f'{cs}u{ups[0]}')
+                continue
+
+            sim = []
+            while len(ups):
+                if not sim:
+                    sim.append(ups.pop(0))
+                    continue
+
+                cur = ups.pop(0)
+                last_item = sim[len(sim) - 1]
+                if last_item + 1 <= cur:
+                    sim.append(cur)
+                    continue
+
+                # they are different, print them
+                if len(sim) == 1:
+                    ret_list.append(f'{cs}u{sim[0]}')
+                else:
+                    ret_list.append(f'{cs}u{sim[0]}-{last_item}')
+
+                sim = [cur]
+
+            # Loop finished, check what's in similar list to print
+            if len(sim) == 1:
+                ret_list.append(f'{cs}u{sim[0]}')
+            elif len(sim) > 1:
+                last_item = sim[len(sim) - 1]
+                ret_list.append(f'{cs}u{sim[0]}-{last_item}')
+
+        return ' '.join(ret_list)
+
+    def get_work_lp_file(self, cs, fname):
+        return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
+
+    def get_cs_code(self, args):
+        cs_files = {}
+
+        # Mount the cs_files dict
+        for arg in args:
+            _, file, cs, _ = arg
+            cs_files.setdefault(cs, [])
+
+            fpath = self.get_work_lp_file(cs, file)
+            with open(fpath, 'r+') as fi:
+                src = fi.read()
+
+                src = re.sub('#include \".+kconfig\.h\"', '', src)
+                # Since 15.4 klp-ccp includes a compiler-version.h header
+                src = re.sub('#include \".+compiler\-version\.h\"', '', src)
+                # Since RT variants, there is now an definition for auto_type
+                src = src.replace('#define __auto_type int\n', '')
+                # We have problems with externalized symbols on macros. Ignore
+                # codestream names specified on paths that are placed on the
+                # expanded macros
+                src = re.sub(f'{self.data}.+{file}', '', src)
+                # We can have more details that can differ for long expanded
+                # macros, like the patterns bellow
+                src = re.sub(f'\.lineno = \d+,', '', src)
+
+                # Remove any mentions to klpr_trace, since it's currently
+                # buggy in klp-ccp
+                src = re.sub('.+klpr_trace.+', '', src)
+
+                cs_files[cs].append((file , src ))
+
+        return cs_files
+
+    # Get the code for each codestream, removing boilerplate code
+    def group_equal_files(self, args):
+        cs_equal = []
+        processed = []
+
+        cs_files = self.get_cs_code(args)
+        toprocess = list(cs_files.keys())
+        while len(toprocess):
+            current_cs_list = []
+
+            # Get an element, and check if it wasn't associated with a previous
+            # codestream
+            cs = toprocess.pop(0)
+            if cs in processed:
+                continue
+
+            # last element, it's different from all other codestreams, so add it
+            # to the cs_equal alone.
+            if not toprocess:
+                cs_equal.append([cs])
+                break
+
+            # start a new list with the current element to compare with others
+            current_cs_list.append(cs)
+            data_cs = cs_files[cs]
+            len_data = len(data_cs)
+
+            # Compare the file names, and file content between codestrams,
+            # trying to find ones that have the same files and contents
+            for cs_proc in toprocess:
+                data_proc = cs_files[cs_proc]
+
+                if len_data != len(data_proc):
+                    continue
+
+                ok = True
+                for i in range(len_data):
+                    file, src = data_cs[i]
+                    file_proc, src_proc = data_proc[i]
+
+                    if file != file_proc or src != src_proc:
+                        ok = False
+                        break
+
+                # cs is equal to cs_proc, with the same number of files, same
+                # file names, and the files have the same content. So we don't
+                # need to process cs_proc later in the process
+                if ok:
+                    processed.append(cs_proc)
+                    current_cs_list.append(cs_proc)
+
+            # Append the current list of equal codestreams to a global list to
+            # be grouped later
+            cs_equal.append(natsorted(current_cs_list))
+
+        # cs_equal will contain a list of lists with codestreams that share the
+        # same code
+        groups = []
+        for cs_list in cs_equal:
+            groups.append(CE.classify_codestreams(cs_list))
+
+        with open(Path(self.bsc_path, 'groups'), 'w') as f:
+            f.write('\n'.join(groups))
+
+        logging.info('\nGrouping codestreams that share the same content and files:')
+        for group in groups:
+            logging.info(f'\t{group}')
+
     def execute_ce(self, cs, fname, funcs, out_dir, sdir, obj):
         odir = Path(f'{sdir}-obj', self.get_odir(cs))
         symvers = str(Path(odir, 'Module.symvers'))
@@ -140,7 +300,7 @@ class CE(Config):
                     if l.count(':') == 2:
                         sym, _, mod = l.replace('#', '').split(':')
                     else:
-                        sym, _, _ = l.replace('#', '').split(':')
+                        sym, _ = l.replace('#', '').split(':')
                     exts.append( (sym, mod) )
 
         exts.sort(key=lambda tup : tup[0])
@@ -210,3 +370,44 @@ class CE(Config):
 
         # Save the ext_symbols set by execute_ce
         self.flush_cs_file()
+
+        self.group_equal_files(args)
+
+        tem = TemplateGen(self.bsc_num, self.filter)
+        tem.generate_commit_msg_file()
+
+        logging.info('Checking the externalized symbols in other architectures...')
+
+        missing_syms = OrderedDict()
+
+        # Iterate over each codestream, getting each file processed, and all
+        # externalized symbols of this file
+        # While we are at it, create the livepatches per codestream
+        for cs, _ in working_cs.items():
+            tem.GenerateLivePatches(cs)
+
+            # Map all symbols related to each obj, to make it check the output
+            # of nm only once per object
+            obj_syms = {}
+            for f, fdata in self.get_cs_files(cs).items():
+                for obj, syms in fdata['ext_symbols'].items():
+                    obj_syms.setdefault(obj, [])
+                    obj_syms[obj].extend(syms)
+
+            for obj, syms in obj_syms.items():
+                missing = self.check_symbol_archs(cs, obj, syms)
+                if missing:
+                    for arch, arch_syms in missing.items():
+                        missing_syms.setdefault(arch, {})
+                        missing_syms[arch].setdefault(obj, {})
+                        missing_syms[arch][obj].setdefault(cs, [])
+                        missing_syms[arch][obj][cs].extend(arch_syms)
+
+            tem.CreateKbuildFile(cs)
+
+        if missing_syms:
+            with open(Path(self.bsc_path, 'missing_syms'), 'w') as f:
+                f.write(json.dumps(missing_syms, indent=4))
+
+            logging.warning('Symbols not found:')
+            logging.warn(json.dumps(missing_syms, indent=4))
