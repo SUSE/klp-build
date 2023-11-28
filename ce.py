@@ -92,8 +92,10 @@ class CE(Config):
         ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
 
         lp_name = self.lp_out_file(fname)
-        dsc_out = Path(out_dir, 'lp.dsc')
         lp_out = Path(out_dir, lp_name)
+
+        lp_dsc = 'lp.dsc'
+        dsc_out = Path(out_dir, lp_dsc)
 
         ce_args = [self.ce_path]
 
@@ -127,6 +129,31 @@ class CE(Config):
             subprocess.run(ce_args, cwd=odir, stdout=f, stderr=f, check=True)
 
         os.symlink(lp_out, Path(self.get_cs_dir(cs), lp_name))
+
+		# Generate the list of exported symbols
+        exts = []
+        with open(dsc_out) as f:
+            for l in f:
+                l = l.strip()
+                if l.startswith('#'):
+                    mod = 'vmlinux'
+                    if l.count(':') == 2:
+                        sym, _, mod = l.replace('#', '').split(':')
+                    else:
+                        sym, _, _ = l.replace('#', '').split(':')
+                    exts.append( (sym, mod) )
+
+        exts.sort(key=lambda tup : tup[0])
+
+        # store the externalized symbols and module used in this codestream file
+        symbols = {}
+        for ext in exts:
+            sym, mod = ext
+
+            symbols.setdefault(mod, [])
+            symbols[mod].append(sym)
+
+        self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
 
     def get_ipa_dir(self, cs, arch='x86_64'):
         kernel = self.get_cs_kernel(cs)
@@ -180,3 +207,6 @@ class CE(Config):
             for result in results:
                 if result:
                     logging.error(f'{cs}: {result}')
+
+        # Save the ext_symbols set by execute_ce
+        self.flush_cs_file()
