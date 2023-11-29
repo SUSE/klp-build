@@ -273,7 +273,8 @@ class CE(Config):
                         f'-DCE_SYMVERS_PATH={symvers}',
                         f'-DCE_EXTRACT_FUNCTIONS={funcs}',
                         f'-DCE_OUTPUT_FILE={lp_out}',
-                        f'-DCE_DSC_OUTPUT={dsc_out}'])
+                        f'-DCE_DSC_OUTPUT={dsc_out}',
+                        f'-DCE_RENAME_SYMBOLS'])
 
         # FIXME: DEBUG
         # The __OPTIMIZE__ is necessary due to problem on compiletime_error
