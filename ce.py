@@ -273,15 +273,11 @@ class CE(Config):
                         f'-DCE_SYMVERS_PATH={symvers}',
                         f'-DCE_EXTRACT_FUNCTIONS={funcs}',
                         f'-DCE_OUTPUT_FILE={lp_out}',
-                        f'-DCE_DSC_OUTPUT={dsc_out}',
-                        f'-DCE_RENAME_SYMBOLS'])
+                        f'-DCE_DSC_OUTPUT={dsc_out}'])
 
-        # FIXME: DEBUG
-        # The __OPTIMIZE__ is necessary due to problem on compiletime_error
-        # macro. This needs to be fixed on clang-extract.
-        ce_args.extend([f'-DCE_DUMP_PASSES',
-                        f'-DCE_KEEP_INCLUDES',
-                        f'-U__OPTIMIZE__'])
+        ce_args.extend(['-DCE_DUMP_PASSES',
+                        '-DCE_KEEP_INCLUDES',
+                        '-DCE_RENAME_SYMBOLS'])
 
         with open(Path(out_dir, 'klp-ce.out.txt'), 'w') as f:
             # Write the command line used
