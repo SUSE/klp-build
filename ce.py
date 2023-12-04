@@ -275,8 +275,10 @@ class CE(Config):
                         f'-DCE_OUTPUT_FILE={lp_out}',
                         f'-DCE_DSC_OUTPUT={dsc_out}'])
 
-        ce_args.extend(['-DCE_DUMP_PASSES',
-                        '-DCE_KEEP_INCLUDES',
+        # Keep includes is necessary so don't end up expanding all headers,
+        # generating a huge amount of code. This only makes sense for the
+        # kernel so far.
+        ce_args.extend(['-DCE_KEEP_INCLUDES',
                         '-DCE_RENAME_SYMBOLS'])
 
         with open(Path(out_dir, 'klp-ce.out.txt'), 'w') as f:
