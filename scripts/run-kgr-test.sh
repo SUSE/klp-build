@@ -26,10 +26,10 @@ if [ ! -f "$CONF_IN" ]; then
 	CONF_IN=repro/${bsc}_config.in
 fi
 
-# On kunlun we are using Nicolai's vm files
+# Always check if he have the same settings on Nicolai's home
 VMSDIR="$HOME/vms"
 if [ ! -d "$VMSDIR" ]; then
-	VMSDIR="/dev/shm/nstange/vms"
+	VMSDIR="/home/nstange/vms"
 fi
 
 # grab all vm.xml files regarding each main codestream
@@ -47,9 +47,17 @@ else
 	JOBS=1
 fi
 
-~/kgr-test/kgr-test/kgr-test.py -s ~/scratch/ \
-					$LPS \
-					-o tests.out \
-					-t repro \
-					$xmls \
-					-j $JOBS 2>&1 | tee testall.out
+KGR_TEST_PATH="~/kgr-test/kgr-test/kgr-test.py"
+if [ ! -f "$KGR_TEST_PATH" ];
+	KGR_TEST_PATH="/home/nstange/kgr-test/kgr-test/kgr-test.py"
+fi
+
+# Create scratch is doesn't exists
+mkdir -p ~/scratch
+
+$KGR_TEST_PATH -s ~/scratch/ \
+		$LPS \
+		-o tests.out \
+		-t repro \
+		$xmls \
+		-j $JOBS 2>&1 | tee testall.out
