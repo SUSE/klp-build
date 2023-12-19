@@ -374,6 +374,8 @@ class CE(Config):
         # Save the ext_symbols set by execute_ce
         self.flush_cs_file()
 
+        self.tem.refresh_codestreams(self.codestreams)
+
         self.group_equal_files(args)
 
         self.tem.generate_commit_msg_file()

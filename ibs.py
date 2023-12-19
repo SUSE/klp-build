@@ -208,9 +208,13 @@ class IBS(Config):
             shutil.rmtree(Path(self.get_data_dir(cs), 'boot'), ignore_errors=True)
             shutil.rmtree(Path(self.get_data_dir(cs), 'lib'), ignore_errors=True)
 
-            # Make sure that we have a proper config file for later executing of ccp
-            subprocess.check_output(['make', 'olddefconfig'],
-                                    cwd=self.get_odir(cs))
+            # Use the SLE .config
+            shutil.copy(self.get_cs_config(cs), Path(self.get_odir(cs),
+                                                     '.config'))
+
+            # Create the build link to enable us to test the generated LP
+            os.symlink(self.get_odir(cs), Path(self.get_mod_path(cs, 'x86_64'),
+                                               'build'))
 
         logging.info('Finished extract vmlinux and modules...')
 

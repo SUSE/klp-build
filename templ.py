@@ -336,6 +336,11 @@ class TemplateGen(Config):
         # is not enabled on all architectures
         self.check_enabled = self.conf['archs'] != self.archs
 
+    # Things might have changed since TemplateGen was instantiated, so reassign
+    # it
+    def refresh_codestreams(self, cs_list):
+        self.codestreams = cs_list 
+
     def fix_mod_string(self, mod):
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
         # and in kallsyms lookup

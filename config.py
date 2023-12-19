@@ -123,6 +123,12 @@ class Config:
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get('rt', False)
 
+    def get_cs_config(self, cs):
+        ktype = 'rt' if self.cs_is_rt(cs) else 'default'
+        kernel = self.get_cs_kernel(cs)
+
+        return Path(self.get_data_dir(cs, 'x86_64'), 'boot', f'config-{kernel}-{ktype}')
+
     def get_sdir(self, cs):
         kdir = '-rt'
         if not self.cs_is_rt(cs):
