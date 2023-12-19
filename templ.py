@@ -317,6 +317,17 @@ def get_patched(cs_files, check_enabled):
 ${get_patched(cs_files, check_enabled)}
 '''
 
+TEMPL_MAKEFILE = '''\
+KDIR := ${ kdir }/build
+MOD_PATH := ${ pwd }
+obj-m := ${ src }
+
+modules:
+\tmake -C $(KDIR) modules M=$(MOD_PATH)
+clean:
+\tmake -C $(KDIR) clean M=$(MOD_PATH)
+'''
+
 class TemplateGen(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
@@ -399,6 +410,18 @@ class TemplateGen(Config):
 
     def get_cs_lp_dir(self, cs):
         return Path(self.get_cs_dir(cs), 'lp')
+
+    def CreateMakefile(self, cs, fname):
+        work_dir = self.get_work_dir(cs, fname)
+
+        render_vars = {
+            'kdir' : self.get_mod_path(cs, 'x86_64'),
+            'pwd' : work_dir,
+            'src' : PurePath(self.lp_out_file(fname)).with_suffix('.o')
+        }
+
+        with open(Path(work_dir, 'Makefile'), 'w') as f:
+            f.write(Template(TEMPL_MAKEFILE).render(**render_vars))
 
     def GenerateLivePatches(self, cs):
         lp_path = self.get_cs_lp_dir(cs)

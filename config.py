@@ -136,7 +136,8 @@ class Config:
         if self.cs_is_rt(cs):
             kdir = 'rt'
 
-        return Path('x86_64', kdir)
+        sdir = self.get_sdir(cs)
+        return Path(f'{sdir}-obj', 'x86_64', kdir)
 
     def get_mod_path(self, cs, arch):
         kdir = 'default'

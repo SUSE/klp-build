@@ -425,7 +425,7 @@ class CCP(Config):
         i, fname, cs, fdata = args
 
         sdir = self.get_sdir(cs)
-        odir = Path(f'{sdir}-obj', self.get_odir(cs))
+        odir = self.get_odir(cs)
 
         # Needed, otherwise threads would interfere with each other
         env = self.env.copy()

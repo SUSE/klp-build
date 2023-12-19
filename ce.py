@@ -34,6 +34,8 @@ class CE(Config):
 
         self.make_lock = Lock()
 
+        self.tem = TemplateGen(self.bsc_num, self.filter)
+
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
 
@@ -247,8 +249,8 @@ class CE(Config):
         for group in groups:
             logging.info(f'\t{group}')
 
-    def execute_ce(self, cs, fname, funcs, out_dir, sdir, obj):
-        odir = Path(f'{sdir}-obj', self.get_odir(cs))
+    def execute_ce(self, cs, fname, funcs, out_dir, obj):
+        odir = self.get_odir(cs)
         symvers = str(Path(odir, 'Module.symvers'))
         ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
 
@@ -315,6 +317,8 @@ class CE(Config):
 
         self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
 
+        self.tem.CreateMakefile(cs, fname)
+
     def get_ipa_dir(self, cs, arch='x86_64'):
         kernel = self.get_cs_kernel(cs)
         if self.cs_is_rt(cs):
@@ -338,8 +342,7 @@ class CE(Config):
         out_dir = self.get_work_dir(cs, fname)
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        self.execute_ce(cs, fname, ','.join(fdata['symbols']), out_dir,
-                        self.get_sdir(cs), obj)
+        self.execute_ce(cs, fname, ','.join(fdata['symbols']), out_dir, obj)
 
     def run_ce(self):
         logging.info(f'Work directory: {self.bsc_path}')
@@ -373,8 +376,7 @@ class CE(Config):
 
         self.group_equal_files(args)
 
-        tem = TemplateGen(self.bsc_num, self.filter)
-        tem.generate_commit_msg_file()
+        self.tem.generate_commit_msg_file()
 
         logging.info('Checking the externalized symbols in other architectures...')
 
@@ -384,7 +386,7 @@ class CE(Config):
         # externalized symbols of this file
         # While we are at it, create the livepatches per codestream
         for cs, _ in working_cs.items():
-            tem.GenerateLivePatches(cs)
+            self.tem.GenerateLivePatches(cs)
 
             # Map all symbols related to each obj, to make it check the output
             # of nm only once per object
@@ -403,7 +405,7 @@ class CE(Config):
                         missing_syms[arch][obj].setdefault(cs, [])
                         missing_syms[arch][obj][cs].extend(arch_syms)
 
-            tem.CreateKbuildFile(cs)
+            self.tem.CreateKbuildFile(cs)
 
         if missing_syms:
             with open(Path(self.bsc_path, 'missing_syms'), 'w') as f:
