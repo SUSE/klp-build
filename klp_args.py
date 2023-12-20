@@ -59,6 +59,9 @@ def create_parser() -> argparse.ArgumentParser:
     diff_opts = sub.add_parser('cs-diff', parents = [parentparser])
     diff_opts.add_argument('--codestreams', nargs=2, type=str, required=True,
             help='Apply diff on two different codestreams')
+    diff_opts.add_argument('--type', type=str, required=True, choices=['ccp',
+                                                                       'ce'],
+            help='Choose between ccp and ce')
 
     format = sub.add_parser('format-patches', parents = [parentparser],
             help='Extract patches from kgraft-patches')
@@ -119,7 +122,10 @@ def main_func(main_args):
         CE(args.bsc, args.filter).run_ce()
 
     elif args.cmd == 'cs-diff':
-        CCP(args.bsc, [], []).diff_cs(args.codestreams)
+        if args.type == 'ccp':
+            CCP(args.bsc, [], []).diff_cs(args.codestreams)
+        else:
+            CE(args.bsc, []).diff_cs(args.codestreams)
 
     elif args.cmd == 'get-patches':
         GitHelper(args.bsc, args.filter).get_commits(args.cve)

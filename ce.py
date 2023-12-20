@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import concurrent.futures
+import difflib as dl
 import json
 import logging
 from natsort import natsorted
@@ -163,8 +164,6 @@ class CE(Config):
                 src = re.sub('#include \".+kconfig\.h\"', '', src)
                 # Since 15.4 klp-ccp includes a compiler-version.h header
                 src = re.sub('#include \".+compiler\-version\.h\"', '', src)
-                # Since RT variants, there is now an definition for auto_type
-                src = src.replace('#define __auto_type int\n', '')
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
@@ -177,9 +176,35 @@ class CE(Config):
                 # buggy in klp-ccp
                 src = re.sub('.+klpr_trace.+', '', src)
 
+                # Remove clang-extract comments
+                src = re.sub('clang-extract: .+', '', src)
+
                 cs_files[cs].append((file , src ))
 
         return cs_files
+
+    # cs_list should be only two entries
+    def diff_cs(self, cs_list):
+        args = []
+        f1 = {}
+        f2 = {}
+        for cs in cs_list:
+            for fname, _ in self.get_cs_files(cs).items():
+                args.append((_, fname, cs, _))
+
+        cs_code = self.get_cs_code(args)
+        f1 = cs_code.get(cs_list[0])
+        f2 = cs_code.get(cs_list[1])
+
+        assert(len(f1) == len(f2))
+
+        for i in range(len(f1)):
+            content1 = f1[i][1].splitlines()
+            content2 = f2[i][1].splitlines()
+
+            for l in dl.unified_diff(content1, content2, fromfile=f1[i][0],
+                                     tofile=f2[i][0]):
+                print(l)
 
     # Get the code for each codestream, removing boilerplate code
     def group_equal_files(self, args):
