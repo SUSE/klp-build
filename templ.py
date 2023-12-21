@@ -3,6 +3,7 @@ from mako.lookup import TemplateLookup
 from mako.template import Template
 from pathlib import Path, PurePath
 import os
+import shutil
 
 from config import Config
 
@@ -320,7 +321,7 @@ ${get_patched(cs_files, check_enabled)}
 TEMPL_MAKEFILE = '''\
 KDIR := ${ kdir }/build
 MOD_PATH := ${ pwd }
-obj-m := ${ src }
+obj-m := livepatch.o
 
 modules:
 \tmake -C $(KDIR) modules M=$(MOD_PATH)
@@ -418,11 +419,17 @@ class TemplateGen(Config):
 
     def CreateMakefile(self, cs, fname):
         work_dir = self.get_work_dir(cs, fname)
+        lp_path = Path(work_dir, 'livepatch.c')
+
+        # Add more data to make it compile correctly
+        shutil.copy(Path(work_dir, self.lp_out_file(fname)), lp_path)
+
+        with open(lp_path, 'a') as f:
+            f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
 
         render_vars = {
             'kdir' : self.get_mod_path(cs, 'x86_64'),
-            'pwd' : work_dir,
-            'src' : PurePath(self.lp_out_file(fname)).with_suffix('.o')
+            'pwd' : work_dir
         }
 
         with open(Path(work_dir, 'Makefile'), 'w') as f:
