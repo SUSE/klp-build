@@ -196,8 +196,6 @@ class CCP(Config):
             f.write(file_buf.replace(f'from {str(sdir)}/', 'from '))
             f.truncate()
 
-        os.symlink(lp_out, Path(self.get_cs_dir(cs), lp_name))
-
 		# Generate the list of exported symbols
         exts = []
 

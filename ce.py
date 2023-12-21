@@ -315,8 +315,6 @@ class CE(Config):
             f.flush()
             subprocess.run(ce_args, cwd=odir, stdout=f, stderr=f, check=True)
 
-        os.symlink(lp_out, Path(self.get_cs_dir(cs), lp_name))
-
 		# Generate the list of exported symbols
         exts = []
         with open(dsc_out) as f:
@@ -366,6 +364,10 @@ class CE(Config):
 
         out_dir = self.get_work_dir(cs, fname)
         out_dir.mkdir(parents=True, exist_ok=True)
+
+        # create symlink to the respective codestream file
+        os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir,
+                                                        Path(fname).name))
 
         self.execute_ce(cs, fname, ','.join(fdata['symbols']), out_dir, obj)
 
