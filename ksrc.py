@@ -28,7 +28,7 @@ class GitHelper(Config):
                                 'sle15-sp1-ltss' : 'SLE15-SP1-LTSS',
                                 'sle15-sp2-ltss' : 'SLE15-SP2-LTSS',
                                 'sle15-sp3-ltss' : 'SLE15-SP3-LTSS',
-                                'sle15-sp4' : 'SLE15-SP4',
+                                'sle15-sp4-ltss' : 'SLE15-SP4-LTSS',
                                 'sle15-sp4-rt' : 'SLE15-SP4-RT',
                                 'sle15-sp5' : 'SLE15-SP5',
                                 'sle15-sp5-rt' : 'SLE15-SP5-RT',

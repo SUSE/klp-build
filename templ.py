@@ -106,7 +106,7 @@ ${get_commits(commits, '4.12')}
 ${get_commits(commits, '5.3')}
  *
  *  SLE15-SP4 and -SP5 commit:
-${get_commits(commits, 'sle15-sp4')}
+${get_commits(commits, 'sle15-sp4-ltss')}
  *
 % endif
  *  Copyright (c) ${year} SUSE
