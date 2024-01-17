@@ -146,7 +146,7 @@ ${get_commits(commits, 'sle15-sp4')}
 % if hollow_c:
 int ${ fname }_init(void)
 {
-    return 0;
+\treturn 0;
 }
 
 void ${ fname }_cleanup(void)
