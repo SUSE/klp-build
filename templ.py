@@ -330,17 +330,18 @@ clean:
 '''
 
 class TemplateGen(Config):
-    def __init__(self, bsc, bsc_filter):
+    def __init__(self, bsc, bsc_filter, app = 'c'):
         super().__init__(bsc, bsc_filter)
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
         self.check_enabled = self.conf['archs'] != self.archs
+        self.app = app
 
     # Things might have changed since TemplateGen was instantiated, so reassign
     # it
     def refresh_codestreams(self, cs_list):
-        self.codestreams = cs_list 
+        self.codestreams = cs_list
 
     def fix_mod_string(self, mod):
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
@@ -363,7 +364,7 @@ class TemplateGen(Config):
 
     def __GenerateLivepatchFile(self, lp_path, cs, ext, src_file, use_src_name=False):
         if src_file:
-            lp_inc_dir = str(self.get_work_dir(cs, src_file))
+            lp_inc_dir = str(self.get_work_dir(cs, src_file, self.app))
             lp_file = self.lp_out_file(src_file)
             fdata = self.get_cs_files(cs)[str(src_file)]
             mod = self.fix_mod_string(fdata['module'])
@@ -415,10 +416,10 @@ class TemplateGen(Config):
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
 
     def get_cs_lp_dir(self, cs):
-        return Path(self.get_cs_dir(cs), 'lp')
+        return Path(self.get_cs_dir(cs, self.app), 'lp')
 
     def CreateMakefile(self, cs, fname):
-        work_dir = self.get_work_dir(cs, fname)
+        work_dir = self.get_work_dir(cs, fname, self.app)
         lp_path = Path(work_dir, 'livepatch.c')
 
         # Add more data to make it compile correctly

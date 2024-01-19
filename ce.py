@@ -35,7 +35,7 @@ class CE(Config):
 
         self.make_lock = Lock()
 
-        self.tem = TemplateGen(self.bsc_num, self.filter)
+        self.tem = TemplateGen(self.bsc_num, self.filter, 'ce')
 
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
@@ -147,7 +147,7 @@ class CE(Config):
         return ' '.join(ret_list)
 
     def get_work_lp_file(self, cs, fname):
-        return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
+        return Path(self.get_work_dir(cs, fname, 'ce'), self.lp_out_file(fname))
 
     def get_cs_code(self, args):
         cs_files = {}
@@ -362,7 +362,7 @@ class CE(Config):
 
         logging.info(f'{idx} {cs_info} {fname}')
 
-        out_dir = self.get_work_dir(cs, fname)
+        out_dir = self.get_work_dir(cs, fname, 'ce')
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # create symlink to the respective codestream file
@@ -382,7 +382,7 @@ class CE(Config):
         i = 1
         for cs, data in working_cs.items():
             # remove any previously generated files
-            shutil.rmtree(self.get_cs_dir(cs), ignore_errors=True)
+            shutil.rmtree(self.get_cs_dir(cs, 'ce'), ignore_errors=True)
 
             for fname, fdata in data['files'].items():
                 args.append((i, fname, cs, fdata))

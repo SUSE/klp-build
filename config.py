@@ -83,14 +83,12 @@ class Config:
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f'{self.bsc}_{fpath}'
 
-    def get_cs_dir(self, cs, arch=''):
-        if arch:
-            return Path(self.bsc_path, 'c', cs, arch)
-        return Path(self.bsc_path, 'c', cs)
+    def get_cs_dir(self, cs, app = 'c'):
+        return Path(self.bsc_path, app, cs)
 
-    def get_work_dir(self, cs, fname):
+    def get_work_dir(self, cs, fname, app = 'c'):
         fpath = f'work_{str(fname).replace("/", "_")}'
-        return Path(self.get_cs_dir(cs), fpath)
+        return Path(self.get_cs_dir(cs, app), fpath)
 
     def get_cs_data(self, cs):
         if self.working_cs.get(cs, ''):
