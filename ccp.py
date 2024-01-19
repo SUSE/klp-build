@@ -403,7 +403,7 @@ class CCP(Config):
         for cs_list in cs_equal:
             groups.append(CCP.classify_codestreams(cs_list))
 
-        with open(Path(self.bsc_path, 'groups'), 'w') as f:
+        with open(Path(self.bsc_path, 'c', 'groups'), 'w') as f:
             f.write('\n'.join(groups))
 
         logging.info('\nGrouping codestreams that share the same content and files:')
