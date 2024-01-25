@@ -146,16 +146,7 @@ def get_exts(ext_vars):
 % endif # inc_src_file
 
 #include "livepatch_bsc${ bsc_num }.h"
-% if hollow_c:
-int ${ fname }_init(void)
-{
-\treturn 0;
-}
 
-void ${ fname }_cleanup(void)
-{
-}
-% else: # hollow_c
 % if ext_vars:
 #include <linux/kernel.h>
 % if mod:
@@ -262,7 +253,34 @@ void ${ fname }_cleanup(void)
 }
 % endif # mod
 % endif # ext_vars
-% endif # hollow_c
+% if check_enabled:
+
+#endif /* IS_ENABLED(${ config }) */
+% endif check_enabled
+'''
+
+TEMPL_HOLLOW= '''\
+% if check_enabled:
+#if IS_ENABLED(${ config })
+% endif # check_enabled
+
+% if mod:
+#if !IS_MODULE(${ config })
+#error "Live patch supports only CONFIG=m"
+#endif
+% endif # mod
+
+#include "livepatch_bsc${ bsc_num }.h"
+
+int ${ fname }_init(void)
+{
+\treturn 0;
+}
+
+void ${ fname }_cleanup(void)
+{
+}
+
 % if check_enabled:
 
 #endif /* IS_ENABLED(${ config }) */
@@ -406,8 +424,7 @@ class TemplateGen(Config):
                 'mod_mutex' : self.is_mod_mutex(cs),
                 'check_enabled' : self.check_enabled,
                 'ext_vars' : exts,
-                'inc_src_file' : lp_file,
-                'hollow_c' : ext == 'c' and not src_file
+                'inc_src_file' : lp_file
         }
 
         with open(Path(lp_path, out_name), 'w') as f:
@@ -416,7 +433,11 @@ class TemplateGen(Config):
             # For C files, first add the LICENSE header template to the file
             if ext == 'c':
                 f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
-                temp_str = TEMPL_C
+
+                # If we have multiple source files for the same livepatch,
+                # create one hollow file to wire-up the multiple _init and
+                # _clean functions
+                temp_str = TEMPL_C if lp_file else TEMPL_HOLLOW
 
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
 
