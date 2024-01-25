@@ -24,16 +24,16 @@ class GitHelper(Config):
             raise RuntimeError('kgraft-patches does not exists in ~/kgr')
 
         self.kernel_branches = {
-                                'sle12-sp5' : 'SLE12-SP5',
-                                'sle15-sp1-ltss' : 'SLE15-SP1-LTSS',
-                                'sle15-sp2-ltss' : 'SLE15-SP2-LTSS',
-                                'sle15-sp3-ltss' : 'SLE15-SP3-LTSS',
-                                'sle15-sp4-ltss' : 'SLE15-SP4-LTSS',
-                                'sle15-sp4-rt' : 'SLE15-SP4-RT',
-                                'sle15-sp5' : 'SLE15-SP5',
-                                'sle15-sp5-rt' : 'SLE15-SP5-RT',
-                                '4.12' : 'cve/linux-4.12',
-                                '5.3' : 'cve/linux-5.3'
+                                '12.5' : 'SLE12-SP5',
+                                '15.1' : 'SLE15-SP1-LTSS',
+                                '15.2' : 'SLE15-SP2-LTSS',
+                                '15.3' : 'SLE15-SP3-LTSS',
+                                '15.4' : 'SLE15-SP4-LTSS',
+                                '15.4rt' : 'SLE15-SP4-RT',
+                                '15.5' : 'SLE15-SP5',
+                                '15.5rt' : 'SLE15-SP5-RT',
+                                'cve-4.12' : 'cve/linux-4.12',
+                                'cve-5.3' : 'cve/linux-5.3'
                             }
 
         # Filter only the branches related to this BSC

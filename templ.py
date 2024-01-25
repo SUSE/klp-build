@@ -100,13 +100,13 @@ def get_exts(ext_vars):
 ${get_commits(commits, 'upstream')}
  *
  *  SLE12-SP5 and SLE15-SP1 commit:
-${get_commits(commits, '4.12')}
+${get_commits(commits, 'cve-4.12')}
  *
  *  SLE15-SP2 and -SP3 commit:
-${get_commits(commits, '5.3')}
+${get_commits(commits, 'cve-5.3')}
  *
  *  SLE15-SP4 and -SP5 commit:
-${get_commits(commits, 'sle15-sp4-ltss')}
+${get_commits(commits, '15.4')}
  *
 % endif
  *  Copyright (c) ${year} SUSE
