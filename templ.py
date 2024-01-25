@@ -36,7 +36,7 @@ static inline void ${ fname }_cleanup(void) {}
 #endif /* _${ fname.upper() }_H */
 '''
 
-TEMPL_C = '''\
+TEMPL_SUSE_HEADER = '''\
 <%
 def get_commits(cmts, cs):
     if not cmts.get(cs, ''):
@@ -51,44 +51,6 @@ def get_commits(cmts, cs):
                 ret.append(f' *  {m}')
 
     return "\\n".join(ret)
-%>\
-<%
-def get_exts(ext_vars):
-        ext_list = []
-        for obj, syms in ext_vars.items():
-            if obj == 'vmlinux':
-                mod = ''
-            else:
-                mod = obj
-
-            for sym in syms:
-                lsym = f'\\t{{ "{sym}",'
-                prefix_var = f'klpe_{sym}'
-                if not mod:
-                    var = f' (void *)&{prefix_var} }},'
-                else:
-                    var = f' (void *)&{prefix_var},'
-                    mod = f' "{obj}" }},'
-
-                # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
-                # our goal when splitting these lines
-                if len(lsym + var + mod) < 73:
-                    ext_list.append(lsym + var + mod)
-
-                elif len(lsym + var) < 73:
-                    ext_list.append(lsym + var)
-                    if mod:
-                        ext_list.append('\\t ' + mod)
-
-                else:
-                    ext_list.append(lsym)
-                    if len(var + mod) < 73:
-                        ext_list.append(f'\\t {var}{mod}')
-                    else:
-                        ext_list.append(f'\\t {var}')
-                        if mod:
-                            ext_list.append(f'\\t {mod}')
-        return '\\n'.join(ext_list)
 %>\
 /*
  * ${fname}
@@ -127,6 +89,47 @@ ${get_commits(commits, '15.4')}
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
+'''
+
+TEMPL_C = '''\
+<%
+def get_exts(ext_vars):
+        ext_list = []
+        for obj, syms in ext_vars.items():
+            if obj == 'vmlinux':
+                mod = ''
+            else:
+                mod = obj
+
+            for sym in syms:
+                lsym = f'\\t{{ "{sym}",'
+                prefix_var = f'klpe_{sym}'
+                if not mod:
+                    var = f' (void *)&{prefix_var} }},'
+                else:
+                    var = f' (void *)&{prefix_var},'
+                    mod = f' "{obj}" }},'
+
+                # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
+                # our goal when splitting these lines
+                if len(lsym + var + mod) < 73:
+                    ext_list.append(lsym + var + mod)
+
+                elif len(lsym + var) < 73:
+                    ext_list.append(lsym + var)
+                    if mod:
+                        ext_list.append('\\t ' + mod)
+
+                else:
+                    ext_list.append(lsym)
+                    if len(var + mod) < 73:
+                        ext_list.append(f'\\t {var}{mod}')
+                    else:
+                        ext_list.append(f'\\t {var}')
+                        if mod:
+                            ext_list.append(f'\\t {mod}')
+        return '\\n'.join(ext_list)
+%>\
 
 % if check_enabled:
 #if IS_ENABLED(${ config })
@@ -410,7 +413,9 @@ class TemplateGen(Config):
         with open(Path(lp_path, out_name), 'w') as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir])
             temp_str = TEMPL_H
+            # For C files, first add the LICENSE header template to the file
             if ext == 'c':
+                f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
                 temp_str = TEMPL_C
 
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
