@@ -285,8 +285,13 @@ class GitHelper(Config):
                     if 'Update' in hash_entry and 'patches.suse' in hash_entry:
                         continue
 
+                    # Sometimes we can have a commit that touches two files. In
+                    # these cases we can have duplicated hash commits, since git
+                    # history for each individual file will show the same hash.
+                    # Skip if the same hash already exists.
                     hash_commit = hash_entry.split(' ')[0]
-                    commits[bc]['commits'].append(hash_commit)
+                    if hash_commit not in commits[bc]['commits']:
+                        commits[bc]['commits'].append(hash_commit)
 
         # Grab each commits subject and date for each commit. The commit dates
         # will be used to sort the patches in the order they were
