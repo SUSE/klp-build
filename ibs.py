@@ -303,18 +303,17 @@ class IBS(Config):
                                       stderr=subprocess.STDOUT).decode()
 
         # Check depends field
+        # At this point we found that our livepatch module depends on
+        # exported functions from other modules. List the modules here.
         match = re.search('depends: (.+)', out)
         if match:
             deps = match.group(1).strip()
-            # At this point we found that our livepatch module depends on
-            # functions that are exported modules.
+            logging.warning(f'{cs}:{arch} has dependencies: {deps}.')
 
-            # TODO: get the UND symbols from the livepatch and find which
-            # symbols are not defined in the vmlinux. These symbols will need to
-            # be worked in the livepatch.
-            if deps:
-                funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
-                logging.warning(f'{cs}:{arch} has dependencies: {deps}. Functions: {" ".join(funcs)}')
+        funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
+        if funcs:
+                logging.warning(f'Undefined functions: {" ".join(funcs)}')
+
 
         shutil.rmtree(Path(rpm_dir, 'lib'), ignore_errors=True)
 
@@ -448,6 +447,8 @@ class IBS(Config):
                 prjs[prj] = {}
 
                 for res in self.osc.build.get(prj).findall('result'):
+                    if not res.xpath('status/@code'):
+                        continue
                     code = res.xpath('status/@code')[0]
                     prjs[prj][res.get('arch')] = code
 
