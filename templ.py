@@ -91,7 +91,7 @@ ${get_commits(commits, '15.4')}
  */
 '''
 
-TEMPL_C = '''\
+TEMPL_PATCH_VMLINUX = '''\
 <%
 def get_exts(ext_vars):
         ext_list = []
@@ -135,34 +135,97 @@ def get_exts(ext_vars):
 #if IS_ENABLED(${ config })
 % endif # check_enabled
 
-% if mod:
-#if !IS_MODULE(${ config })
-#error "Live patch supports only CONFIG=m"
-#endif
-% endif # mod
-
-% if inc_src_file:
 <%include file="${ inc_src_file }"/>
-% endif # inc_src_file
 
 #include "livepatch_bsc${ bsc_num }.h"
 
 % if ext_vars:
 #include <linux/kernel.h>
-% if mod:
-#include <linux/module.h>
-% endif # mod
 #include "../kallsyms_relocs.h"
-
-% if mod:
-#define LP_MODULE "${ mod }"
-% endif # mod
 
 static struct klp_kallsyms_reloc klp_funcs[] = {
 ${get_exts(ext_vars)}
 };
 
-% if mod:
+int ${ fname }_init(void)
+{
+% if mod_mutex:
+	return __klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
+% else: # mod_mutex
+	return klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
+% endif # mod_mutex
+}
+
+% endif # ext_vars
+% if check_enabled:
+
+#endif /* IS_ENABLED(${ config }) */
+% endif check_enabled
+'''
+
+TEMPL_PATCH_MODULE = '''\
+<%
+def get_exts(ext_vars):
+        ext_list = []
+        for obj, syms in ext_vars.items():
+            if obj == 'vmlinux':
+                mod = ''
+            else:
+                mod = obj
+
+            for sym in syms:
+                lsym = f'\\t{{ "{sym}",'
+                prefix_var = f'klpe_{sym}'
+                if not mod:
+                    var = f' (void *)&{prefix_var} }},'
+                else:
+                    var = f' (void *)&{prefix_var},'
+                    mod = f' "{obj}" }},'
+
+                # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
+                # our goal when splitting these lines
+                if len(lsym + var + mod) < 73:
+                    ext_list.append(lsym + var + mod)
+
+                elif len(lsym + var) < 73:
+                    ext_list.append(lsym + var)
+                    if mod:
+                        ext_list.append('\\t ' + mod)
+
+                else:
+                    ext_list.append(lsym)
+                    if len(var + mod) < 73:
+                        ext_list.append(f'\\t {var}{mod}')
+                    else:
+                        ext_list.append(f'\\t {var}')
+                        if mod:
+                            ext_list.append(f'\\t {mod}')
+        return '\\n'.join(ext_list)
+%>\
+
+% if check_enabled:
+#if IS_ENABLED(${ config })
+% endif # check_enabled
+
+#if !IS_MODULE(${ config })
+#error "Live patch supports only CONFIG=m"
+#endif
+
+<%include file="${ inc_src_file }"/>
+
+#include "livepatch_bsc${ bsc_num }.h"
+
+% if ext_vars:
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include "../kallsyms_relocs.h"
+
+#define LP_MODULE "${ mod }"
+
+static struct klp_kallsyms_reloc klp_funcs[] = {
+${get_exts(ext_vars)}
+};
+
 static int module_notify(struct notifier_block *nb,
 			unsigned long action, void *data)
 {
@@ -189,11 +252,9 @@ static struct notifier_block module_nb = {
 	.notifier_call = module_notify,
 	.priority = INT_MIN+1,
 };
-% endif # mod
 
 int ${ fname }_init(void)
 {
-% if mod:
 	int ret;
 % if mod_mutex:
 
@@ -237,21 +298,12 @@ out:
 
 	return ret;
 % endif # mod_mutex
-% else: # mod
-% if mod_mutex:
-	return __klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
-% else: # mod_mutex
-	return klp_resolve_kallsyms_relocs(klp_funcs, ARRAY_SIZE(klp_funcs));
-% endif # mod_mutex
-% endif # mod
 }
 
-% if mod:
 void ${ fname }_cleanup(void)
 {
 	unregister_module_notifier(&module_nb);
 }
-% endif # mod
 % endif # ext_vars
 % if check_enabled:
 
@@ -263,12 +315,6 @@ TEMPL_HOLLOW= '''\
 % if check_enabled:
 #if IS_ENABLED(${ config })
 % endif # check_enabled
-
-% if mod:
-#if !IS_MODULE(${ config })
-#error "Live patch supports only CONFIG=m"
-#endif
-% endif # mod
 
 #include "livepatch_bsc${ bsc_num }.h"
 
@@ -437,7 +483,17 @@ class TemplateGen(Config):
                 # If we have multiple source files for the same livepatch,
                 # create one hollow file to wire-up the multiple _init and
                 # _clean functions
-                temp_str = TEMPL_C if lp_file else TEMPL_HOLLOW
+                #
+                # If we are patching a module, we should have the
+                # module_notifier armed to signal whenever the module comes on
+                # in order to do the symbol lookups. Otherwise only _init is
+                # needed, and only if there are externalized symbols being used.
+                if not lp_file:
+                    temp_str = TEMPL_HOLLOW
+                elif mod:
+                    temp_str = TEMPL_PATCH_MODULE
+                else:
+                    temp_str = TEMPL_PATCH_VMLINUX
 
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
 
