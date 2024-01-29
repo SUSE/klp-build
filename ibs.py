@@ -305,10 +305,11 @@ class IBS(Config):
         # Check depends field
         # At this point we found that our livepatch module depends on
         # exported functions from other modules. List the modules here.
-        match = re.search('depends: (.+)', out)
+        match = re.search('depends:(.+)', out)
         if match:
             deps = match.group(1).strip()
-            logging.warning(f'{cs}:{arch} has dependencies: {deps}.')
+            if len(deps):
+                logging.warning(f'{cs}:{arch} has dependencies: {deps}.')
 
         funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
         if funcs:
