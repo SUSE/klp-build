@@ -25,9 +25,8 @@ def create_parser() -> argparse.ArgumentParser:
             help='The CVE assigned to this livepatch')
     setup.add_argument('--conf', type=str, default='',
             help='The kernel CONFIG used to be build the livepatch')
-    setup.add_argument('--codestream', type=str, default='',
-            help='Codestream of which the file and functions are related. Can '
-                ' be used a regex, like, 15.u[34]')
+    setup.add_argument('--codestreams', type=str, default='',
+            help='Codestreams affected by the CVE. Can be used a regex, like, 15.u[34]')
     setup.add_argument('--file-funcs', required=False, action='append',
                        nargs='*', default=[],
             help='File and functions to be livepatched. Can be set '
@@ -101,7 +100,7 @@ def main_func(main_args):
     args = create_parser().parse_args(main_args)
 
     if args.cmd == 'setup':
-        setup = Setup(args.bsc, args.filter, args.cve, args.codestream,
+        setup = Setup(args.bsc, args.filter, args.cve, args.codestreams,
                       args.file_funcs, args.mod_file_funcs, args.conf_mod_file_funcs,
                       args.module, args.conf, args.archs, args.skips)
         setup.setup_project_files()
