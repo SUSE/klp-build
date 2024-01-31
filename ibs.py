@@ -332,10 +332,9 @@ class IBS(Config):
 
         return f'{buf}_Update_{up}'
 
-    def prepare_tests(self, skip_download):
-        if not skip_download:
-            # Download all built rpms
-            self.download()
+    def prepare_tests(self):
+        # Download all built rpms
+        self.download()
 
         test_sh = Path(self.kgraft_tests_path,
                        f'{self.bsc}_test_script.sh')

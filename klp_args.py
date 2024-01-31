@@ -75,17 +75,8 @@ def create_parser() -> argparse.ArgumentParser:
     cleanup = sub.add_parser('cleanup', parents = [parentparser],
                              help='Remove livepatch packages from IBS')
 
-    ibs = sub.add_parser('ibs', parents = [parentparser],
-            help='Manipulate livepatch packages in IBS')
-
-    ibs.add_argument('--download', action='store_true',
-            help='Download livepatch rpms')
-
-    ibs.add_argument('--prepare-tests', action='store_true',
-            help='Prepare a tarball with the rpms and tests')
-
-    ibs.add_argument('--skip-download', action='store_true', default=False,
-            help='Do not drop and redownload the built rpms')
+    prep_tests = sub.add_parser('prepare-tests', parents = [parentparser],
+            help='Download the built tests and check for LP dependencies')
 
     push = sub.add_parser('push', parents = [parentparser],
             help='Push livepatch packages to IBS to be built')
@@ -145,9 +136,5 @@ def main_func(main_args):
     elif args.cmd == 'cleanup':
         IBS(args.bsc, args.filter).cleanup()
 
-    elif args.cmd == 'ibs':
-        ibs = IBS(args.bsc, args.filter)
-        if args.download:
-            ibs.download()
-        elif args.prepare_tests:
-            ibs.prepare_tests(args.skip_download)
+    elif args.cmd == 'prepare-tests':
+        IBS(args.bsc, args.filter).prepare_tests()
