@@ -83,6 +83,9 @@ class Config:
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f'{self.bsc}_{fpath}'
 
+    def get_patches_dir(self):
+        return Path(self.bsc_path, 'fixes')
+
     def get_cs_dir(self, cs, app = 'c'):
         return Path(self.bsc_path, app, cs)
 

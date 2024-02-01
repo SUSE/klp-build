@@ -16,6 +16,8 @@ def create_parser() -> argparse.ArgumentParser:
             help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
     parentparser.add_argument('--filter', type=str,
             help='Filter out codestreams using a regex. Example: 15\.3u[0-9]+')
+    parentparser.add_argument('--experimental', action='store_true',
+            help='Enables functions that may not work as expected yet.')
 
     parser = argparse.ArgumentParser(add_help=False)
     sub = parser.add_subparsers(dest='cmd')
@@ -47,6 +49,8 @@ def create_parser() -> argparse.ArgumentParser:
     setup.add_argument('--archs', required=True, choices=archs, nargs='+',
                        help='Supported architectures for this livepatch')
     setup.add_argument('--skips', help='List of codestreams to filter out')
+    setup.add_argument('--apply-patches', action='store_true',
+                       help='Apply patches found by get-patches subcommand, if they exist')
 
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
     ccp_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],
@@ -102,7 +106,8 @@ def main_func(main_args):
     if args.cmd == 'setup':
         setup = Setup(args.bsc, args.filter, args.cve, args.codestreams,
                       args.file_funcs, args.mod_file_funcs, args.conf_mod_file_funcs,
-                      args.module, args.conf, args.archs, args.skips)
+                      args.module, args.conf, args.archs, args.skips,
+                      args.apply_patches)
         setup.setup_project_files()
 
     elif args.cmd == 'run-ccp':
