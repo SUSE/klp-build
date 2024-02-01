@@ -345,10 +345,10 @@ class CE(Config):
     def get_ipa_dir(self, cs, arch='x86_64'):
         kernel = self.get_cs_kernel(cs)
         if self.cs_is_rt(cs):
-            return Path(self.get_data_dir(cs), 'usr', 'src',
+            return Path(self.get_data_dir(arch), 'usr', 'src',
                         f'linux-{kernel}-rt-obj', arch, 'rt')
 
-        return Path(self.get_data_dir(cs), 'usr', 'src', f'linux-{kernel}-obj',
+        return Path(self.get_data_dir(arch), 'usr', 'src', f'linux-{kernel}-obj',
                     arch, 'default')
 
     def process_ce(self, args):

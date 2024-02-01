@@ -140,6 +140,30 @@ class Setup(Config):
 
         return codestreams
 
+    def cs_repo(self, cs):
+        sle, sp, up, rt = self.get_cs_tuple(cs)
+        if up == 0:
+            return 'standard'
+
+        repo = f"SUSE_SLE-{sle}"
+        if sp != 0:
+            repo = f"{repo}-SP{sp}"
+
+        repo = f'{repo}_Update'
+
+        # On 15.5 the RT kernels and in the main codestreams
+        if not rt or (sle >= 15 and sp >= 5):
+            return repo
+
+        return f'{repo}_Products_SLERT_Update'
+
+    # s390x is enabled on 12.5 for all updates.
+    # s390x is not supported on 15.1
+    # s390x is supported from 15.2 onwards.
+    def is_s390_supported(self, cs):
+        sle, sp, _, _ = self.get_cs_tuple(cs)
+        return sle == 12 or (sle == 15 and sp >= 2)
+
     def setup_project_files(self):
         self.bsc_path.mkdir(exist_ok=True)
 
@@ -160,7 +184,7 @@ class Setup(Config):
         cs_data_missing = {}
 
         # list of codestreams that matches the file-funcs argument
-        working_cs = OrderedDict()
+        self.working_cs = OrderedDict()
         patched_cs = []
 
         for cs, data in all_codestreams.items():
@@ -187,10 +211,10 @@ class Setup(Config):
 
             data['archs'] = archs
 
-            if not self.get_data_dir(cs, 'x86_64').is_dir():
-                cs_data_missing[cs] = data
+            self.working_cs[cs] = data
 
-            working_cs[cs] = data
+            if self.missing_codestream(cs):
+                cs_data_missing[cs] = data
 
         if patched_cs:
             logging.info('Skipping already patched codestreams:')
@@ -206,7 +230,7 @@ class Setup(Config):
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
-        self.working_cs = self.filter_cs(working_cs, verbose=True)
+        self.working_cs = self.filter_cs(self.working_cs, verbose=True)
 
         # Remove filtered codestreams from missing data codestreams, as we don't
         # need to download data from codestreams that we don't need to build
@@ -256,26 +280,4 @@ class Setup(Config):
 
         self.flush_cs_file()
 
-    def cs_repo(self, cs):
-        sle, sp, up, rt = self.get_cs_tuple(cs)
-        if up == 0:
-            return 'standard'
 
-        repo = f"SUSE_SLE-{sle}"
-        if sp != 0:
-            repo = f"{repo}-SP{sp}"
-
-        repo = f'{repo}_Update'
-
-        # On 15.5 the RT kernels and in the main codestreams
-        if not rt or (sle >= 15 and sp >= 5):
-            return repo
-
-        return f'{repo}_Products_SLERT_Update'
-
-    # s390x is enabled on 12.5 for all updates.
-    # s390x is not supported on 15.1
-    # s390x is supported from 15.2 onwards.
-    def is_s390_supported(self, cs):
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        return sle == 12 or (sle == 15 and sp >= 2)

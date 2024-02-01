@@ -120,15 +120,10 @@ class IBS(Config):
         if arch != 'x86_64' and '-extra' in rpm:
             return
 
-        if re.search('kernel\-(default|rt)\-\d+', rpm) or \
-                re.search('kernel\-(default|rt)\-extra\-\d+', rpm):
-            path_dest = self.get_data_dir(cs, arch)
-        else:
-            path_dest = self.get_data_dir(cs)
-
-        rpm_file = Path(dest, rpm)
+        path_dest = self.get_data_dir(arch)
         path_dest.mkdir(exist_ok=True, parents=True)
 
+        rpm_file = Path(dest, rpm)
         cmd = f'rpm2cpio {rpm_file} | cpio --quiet -uidm'
         subprocess.check_output(cmd, shell=True, cwd=path_dest)
 
@@ -156,7 +151,7 @@ class IBS(Config):
             prj = data['project']
             repo = data['repo']
 
-            path_dest = Path(self.data, cs, 'kernel-rpms')
+            path_dest = Path(self.data, 'kernel-rpms')
             path_dest.mkdir(exist_ok=True, parents=True)
 
             for arch, val in self.cs_data.items():
@@ -184,6 +179,13 @@ class IBS(Config):
                             rpm = file
                         else:
                             rpm = file[0]
+
+                        # Extract the source and kernel-devel in the current
+                        # machine arch to make it possible to run klp-build in
+                        # different architectures
+                        if 'kernel-source' in pkg or 'kernel-devel' in pkg:
+                            arch = self.arch
+
                         rpms.append( (i, cs, prj, repo, arch, pkg, rpm, path_dest) )
                         i += 1
 
@@ -195,26 +197,23 @@ class IBS(Config):
         # codestream
         for cs in cs_list:
             for arch in self.get_cs_archs(cs):
-                mod_path= Path(self.get_data_dir(cs, arch), 'lib', 'modules')
-                vmlinux_path = Path(self.get_data_dir(cs, arch), 'boot')
-
+                # Extract modules and vmlinux files that are compressed
+                mod_path= Path(self.get_data_dir(arch), 'lib', 'modules')
                 for fext, ecmd in [('zst', 'unzstd --rm -f -d'), ('xz', 'xz --quiet -d')]:
                     cmd = f'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
+                vmlinux_path = Path(self.get_data_dir(arch), 'boot')
                 subprocess.check_output(f'find {vmlinux_path} -name "vmlinux*gz" -exec gzip -d -f {{}} \;',
                                         shell=True)
 
-            shutil.rmtree(Path(self.get_data_dir(cs), 'boot'), ignore_errors=True)
-            shutil.rmtree(Path(self.get_data_dir(cs), 'lib'), ignore_errors=True)
-
             # Use the SLE .config
-            shutil.copy(self.get_cs_config(cs), Path(self.get_odir(cs),
-                                                     '.config'))
+            shutil.copy(self.get_cs_config(cs), Path(self.get_odir(cs), '.config'))
 
-            # Create the build link to enable us to test the generated LP
-            os.symlink(self.get_odir(cs), Path(self.get_mod_path(cs, 'x86_64'),
-                                               'build'))
+            # Recreate the build link to enable us to test the generated LP
+            mod_path = Path(self.get_mod_path(cs, self.arch), 'build')
+            mod_path.unlink()
+            os.symlink(self.get_odir(cs), mod_path)
 
         logging.info('Finished extract vmlinux and modules...')
 
@@ -253,7 +252,7 @@ class IBS(Config):
             kdir = 'rt'
 
         kernel = self.get_cs_kernel(cs)
-        return Path(self.get_data_dir(cs, arch), 'boot',
+        return Path(self.get_data_dir(arch), 'boot',
                             f'vmlinux-{kernel}-{kdir}')
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):

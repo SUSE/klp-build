@@ -511,7 +511,7 @@ class TemplateGen(Config):
             f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
 
         render_vars = {
-            'kdir' : self.get_mod_path(cs, 'x86_64'),
+            'kdir' : self.get_mod_path(cs, self.arch),
             'pwd' : work_dir
         }
 

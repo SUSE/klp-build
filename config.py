@@ -4,6 +4,7 @@ import json
 import git
 import logging
 from pathlib import Path
+import platform
 import os
 import re
 import shutil
@@ -40,6 +41,7 @@ class Config:
         self.scripts = Path(os.path.dirname(__file__), 'scripts')
         self.filter = bsc_filter
         self.skips = skips
+        self.arch = platform.processor()
 
         self.archs = ['ppc64le', 's390x', 'x86_64']
 
@@ -114,12 +116,11 @@ class Config:
         return (int(match.group(1)), int(match.group(2)), int(match.group(4)),
                 match.group(3))
 
-    def get_data_dir(self, cs='', arch=''):
-        if not cs:
-            return self.data
-        if not arch:
-            return Path(self.data, cs)
-        return Path(self.data, cs, arch)
+    def missing_codestream(self, cs):
+        return not self.get_cs_config(cs).exists()
+
+    def get_data_dir(self, arch):
+        return Path(self.data, arch)
 
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get('rt', False)
@@ -128,14 +129,14 @@ class Config:
         ktype = 'rt' if self.cs_is_rt(cs) else 'default'
         kernel = self.get_cs_kernel(cs)
 
-        return Path(self.get_data_dir(cs, 'x86_64'), 'boot', f'config-{kernel}-{ktype}')
+        return Path(self.get_data_dir(self.arch), 'boot', f'config-{kernel}-{ktype}')
 
     def get_sdir(self, cs):
         kdir = '-rt'
         if not self.cs_is_rt(cs):
             kdir = ''
 
-        return Path(self.data, cs, 'usr', 'src',
+        return Path(self.data, self.arch, 'usr', 'src',
                         f"linux-{self.get_cs_kernel(cs)}{kdir}")
 
     def get_odir(self, cs):
@@ -144,14 +145,14 @@ class Config:
             kdir = 'rt'
 
         sdir = self.get_sdir(cs)
-        return Path(f'{sdir}-obj', 'x86_64', kdir)
+        return Path(f'{sdir}-obj', self.arch, kdir)
 
     def get_mod_path(self, cs, arch):
         kdir = 'default'
         if self.cs_is_rt(cs):
             kdir = 'rt'
 
-        return Path(self.get_data_dir(cs, arch), 'lib', 'modules',
+        return Path(self.get_data_dir(arch), 'lib', 'modules',
                     f'{self.get_cs_kernel(cs)}-{kdir}')
 
     def flush_cs_file(self):
@@ -162,7 +163,7 @@ class Config:
         return mod != 'vmlinux'
 
     def get_module_obj(self, arch, cs, module):
-        ex_dir = self.get_data_dir(cs, arch)
+        ex_dir = self.get_data_dir(arch)
 
         # We already search if the module exists on setup phase, so only search
         # for the module when looking for externalized symbols
