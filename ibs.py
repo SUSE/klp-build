@@ -203,8 +203,10 @@ class IBS(Config):
                     cmd = f'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
+                # Extract all gzipped files under arch//boot, including vmlinux,
+                # symvers and maybe others.
                 vmlinux_path = Path(self.get_data_dir(arch), 'boot')
-                subprocess.check_output(f'find {vmlinux_path} -name "vmlinux*gz" -exec gzip -d -f {{}} \;',
+                subprocess.check_output(f'find {vmlinux_path} -name "*gz" -exec gzip -d -f {{}} \;',
                                         shell=True)
 
             # Use the SLE .config
