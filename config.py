@@ -88,10 +88,10 @@ class Config:
     def get_patches_dir(self):
         return Path(self.bsc_path, 'fixes')
 
-    def get_cs_dir(self, cs, app = 'c'):
+    def get_cs_dir(self, cs, app):
         return Path(self.bsc_path, app, cs)
 
-    def get_work_dir(self, cs, fname, app = 'c'):
+    def get_work_dir(self, cs, fname, app):
         fpath = f'work_{str(fname).replace("/", "_")}'
         return Path(self.get_cs_dir(cs, app), fpath)
 

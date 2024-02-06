@@ -14,10 +14,11 @@ from threading import Lock
 from config import Config
 from templ import TemplateGen
 
-# clang-extract executer
 class CE(Config):
     def __init__(self, bsc, bsc_filter):
         super().__init__(bsc, bsc_filter)
+
+        self.app = 'ce'
 
         # Prefer the env var to the HOME directory location
         ce_path = os.getenv('KLP_CE_PATH', '')
@@ -35,7 +36,7 @@ class CE(Config):
 
         self.make_lock = Lock()
 
-        self.tem = TemplateGen(self.bsc_num, self.filter, 'ce')
+        self.tem = TemplateGen(self.bsc_num, self.filter, self.app)
 
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
@@ -147,7 +148,7 @@ class CE(Config):
         return ' '.join(ret_list)
 
     def get_work_lp_file(self, cs, fname):
-        return Path(self.get_work_dir(cs, fname, 'ce'), self.lp_out_file(fname))
+        return Path(self.get_work_dir(cs, fname, self.app), self.lp_out_file(fname))
 
     def get_cs_code(self, args):
         cs_files = {}
@@ -267,14 +268,14 @@ class CE(Config):
         for cs_list in cs_equal:
             groups.append(CE.classify_codestreams(cs_list))
 
-        with open(Path(self.bsc_path, 'ce', 'groups'), 'w') as f:
+        with open(Path(self.bsc_path, self.app, 'groups'), 'w') as f:
             f.write('\n'.join(groups))
 
         logging.info('\nGrouping codestreams that share the same content and files:')
         for group in groups:
             logging.info(f'\t{group}')
 
-    def execute_ce(self, cs, fname, funcs, out_dir, obj):
+    def execute(self, cs, fname, funcs, out_dir, obj):
         odir = self.get_odir(cs)
         symvers = str(Path(odir, 'Module.symvers'))
         ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
@@ -309,7 +310,7 @@ class CE(Config):
         ce_args.extend(['-DCE_KEEP_INCLUDES',
                         '-DCE_RENAME_SYMBOLS'])
 
-        with open(Path(out_dir, 'klp-ce.out.txt'), 'w') as f:
+        with open(Path(out_dir, 'ce.out.txt'), 'w') as f:
             # Write the command line used
             f.write('\n'.join(ce_args) + '\n')
             f.flush()
@@ -351,7 +352,7 @@ class CE(Config):
         return Path(self.get_data_dir(arch), 'usr', 'src', f'linux-{kernel}-obj',
                     arch, 'default')
 
-    def process_ce(self, args):
+    def process(self, args):
         i, fname, cs, fdata = args
 
         obj = self.get_module_obj('x86_64', cs, fdata['module'])
@@ -362,27 +363,27 @@ class CE(Config):
 
         logging.info(f'{idx} {cs_info} {fname}')
 
-        out_dir = self.get_work_dir(cs, fname, 'ce')
+        out_dir = self.get_work_dir(cs, fname, self.app)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # create symlink to the respective codestream file
         os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir,
                                                         Path(fname).name))
 
-        self.execute_ce(cs, fname, ','.join(fdata['symbols']), out_dir, obj)
+        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, obj)
 
-    def run_ce(self):
+    def run(self):
         logging.info(f'Work directory: {self.bsc_path}')
 
         working_cs = self.filter_cs(verbose=True)
 
-        # Make it perform better by spawning a process_ce function per
+        # Make it perform better by spawning a process function per
         # cs/file/funcs tuple, instead of spawning a thread per codestream
         args = []
         i = 1
         for cs, data in working_cs.items():
             # remove any previously generated files
-            shutil.rmtree(self.get_cs_dir(cs, 'ce'), ignore_errors=True)
+            shutil.rmtree(self.get_cs_dir(cs, self.app), ignore_errors=True)
 
             for fname, fdata in data['files'].items():
                 args.append((i, fname, cs, fdata))
@@ -393,12 +394,12 @@ class CE(Config):
         logging.info('\t\tCodestream\tFile')
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            results = executor.map(self.process_ce, args)
+            results = executor.map(self.process, args)
             for result in results:
                 if result:
                     logging.error(f'{cs}: {result}')
 
-        # Save the ext_symbols set by execute_ce
+        # Save the ext_symbols set by execute
         self.flush_cs_file()
 
         self.tem.refresh_codestreams(self.codestreams)

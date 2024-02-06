@@ -111,10 +111,10 @@ def main_func(main_args):
         setup.setup_project_files()
 
     elif args.cmd == 'run-ccp':
-        CCP(args.bsc, args.filter, args.avoid_ext).run_ccp()
+        CCP(args.bsc, args.filter, args.avoid_ext).run()
 
     elif args.cmd == 'run-ce':
-        CE(args.bsc, args.filter).run_ce()
+        CE(args.bsc, args.filter).run()
 
     elif args.cmd == 'cs-diff':
         if args.type == 'ccp':

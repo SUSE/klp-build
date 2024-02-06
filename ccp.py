@@ -3,9 +3,9 @@ import concurrent.futures
 import difflib as dl
 import json
 import logging
+from natsort import natsorted
 import os
 from pathlib import Path, PurePath
-from natsort import natsorted
 import re
 import shutil
 import subprocess
@@ -17,6 +17,8 @@ from templ import TemplateGen
 class CCP(Config):
     def __init__(self, bsc, bsc_filter, avoid_ext):
         super().__init__(bsc, bsc_filter)
+
+        self.app = 'c'
 
         self.env = os.environ
 
@@ -76,7 +78,7 @@ class CCP(Config):
 
         self.make_lock = Lock()
 
-        self.tem = TemplateGen(self.bsc_num, self.filter, 'c')
+        self.tem = TemplateGen(self.bsc_num, self.filter, self.app)
 
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
@@ -158,7 +160,7 @@ class CCP(Config):
 
         return None
 
-    def execute_ccp(self, cs, fname, funcs, out_dir, sdir, odir, env):
+    def execute(self, cs, fname, funcs, out_dir, sdir, odir, env):
         lp_name = self.lp_out_file(fname)
         lp_out = Path(out_dir, lp_name)
         ppath = self.pol_path
@@ -288,7 +290,7 @@ class CCP(Config):
         return ' '.join(ret_list)
 
     def get_work_lp_file(self, cs, fname):
-        return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
+        return Path(self.get_work_dir(cs, fname, self.app), self.lp_out_file(fname))
 
     def get_cs_code(self, args):
         cs_files = {}
@@ -407,7 +409,7 @@ class CCP(Config):
         for cs_list in cs_equal:
             groups.append(CCP.classify_codestreams(cs_list))
 
-        with open(Path(self.bsc_path, 'c', 'groups'), 'w') as f:
+        with open(Path(self.bsc_path, self.app, 'groups'), 'w') as f:
             f.write('\n'.join(groups))
 
         logging.info('\nGrouping codestreams that share the same content and files:')
@@ -423,7 +425,7 @@ class CCP(Config):
         return Path(self.get_data_dir(arch), 'usr', 'src', f'linux-{kernel}-obj',
                     arch, 'default')
 
-    def process_ccp(self, args):
+    def process(self, args):
         i, fname, cs, fdata = args
 
         sdir = self.get_sdir(cs)
@@ -445,7 +447,7 @@ class CCP(Config):
 
         base_fname = Path(fname).name
 
-        out_dir = self.get_work_dir(cs, fname)
+        out_dir = self.get_work_dir(cs, fname, self.app)
         out_dir.mkdir(parents=True, exist_ok=True)
         # create symlink to the respective codestream file
         os.symlink(Path(sdir, fname), Path(out_dir, base_fname))
@@ -454,21 +456,21 @@ class CCP(Config):
         env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs),
                                               f'{fname}.000i.ipa-clones'))
 
-        self.execute_ccp(cs, fname, ','.join(fdata['symbols']), out_dir, sdir, odir,
+        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, sdir, odir,
                 env)
 
-    def run_ccp(self):
+    def run(self):
         logging.info(f'Work directory: {self.bsc_path}')
 
         working_cs = self.filter_cs(verbose=True)
 
-        # Make it perform better by spawning a process_ccp function per
+        # Make it perform better by spawning a process function per
         # cs/file/funcs tuple, instead of spawning a thread per codestream
         args = []
         i = 1
         for cs, data in working_cs.items():
             # remove any previously generated files
-            shutil.rmtree(self.get_cs_dir(cs), ignore_errors=True)
+            shutil.rmtree(self.get_cs_dir(cs, self.app), ignore_errors=True)
 
             for fname, fdata in data['files'].items():
                 args.append((i, fname, cs, fdata))
@@ -479,12 +481,12 @@ class CCP(Config):
         logging.info('\t\tCodestream\tFile')
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            results = executor.map(self.process_ccp, args)
+            results = executor.map(self.process, args)
             for result in results:
                 if result:
                     logging.error(f'{cs}: {result}')
 
-        # Save the ext_symbols set by execute_ccp
+        # Save the ext_symbols set by execute
         self.flush_cs_file()
 
         self.tem.refresh_codestreams(self.codestreams)
