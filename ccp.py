@@ -76,6 +76,8 @@ class CCP(Config):
 
         self.make_lock = Lock()
 
+        self.tem = TemplateGen(self.bsc_num, self.filter, 'c')
+
     def unquote_output(self, matchobj):
         return matchobj.group(0).replace('"', '')
 
@@ -229,6 +231,8 @@ class CCP(Config):
             symbols[mod].append(sym)
 
         self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
+
+        self.tem.CreateMakefile(cs, fname)
 
     # Group all codestreams that share code in a format like bellow:
     #   [15.2u10 15.2u11 15.3u10 15.3u12 ]
@@ -483,10 +487,11 @@ class CCP(Config):
         # Save the ext_symbols set by execute_ccp
         self.flush_cs_file()
 
+        self.tem.refresh_codestreams(self.codestreams)
+
         self.group_equal_files(args)
 
-        tem = TemplateGen(self.bsc_num, self.filter)
-        tem.generate_commit_msg_file()
+        self.tem.generate_commit_msg_file()
 
         logging.info('Checking the externalized symbols in other architectures...')
 
@@ -496,7 +501,7 @@ class CCP(Config):
         # externalized symbols of this file
         # While we are at it, create the livepatches per codestream
         for cs, _ in working_cs.items():
-            tem.GenerateLivePatches(cs)
+            self.tem.GenerateLivePatches(cs)
 
             # Map all symbols related to each obj, to make it check the output
             # of nm only once per object
@@ -515,7 +520,7 @@ class CCP(Config):
                         missing_syms[arch][obj].setdefault(cs, [])
                         missing_syms[arch][obj][cs].extend(arch_syms)
 
-            tem.CreateKbuildFile(cs)
+            self.tem.CreateKbuildFile(cs)
 
         if missing_syms:
             with open(Path(self.bsc_path, 'missing_syms'), 'w') as f:
