@@ -160,7 +160,21 @@ class CCP(Config):
 
         return None
 
-    def execute(self, cs, fname, funcs, out_dir, sdir, odir, env):
+    def execute(self, cs, fname, funcs, out_dir, fdata):
+        sdir = self.get_sdir(cs)
+        odir = self.get_odir(cs)
+
+        # Needed, otherwise threads would interfere with each other
+        env = self.env.copy()
+
+        env['KCP_MOD_SYMVERS'] = str(Path(odir, 'Module.symvers'))
+        env['KCP_KBUILD_ODIR'] = str(odir)
+        env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
+        env['KCP_KBUILD_SDIR'] = str(sdir)
+        env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs),
+                                              f'{fname}.000i.ipa-clones'))
+        env['KCP_WORK_DIR'] = str(out_dir)
+
         lp_name = self.lp_out_file(fname)
         lp_out = Path(out_dir, lp_name)
         ppath = self.pol_path
@@ -428,36 +442,20 @@ class CCP(Config):
     def process(self, args):
         i, fname, cs, fdata = args
 
-        sdir = self.get_sdir(cs)
-        odir = self.get_odir(cs)
-
-        # Needed, otherwise threads would interfere with each other
-        env = self.env.copy()
-
-        env['KCP_MOD_SYMVERS'] = str(Path(odir, 'Module.symvers'))
-        env['KCP_KBUILD_ODIR'] = str(odir)
-        env['KCP_KBUILD_SDIR'] = str(sdir)
-        env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
-
         # The header text has two tabs
         cs_info = cs.ljust(15, ' ')
         idx = f'({i}/{self.total})'.rjust(15, ' ')
 
         logging.info(f'{idx} {cs_info} {fname}')
 
-        base_fname = Path(fname).name
-
         out_dir = self.get_work_dir(cs, fname, self.app)
         out_dir.mkdir(parents=True, exist_ok=True)
+
         # create symlink to the respective codestream file
-        os.symlink(Path(sdir, fname), Path(out_dir, base_fname))
-        env['KCP_WORK_DIR'] = str(out_dir)
+        os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir, Path(fname).name))
 
-        env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs),
-                                              f'{fname}.000i.ipa-clones'))
+        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata)
 
-        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, sdir, odir,
-                env)
 
     def run(self):
         logging.info(f'Work directory: {self.bsc_path}')

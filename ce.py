@@ -275,10 +275,11 @@ class CE(Config):
         for group in groups:
             logging.info(f'\t{group}')
 
-    def execute(self, cs, fname, funcs, out_dir, obj):
+    def execute(self, cs, fname, funcs, out_dir, fdata):
         odir = self.get_odir(cs)
         symvers = str(Path(odir, 'Module.symvers'))
         ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
+        obj = self.get_module_obj('x86_64', cs, fdata['module'])
 
         lp_name = self.lp_out_file(fname)
         lp_out = Path(out_dir, lp_name)
@@ -355,8 +356,6 @@ class CE(Config):
     def process(self, args):
         i, fname, cs, fdata = args
 
-        obj = self.get_module_obj('x86_64', cs, fdata['module'])
-
         # The header text has two tabs
         cs_info = cs.ljust(15, ' ')
         idx = f'({i}/{self.total})'.rjust(15, ' ')
@@ -367,10 +366,9 @@ class CE(Config):
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # create symlink to the respective codestream file
-        os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir,
-                                                        Path(fname).name))
+        os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir, Path(fname).name))
 
-        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, obj)
+        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata)
 
     def run(self):
         logging.info(f'Work directory: {self.bsc_path}')
