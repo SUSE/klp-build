@@ -20,17 +20,9 @@ class CE(Config):
 
         self.app = 'ce'
 
-        # Prefer the env var to the HOME directory location
-        ce_path = os.getenv('KLP_CE_PATH', '')
-        if ce_path and not Path(ce_path).is_file():
-            raise RuntimeError('KLP_CE_PATH does not point to a file')
-
-        elif not ce_path:
-            ce_path = Path(Path().home(), 'git', 'clang-extract', 'clang-extract')
-            if not ce_path.exists():
-                raise RuntimeError('clang-extract not found in ~/git/clang-extract/clang-extract. Please set KLP_CE_PATH env var to a valid clang-extract binary')
-
-        self.ce_path = str(ce_path)
+        self.ce_path = shutil.which('clang-extract')
+        if not self.ce_path:
+            raise RuntimeError('clang-extract not found. Aborting.')
 
         self.total = 0
 
@@ -165,6 +157,8 @@ class CE(Config):
                 src = re.sub('#include \".+kconfig\.h\"', '', src)
                 # Since 15.4 klp-ccp includes a compiler-version.h header
                 src = re.sub('#include \".+compiler\-version\.h\"', '', src)
+                # Since RT variants, there is now an definition for auto_type
+                src = src.replace('#define __auto_type int\n', '')
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
@@ -317,7 +311,7 @@ class CE(Config):
             f.flush()
             subprocess.run(ce_args, cwd=odir, stdout=f, stderr=f, check=True)
 
-		# Generate the list of exported symbols
+        # Generate the list of exported symbols
         exts = []
         with open(dsc_out) as f:
             for l in f:
@@ -388,7 +382,7 @@ class CE(Config):
                 i += 1
 
         self.total = len(args)
-        logging.info(f'\nRunning clang-extract for {len(args)} file(s)...')
+        logging.info(f'\nGenerating livepatches for {len(args)} file(s)...')
         logging.info('\t\tCodestream\tFile')
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
