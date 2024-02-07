@@ -272,7 +272,7 @@ class CE(Config):
     def execute(self, cs, fname, funcs, out_dir, fdata):
         odir = self.get_odir(cs)
         symvers = str(Path(odir, 'Module.symvers'))
-        ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
+        ipa = Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones')
         obj = self.get_module_obj('x86_64', cs, fdata['module'])
 
         lp_name = self.lp_out_file(fname)
@@ -293,11 +293,15 @@ class CE(Config):
 
         # Now add the macros to tell clang-extract what to do
         ce_args.extend([f'-DCE_DEBUGINFO_PATH={obj}',
-                        f'-DCE_IPACLONES_PATH={ipa}',
                         f'-DCE_SYMVERS_PATH={symvers}',
                         f'-DCE_EXTRACT_FUNCTIONS={funcs}',
                         f'-DCE_OUTPUT_FILE={lp_out}',
                         f'-DCE_DSC_OUTPUT={dsc_out}'])
+
+        if ipa.exists():
+            ce_args.extend([f'-DCE_IPACLONES_PATH={str(ipa)}'])
+        else:
+            logging.warning(f'{cs}: IPA file not found: {str(ipa)}')
 
         # Keep includes is necessary so don't end up expanding all headers,
         # generating a huge amount of code. This only makes sense for the
@@ -337,15 +341,6 @@ class CE(Config):
         self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
 
         self.tem.CreateMakefile(cs, fname)
-
-    def get_ipa_dir(self, cs, arch='x86_64'):
-        kernel = self.get_cs_kernel(cs)
-        if self.cs_is_rt(cs):
-            return Path(self.get_data_dir(arch), 'usr', 'src',
-                        f'linux-{kernel}-rt-obj', arch, 'rt')
-
-        return Path(self.get_data_dir(arch), 'usr', 'src', f'linux-{kernel}-obj',
-                    arch, 'default')
 
     def process(self, args):
         i, fname, cs, fdata = args
