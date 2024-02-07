@@ -138,9 +138,6 @@ class IBS(Config):
         if 'kernel-macros' not in rpm:
             self.extract_rpms( (i, cs, arch, rpm, dest) )
 
-    def get_cs_archs(self, cs):
-        return self.get_cs_data(cs)['archs']
-
     def download_cs_data(self, cs_list):
         rpms = []
         extract = []
@@ -210,7 +207,7 @@ class IBS(Config):
                                         shell=True)
 
             # Use the SLE .config
-            shutil.copy(self.get_cs_config(cs), Path(self.get_odir(cs), '.config'))
+            shutil.copy(self.get_cs_kconfig(cs), Path(self.get_odir(cs), '.config'))
 
             # Recreate the build link to enable us to test the generated LP
             mod_path = Path(self.get_mod_path(cs, self.arch), 'build')

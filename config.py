@@ -97,6 +97,9 @@ class Config:
     def get_patches_dir(self):
         return Path(self.bsc_path, 'fixes')
 
+    def get_cs_archs(self, cs):
+        return self.get_cs_data(cs)['archs']
+
     def get_cs_dir(self, cs, app):
         return Path(self.bsc_path, app, cs)
 
@@ -125,8 +128,16 @@ class Config:
         return (int(match.group(1)), int(match.group(2)), int(match.group(4)),
                 match.group(3))
 
+    def validate_config(self, cs, conf):
+        for arch in self.get_cs_archs(cs):
+            kconf = self.get_cs_kconfig(cs, arch)
+            with open(kconf) as f:
+                match = re.search(f'{conf}=[ym]', f.read())
+                if not match:
+                    raise RuntimeError(f'{cs}:{arch}: Config {conf} not enabled')
+
     def missing_codestream(self, cs):
-        return not self.get_cs_config(cs).exists()
+        return not self.get_cs_kconfig(cs).exists()
 
     def get_data_dir(self, arch):
         return Path(self.data, arch)
@@ -134,7 +145,9 @@ class Config:
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get('rt', False)
 
-    def get_cs_config(self, cs):
+    def get_cs_kconfig(self, cs, arch=''):
+        if not arch:
+            arch = self.arch
         ktype = 'rt' if self.cs_is_rt(cs) else 'default'
         kernel = self.get_cs_kernel(cs)
 

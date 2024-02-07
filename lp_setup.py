@@ -259,6 +259,11 @@ class Setup(Config):
                 if not fdir.is_file():
                     raise RuntimeError(f'{cs}: File {f} not found')
 
+                # Check if the CONFIG is enabled on all affected architectures
+                conf = fdata['conf']
+                if conf:
+                    self.validate_config(cs, conf)
+
                 mod = fdata['module']
                 if not data['modules'].get(mod, ''):
                     # Use x86_64 to find the module, as it is be the same path for other archs
