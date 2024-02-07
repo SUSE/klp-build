@@ -25,7 +25,6 @@ class GitHelper(Config):
 
         self.kernel_branches = {
                                 '12.5' : 'SLE12-SP5',
-                                '15.1' : 'SLE15-SP1-LTSS',
                                 '15.2' : 'SLE15-SP2-LTSS',
                                 '15.3' : 'SLE15-SP3-LTSS',
                                 '15.4' : 'SLE15-SP4-LTSS',
