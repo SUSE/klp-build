@@ -301,13 +301,10 @@ class CE(Config):
         ce_args.extend([f'-DCE_DEBUGINFO_PATH={obj}',
                         f'-DCE_SYMVERS_PATH={symvers}',
                         f'-DCE_EXTRACT_FUNCTIONS={funcs}',
+                        f'-DCE_IPACLONES_PATH={str(ipa)}',
                         f'-DCE_OUTPUT_FILE={lp_out}',
                         f'-DCE_DSC_OUTPUT={dsc_out}'])
 
-        if ipa.exists():
-            ce_args.extend([f'-DCE_IPACLONES_PATH={str(ipa)}'])
-        else:
-            logging.warning(f'{cs}: IPA file not found: {str(ipa)}')
 
         # Keep includes is necessary so don't end up expanding all headers,
         # generating a huge amount of code. This only makes sense for the

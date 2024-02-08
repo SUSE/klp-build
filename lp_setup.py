@@ -249,12 +249,14 @@ class Setup(Config):
         # Setup the missing codestream info needed
         for cs, data in self.working_cs.items():
             # Check if the files exist in the respective codestream directories
-            sdir = self.get_sdir(cs)
             mod_syms = {}
             for f, fdata in data['files'].items():
-                fdir = Path(sdir, f)
-                if not fdir.is_file():
+                if not Path(self.get_sdir(cs), f).is_file():
                     raise RuntimeError(f'{cs}: File {f} not found')
+
+                ipa_f = Path(self.get_ipa_dir(cs), f'{f}.000i.ipa-clones')
+                if not ipa_f.is_file():
+                    raise RuntimeError(f'{cs}: File {ipa_f} not found')
 
                 # Check if the CONFIG is enabled on all affected architectures
                 conf = fdata['conf']
