@@ -97,6 +97,75 @@ class Config:
     def get_patches_dir(self):
         return Path(self.bsc_path, 'fixes')
 
+    def remove_patches(self, cs, fil):
+        sdir = self.get_sdir(cs)
+        # Check if there were patches applied previously
+        patches_dir = Path(sdir, 'patches')
+        if not patches_dir.exists():
+            return
+
+        fil.write(f'\nRemoving patches from {cs}\n')
+        err = subprocess.run(['quilt', 'pop', '-a'], cwd=sdir,
+                             stderr=fil, stdout=fil)
+        fil.flush()
+
+        if err.returncode not in [0, 2]:
+            raise RuntimeError(f'{cs}: quilt pop failed: {err.stderr}')
+
+        shutil.rmtree(patches_dir)
+
+    def apply_all_patches(self, cs, fil=subprocess.STDOUT):
+        patched = False
+        # Remove previously applied patches
+        self.remove_patches(cs, fil)
+
+        sle, sp, u, rt = self.get_cs_tuple(cs)
+
+        if not rt:
+            rt = ''
+
+        patch_dirs = []
+
+        if sle == 12:
+            patch_dirs = ['12.5', 'cve-4.12']
+        elif sle == 15:
+            patch_dirs = [f'{sle}.{sp}{rt}', f'{sle}.{sp}']
+            if sp < 4:
+                patch_dirs.append('cve-5.3')
+
+        sdir = self.get_sdir(cs)
+        for d in patch_dirs:
+            pdir = Path(self.get_patches_dir(), d)
+            if not pdir.exists():
+                fil.write(f'\nPatches dir {pdir} doesnt exists\n')
+                continue
+
+            fil.write(f'\nAplying patches on {cs} from {pdir}\n')
+
+            for patch in pdir.iterdir():
+                err = subprocess.run(['quilt', 'import', str(patch)],
+                                     cwd=sdir, stderr=fil, stdout=fil)
+                if err.returncode != 0:
+                    fil.write('\nFailed to import patches, remove applied and try again\n')
+                    self.remove_patches(cs, fil)
+
+            err = subprocess.run(['quilt', 'push', '-a'], cwd=sdir,
+                                 stderr=fil, stdout=fil)
+
+            if err.returncode != 0:
+                fil.write('\nFailed to apply patches, remove applied and try again\n')
+                self.remove_patches(cs, fil)
+
+                continue
+
+            patched = True
+            fil.flush()
+            # Stop the loop in the first dir that we find patches.
+            break
+
+        if not patched:
+            raise RuntimeError(f'{cs}: Failed to apply patches. Aborting')
+
     def get_cs_archs(self, cs):
         return self.get_cs_data(cs)['archs']
 

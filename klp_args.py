@@ -49,15 +49,17 @@ def create_parser() -> argparse.ArgumentParser:
     setup.add_argument('--archs', required=True, choices=archs, nargs='+',
                        help='Supported architectures for this livepatch')
     setup.add_argument('--skips', help='List of codestreams to filter out')
-    setup.add_argument('--apply-patches', action='store_true',
-                       help='Apply patches found by get-patches subcommand, if they exist')
 
     ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
     ccp_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],
             help='Functions to be copied into the LP by klp-ccp instead of externalizing. '
                  'Useful to make sure to include symbols that are optimized in different architectures')
+    ccp_opts.add_argument('--apply-patches', action='store_true',
+                       help='Apply patches found by get-patches subcommand, if they exist')
 
-    sub.add_parser('run-ce', parents = [parentparser])
+    ce = sub.add_parser('run-ce', parents = [parentparser])
+    ce.add_argument('--apply-patches', action='store_true',
+                       help='Apply patches found by get-patches subcommand, if they exist')
 
     diff_opts = sub.add_parser('cs-diff', parents = [parentparser])
     diff_opts.add_argument('--codestreams', nargs=2, type=str, required=True,
@@ -106,15 +108,14 @@ def main_func(main_args):
     if args.cmd == 'setup':
         setup = Setup(args.bsc, args.filter, args.cve, args.codestreams,
                       args.file_funcs, args.mod_file_funcs, args.conf_mod_file_funcs,
-                      args.module, args.conf, args.archs, args.skips,
-                      args.apply_patches)
+                      args.module, args.conf, args.archs, args.skips)
         setup.setup_project_files()
 
     elif args.cmd == 'run-ccp':
-        CCP(args.bsc, args.filter, args.avoid_ext).run()
+        CCP(args.bsc, args.filter, args.avoid_ext, args.apply_patches).run()
 
     elif args.cmd == 'run-ce':
-        CE(args.bsc, args.filter).run()
+        CE(args.bsc, args.filter, args.apply_patches).run()
 
     elif args.cmd == 'cs-diff':
         if args.type == 'ccp':

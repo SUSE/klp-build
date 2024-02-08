@@ -14,7 +14,7 @@ from ksrc import GitHelper
 class Setup(Config):
     def __init__(self, bsc, bsc_filter, cve, cs_arg,
                  file_funcs, mod_file_funcs, conf_mod_file_funcs,
-                 mod_arg, conf, archs, skips, apply_patches):
+                 mod_arg, conf, archs, skips):
         super().__init__(bsc, bsc_filter, skips=skips)
 
         archs.sort()
@@ -35,9 +35,6 @@ class Setup(Config):
 
         if not file_funcs and not mod_file_funcs and not conf_mod_file_funcs:
             raise ValueError('You need to specify at least one of the file-funcs variants!')
-
-        if apply_patches and not self.get_patches_dir().exists():
-            raise ValueError('--apply-patches specified without patches. Run get-patches!')
 
         self.conf['archs'] = archs
         self.conf['cve'] = re.search('([0-9]+\-[0-9]+)', cve).group(1)

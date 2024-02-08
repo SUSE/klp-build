@@ -15,15 +15,21 @@ from config import Config
 from templ import TemplateGen
 
 class CE(Config):
-    def __init__(self, bsc, bsc_filter):
+    def __init__(self, bsc, bsc_filter, apply_patches):
         super().__init__(bsc, bsc_filter)
 
         self.app = 'ce'
+
+        if apply_patches and not self.get_patches_dir().exists():
+            raise ValueError('--apply-patches specified without patches. Run get-patches!')
+        self.apply_patches = apply_patches
 
         self.ce_path = shutil.which('clang-extract')
         if not self.ce_path:
             raise RuntimeError('clang-extract not found. Aborting.')
 
+        self.quilt_log = open(Path(self.get_patches_dir(), 'quilt.log'), 'w')
+        self.quilt_log.truncate()
         self.total = 0
 
         self.make_lock = Lock()
@@ -372,6 +378,10 @@ class CE(Config):
             # remove any previously generated files
             shutil.rmtree(self.get_cs_dir(cs, self.app), ignore_errors=True)
 
+            # Apply patches before the LPs were created
+            if self.apply_patches:
+                self.apply_all_patches(cs, self.quilt_log)
+
             for fname, fdata in data['files'].items():
                 args.append((i, fname, cs, fdata))
                 i += 1
@@ -404,6 +414,10 @@ class CE(Config):
         # While we are at it, create the livepatches per codestream
         for cs, _ in working_cs.items():
             self.tem.GenerateLivePatches(cs)
+
+            # Cleanup patches after the LPs were created
+            if self.apply_patches:
+                self.remove_patches(cs, self.quilt_log)
 
             # Map all symbols related to each obj, to make it check the output
             # of nm only once per object
