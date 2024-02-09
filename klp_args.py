@@ -119,9 +119,9 @@ def main_func(main_args):
 
     elif args.cmd == 'cs-diff':
         if args.type == 'ccp':
-            CCP(args.bsc, [], []).diff_cs(args.codestreams)
+            CCP(args.bsc, [], [], False).diff_cs(args.codestreams)
         else:
-            CE(args.bsc, []).diff_cs(args.codestreams)
+            CE(args.bsc, [], False).diff_cs(args.codestreams)
 
     elif args.cmd == 'get-patches':
         GitHelper(args.bsc, args.filter).get_commits(args.cve)
