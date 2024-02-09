@@ -256,7 +256,8 @@ class Setup(Config):
 
                 ipa_f = Path(self.get_ipa_dir(cs), f'{f}.000i.ipa-clones')
                 if not ipa_f.is_file():
-                    raise RuntimeError(f'{cs}: File {ipa_f} not found')
+                    ipa_f.touch()
+                    logging.warning(f'{cs}: File {ipa_f} not found. Creating an empty file.')
 
                 # Check if the CONFIG is enabled on all affected architectures
                 conf = fdata['conf']
