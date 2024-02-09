@@ -317,8 +317,9 @@ class Config:
                 filtered.append(cs)
 
         if verbose:
-            logging.info('Skipping codestreams:')
-            logging.info(f'\t{" ".join(filtered)}')
+            if filtered:
+                logging.info('Skipping codestreams:')
+                logging.info(f'\t{" ".join(filtered)}')
 
         cs_del_list.extend(filtered)
 
