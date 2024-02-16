@@ -10,6 +10,7 @@ import sys
 
 from ibs import IBS
 from ksrc import GitHelper
+import lp_utils
 
 class Setup(Config):
     def __init__(self, bsc, bsc_filter, cve, cs_arg,
@@ -214,8 +215,9 @@ class Setup(Config):
                 cs_data_missing[cs] = data
 
         if patched_cs:
+            cs_list = lp_utils.classify_codestreams(patched_cs)
             logging.info('Skipping already patched codestreams:')
-            logging.info(f'\t{" ".join(patched_cs)}')
+            logging.info(f'\t{" ".join(cs_list)}')
 
         # Add new codestreams to the already existing list, skipping duplicates
         self.conf['patched_cs'] = natsorted(list(set(self.conf.get('patched_cs', []) +

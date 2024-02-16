@@ -12,6 +12,7 @@ import subprocess
 from threading import Lock
 
 from config import Config
+import lp_utils
 from templ import TemplateGen
 
 class CCP(Config):
@@ -87,85 +88,9 @@ class CCP(Config):
 
         self.tem = TemplateGen(self.bsc_num, self.filter, self.app)
 
-    def unquote_output(self, matchobj):
-        return matchobj.group(0).replace('"', '')
-
     # Check if the extract command line is compilable with gcc
     def test_gcc_cmd(self, cmd):
         subprocess.check_output(self.cc + ' ' + cmd)
-
-    def process_make_output(self, cs, filename, output):
-        fname = str(filename)
-
-        ofname = '.' + filename.name.replace('.c', '.o.d')
-        ofname = Path(filename.parent, ofname)
-
-        cmd_args_regex = '(-Wp,{},{}\s+-nostdinc\s+-isystem.*{});'
-
-        result = re.search(cmd_args_regex.format('-MD', ofname, fname), str(output).strip())
-        if not result:
-            # 15.4 onwards changes the regex a little: -MD -> -MMD
-            result = re.search(cmd_args_regex.format('-MMD', ofname, fname), str(output).strip())
-
-        if not result:
-            raise RuntimeError(f'Failed to get the kernel cmdline for file {str(ofname)} in {cs}')
-
-        # some strings  have single quotes around double quotes, so remove the
-        # outer quotes
-        output = result.group(1).replace('\'', '')
-
-        # also remove double quotes from macros like -D"KBUILD....=.."
-        output = re.sub('-D"KBUILD_([\w\#\_\=\(\)])+"', self.unquote_output, output)
-
-        # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
-        # 15.4u0 options
-        # -fno-allow-store-data-races and -Wno-zero-length-bounds
-        # 15.4u1 options
-        # -mindirect-branch-cs-prefix appear in 15.4u1
-        # more options to be removed
-        # -mharden-sls=all
-        for opt in ['-flive-patching=inline-clone', '-fdump-ipa-clones',
-                '-fno-allow-store-data-races', '-Wno-zero-length-bounds',
-                '-mindirect-branch-cs-prefix', '-mharden-sls=all']:
-            output = output.replace(opt, '')
-
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        if sle >= 15:
-            if sp >= 2:
-                output += ' -D_Static_assert(e,m)='
-            if sp >= 4:
-                output += ' -D__auto_type=int'
-                output += ' -D__has_attribute(x)=0'
-
-        # TODO: commented since it currently fails, because of missing headers
-        # on the kernel source.
-        #self.test_gcc_cmd(output)
-
-        return output
-
-    def get_make_cmd(self, out_dir, cs, filename, odir):
-        filename = PurePath(filename)
-        file_ = filename.with_suffix('.o')
-
-        with open(Path(out_dir, 'make.out.txt'), 'w') as f:
-            completed = subprocess.check_output(['make', '-sn', f'CC={self.cc}',
-                                                 f'KLP_CS={cs}',
-                                                 f'HOSTCC={self.cc}',
-                                                 'WERROR=0',
-                                                 'CFLAGS_REMOVE_objtool=-Werror',
-                                                 file_], cwd=odir,
-                                        stderr=f)
-
-            ret = self.process_make_output(cs, filename, completed.decode())
-            # save the cmdline
-            f.write(ret)
-
-            if not ' -pg ' in ret:
-                logging.warning(f'{cs}:{file_} is not compiled with livepatch support (-pg flag)')
-
-            return ret
-
-        return None
 
     def execute(self, cs, fname, funcs, out_dir, fdata):
         sdir = self.get_sdir(cs)
@@ -200,7 +125,29 @@ class CCP(Config):
         # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
         # calls. Make is pretty fast, so there isn't a real slow down here.
         with self.make_lock:
-            ccp_args.extend(self.get_make_cmd(out_dir, cs, fname, odir).split(' '))
+            cmd = lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir)
+
+            # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
+            # 15.4u0 options
+            # -fno-allow-store-data-races and -Wno-zero-length-bounds
+            # 15.4u1 options
+            # -mindirect-branch-cs-prefix appear in 15.4u1
+            # more options to be removed
+            # -mharden-sls=all
+            for opt in ['-flive-patching=inline-clone', '-fdump-ipa-clones',
+                    '-fno-allow-store-data-races', '-Wno-zero-length-bounds',
+                    '-mindirect-branch-cs-prefix', '-mharden-sls=all']:
+                cmd = cmd.replace(opt, '')
+
+            sle, sp, _, _ = self.get_cs_tuple(cs)
+            if sle >= 15:
+                if sp >= 2:
+                    cmd += ' -D_Static_assert(e,m)='
+                if sp >= 4:
+                    cmd += ' -D__auto_type=int'
+                    cmd += ' -D__has_attribute(x)=0'
+
+            ccp_args.extend(cmd.split(' '))
 
         ccp_args = list(filter(None, ccp_args))
 
@@ -256,59 +203,6 @@ class CCP(Config):
         self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
 
         self.tem.CreateMakefile(cs, fname)
-
-    # Group all codestreams that share code in a format like bellow:
-    #   [15.2u10 15.2u11 15.3u10 15.3u12 ]
-    # Will be converted to:
-    #   15.2u10-11 15.3u10 15.3u12
-    # The returned value will be a list of lists, each internal list will
-    # contain all codestreams which share the same code
-    def classify_codestreams(cs_list):
-        # Group all codestreams that share the same codestream by a new dict
-        # divided by the SLE version alone, making it easier to process
-        # later
-        cs_group = {}
-        for cs in cs_list:
-            prefix, up = cs.split('u')
-            if not cs_group.get(prefix, ''):
-                cs_group[prefix] = [int(up)]
-            else:
-                cs_group[prefix].append(int(up))
-
-        ret_list = []
-        for cs, ups in cs_group.items():
-            if len(ups) == 1:
-                ret_list.append(f'{cs}u{ups[0]}')
-                continue
-
-            sim = []
-            while len(ups):
-                if not sim:
-                    sim.append(ups.pop(0))
-                    continue
-
-                cur = ups.pop(0)
-                last_item = sim[len(sim) - 1]
-                if last_item + 1 <= cur:
-                    sim.append(cur)
-                    continue
-
-                # they are different, print them
-                if len(sim) == 1:
-                    ret_list.append(f'{cs}u{sim[0]}')
-                else:
-                    ret_list.append(f'{cs}u{sim[0]}-{last_item}')
-
-                sim = [cur]
-
-            # Loop finished, check what's in similar list to print
-            if len(sim) == 1:
-                ret_list.append(f'{cs}u{sim[0]}')
-            elif len(sim) > 1:
-                last_item = sim[len(sim) - 1]
-                ret_list.append(f'{cs}u{sim[0]}-{last_item}')
-
-        return ' '.join(ret_list)
 
     def get_work_lp_file(self, cs, fname):
         return Path(self.get_work_dir(cs, fname, self.app), self.lp_out_file(fname))
@@ -428,7 +322,7 @@ class CCP(Config):
         # same code
         groups = []
         for cs_list in cs_equal:
-            groups.append(CCP.classify_codestreams(cs_list))
+            groups.append(' '.join(lp_utils.classify_codestreams(cs_list)))
 
         with open(Path(self.bsc_path, self.app, 'groups'), 'w') as f:
             f.write('\n'.join(groups))
@@ -453,7 +347,6 @@ class CCP(Config):
         os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir, Path(fname).name))
 
         self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata)
-
 
     def run(self):
         logging.info(f'Work directory: {self.bsc_path}')

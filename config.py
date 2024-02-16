@@ -10,6 +10,8 @@ import re
 import shutil
 import subprocess
 
+from lp_utils import classify_codestreams
+
 class Config:
     def __init__(self, bsc, bsc_filter, skips = '', working_cs = {}):
         work_dir = os.getenv('KLP_WORK_DIR')
@@ -319,7 +321,7 @@ class Config:
         if verbose:
             if filtered:
                 logging.info('Skipping codestreams:')
-                logging.info(f'\t{" ".join(filtered)}')
+                logging.info(f'\t{" ".join(classify_codestreams(filtered))}')
 
         cs_del_list.extend(filtered)
 
