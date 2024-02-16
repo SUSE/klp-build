@@ -99,7 +99,7 @@ class CCP(Config):
         # Needed, otherwise threads would interfere with each other
         env = self.env.copy()
 
-        env['KCP_MOD_SYMVERS'] = str(Path(odir, 'Module.symvers'))
+        env['KCP_MOD_SYMVERS'] = str(self.get_cs_symvers(cs))
         env['KCP_KBUILD_ODIR'] = str(odir)
         env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
         env['KCP_KBUILD_SDIR'] = str(sdir)

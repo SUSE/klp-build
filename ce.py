@@ -173,8 +173,8 @@ class CE(Config):
 
     def execute(self, cs, fname, funcs, out_dir, fdata):
         odir = self.get_odir(cs)
-        symvers = str(Path(odir, 'Module.symvers'))
-        ipa = Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones')
+        symvers = str(self.get_cs_symvers(cs))
+        ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
         obj = self.get_module_obj('x86_64', cs, fdata['module'])
 
         lp_name = self.lp_out_file(fname)
@@ -189,7 +189,7 @@ class CE(Config):
         # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
         # calls. Make is pretty fast, so there isn't a real slow down here.
         with self.make_lock:
-            ce_args.extend(lp_utils.get_make_cmd(out_dir, cs, fname, odir).split(' '))
+            ce_args.extend(lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir).split(' '))
 
         ce_args = list(filter(None, ce_args))
 
@@ -197,10 +197,9 @@ class CE(Config):
         ce_args.extend([f'-DCE_DEBUGINFO_PATH={obj}',
                         f'-DCE_SYMVERS_PATH={symvers}',
                         f'-DCE_EXTRACT_FUNCTIONS={funcs}',
-                        f'-DCE_IPACLONES_PATH={str(ipa)}',
+                        f'-DCE_IPACLONES_PATH={ipa}',
                         f'-DCE_OUTPUT_FILE={lp_out}',
                         f'-DCE_DSC_OUTPUT={dsc_out}'])
-
 
         # Keep includes is necessary so don't end up expanding all headers,
         # generating a huge amount of code. This only makes sense for the

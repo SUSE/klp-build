@@ -216,6 +216,14 @@ class Config:
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get('rt', False)
 
+    def get_cs_symvers(self, cs, arch=''):
+        if not arch:
+            arch = self.arch
+        ktype = 'rt' if self.cs_is_rt(cs) else 'default'
+        kernel = self.get_cs_kernel(cs)
+
+        return Path(self.get_data_dir(self.arch), 'boot', f'symvers-{kernel}-{ktype}')
+
     def get_cs_kconfig(self, cs, arch=''):
         if not arch:
             arch = self.arch
