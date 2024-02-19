@@ -115,6 +115,7 @@ class Config:
             raise RuntimeError(f'{cs}: quilt pop failed: {err.stderr}')
 
         shutil.rmtree(patches_dir)
+        shutil.rmtree(Path(sdir, ".pc")
 
     def apply_all_patches(self, cs, fil=subprocess.STDOUT):
         patched = False
