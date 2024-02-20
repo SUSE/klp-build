@@ -92,20 +92,41 @@ class CCP(Config):
     def test_gcc_cmd(self, cmd):
         subprocess.check_output(self.cc + ' ' + cmd)
 
+	# Generate the list of exported symbols
+    def get_symbol_list(self, out_dir):
+        exts = []
+
+        for ext_file in ['fun_exts', 'obj_exts']:
+            ext_path = Path(out_dir, ext_file)
+            if not ext_path.exists():
+                continue
+
+            with open(ext_path) as f:
+                for l in f:
+                    l = l.strip()
+                    if not l.startswith('KALLSYMS'):
+                        continue
+
+                    _, sym, var, mod = l.split(' ')
+                    if not self.is_mod(mod):
+                        mod = 'vmlinux'
+
+                    exts.append( (sym, var, mod) )
+
+        exts.sort(key=lambda tup : tup[0])
+
+        # store the externalized symbols and module used in this codestream file
+        symbols = {}
+        for ext in exts:
+            sym, mod = ext[0], ext[2]
+            symbols.setdefault(mod, [])
+            symbols[mod].append(sym)
+
+        return symbols
+
     def execute(self, cs, fname, funcs, out_dir, fdata, cmd):
         sdir = self.get_sdir(cs)
         odir = self.get_odir(cs)
-
-        # Needed, otherwise threads would interfere with each other
-        env = self.env.copy()
-
-        env['KCP_MOD_SYMVERS'] = str(self.get_cs_symvers(cs))
-        env['KCP_KBUILD_ODIR'] = str(odir)
-        env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
-        env['KCP_KBUILD_SDIR'] = str(sdir)
-        env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs),
-                                              f'{fname}.000i.ipa-clones'))
-        env['KCP_WORK_DIR'] = str(out_dir)
 
         lp_name = self.lp_out_file(fname)
         lp_out = Path(out_dir, lp_name)
@@ -145,56 +166,23 @@ class CCP(Config):
 
         ccp_args = list(filter(None, ccp_args))
 
+        # Needed, otherwise threads would interfere with each other
+        env = self.env.copy()
+
+        env['KCP_MOD_SYMVERS'] = str(self.get_cs_symvers(cs))
+        env['KCP_KBUILD_ODIR'] = str(odir)
+        env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
+        env['KCP_KBUILD_SDIR'] = str(sdir)
+        env['KCP_IPA_CLONES_DUMP'] = str(Path(self.get_ipa_dir(cs),
+                                              f'{fname}.000i.ipa-clones'))
+        env['KCP_WORK_DIR'] = str(out_dir)
+
         with open(Path(out_dir, 'klp-ccp.out.txt'), 'w') as f:
             # Write the command line used
             f.write('\n'.join(ccp_args) + '\n')
             f.flush()
             subprocess.run(ccp_args, cwd=odir, stdout=f, stderr=f, env=env,
                         check=True)
-
-		# Remove the local path prefix of the klp-ccp generated comments
-        # Open the file, read, seek to the beginning, write the new data, and
-        # then truncate (which will use the current position in file as the
-        # size)
-        with open(str(lp_out), 'r+') as f:
-            file_buf = f.read()
-            f.seek(0)
-            f.write(file_buf.replace(f'from {str(sdir)}/', 'from '))
-            f.truncate()
-
-		# Generate the list of exported symbols
-        exts = []
-
-        for ext_file in ['fun_exts', 'obj_exts']:
-            ext_path = Path(out_dir, ext_file)
-            if not ext_path.exists():
-                continue
-
-            with open(ext_path) as f:
-                for l in f:
-                    l = l.strip()
-                    if not l.startswith('KALLSYMS'):
-                        continue
-
-                    _, sym, var, mod = l.split(' ')
-                    if not self.is_mod(mod):
-                        mod = ''
-
-                    exts.append( (sym, var, mod) )
-
-        exts.sort(key=lambda tup : tup[0])
-
-        # store the externalized symbols and module used in this codestream file
-        symbols = {}
-        for ext in exts:
-            sym, mod = ext[0], ext[2]
-            if not mod:
-                mod = 'vmlinux'
-
-            symbols.setdefault(mod, [])
-            symbols[mod].append(sym)
-
-        self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
 
     def get_work_lp_file(self, cs, fname):
         return Path(self.get_work_dir(cs, fname, self.app), self.lp_out_file(fname))
@@ -335,8 +323,10 @@ class CCP(Config):
         out_dir = self.get_work_dir(cs, fname, self.app)
         out_dir.mkdir(parents=True, exist_ok=True)
 
+        sdir = self.get_sdir(cs)
+
         # create symlink to the respective codestream file
-        os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir, Path(fname).name))
+        os.symlink(Path(sdir, fname), Path(out_dir, Path(fname).name))
 
         odir = self.get_odir(cs)
 
@@ -347,6 +337,20 @@ class CCP(Config):
             cmd = lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir)
 
         self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata, cmd)
+
+        self.codestreams[cs]['files'][fname]['ext_symbols'] = self.get_symbol_list(out_dir)
+
+        lp_out = Path(out_dir, self.lp_out_file(fname))
+
+		# Remove the local path prefix of the klp-ccp generated comments
+        # Open the file, read, seek to the beginning, write the new data, and
+        # then truncate (which will use the current position in file as the
+        # size)
+        with open(str(lp_out), 'r+') as f:
+            file_buf = f.read()
+            f.seek(0)
+            f.write(file_buf.replace(f'from {str(sdir)}/', 'from '))
+            f.truncate()
 
         self.tem.CreateMakefile(cs, fname)
 

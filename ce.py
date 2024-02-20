@@ -171,6 +171,33 @@ class CE(Config):
         for group in groups:
             logging.info(f'\t{group}')
 
+	# Generate the list of exported symbols
+    def get_symbol_list(self, out_dir):
+        exts = []
+        dsc_out = Path(out_dir, 'lp.dsc')
+        with open(dsc_out) as f:
+            for l in f:
+                l = l.strip()
+                if l.startswith('#'):
+                    mod = 'vmlinux'
+                    if l.count(':') == 2:
+                        sym, _, mod = l.replace('#', '').split(':')
+                    else:
+                        sym, _ = l.replace('#', '').split(':')
+                    exts.append( (sym, mod) )
+
+        exts.sort(key=lambda tup : tup[0])
+
+        # store the externalized symbols and module used in this codestream file
+        symbols = {}
+        for ext in exts:
+            sym, mod = ext
+
+            symbols.setdefault(mod, [])
+            symbols[mod].append(sym)
+
+        return symbols
+
     def execute(self, cs, fname, funcs, out_dir, fdata, cmd):
         odir = self.get_odir(cs)
         symvers = str(self.get_cs_symvers(cs))
@@ -180,8 +207,7 @@ class CE(Config):
         lp_name = self.lp_out_file(fname)
         lp_out = Path(out_dir, lp_name)
 
-        lp_dsc = 'lp.dsc'
-        dsc_out = Path(out_dir, lp_dsc)
+        dsc_out = Path(out_dir, 'lp.dsc')
 
         ce_args = [self.ce_path]
 
@@ -209,31 +235,6 @@ class CE(Config):
             f.flush()
             subprocess.run(ce_args, cwd=odir, stdout=f, stderr=f, check=True)
 
-        # Generate the list of exported symbols
-        exts = []
-        with open(dsc_out) as f:
-            for l in f:
-                l = l.strip()
-                if l.startswith('#'):
-                    mod = 'vmlinux'
-                    if l.count(':') == 2:
-                        sym, _, mod = l.replace('#', '').split(':')
-                    else:
-                        sym, _ = l.replace('#', '').split(':')
-                    exts.append( (sym, mod) )
-
-        exts.sort(key=lambda tup : tup[0])
-
-        # store the externalized symbols and module used in this codestream file
-        symbols = {}
-        for ext in exts:
-            sym, mod = ext
-
-            symbols.setdefault(mod, [])
-            symbols[mod].append(sym)
-
-        self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
-
     def process(self, args):
         i, fname, cs, fdata = args
 
@@ -246,8 +247,10 @@ class CE(Config):
         out_dir = self.get_work_dir(cs, fname, self.app)
         out_dir.mkdir(parents=True, exist_ok=True)
 
+        sdir = self.get_sdir(cs)
+
         # create symlink to the respective codestream file
-        os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir, Path(fname).name))
+        os.symlink(Path(sdir, fname), Path(out_dir, Path(fname).name))
 
         odir = self.get_odir(cs)
 
@@ -258,6 +261,20 @@ class CE(Config):
             cmd = lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir)
 
         self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata, cmd)
+
+        self.codestreams[cs]['files'][fname]['ext_symbols'] = self.get_symbol_list(out_dir)
+
+        lp_out = Path(out_dir, self.lp_out_file(fname))
+
+		# Remove the local path prefix of the klp-ccp generated comments
+        # Open the file, read, seek to the beginning, write the new data, and
+        # then truncate (which will use the current position in file as the
+        # size)
+        with open(str(lp_out), 'r+') as f:
+            file_buf = f.read()
+            f.seek(0)
+            f.write(file_buf.replace(f'from {str(sdir)}/', 'from '))
+            f.truncate()
 
         self.tem.CreateMakefile(cs, fname)
 
