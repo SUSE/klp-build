@@ -171,7 +171,7 @@ class CE(Config):
         for group in groups:
             logging.info(f'\t{group}')
 
-    def execute(self, cs, fname, funcs, out_dir, fdata):
+    def execute(self, cs, fname, funcs, out_dir, fdata, cmd):
         odir = self.get_odir(cs)
         symvers = str(self.get_cs_symvers(cs))
         ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
@@ -185,11 +185,7 @@ class CE(Config):
 
         ce_args = [self.ce_path]
 
-        # Make can regenerate fixdep for each file being processed per
-        # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
-        # calls. Make is pretty fast, so there isn't a real slow down here.
-        with self.make_lock:
-            ce_args.extend(lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir).split(' '))
+        ce_args.extend(cmd.split(' '))
 
         ce_args = list(filter(None, ce_args))
 
@@ -238,8 +234,6 @@ class CE(Config):
 
         self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
 
-        self.tem.CreateMakefile(cs, fname)
-
     def process(self, args):
         i, fname, cs, fdata = args
 
@@ -255,7 +249,17 @@ class CE(Config):
         # create symlink to the respective codestream file
         os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir, Path(fname).name))
 
-        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata)
+        odir = self.get_odir(cs)
+
+        # Make can regenerate fixdep for each file being processed per
+        # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
+        # calls. Make is pretty fast, so there isn't a real slow down here.
+        with self.make_lock:
+            cmd = lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir)
+
+        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata, cmd)
+
+        self.tem.CreateMakefile(cs, fname)
 
     def run(self):
         logging.info(f'Work directory: {self.bsc_path}')

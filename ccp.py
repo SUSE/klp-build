@@ -92,7 +92,7 @@ class CCP(Config):
     def test_gcc_cmd(self, cmd):
         subprocess.check_output(self.cc + ' ' + cmd)
 
-    def execute(self, cs, fname, funcs, out_dir, fdata):
+    def execute(self, cs, fname, funcs, out_dir, fdata, cmd):
         sdir = self.get_sdir(cs)
         odir = self.get_odir(cs)
 
@@ -121,33 +121,27 @@ class CCP(Config):
         ccp_args.extend(['--compiler=x86_64-gcc-9.1.0', '-i', f'{funcs}',
                         '-o', f'{str(lp_out)}', '--'])
 
-        # Make can regenerate fixdep for each file being processed per
-        # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
-        # calls. Make is pretty fast, so there isn't a real slow down here.
-        with self.make_lock:
-            cmd = lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir)
+        # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
+        # 15.4u0 options
+        # -fno-allow-store-data-races and -Wno-zero-length-bounds
+        # 15.4u1 options
+        # -mindirect-branch-cs-prefix appear in 15.4u1
+        # more options to be removed
+        # -mharden-sls=all
+        for opt in ['-flive-patching=inline-clone', '-fdump-ipa-clones',
+                '-fno-allow-store-data-races', '-Wno-zero-length-bounds',
+                '-mindirect-branch-cs-prefix', '-mharden-sls=all']:
+            cmd = cmd.replace(opt, '')
 
-            # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
-            # 15.4u0 options
-            # -fno-allow-store-data-races and -Wno-zero-length-bounds
-            # 15.4u1 options
-            # -mindirect-branch-cs-prefix appear in 15.4u1
-            # more options to be removed
-            # -mharden-sls=all
-            for opt in ['-flive-patching=inline-clone', '-fdump-ipa-clones',
-                    '-fno-allow-store-data-races', '-Wno-zero-length-bounds',
-                    '-mindirect-branch-cs-prefix', '-mharden-sls=all']:
-                cmd = cmd.replace(opt, '')
+        sle, sp, _, _ = self.get_cs_tuple(cs)
+        if sle >= 15:
+            if sp >= 2:
+                cmd += ' -D_Static_assert(e,m)='
+            if sp >= 4:
+                cmd += ' -D__auto_type=int'
+                cmd += ' -D__has_attribute(x)=0'
 
-            sle, sp, _, _ = self.get_cs_tuple(cs)
-            if sle >= 15:
-                if sp >= 2:
-                    cmd += ' -D_Static_assert(e,m)='
-                if sp >= 4:
-                    cmd += ' -D__auto_type=int'
-                    cmd += ' -D__has_attribute(x)=0'
-
-            ccp_args.extend(cmd.split(' '))
+        ccp_args.extend(cmd.split(' '))
 
         ccp_args = list(filter(None, ccp_args))
 
@@ -201,8 +195,6 @@ class CCP(Config):
             symbols[mod].append(sym)
 
         self.codestreams[cs]['files'][fname]['ext_symbols'] = symbols
-
-        self.tem.CreateMakefile(cs, fname)
 
     def get_work_lp_file(self, cs, fname):
         return Path(self.get_work_dir(cs, fname, self.app), self.lp_out_file(fname))
@@ -346,7 +338,17 @@ class CCP(Config):
         # create symlink to the respective codestream file
         os.symlink(Path(self.get_sdir(cs), fname), Path(out_dir, Path(fname).name))
 
-        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata)
+        odir = self.get_odir(cs)
+
+        # Make can regenerate fixdep for each file being processed per
+        # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
+        # calls. Make is pretty fast, so there isn't a real slow down here.
+        with self.make_lock:
+            cmd = lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir)
+
+        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata, cmd)
+
+        self.tem.CreateMakefile(cs, fname)
 
     def run(self):
         logging.info(f'Work directory: {self.bsc_path}')
