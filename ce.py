@@ -198,7 +198,7 @@ class CE(Config):
 
         return symbols
 
-    def execute(self, cs, fname, funcs, out_dir, fdata, cmd):
+    def cmd_args(self, cs, fname, funcs, out_dir, fdata, cmd):
         odir = self.get_odir(cs)
         symvers = str(self.get_cs_symvers(cs))
         ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
@@ -229,11 +229,8 @@ class CE(Config):
         ce_args.extend(['-DCE_KEEP_INCLUDES',
                         '-DCE_RENAME_SYMBOLS'])
 
-        with open(Path(out_dir, 'ce.out.txt'), 'w') as f:
-            # Write the command line used
-            f.write('\n'.join(ce_args) + '\n')
-            f.flush()
-            subprocess.run(ce_args, cwd=odir, stdout=f, stderr=f, check=True)
+
+        return ce_args, None
 
     def process(self, args):
         i, fname, cs, fdata = args
@@ -260,7 +257,14 @@ class CE(Config):
         with self.make_lock:
             cmd = lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir)
 
-        self.execute(cs, fname, ','.join(fdata['symbols']), out_dir, fdata, cmd)
+        args, lenv = self.cmd_args(cs, fname, ','.join(fdata['symbols']), out_dir, fdata, cmd)
+
+        with open(Path(out_dir, f'{self.app}.out.txt'), 'w') as f:
+            # Write the command line used
+            f.write('\n'.join(args) + '\n')
+            f.flush()
+            subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv,
+                           check=True)
 
         self.codestreams[cs]['files'][fname]['ext_symbols'] = self.get_symbol_list(out_dir)
 
