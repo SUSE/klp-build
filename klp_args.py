@@ -2,11 +2,11 @@
 
 import argparse
 
-from ccp import CCP
-from ce import CE
 from ksrc import GitHelper
 from lp_setup import Setup
 from ibs import IBS
+
+from lp_extractor import Extractor
 
 def create_parser() -> argparse.ArgumentParser:
     archs = ['ppc64le', 's390x', 'x86_64']
@@ -50,16 +50,14 @@ def create_parser() -> argparse.ArgumentParser:
                        help='Supported architectures for this livepatch')
     setup.add_argument('--skips', help='List of codestreams to filter out')
 
-    ccp_opts = sub.add_parser('run-ccp', parents = [parentparser])
-    ccp_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],
-            help='Functions to be copied into the LP by klp-ccp instead of externalizing. '
+    extract_opts = sub.add_parser('extract', parents = [parentparser])
+    extract_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],
+            help='Functions to be copied into the LP instead of externalizing. '
                  'Useful to make sure to include symbols that are optimized in different architectures')
-    ccp_opts.add_argument('--apply-patches', action='store_true',
+    extract_opts.add_argument('--apply-patches', action='store_true',
                        help='Apply patches found by get-patches subcommand, if they exist')
-
-    ce = sub.add_parser('run-ce', parents = [parentparser])
-    ce.add_argument('--apply-patches', action='store_true',
-                       help='Apply patches found by get-patches subcommand, if they exist')
+    extract_opts.add_argument('--type', type=str, required=True, choices=['ccp', 'ce'],
+            help='Choose between ccp and ce')
 
     diff_opts = sub.add_parser('cs-diff', parents = [parentparser])
     diff_opts.add_argument('--codestreams', nargs=2, type=str, required=True,
@@ -111,17 +109,12 @@ def main_func(main_args):
                       args.module, args.conf, args.archs, args.skips)
         setup.setup_project_files()
 
-    elif args.cmd == 'run-ccp':
-        CCP(args.bsc, args.filter, args.avoid_ext, args.apply_patches).run()
-
-    elif args.cmd == 'run-ce':
-        CE(args.bsc, args.filter, args.apply_patches).run()
+    elif args.cmd == 'extract':
+        Extractor(args.bsc, args.filter, args.apply_patches, args.type,
+                  args.avoid_ext).run()
 
     elif args.cmd == 'cs-diff':
-        if args.type == 'ccp':
-            CCP(args.bsc, [], [], False).diff_cs(args.codestreams)
-        else:
-            CE(args.bsc, [], False).diff_cs(args.codestreams)
+        Extractor(args.bsc, '', False, self.app).diff_cs(args.codestrams)
 
     elif args.cmd == 'get-patches':
         GitHelper(args.bsc, args.filter).get_commits(args.cve)
