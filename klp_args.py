@@ -114,7 +114,7 @@ def main_func(main_args):
                   args.avoid_ext).run()
 
     elif args.cmd == 'cs-diff':
-        Extractor(args.bsc, '', False, self.app).diff_cs(args.codestrams)
+        Extractor(args.bsc, '', False, args.type).diff_cs(args.codestreams)
 
     elif args.cmd == 'get-patches':
         GitHelper(args.bsc, args.filter).get_commits(args.cve)
