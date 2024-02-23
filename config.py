@@ -101,12 +101,13 @@ class Config:
 
     def remove_patches(self, cs, fil):
         sdir = self.get_sdir(cs)
+        kernel = self.get_cs_kernel(cs)
         # Check if there were patches applied previously
         patches_dir = Path(sdir, 'patches')
         if not patches_dir.exists():
             return
 
-        fil.write(f'\nRemoving patches from {cs}\n')
+        fil.write(f'\nRemoving patches from {cs}({kernel})\n')
         err = subprocess.run(['quilt', 'pop', '-a'], cwd=sdir,
                              stderr=fil, stdout=fil)
         fil.flush()
@@ -137,13 +138,14 @@ class Config:
                 patch_dirs.append('cve-5.3')
 
         sdir = self.get_sdir(cs)
+        kernel = self.get_cs_kernel(cs)
         for d in patch_dirs:
             pdir = Path(self.get_patches_dir(), d)
             if not pdir.exists():
                 fil.write(f'\nPatches dir {pdir} doesnt exists\n')
                 continue
 
-            fil.write(f'\nAplying patches on {cs} from {pdir}\n')
+            fil.write(f'\nAplying patches on {cs}({kernel}) from {pdir}\n')
 
             for patch in pdir.iterdir():
                 err = subprocess.run(['quilt', 'import', str(patch)],
