@@ -556,6 +556,10 @@ class IBS(Config):
                                  str(self.kgraft_path), str(code_path)],
                                 stderr=subprocess.STDOUT)
 
+        # Check if the directory related to this bsc exists
+        if self.bsc not in os.listdir(code_path):
+            raise RuntimeError(f'Directory {self.bsc} not found on branch {branch}')
+
         # Fix RELEASE version
         with open(Path(code_path, 'scripts', 'release-version.sh'), 'w') as f:
             ver = self.get_full_cs(cs).replace('EMBARGO', '')
