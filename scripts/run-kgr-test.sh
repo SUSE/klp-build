@@ -47,7 +47,7 @@ else
 	JOBS=1
 fi
 
-KGR_TEST_PATH="~/kgr-test/kgr-test/kgr-test.py"
+KGR_TEST_PATH="$HOME/kgr-test/kgr-test/kgr-test.py"
 if [ ! -f "$KGR_TEST_PATH" ]; then
 	KGR_TEST_PATH="/home/nstange/kgr-test/kgr-test/kgr-test.py"
 fi
