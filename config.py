@@ -108,9 +108,9 @@ class Config:
             return
 
         fil.write(f'\nRemoving patches from {cs}({kernel})\n')
+        fil.flush()
         err = subprocess.run(['quilt', 'pop', '-a'], cwd=sdir,
                              stderr=fil, stdout=fil)
-        fil.flush()
 
         if err.returncode not in [0, 2]:
             raise RuntimeError(f'{cs}: quilt pop failed: {err.stderr}')
@@ -125,17 +125,15 @@ class Config:
 
         sle, sp, u, rt = self.get_cs_tuple(cs)
 
-        if not rt:
-            rt = ''
-
-        patch_dirs = []
+        if rt:
+            patch_dirs = [f'{sle}.{sp}{rt}']
+        else:
+            patch_dirs = [f'{sle}.{sp}']
 
         if sle == 12:
-            patch_dirs = ['12.5', 'cve-4.12']
-        elif sle == 15:
-            patch_dirs = [f'{sle}.{sp}{rt}', f'{sle}.{sp}']
-            if sp < 4:
-                patch_dirs.append('cve-5.3')
+            patch_dirs.append('cve-4.12')
+        elif sle == 15 and sp < 4:
+            patch_dirs.append('cve-5.3')
 
         sdir = self.get_sdir(cs)
         kernel = self.get_cs_kernel(cs)
@@ -145,9 +143,10 @@ class Config:
                 fil.write(f'\nPatches dir {pdir} doesnt exists\n')
                 continue
 
-            fil.write(f'\nAplying patches on {cs}({kernel}) from {pdir}\n')
+            fil.write(f'\nApplying patches on {cs}({kernel}) from {pdir}\n')
+            fil.flush()
 
-            for patch in pdir.iterdir():
+            for patch in sorted(pdir.iterdir(), reverse=True):
                 err = subprocess.run(['quilt', 'import', str(patch)],
                                      cwd=sdir, stderr=fil, stdout=fil)
                 if err.returncode != 0:
