@@ -5,7 +5,7 @@ import json
 import logging
 from natsort import natsorted
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 import re
 import shutil
 import subprocess
@@ -39,6 +39,56 @@ class Extractor(Config):
         self.app = app
         self.tem = TemplateGen(self.bsc_num, self.filter, self.app)
 
+    def unquote_output(matchobj):
+        return matchobj.group(0).replace('"', '')
+
+    def process_make_output(cs, filename, output):
+        fname = str(filename)
+
+        ofname = '.' + filename.name.replace('.c', '.o.d')
+        ofname = Path(filename.parent, ofname)
+
+        cmd_args_regex = '(-Wp,{},{}\s+-nostdinc\s+-isystem.*{});'
+
+        result = re.search(cmd_args_regex.format('-MD', ofname, fname), str(output).strip())
+        if not result:
+            # 15.4 onwards changes the regex a little: -MD -> -MMD
+            result = re.search(cmd_args_regex.format('-MMD', ofname, fname), str(output).strip())
+
+        if not result:
+            raise RuntimeError(f'Failed to get the kernel cmdline for file {str(ofname)} in {cs}')
+
+        # some strings  have single quotes around double quotes, so remove the
+        # outer quotes
+        output = result.group(1).replace('\'', '')
+
+        # also remove double quotes from macros like -D"KBUILD....=.."
+        return re.sub('-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
+
+    def get_make_cmd(cc, out_dir, cs, filename, odir):
+        filename = PurePath(filename)
+        file_ = filename.with_suffix('.o')
+
+        with open(Path(out_dir, 'make.out.txt'), 'w') as f:
+            completed = subprocess.check_output(['make', '-sn', f'CC={cc}',
+                                                 f'KLP_CS={cs}',
+                                                 f'HOSTCC={cc}',
+                                                 'WERROR=0',
+                                                 'CFLAGS_REMOVE_objtool=-Werror',
+                                                 file_], cwd=odir,
+                                        stderr=f)
+
+            ret = Extractor.process_make_output(cs, filename, completed.decode())
+            # save the cmdline
+            f.write(ret)
+
+            if not ' -pg ' in ret:
+                logging.warning(f'{cs}:{file_} is not compiled with livepatch support (-pg flag)')
+
+            return ret
+
+        return None
+
     def process(self, args):
         i, fname, cs, fdata = args
 
@@ -61,7 +111,7 @@ class Extractor(Config):
         # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
         # calls. Make is pretty fast, so there isn't a real slow down here.
         with self.make_lock:
-            cmd = lp_utils.get_make_cmd(self.cc, out_dir, cs, fname, odir)
+            cmd = Extractor.get_make_cmd(self.cc, out_dir, cs, fname, odir)
 
         args, lenv = self.runner.cmd_args(cs, fname, ','.join(fdata['symbols']), out_dir,
                                           fdata, cmd)
