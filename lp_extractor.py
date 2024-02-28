@@ -67,16 +67,19 @@ class Extractor(Config):
 
     def get_make_cmd(cc, out_dir, cs, filename, odir):
         filename = PurePath(filename)
-        file_ = filename.with_suffix('.o')
+        file_ = str(filename.with_suffix('.o'))
 
         with open(Path(out_dir, 'make.out.txt'), 'w') as f:
-            completed = subprocess.check_output(['make', '-sn', f'CC={cc}',
-                                                 f'KLP_CS={cs}',
-                                                 f'HOSTCC={cc}',
-                                                 'WERROR=0',
-                                                 'CFLAGS_REMOVE_objtool=-Werror',
-                                                 file_], cwd=odir,
-                                        stderr=f)
+            make_args = ['make', '-sn', f'CC={cc}', f'KLP_CS={cs}',
+                         f'HOSTCC={cc}', 'WERROR=0',
+                         'CFLAGS_REMOVE_objtool=-Werror', file_]
+
+            f.write(f'Executing make on {odir}\n')
+            f.write(' '.join(make_args))
+            f.write('\n')
+            f.flush()
+
+            completed = subprocess.check_output(make_args, cwd=odir, stderr=f)
 
             ret = Extractor.process_make_output(cs, filename, completed.decode())
             # save the cmdline
