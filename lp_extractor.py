@@ -48,13 +48,9 @@ class Extractor(Config):
         ofname = '.' + filename.name.replace('.c', '.o.d')
         ofname = Path(filename.parent, ofname)
 
-        cmd_args_regex = '(-Wp,{},{}\s+-nostdinc\s+-isystem.*{});'
-
-        result = re.search(cmd_args_regex.format('-MD', ofname, fname), str(output).strip())
-        if not result:
-            # 15.4 onwards changes the regex a little: -MD -> -MMD
-            result = re.search(cmd_args_regex.format('-MMD', ofname, fname), str(output).strip())
-
+        # 15.4 onwards changes the regex a little: -MD -> -MMD
+        result = re.search(f'(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});'
+                  , str(output).strip())
         if not result:
             raise RuntimeError(f'Failed to get the kernel cmdline for file {str(ofname)} in {cs}')
 
