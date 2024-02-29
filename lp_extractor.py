@@ -66,6 +66,14 @@ class Extractor(Config):
         file_ = str(filename.with_suffix('.o'))
 
         with open(Path(out_dir, 'make.out.txt'), 'w') as f:
+            # Corner case for lib directory, that fails with the conventional
+            # way of grabbing the gcc args used to compile the file. If then
+            # need to ask the make to show the commands for all files inside the
+            # directory. Later process_make_output will take care of picking
+            # what is interesting for klp-build
+            if filename.parent == PurePath('arch/x86/lib'):
+                file_ = str(filename.parent)
+
             make_args = ['make', '-sn', f'CC={cc}', f'KLP_CS={cs}',
                          f'HOSTCC={cc}', 'WERROR=0',
                          'CFLAGS_REMOVE_objtool=-Werror', file_]
