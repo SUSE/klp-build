@@ -1,4 +1,3 @@
-from natsort import natsorted
 import os
 from pathlib import Path
 

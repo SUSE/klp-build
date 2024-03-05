@@ -3,6 +3,7 @@ import copy
 import json
 import git
 import logging
+from natsort import natsorted
 from pathlib import Path
 import platform
 import os
@@ -338,7 +339,8 @@ class Config:
         for cs in cs_del_list:
             full_cs.pop(cs, '')
 
-        return full_cs
+        keys = natsorted(full_cs.keys())
+        return OrderedDict((k, full_cs[k]) for k in keys)
 
     # Cache the output of nm by using the object path. It differs for each
     # codestream and architecture
