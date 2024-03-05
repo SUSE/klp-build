@@ -121,8 +121,6 @@ class Config:
 
     def apply_all_patches(self, cs, fil=subprocess.STDOUT):
         patched = False
-        # Remove previously applied patches
-        self.remove_patches(cs, fil)
 
         sle, sp, u, rt = self.get_cs_tuple(cs)
 

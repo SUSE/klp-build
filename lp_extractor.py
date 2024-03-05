@@ -156,8 +156,9 @@ class Extractor(Config):
         args = []
         i = 1
         for cs, data in working_cs.items():
-            # remove any previously generated files
+            # remove any previously generated files and leftover patches
             shutil.rmtree(self.get_cs_dir(cs, self.app), ignore_errors=True)
+            self.remove_patches(cs, self.quilt_log)
 
             # Apply patches before the LPs were created
             if self.apply_patches:
@@ -196,7 +197,7 @@ class Extractor(Config):
         for cs, _ in working_cs.items():
             self.tem.GenerateLivePatches(cs)
 
-            # Cleanup patches after the LPs were created
+            # Cleanup patches after the LPs were created if they were applied
             if self.apply_patches:
                 self.remove_patches(cs, self.quilt_log)
 
