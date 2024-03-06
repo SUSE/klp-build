@@ -42,8 +42,7 @@ class CE(Config):
         return symbols
 
     def cmd_args(self, cs, fname, funcs, out_dir, fdata, cmd):
-        odir = self.get_odir(cs)
-        symvers = str(self.get_cs_symvers(cs))
+        symvers = str(self.get_cs_boot_file(cs, 'symvers'))
         ipa = str(self.get_ipa_file(cs, fname))
         obj = self.get_module_obj('x86_64', cs, fdata['module'])
 

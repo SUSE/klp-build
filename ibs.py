@@ -207,7 +207,7 @@ class IBS(Config):
                                         shell=True)
 
             # Use the SLE .config
-            shutil.copy(self.get_cs_kconfig(cs), Path(self.get_odir(cs), '.config'))
+            shutil.copy(self.get_cs_boot_file(cs, 'config'), Path(self.get_odir(cs), '.config'))
 
             # Recreate the build link to enable us to test the generated LP
             mod_path = Path(self.get_mod_path(cs, self.arch), 'build')

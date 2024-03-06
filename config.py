@@ -193,33 +193,27 @@ class Config:
 
     def validate_config(self, cs, conf):
         for arch in self.get_cs_archs(cs):
-            kconf = self.get_cs_kconfig(cs, arch)
+            kconf = self.get_cs_boot_file(cs, 'config', arch)
             with open(kconf) as f:
                 match = re.search(f'{conf}=[ym]', f.read())
                 if not match:
                     raise RuntimeError(f'{cs}:{arch}: Config {conf} not enabled')
 
     def missing_codestream(self, cs):
-        return not self.get_cs_kconfig(cs).exists()
+        return not self.get_cs_boot_file(cs, 'config').exists()
 
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get('rt', False)
 
-    def get_cs_symvers(self, cs, arch=''):
+    def get_ktype(self, cs):
+        return 'rt' if self.cs_is_rt(cs) else 'default'
+
+    def get_cs_boot_file(self, cs, file, arch=''):
         if not arch:
             arch = self.arch
-        ktype = 'rt' if self.cs_is_rt(cs) else 'default'
-        kernel = self.get_cs_kernel(cs)
 
-        return Path(self.get_data_dir(self.arch), 'boot', f'symvers-{kernel}-{ktype}')
-
-    def get_cs_kconfig(self, cs, arch=''):
-        if not arch:
-            arch = self.arch
-        ktype = 'rt' if self.cs_is_rt(cs) else 'default'
-        kernel = self.get_cs_kernel(cs)
-
-        return Path(self.get_data_dir(self.arch), 'boot', f'config-{kernel}-{ktype}')
+        return Path(self.get_data_dir(self.arch), 'boot',
+                    f'{file}-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}')
 
     def get_data_dir(self, arch):
         return Path(self.data, arch)
@@ -233,12 +227,7 @@ class Config:
                         f"linux-{self.get_cs_kernel(cs)}{kdir}")
 
     def get_odir(self, cs):
-        kdir = 'default'
-        if self.cs_is_rt(cs):
-            kdir = 'rt'
-
-        sdir = self.get_sdir(cs)
-        return Path(f'{sdir}-obj', self.arch, kdir)
+        return Path(f'{self.get_sdir(cs)}-obj', self.arch, self.get_ktype(cs))
 
     def get_ipa_file(self, cs, fname):
         return Path(self.get_odir(cs), f'{fname}.000i.ipa-clones')
@@ -276,10 +265,7 @@ class Config:
     def find_module_obj(self, arch, cs, mod, check_support=False):
         kernel = self.get_cs_kernel(cs)
         if not self.is_mod(mod):
-            ktype = 'default'
-            if self.cs_is_rt(cs):
-                ktype = 'rt'
-            return f'boot/vmlinux-{kernel}-{ktype}'
+            return f'boot/vmlinux-{kernel}-{self.get_ktype(cs)}'
 
         # mod here can be using _ but the filename can be using -, so replace
         # the _ cases with a regex like form to check for both _ and -
