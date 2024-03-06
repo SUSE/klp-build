@@ -44,7 +44,7 @@ class CE(Config):
     def cmd_args(self, cs, fname, funcs, out_dir, fdata, cmd):
         odir = self.get_odir(cs)
         symvers = str(self.get_cs_symvers(cs))
-        ipa = str(Path(self.get_ipa_dir(cs), f'{fname}.000i.ipa-clones'))
+        ipa = str(self.get_ipa_file(cs, fname))
         obj = self.get_module_obj('x86_64', cs, fdata['module'])
 
         lp_name = self.lp_out_file(fname)

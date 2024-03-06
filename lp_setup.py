@@ -256,7 +256,7 @@ class Setup(Config):
                 if not Path(self.get_sdir(cs), f).is_file():
                     raise RuntimeError(f'{cs}: File {f} not found')
 
-                ipa_f = Path(self.get_ipa_dir(cs), f'{f}.000i.ipa-clones')
+                ipa_f = self.get_ipa_file(cs, f)
                 if not ipa_f.is_file():
                     ipa_f.touch()
                     logging.warning(f'{cs}: File {ipa_f} not found. Creating an empty file.')

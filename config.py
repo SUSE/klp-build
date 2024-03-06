@@ -88,15 +88,6 @@ class Config:
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f'{self.bsc}_{fpath}'
 
-    def get_ipa_dir(self, cs):
-        kernel = self.get_cs_kernel(cs)
-        if self.cs_is_rt(cs):
-            return Path(self.get_data_dir(self.arch), 'usr', 'src',
-                        f'linux-{kernel}-rt-obj', self.arch, 'rt')
-
-        return Path(self.get_data_dir(self.arch), 'usr', 'src', f'linux-{kernel}-obj',
-                    self.arch, 'default')
-
     def get_patches_dir(self):
         return Path(self.bsc_path, 'fixes')
 
@@ -248,6 +239,9 @@ class Config:
 
         sdir = self.get_sdir(cs)
         return Path(f'{sdir}-obj', self.arch, kdir)
+
+    def get_ipa_file(self, cs, fname):
+        return Path(self.get_odir(cs), f'{fname}.000i.ipa-clones')
 
     def get_mod_path(self, cs, arch):
         kdir = 'default'
