@@ -107,8 +107,8 @@ class Config:
         if err.returncode not in [0, 2]:
             raise RuntimeError(f'{cs}: quilt pop failed: {err.stderr}')
 
-        shutil.rmtree(patches_dir)
-        shutil.rmtree(Path(sdir, ".pc"))
+        shutil.rmtree(patches_dir, ignore_errors=True)
+        shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
 
     def apply_all_patches(self, cs, fil=subprocess.STDOUT):
         patched = False
@@ -202,9 +202,6 @@ class Config:
     def missing_codestream(self, cs):
         return not self.get_cs_kconfig(cs).exists()
 
-    def get_data_dir(self, arch):
-        return Path(self.data, arch)
-
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get('rt', False)
 
@@ -224,12 +221,15 @@ class Config:
 
         return Path(self.get_data_dir(self.arch), 'boot', f'config-{kernel}-{ktype}')
 
+    def get_data_dir(self, arch):
+        return Path(self.data, arch)
+
     def get_sdir(self, cs):
         kdir = '-rt'
         if not self.cs_is_rt(cs):
             kdir = ''
 
-        return Path(self.data, self.arch, 'usr', 'src',
+        return Path(self.get_data_dir(self.arch), 'usr', 'src',
                         f"linux-{self.get_cs_kernel(cs)}{kdir}")
 
     def get_odir(self, cs):
