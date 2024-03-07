@@ -212,7 +212,7 @@ class Extractor(Config):
                     obj_syms[obj].extend(syms)
 
             for obj, syms in obj_syms.items():
-                missing = self.check_symbol_archs(cs, obj, syms)
+                missing = self.check_symbol_archs(cs, obj, syms, False)
                 if missing:
                     for arch, arch_syms in missing.items():
                         missing_syms.setdefault(arch, {})

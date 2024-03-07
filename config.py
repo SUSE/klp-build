@@ -339,14 +339,21 @@ class Config:
 
         return ret
 
-    def check_symbol_archs(self, cs, mod, symbols, x86=False):
+    # This functions is used to check if the symbols exist in the module they
+    # we will livepatch. In this case skip_on_host argument will be false,
+    # meaning that we want the symbol to checked against all supported
+    # architectures before creating the livepatches.
+    #
+    # It is also used when we want to check if a symbol externalized in one
+    # architecture exists in the other supported ones. In this case skip_on_host
+    # will be True, since we trust the decisions made by the extractor tool.
+    def check_symbol_archs(self, cs, mod, symbols, skip_on_host):
         data = self.get_cs_data(cs)
         arch_sym = {}
         # Validate only architectures supported by the codestream
         for arch in data['archs']:
 
-            # Avoid rechecking on checking for externalized symbols
-            if arch == 'x86_64' and not x86:
+            if arch == self.arch and skip_on_host:
                 continue
 
             # Skip if the arch is not supported by the livepatch code
