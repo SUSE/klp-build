@@ -58,6 +58,8 @@ def create_parser() -> argparse.ArgumentParser:
                        help='Apply patches found by get-patches subcommand, if they exist')
     extract_opts.add_argument('--type', type=str, required=True, choices=['ccp', 'ce'],
             help='Choose between ccp and ce')
+    extract_opts.add_argument('--workers', type=int, default=4,
+            help='Number of processes for ccp and ce. Default is 4')
 
     diff_opts = sub.add_parser('cs-diff', parents = [parentparser])
     diff_opts.add_argument('--codestreams', nargs=2, type=str, required=True,
@@ -111,7 +113,7 @@ def main_func(main_args):
 
     elif args.cmd == 'extract':
         Extractor(args.bsc, args.filter, args.apply_patches, args.type,
-                  args.avoid_ext).run()
+                  args.workers, args.avoid_ext).run()
 
     elif args.cmd == 'cs-diff':
         Extractor(args.bsc, '', False, args.type).diff_cs(args.codestreams)

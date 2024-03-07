@@ -18,8 +18,10 @@ import lp_utils
 from templ import TemplateGen
 
 class Extractor(Config):
-    def __init__(self, bsc, bsc_filter, apply_patches, app, avoid_ext = ''):
+    def __init__(self, bsc, bsc_filter, apply_patches, app, workers = 4, avoid_ext = ''):
         super().__init__(bsc, bsc_filter)
+
+        self.workers = workers
 
         if apply_patches and not self.get_patches_dir().exists():
             raise ValueError('--apply-patches specified without patches. Run get-patches!')
@@ -172,7 +174,7 @@ class Extractor(Config):
         logging.info(f'\nGenerating livepatches for {len(args)} file(s)...')
         logging.info('\t\tCodestream\tFile')
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as executor:
             results = executor.map(self.process, args)
             for result in results:
                 if result:
