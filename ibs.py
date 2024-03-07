@@ -245,17 +245,8 @@ class IBS(Config):
 
         return filtered
 
-    def get_kernel_path(self, cs, arch):
-        kdir = 'default'
-        if self.cs_is_rt(cs):
-            kdir = 'rt'
-
-        kernel = self.get_cs_kernel(cs)
-        return Path(self.get_data_dir(arch), 'boot',
-                            f'vmlinux-{kernel}-{kdir}')
-
     def find_missing_symbols(self, cs, arch, lp_mod_path):
-        vmlinux_path = self.get_kernel_path(cs, arch)
+        vmlinux_path = self.get_cs_boot_file(cs, 'vmlinux', arch)
 
         # Get list of UNDEFINED symbols from the livepatch module
         out = subprocess.check_output(['nm', '--undefined-only', str(lp_mod_path)],

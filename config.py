@@ -219,12 +219,12 @@ class Config:
         return Path(self.data, arch)
 
     def get_sdir(self, cs):
-        kdir = '-rt'
-        if not self.cs_is_rt(cs):
-            kdir = ''
-
+        # Only -rt codestreams have a suffix for source directory
+        ktype = f'-{self.get_ktype(cs)}'
+        if ktype == '-default':
+            ktype = ''
         return Path(self.get_data_dir(self.arch), 'usr', 'src',
-                        f"linux-{self.get_cs_kernel(cs)}{kdir}")
+                        f"linux-{self.get_cs_kernel(cs)}{ktype}")
 
     def get_odir(self, cs):
         return Path(f'{self.get_sdir(cs)}-obj', self.arch, self.get_ktype(cs))
@@ -232,13 +232,11 @@ class Config:
     def get_ipa_file(self, cs, fname):
         return Path(self.get_odir(cs), f'{fname}.000i.ipa-clones')
 
-    def get_mod_path(self, cs, arch):
-        kdir = 'default'
-        if self.cs_is_rt(cs):
-            kdir = 'rt'
-
-        return Path(self.get_data_dir(arch), 'lib', 'modules',
-                    f'{self.get_cs_kernel(cs)}-{kdir}')
+    def get_mod_path(self, cs, arch, mod = ''):
+        if not mod or self.is_mod(mod):
+            return Path(self.get_data_dir(arch), 'lib', 'modules',
+                        f'{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}')
+        return self.get_data_dir(arch)
 
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:
@@ -247,19 +245,14 @@ class Config:
     def is_mod(self, mod):
         return mod != 'vmlinux'
 
+    # This function can be called to get the path to a module that has symbols
+    # that were externalized, so we need to find the path to the module as well.
     def get_module_obj(self, arch, cs, module):
-        ex_dir = self.get_data_dir(arch)
-
-        # We already search if the module exists on setup phase, so only search
-        # for the module when looking for externalized symbols
         obj = self.get_cs_modules(cs).get(module, '')
         if not obj:
             obj = self.find_module_obj(arch, cs, module)
 
-        if not self.is_mod(module):
-            return str(Path(ex_dir, obj))
-
-        return str(Path(self.get_mod_path(cs, arch), obj))
+        return str(Path(self.get_mod_path(cs, arch, module), obj))
 
     # Return only the name of the module to be livepatched
     def find_module_obj(self, arch, cs, mod, check_support=False):
@@ -271,12 +264,11 @@ class Config:
         # the _ cases with a regex like form to check for both _ and -
         mod = mod.replace('_', '[-_]')
 
-        mod_path = self.get_mod_path(cs, arch)
+        mod_path = self.get_mod_path(cs, arch, mod)
         with open(Path(mod_path, 'modules.order')) as f:
             obj = re.search(f'([\w\/\-]+\/{mod}.ko)', f.read())
             if not obj:
                 raise RuntimeError(f'{cs}: Module not found: {mod}')
-
 
             obj = obj.group(1)
             obj_path = str(Path(mod_path, obj))
