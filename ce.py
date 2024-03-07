@@ -44,7 +44,7 @@ class CE(Config):
     def cmd_args(self, cs, fname, funcs, out_dir, fdata, cmd):
         symvers = str(self.get_cs_boot_file(cs, 'symvers'))
         ipa = str(self.get_ipa_file(cs, fname))
-        obj = self.get_module_obj('x86_64', cs, fdata['module'])
+        obj = self.get_module_obj(self.arch, cs, fdata['module'])
 
         lp_name = self.lp_out_file(fname)
         lp_out = Path(out_dir, lp_name)

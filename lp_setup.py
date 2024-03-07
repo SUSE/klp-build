@@ -268,8 +268,7 @@ class Setup(Config):
 
                 mod = fdata['module']
                 if not data['modules'].get(mod, ''):
-                    # Use x86_64 to find the module, as it is be the same path for other archs
-                    data['modules'][mod] = self.find_module_obj('x86_64', cs, mod, check_support=True)
+                    data['modules'][mod] = self.find_module_obj(self.arch, cs, mod, check_support=True)
 
                 mod_syms.setdefault(mod, [])
                 mod_syms[mod].extend(fdata['symbols'])

@@ -260,8 +260,7 @@ class Config:
         if not self.is_mod(mod):
             return f'boot/vmlinux-{kernel}-{self.get_ktype(cs)}'
 
-        # mod here can be using _ but the filename can be using -, so replace
-        # the _ cases with a regex like form to check for both _ and -
+        # Module name use underscores, but the final module object uses hyphens.
         mod = mod.replace('_', '[-_]')
 
         mod_path = self.get_mod_path(cs, arch, mod)
@@ -270,17 +269,17 @@ class Config:
             if not obj:
                 raise RuntimeError(f'{cs}: Module not found: {mod}')
 
-            obj = obj.group(1)
-            obj_path = str(Path(mod_path, obj))
+        obj = obj.group(1)
 
+        if check_support:
             # Validate if the module being livepatches is supported or not
-            out = subprocess.check_output(['/sbin/modinfo', obj_path],
+            out = subprocess.check_output(['/sbin/modinfo', obj], cwd=mod_path,
                                           stderr=subprocess.STDOUT).decode()
 
-            if check_support and re.search('supported:\s+no', out):
+            if re.search('supported:\s+no', out):
                 print(f'WARN: {cs}: Module {mod} is not supported by SLE')
 
-            return obj
+        return obj
 
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter

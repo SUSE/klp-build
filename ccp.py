@@ -140,7 +140,7 @@ class CCP(Config):
 
         env['KCP_MOD_SYMVERS'] = str(self.get_cs_boot_file(cs, 'symvers'))
         env['KCP_KBUILD_ODIR'] = str(odir)
-        env['KCP_PATCHED_OBJ'] = self.get_module_obj('x86_64', cs, fdata['module'])
+        env['KCP_PATCHED_OBJ'] = self.get_module_obj(self.arch, cs, fdata['module'])
         env['KCP_KBUILD_SDIR'] = str(sdir)
         env['KCP_IPA_CLONES_DUMP'] = str(self.get_ipa_file(cs, fname))
         env['KCP_WORK_DIR'] = str(out_dir)
