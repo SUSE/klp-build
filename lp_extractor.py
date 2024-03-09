@@ -171,7 +171,8 @@ class Extractor(Config):
                 i += 1
 
         self.total = len(args)
-        logging.info(f'\nGenerating livepatches for {len(args)} file(s)...')
+        logging.info(f'\nGenerating livepatches for {len(args)} file(s) using'
+                     f'{self.workers} workers...')
         logging.info('\t\tCodestream\tFile')
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as executor:
