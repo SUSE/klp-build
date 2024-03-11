@@ -6,6 +6,7 @@ from pathlib import Path, PurePath
 import os
 import re
 import requests
+import shutil
 import subprocess
 import sys
 
@@ -103,7 +104,9 @@ class GitHelper(Config):
         if not kgraft_tests_path.is_dir():
             raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
 
+        # Remove dir to avoid leftover patches with different names
         patches_dir = Path(self.bsc_path, 'patches')
+        shutil.rmtree(patches_dir, ignore_errors=True)
 
         # Ensure that a testfile was created before preparing the patches
         test_sh = Path(kgraft_tests_path, f'{self.bsc}_test_script.sh')
