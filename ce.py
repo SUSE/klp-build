@@ -42,28 +42,20 @@ class CE(Config):
         return symbols
 
     def cmd_args(self, cs, fname, funcs, out_dir, fdata, cmd):
-        symvers = str(self.get_cs_boot_file(cs, 'symvers'))
-        ipa = str(self.get_ipa_file(cs, fname))
-        obj = self.get_module_obj(self.arch, cs, fdata['module'])
-
-        lp_name = self.lp_out_file(fname)
-        lp_out = Path(out_dir, lp_name)
-
-        dsc_out = Path(out_dir, 'lp.dsc')
-
         ce_args = [self.ce_path]
-
         ce_args.extend(cmd.split(' '))
 
         ce_args = list(filter(None, ce_args))
 
         # Now add the macros to tell clang-extract what to do
-        ce_args.extend([f'-DCE_DEBUGINFO_PATH={obj}',
-                        f'-DCE_SYMVERS_PATH={symvers}',
+        ce_args.extend([f'-DCE_DEBUGINFO_PATH={self.get_module_obj(self.arch, cs, fdata["module"])}',
+                        f'-DCE_SYMVERS_PATH={self.get_cs_boot_file(cs, "symvers")}',
+                        f'-DCE_IPACLONES_PATH={self.get_ipa_file(cs, fname)}',
+                        f'-DCE_OUTPUT_FILE={Path(out_dir, self.lp_out_file(fname))}',
+                        f'-DCE_OUTPUT_FUNCTION_PROTOTYPE_HEADER={Path(out_dir, "proto.h")}',
+                        f'-DCE_DSC_OUTPUT={Path(out_dir, "lp.dsc")}',
                         f'-DCE_EXTRACT_FUNCTIONS={funcs}',
-                        f'-DCE_IPACLONES_PATH={ipa}',
-                        f'-DCE_OUTPUT_FILE={lp_out}',
-                        f'-DCE_DSC_OUTPUT={dsc_out}'])
+                       ])
 
         # Keep includes is necessary so don't end up expanding all headers,
         # generating a huge amount of code. This only makes sense for the
