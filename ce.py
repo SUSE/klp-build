@@ -63,5 +63,8 @@ class CE(Config):
         ce_args.extend(['-DCE_KEEP_INCLUDES',
                         '-DCE_RENAME_SYMBOLS'])
 
+        # For debug purposes. Uncomment for dumping clang-extract passes
+        #ce_args.extend(['-DCE_DUMP_PASSES'])
+
 
         return ce_args, None
