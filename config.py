@@ -14,20 +14,22 @@ import subprocess
 from lp_utils import classify_codestreams
 
 class Config:
-    def __init__(self, bsc, bsc_filter, skips = '', working_cs = {}):
-        work_dir = os.getenv('KLP_WORK_DIR')
+    def __init__(self, bsc, bsc_filter, work_dir = None, data_dir = None, skips = '', working_cs = {}):
         if not work_dir:
-            raise ValueError('KLP_WORK_DIR should be defined')
+            work_dir = os.getenv('KLP_WORK_DIR')
+            if not work_dir:
+                raise ValueError('KLP_WORK_DIR should be defined')
 
         work = Path(work_dir)
         if not work.is_dir():
             raise ValueError('Work dir should be a directory')
 
-        data = os.getenv('KLP_DATA_DIR', '')
-        if not data:
-            raise ValueError('KLP_DATA_DIR should be defined')
+        if not data_dir:
+            data_dir = os.getenv('KLP_DATA_DIR', '')
+            if not data_dir:
+                raise ValueError('KLP_DATA_DIR should be defined')
 
-        self.data = Path(data)
+        self.data = Path(data_dir)
         if not self.data.is_dir():
             raise ValueError('Data dir should be a directory')
 

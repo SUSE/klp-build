@@ -13,10 +13,10 @@ from ksrc import GitHelper
 import lp_utils
 
 class Setup(Config):
-    def __init__(self, bsc, bsc_filter, cve, cs_arg,
+    def __init__(self, bsc, bsc_filter, work_dir, data_dir, cve, cs_arg,
                  file_funcs, mod_file_funcs, conf_mod_file_funcs,
                  mod_arg, conf, archs, skips):
-        super().__init__(bsc, bsc_filter, skips=skips)
+        super().__init__(bsc, bsc_filter, work_dir, data_dir, skips=skips)
 
         archs.sort()
 
