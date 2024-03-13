@@ -31,7 +31,7 @@ class Config:
         if kdir:
             self.user = ''
             self.email = ''
-        else
+        else:
             try:
                 import git
                 git_data = git.GitConfigParser()
