@@ -41,8 +41,6 @@ class Setup(Config):
         self.conf['archs'] = archs
         self.conf['cve'] = re.search('([0-9]+\-[0-9]+)', cve).group(1)
 
-        self.ksrc = GitHelper(self.bsc_num, self.filter)
-
         self.codestream = cs_arg
         self.file_funcs = {}
 
@@ -168,13 +166,15 @@ class Setup(Config):
         # against the codestreams informed by the user
         all_codestreams = self.download_supported_file()
 
+        ksrc = GitHelper(self.bsc_num, self.filter)
+
         # Called at this point because codestreams is populated
-        self.conf['commits'] = self.ksrc.get_commits(self.conf['cve'])
+        self.conf['commits'] = ksrc.get_commits(self.conf['cve'])
 
         # do not get the commits twice
         patched_kernels = self.conf.get('patched_kernels', [])
         if not patched_kernels:
-            patched_kernels = self.ksrc.get_patched_kernels(self.conf['commits'])
+            patched_kernels = ksrc.get_patched_kernels(self.conf['commits'])
 
         self.conf['patched_kernels'] = patched_kernels
 
