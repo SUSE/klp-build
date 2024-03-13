@@ -277,7 +277,6 @@ class Config:
 
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:
-            print(self.codestreams)
             f.write(json.dumps(self.codestreams, indent=4))
 
     def is_mod(self, mod):

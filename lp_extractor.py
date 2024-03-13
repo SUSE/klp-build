@@ -51,21 +51,10 @@ class Extractor(Config):
     def unquote_output(matchobj):
         return matchobj.group(0).replace('"', '')
 
-    def process_make_output(cs, filename, output):
-        fname = str(filename)
-
-        ofname = '.' + filename.name.replace('.c', '.o.d')
-        ofname = Path(filename.parent, ofname)
-
-        # 15.4 onwards changes the regex a little: -MD -> -MMD
-        result = re.search(f'(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});'
-                  , str(output).strip())
-        if not result:
-            raise RuntimeError(f'Failed to get the kernel cmdline for file {str(ofname)} in {cs}')
-
+    def process_make_output(output):
         # some strings  have single quotes around double quotes, so remove the
         # outer quotes
-        output = result.group(1).replace('\'', '')
+        output = output.replace('\'', '')
 
         # also remove double quotes from macros like -D"KBUILD....=.."
         return re.sub('-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
@@ -92,9 +81,19 @@ class Extractor(Config):
             f.write('\n')
             f.flush()
 
-            completed = subprocess.check_output(make_args, cwd=odir, stderr=f)
+            completed = subprocess.check_output(make_args, cwd=odir,
+                                                stderr=f).decode()
 
-            ret = Extractor.process_make_output(cs, filename, completed.decode())
+            ofname = '.' + filename.name.replace('.c', '.o.d')
+            ofname = Path(filename.parent, ofname)
+
+            # 15.4 onwards changes the regex a little: -MD -> -MMD
+            result = re.search(f'(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});'
+                      , str(completed).strip())
+            if not result:
+                raise RuntimeError(f'Failed to get the kernel cmdline for file {str(ofname)} in {cs}')
+
+            ret = Extractor.process_make_output(result.group(1))
             # save the cmdline
             f.write(ret)
 
@@ -102,6 +101,17 @@ class Extractor(Config):
                 logging.warning(f'{cs}:{file_} is not compiled with livepatch support (-pg flag)')
 
             return ret
+
+        return None
+
+    def get_cmd_from_json(self, fname):
+        with open(Path(self.get_data_dir(self.arch), 'compile_commands.json')) as f:
+            buf = f.read()
+        data = json.loads(buf)
+        for d in data:
+            if fname in d['file']:
+                output = d['command']
+                return Extractor.process_make_output(output)
 
         return None
 
@@ -128,14 +138,7 @@ class Extractor(Config):
         # calls. Make is pretty fast, so there isn't a real slow down here.
         with self.make_lock:
             if self.kdir:
-                with open(Path(self.get_data_dir(self.arch), 'compile_commands.json')) as f:
-                    buf = f.read()
-                data = json.loads(buf)
-                for d in data:
-                    if fname in d['file']:
-                        cmd = d['command']
-                        break
-
+                cmd = self.get_cmd_from_json(fname)
             else:
                 cmd = Extractor.get_make_cmd(self.cc, out_dir, cs, fname, odir)
 
@@ -203,7 +206,8 @@ class Extractor(Config):
 
         self.tem.refresh_codestreams(self.codestreams)
 
-        self.group_equal_files(args)
+        if not self.kdir:
+            self.group_equal_files(args)
 
         self.tem.generate_commit_msg_file()
 
