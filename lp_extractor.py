@@ -41,6 +41,8 @@ class Extractor(Config):
         self.make_lock = Lock()
 
         if app == 'ccp':
+            if self.kdir:
+                raise ValueError('ccp with --kdir isn\'t supported')
             self.runner = CCP(bsc, bsc_filter, avoid_ext)
         else:
             self.runner = CE(bsc, bsc_filter)
@@ -206,8 +208,13 @@ class Extractor(Config):
 
         self.tem.refresh_codestreams(self.codestreams)
 
-        if not self.kdir:
-            self.group_equal_files(args)
+        # For kdir setup, do not execute additional checks
+        # TODO: change the templates so we generate a similar code than we
+        # already do for SUSE livepatches
+        if self.kdir:
+            return
+
+        self.group_equal_files(args)
 
         self.tem.generate_commit_msg_file()
 
