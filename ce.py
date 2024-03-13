@@ -50,12 +50,16 @@ class CE(Config):
         # Now add the macros to tell clang-extract what to do
         ce_args.extend([f'-DCE_DEBUGINFO_PATH={self.get_module_obj(self.arch, cs, fdata["module"])}',
                         f'-DCE_SYMVERS_PATH={self.get_cs_boot_file(cs, "symvers")}',
-                        f'-DCE_IPACLONES_PATH={self.get_ipa_file(cs, fname)}',
                         f'-DCE_OUTPUT_FILE={Path(out_dir, self.lp_out_file(fname))}',
                         f'-DCE_OUTPUT_FUNCTION_PROTOTYPE_HEADER={Path(out_dir, "proto.h")}',
                         f'-DCE_DSC_OUTPUT={Path(out_dir, "lp.dsc")}',
                         f'-DCE_EXTRACT_FUNCTIONS={funcs}',
                        ])
+
+        # clang-extract works without ipa-clones, so don't hard require it
+        ipa_f = self.get_ipa_file(cs, fname)
+        if ipa_f.exists():
+            ce_args.extend([f'-DCE_IPACLONES_PATH={ipa_f}'])
 
         # Keep includes is necessary so don't end up expanding all headers,
         # generating a huge amount of code. This only makes sense for the

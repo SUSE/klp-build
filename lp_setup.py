@@ -264,8 +264,11 @@ class Setup(Config):
 
                 ipa_f = self.get_ipa_file(cs, f)
                 if not ipa_f.is_file():
-                    ipa_f.touch()
-                    logging.warning(f'{cs}: File {ipa_f} not found. Creating an empty file.')
+                    msg = f'{cs}: File {ipa_f} not found.'
+                    if not self.kdir:
+                        msg += ' Creating an empty file.'
+                        ipa_f.touch()
+                    logging.warning(msg)
 
                 # Check if the CONFIG is enabled on all affected architectures
                 conf = fdata['conf']
