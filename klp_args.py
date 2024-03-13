@@ -29,8 +29,6 @@ def create_parser() -> argparse.ArgumentParser:
             help='The kernel CONFIG used to be build the livepatch')
     setup.add_argument('--kdir', action='store_true',
             help='Change the lookup procedure to search in a compiled kernel directory')
-    setup.add_argument('--work-dir', type=str, required=False, default='',
-            help='The path where the resulting bsc files will be placed')
     setup.add_argument('--data-dir', type=str, required=False, default='',
             help='The path where source files and modules will be found')
     setup.add_argument('--codestreams', type=str, default='',
@@ -112,9 +110,8 @@ def main_func(main_args):
     args = create_parser().parse_args(main_args)
 
     if args.cmd == 'setup':
-        setup = Setup(args.bsc, args.filter, args.kdir, args.work_dir,
-                      args.data_dir, args.cve, args.codestreams,
-                      args.file_funcs, args.mod_file_funcs,
+        setup = Setup(args.bsc, args.filter, args.kdir, args.data_dir, args.cve,
+                      args.codestreams, args.file_funcs, args.mod_file_funcs,
                       args.conf_mod_file_funcs, args.module, args.conf,
                       args.archs, args.skips)
         setup.setup_project_files()
