@@ -337,6 +337,9 @@ class Config:
             cs_list = self.codestreams
         full_cs = copy.deepcopy(cs_list)
 
+        if self.kdir:
+            return full_cs
+
         if verbose:
             logging.info('Checking filter and skips...')
         filtered = []

@@ -13,8 +13,8 @@ import sys
 from config import Config
 
 class GitHelper(Config):
-    def __init__(self, bsc, bsc_filter):
-        super().__init__(bsc, bsc_filter)
+    def __init__(self, bsc, bsc_filter, kdir, data_dir):
+        super().__init__(bsc, bsc_filter, kdir, data_dir)
 
         self.kern_src = os.getenv('KLP_KERNEL_SOURCE', '')
         if self.kern_src and not Path(self.kern_src).is_dir():

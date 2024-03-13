@@ -166,7 +166,7 @@ class Setup(Config):
         # against the codestreams informed by the user
         all_codestreams = self.download_supported_file()
 
-        ksrc = GitHelper(self.bsc_num, self.filter)
+        ksrc = GitHelper(self.bsc_num, self.filter, self.kdir, self.data)
 
         # Called at this point because codestreams is populated
         self.conf['commits'] = ksrc.get_commits(self.conf['cve'])
