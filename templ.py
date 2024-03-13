@@ -386,7 +386,7 @@ ${get_patched(cs_files, check_enabled)}
 '''
 
 TEMPL_MAKEFILE = '''\
-KDIR := ${ kdir }/build
+KDIR := ${ kdir }
 MOD_PATH := ${ pwd }
 obj-m := livepatch.o
 
@@ -510,8 +510,12 @@ class TemplateGen(Config):
         with open(lp_path, 'a') as f:
             f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
 
+        modpath = self.get_mod_path(cs, self.arch)
+        if not self.kdir:
+            modpath = Path(modpath, 'build')
+
         render_vars = {
-            'kdir' : self.get_mod_path(cs, self.arch),
+            'kdir' : modpath,
             'pwd' : work_dir
         }
 

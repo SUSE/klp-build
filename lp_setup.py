@@ -254,8 +254,6 @@ class Setup(Config):
         else:
             self.setup_codestreams()
 
-        logging.info('Validating info data...')
-
         # Setup the missing codestream info needed
         for cs, data in self.working_cs.items():
             # Check if the files exist in the respective codestream directories
