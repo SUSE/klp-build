@@ -22,11 +22,6 @@ class Config:
         if not work.is_dir():
             raise ValueError('Work dir should be a directory')
 
-        if not data_dir:
-            data_dir = os.getenv('KLP_DATA_DIR', '')
-            if not data_dir:
-                raise ValueError('KLP_DATA_DIR should be defined')
-
         # We dont need author info when creating a LP using kdir
         if kdir:
             self.user = ''
@@ -71,7 +66,13 @@ class Config:
                 self.conf = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
         self.kdir = self.conf.get('kdir', False)
-        self.data = Path(self.conf['data'])
+        self.data = Path(self.conf.get('data', 'non-existent'))
+        if not self.data.exists():
+            data_dir = os.getenv('KLP_DATA_DIR', '')
+            if not data_dir:
+                raise ValueError('KLP_DATA_DIR should be defined')
+            self.data = Path(data_dir)
+
         if not self.data.is_dir():
             raise ValueError('Data dir should be a directory')
 
