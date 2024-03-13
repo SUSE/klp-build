@@ -1,7 +1,6 @@
 from collections import OrderedDict
 import copy
 import json
-import git
 import logging
 from natsort import natsorted
 from pathlib import Path, PurePath
@@ -28,12 +27,18 @@ class Config:
             if not data_dir:
                 raise ValueError('KLP_DATA_DIR should be defined')
 
-        try:
-            git_data = git.GitConfigParser()
-            self.user = git_data.get_value('user', 'name')
-            self.email = git_data.get_value('user', 'email')
-        except:
-            raise ValueError('Please define name/email in global git config')
+        # We dont need author info when creating a LP using kdir
+        if kdir:
+            self.user = ''
+            self.email = ''
+        else
+            try:
+                import git
+                git_data = git.GitConfigParser()
+                self.user = git_data.get_value('user', 'name')
+                self.email = git_data.get_value('user', 'email')
+            except:
+                raise ValueError('Please define name/email in global git config')
 
         self.bsc_num = bsc
         self.bsc = 'bsc' + str(bsc)
