@@ -27,8 +27,15 @@ class Extractor(Config):
             raise ValueError('--apply-patches specified without patches. Run get-patches!')
         self.apply_patches = apply_patches
 
-        self.quilt_log = open(Path(self.get_patches_dir(), 'quilt.log'), 'w')
-        self.quilt_log.truncate()
+        if self.kdir:
+            if self.apply_patches:
+                logging.warning(f'Disabling --apply-patches when using with --kdir')
+                self.apply_patches = False
+
+            self.quilt_log = None
+        else:
+            self.quilt_log = open(Path(self.get_patches_dir(), 'quilt.log'), 'w')
+            self.quilt_log.truncate()
 
         self.total = 0
         self.make_lock = Lock()
@@ -120,7 +127,17 @@ class Extractor(Config):
         # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
         # calls. Make is pretty fast, so there isn't a real slow down here.
         with self.make_lock:
-            cmd = Extractor.get_make_cmd(self.cc, out_dir, cs, fname, odir)
+            if self.kdir:
+                with open(Path(self.get_data_dir(self.arch), 'compile_commands.json')) as f:
+                    buf = f.read()
+                data = json.loads(buf)
+                for d in data:
+                    if fname in d['file']:
+                        cmd = d['command']
+                        break
+
+            else:
+                cmd = Extractor.get_make_cmd(self.cc, out_dir, cs, fname, odir)
 
         args, lenv = self.runner.cmd_args(cs, fname, ','.join(fdata['symbols']), out_dir,
                                           fdata, cmd)

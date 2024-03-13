@@ -4,6 +4,7 @@ import json
 import logging
 from natsort import natsorted
 from pathlib import Path
+import platform
 import re
 import requests
 import sys
@@ -13,10 +14,10 @@ from ksrc import GitHelper
 import lp_utils
 
 class Setup(Config):
-    def __init__(self, bsc, bsc_filter, work_dir, data_dir, cve, cs_arg,
+    def __init__(self, bsc, bsc_filter, kdir, work_dir, data_dir, cve, cs_arg,
                  file_funcs, mod_file_funcs, conf_mod_file_funcs,
                  mod_arg, conf, archs, skips):
-        super().__init__(bsc, bsc_filter, work_dir, data_dir, skips=skips)
+        super().__init__(bsc, bsc_filter, kdir, work_dir, data_dir, skips=skips)
 
         archs.sort()
 
@@ -162,9 +163,7 @@ class Setup(Config):
         sle, sp, _, _ = self.get_cs_tuple(cs)
         return sle == 12 or (sle == 15 and sp >= 2)
 
-    def setup_project_files(self):
-        self.bsc_path.mkdir(exist_ok=True)
-
+    def setup_codestreams(self):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
         all_codestreams = self.download_supported_file()
@@ -223,10 +222,6 @@ class Setup(Config):
         self.conf['patched_cs'] = natsorted(list(set(self.conf.get('patched_cs', []) +
                                       patched_cs)))
 
-        # cpp will use this data in the next step
-        with open(self.conf_file, 'w') as f:
-            f.write(json.dumps(self.conf, indent=4))
-
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
         self.working_cs = self.filter_cs(self.working_cs, verbose=True)
@@ -246,7 +241,20 @@ class Setup(Config):
             ibs = IBS(self.bsc_num, self.filter, self.working_cs)
             ibs.download_cs_data(data_missing)
 
-        logging.info('Validating codestreams data...')
+    def setup_project_files(self):
+        self.bsc_path.mkdir(exist_ok=True)
+
+        if self.kdir:
+            self.working_cs['linux'] = {
+                    'kernel' : platform.uname()[2],
+                    'modules' : {},
+                    'files' : self.file_funcs,
+                    'archs' : self.arch
+            }
+        else:
+            self.setup_codestreams()
+
+        logging.info('Validating info data...')
 
         # Setup the missing codestream info needed
         for cs, data in self.working_cs.items():
@@ -286,4 +294,6 @@ class Setup(Config):
 
         self.flush_cs_file()
 
-
+        # cpp will use this data in the next step
+        with open(self.conf_file, 'w') as f:
+            f.write(json.dumps(self.conf, indent=4))

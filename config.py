@@ -4,7 +4,7 @@ import json
 import git
 import logging
 from natsort import natsorted
-from pathlib import Path
+from pathlib import Path, PurePath
 import platform
 import os
 import re
@@ -14,7 +14,7 @@ import subprocess
 from lp_utils import classify_codestreams
 
 class Config:
-    def __init__(self, bsc, bsc_filter, work_dir = None, data_dir = None, skips = '', working_cs = {}):
+    def __init__(self, bsc, bsc_filter, kdir = False, work_dir = None, data_dir = None, skips = '', working_cs = {}):
         if not work_dir:
             work_dir = os.getenv('KLP_WORK_DIR')
             if not work_dir:
@@ -28,10 +28,6 @@ class Config:
             data_dir = os.getenv('KLP_DATA_DIR', '')
             if not data_dir:
                 raise ValueError('KLP_DATA_DIR should be defined')
-
-        self.data = Path(data_dir)
-        if not self.data.is_dir():
-            raise ValueError('Data dir should be a directory')
 
         try:
             git_data = git.GitConfigParser()
@@ -61,13 +57,19 @@ class Config:
         self.conf = OrderedDict({
                 'bsc' : str(self.bsc_num),
                 'work_dir' : str(self.bsc_path),
-                'data' : str(self.data)
+                'data' : str(data_dir),
+                'kdir' : kdir
         })
 
         self.conf_file = Path(self.bsc_path, 'conf.json')
         if self.conf_file.is_file():
             with open(self.conf_file) as f:
                 self.conf = json.loads(f.read(), object_pairs_hook=OrderedDict)
+
+        self.kdir = self.conf.get('kdir', False)
+        self.data = Path(self.conf['data'])
+        if not self.data.is_dir():
+            raise ValueError('Data dir should be a directory')
 
         # will contain the nm output from the to be livepatched object
         # cache nm calls for the codestream : object
@@ -94,6 +96,9 @@ class Config:
         return Path(self.bsc_path, 'fixes')
 
     def remove_patches(self, cs, fil):
+        if self.kdir:
+            return
+
         sdir = self.get_sdir(cs)
         kernel = self.get_cs_kernel(cs)
         # Check if there were patches applied previously
@@ -113,6 +118,9 @@ class Config:
         shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
 
     def apply_all_patches(self, cs, fil=subprocess.STDOUT):
+        if self.kdir:
+            return
+
         patched = False
 
         sle, sp, u, rt = self.get_cs_tuple(cs)
@@ -194,6 +202,14 @@ class Config:
                 match.group(3))
 
     def validate_config(self, cs, conf):
+        if self.kdir:
+            kconf = Path(self.data, '.config')
+            with open(kconf) as f:
+                match = re.search(f'{conf}=[ym]', f.read())
+                if not match:
+                    raise RuntimeError(f'Config {conf} not enabled')
+            return
+
         for arch in self.get_cs_archs(cs):
             kconf = self.get_cs_boot_file(cs, 'config', arch)
             with open(kconf) as f:
@@ -211,6 +227,11 @@ class Config:
         return 'rt' if self.cs_is_rt(cs) else 'default'
 
     def get_cs_boot_file(self, cs, file, arch=''):
+        if self.kdir:
+            if file == 'symvers':
+                return Path(self.data, 'Module.symvers')
+            return Path(self.data, file)
+
         if not arch:
             arch = self.arch
 
@@ -218,9 +239,15 @@ class Config:
                     f'{file}-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}')
 
     def get_data_dir(self, arch):
+        if self.kdir:
+            return self.data
+
         return Path(self.data, arch)
 
     def get_sdir(self, cs):
+        if self.kdir:
+            return self.data
+
         # Only -rt codestreams have a suffix for source directory
         ktype = f'-{self.get_ktype(cs)}'
         if ktype == '-default':
@@ -229,12 +256,20 @@ class Config:
                         f"linux-{self.get_cs_kernel(cs)}{ktype}")
 
     def get_odir(self, cs):
+        if self.kdir:
+            return self.data
         return Path(f'{self.get_sdir(cs)}-obj', self.arch, self.get_ktype(cs))
 
     def get_ipa_file(self, cs, fname):
+        if self.kdir:
+            return Path(self.data, f'{fname}.000i.ipa-clones')
+
         return Path(self.get_odir(cs), f'{fname}.000i.ipa-clones')
 
     def get_mod_path(self, cs, arch, mod = ''):
+        if self.kdir:
+            return self.data
+
         if not mod or self.is_mod(mod):
             return Path(self.get_data_dir(arch), 'lib', 'modules',
                         f'{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}')
@@ -242,6 +277,7 @@ class Config:
 
     def flush_cs_file(self):
         with open(self.cs_file, 'w') as f:
+            print(self.codestreams)
             f.write(json.dumps(self.codestreams, indent=4))
 
     def is_mod(self, mod):
@@ -260,6 +296,8 @@ class Config:
     def find_module_obj(self, arch, cs, mod, check_support=False):
         kernel = self.get_cs_kernel(cs)
         if not self.is_mod(mod):
+            if self.kdir:
+                return 'vmlinux'
             return f'boot/vmlinux-{kernel}-{self.get_ktype(cs)}'
 
         # Module name use underscores, but the final module object uses hyphens.
@@ -267,11 +305,13 @@ class Config:
 
         mod_path = self.get_mod_path(cs, arch, mod)
         with open(Path(mod_path, 'modules.order')) as f:
-            obj = re.search(f'([\w\/\-]+\/{mod}.ko)', f.read())
+            obj = re.search(f'([\w\/\-]+\/{mod}.k?o)', f.read())
             if not obj:
                 raise RuntimeError(f'{cs}: Module not found: {mod}')
 
-        obj = obj.group(1)
+        # if kdir if set, modules.order will show the module with suffix .o, so
+        # make sure the extension
+        obj = str(PurePath(obj.group(1)).with_suffix('.ko'))
 
         if check_support:
             # Validate if the module being livepatches is supported or not
