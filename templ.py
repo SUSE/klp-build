@@ -61,8 +61,8 @@ def get_commits(cmts, cs):
  *  Upstream commit:
 ${get_commits(commits, 'upstream')}
  *
- *  SLE12-SP5 and SLE15-SP1 commit:
-${get_commits(commits, 'cve-4.12')}
+ *  SLE12-SP5 commit:
+${get_commits(commits, '12.5')}
  *
  *  SLE15-SP2 and -SP3 commit:
 ${get_commits(commits, 'cve-5.3')}

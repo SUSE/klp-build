@@ -137,9 +137,7 @@ class Config:
         else:
             patch_dirs = [f'{sle}.{sp}']
 
-        if sle == 12:
-            patch_dirs.append('cve-4.12')
-        elif sle == 15 and sp < 4:
+        if sle == 15 and sp < 4:
             patch_dirs.append('cve-5.3')
 
         sdir = self.get_sdir(cs)
