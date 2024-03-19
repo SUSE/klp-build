@@ -35,7 +35,7 @@ class IBS(Config):
         if not self.kgraft_tests_path.is_dir():
             raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
 
-        self.ksrc = GitHelper(self.bsc_num, self.filter)
+        self.ksrc = GitHelper(self.bsc_num, self.filter, False, None)
 
         # Download all sources for x86
         # For ppc64le and s390x only download vmlinux and the built modules

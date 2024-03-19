@@ -29,7 +29,7 @@ def create_parser() -> argparse.ArgumentParser:
             help='The kernel CONFIG used to be build the livepatch')
     setup.add_argument('--kdir', action='store_true',
             help='Change the lookup procedure to search in a compiled kernel directory')
-    setup.add_argument('--data-dir', type=str, required=False, default='',
+    setup.add_argument('--data-dir', type=str, required=False, default=None,
             help='The path where source files and modules will be found')
     setup.add_argument('--codestreams', type=str, default='',
             help='Codestreams affected by the CVE. Can be used a regex, like, 15.u[34]')
@@ -124,10 +124,10 @@ def main_func(main_args):
         Extractor(args.bsc, '', False, args.type).diff_cs(args.codestreams)
 
     elif args.cmd == 'get-patches':
-        GitHelper(args.bsc, args.filter).get_commits(args.cve)
+        GitHelper(args.bsc, args.filter, False, None).get_commits(args.cve)
 
     elif args.cmd == 'format-patches':
-        GitHelper(args.bsc, args.filter).format_patches(args.version)
+        GitHelper(args.bsc, args.filter, False, None).format_patches(args.version)
 
     elif args.cmd == 'status':
         IBS(args.bsc, args.filter).status(args.wait)
