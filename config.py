@@ -60,19 +60,6 @@ class Config:
         if not self.data.is_dir():
             raise ValueError('Data dir should be a directory')
 
-        # We dont need author info when creating a LP using kdir
-        if self.kdir:
-            self.user = ''
-            self.email = ''
-        else:
-            try:
-                import git
-                git_data = git.GitConfigParser()
-                self.user = git_data.get_value('user', 'name')
-                self.email = git_data.get_value('user', 'email')
-            except:
-                raise ValueError('Please define name/email in global git config')
-
         # will contain the nm output from the to be livepatched object
         # cache nm calls for the codestream : object
         self.nm_out = {}

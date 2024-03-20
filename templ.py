@@ -406,6 +406,19 @@ class TemplateGen(Config):
         self.check_enabled = self.conf['archs'] != ARCHS
         self.app = app
 
+        # We dont need author info when creating a LP using kdir
+        if self.kdir:
+            self.user = ''
+            self.email = ''
+        else:
+            try:
+                import git
+                git_data = git.GitConfigParser()
+                self.user = git_data.get_value('user', 'name')
+                self.email = git_data.get_value('user', 'email')
+            except:
+                raise ValueError('Please define name/email in global git config')
+
     # Things might have changed since TemplateGen was instantiated, so reassign
     # it
     def refresh_codestreams(self, cs_list):
