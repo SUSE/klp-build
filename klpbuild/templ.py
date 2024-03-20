@@ -5,8 +5,8 @@ import shutil
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
-from config import Config
-from lp_utils import ARCHS, ARCH
+from klpbuild.config import Config
+from klpbuild.utils import ARCHS, ARCH
 
 TEMPL_H = '''\
 #ifndef _${ fname.upper() }_H

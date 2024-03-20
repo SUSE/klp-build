@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 
-from config import Config
+from klpbuild.config import Config
 
 class GitHelper(Config):
     def __init__(self, bsc, bsc_filter, kdir, data_dir):

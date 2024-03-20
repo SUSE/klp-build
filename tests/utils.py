@@ -5,7 +5,7 @@ import sys
 import unittest
 
 sys.path.append('..')
-from lp_setup import Setup
+from klpbuild.setup import Setup
 
 class TestUtils(unittest.TestCase):
 

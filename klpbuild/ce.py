@@ -1,8 +1,8 @@
 from pathlib import Path
 import shutil
 
-from config import Config
-from lp_utils import ARCH
+from klpbuild.config import Config
+from klpbuild.utils import ARCH
 
 class CE(Config):
     def __init__(self, bsc, bsc_filter):

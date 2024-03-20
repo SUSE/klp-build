@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
-
 import argparse
 
-from ksrc import GitHelper
-from ibs import IBS
-from lp_extractor import Extractor
-from lp_setup import Setup
-from lp_utils import ARCHS
+from klpbuild.ksrc import GitHelper
+from klpbuild.ibs import IBS
+from klpbuild.extractor import Extractor
+from klpbuild.setup import Setup
+from klpbuild.utils import ARCHS
 
 def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=False)

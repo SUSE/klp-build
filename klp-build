@@ -1,9 +1,0 @@
-#!/usr/bin/env python3
-
-import sys
-import klp_args
-
-if  __name__ == '__main__':
-    sys.tracebacklimit = 0
-
-    klp_args.main_func(sys.argv[1:])

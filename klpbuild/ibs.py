@@ -16,9 +16,9 @@ from natsort import natsorted
 from osctiny import Osc
 import requests
 
-from config import Config
-from ksrc import GitHelper
-from lp_utils import ARCHS, ARCH
+from klpbuild.config import Config
+from klpbuild.ksrc import GitHelper
+from klpbuild.utils import ARCHS, ARCH
 
 class IBS(Config):
     def __init__(self, bsc, bsc_filter, working_cs = {}):

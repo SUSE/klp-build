@@ -8,10 +8,10 @@ import re
 from natsort import natsorted
 import requests
 
-from config import Config
-from ibs import IBS
-from ksrc import GitHelper
-import lp_utils
+from klpbuild.config import Config
+from klpbuild.ibs import IBS
+from klpbuild.ksrc import GitHelper
+from klpbuild import utils
 
 class Setup(Config):
     def __init__(self, bsc, bsc_filter, kdir, data_dir, cve, cs_arg, file_funcs,
@@ -23,7 +23,7 @@ class Setup(Config):
 
         # Check if the livepatch isn't enabled on some architectures, and so
         # require conf to be set, otherwise it can be a problem later
-        if archs != lp_utils.ARCHS and not conf:
+        if archs != utils.ARCHS and not conf:
             raise ValueError('Please specify --conf when not all architectures are supported')
 
         if self.is_mod(mod_arg) and not conf:
@@ -214,7 +214,7 @@ class Setup(Config):
                 cs_data_missing[cs] = data
 
         if patched_cs:
-            cs_list = lp_utils.classify_codestreams(patched_cs)
+            cs_list = utils.classify_codestreams(patched_cs)
             logging.info('Skipping already patched codestreams:')
             logging.info(f'\t{" ".join(cs_list)}')
 
@@ -249,7 +249,7 @@ class Setup(Config):
                     'kernel' : platform.uname()[2],
                     'modules' : {},
                     'files' : self.file_funcs,
-                    'archs' : lp_utils.ARCH
+                    'archs' : utils.ARCH
             }
         else:
             self.setup_codestreams()
@@ -277,7 +277,7 @@ class Setup(Config):
 
                 mod = fdata['module']
                 if not data['modules'].get(mod, ''):
-                    data['modules'][mod] = self.find_module_obj(lp_utils.ARCH, cs, mod, check_support=True)
+                    data['modules'][mod] = self.find_module_obj(utils.ARCH, cs, mod, check_support=True)
 
                 mod_syms.setdefault(mod, [])
                 mod_syms[mod].extend(fdata['symbols'])

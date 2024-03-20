@@ -12,11 +12,11 @@ from threading import Lock
 import difflib as dl
 from natsort import natsorted
 
-from ccp import CCP
-from ce import CE
-from config import Config
-import lp_utils
-from templ import TemplateGen
+from klpbuild.ccp import CCP
+from klpbuild.ce import CE
+from klpbuild.config import Config
+from klpbuild import utils
+from klpbuild.templ import TemplateGen
 
 class Extractor(Config):
     def __init__(self, bsc, bsc_filter, apply_patches, app, workers = 4, avoid_ext = ''):
@@ -119,7 +119,7 @@ class Extractor(Config):
         return None
 
     def get_cmd_from_json(self, fname):
-        with open(Path(self.get_data_dir(lp_utils.ARCH), 'compile_commands.json')) as f:
+        with open(Path(self.get_data_dir(utils.ARCH), 'compile_commands.json')) as f:
             buf = f.read()
         data = json.loads(buf)
         for d in data:
@@ -293,7 +293,7 @@ class Extractor(Config):
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f'{self.get_data_dir(lp_utils.ARCH)}.+{file}', '', src)
+                src = re.sub(f'{self.get_data_dir(utils.ARCH)}.+{file}', '', src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(f'\.lineno = \d+,', '', src)
@@ -391,7 +391,7 @@ class Extractor(Config):
         # same code
         groups = []
         for cs_list in cs_equal:
-            groups.append(' '.join(lp_utils.classify_codestreams(cs_list)))
+            groups.append(' '.join(utils.classify_codestreams(cs_list)))
 
         with open(Path(self.bsc_path, self.app, 'groups'), 'w') as f:
             f.write('\n'.join(groups))

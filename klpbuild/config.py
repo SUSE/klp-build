@@ -10,7 +10,7 @@ import subprocess
 
 from natsort import natsorted
 
-from lp_utils import ARCH, classify_codestreams
+from klpbuild.utils import ARCH, classify_codestreams
 
 class Config:
     def __init__(self, bsc, bsc_filter, kdir = False, data_dir = None, skips = '', working_cs = {}):

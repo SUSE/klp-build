@@ -4,7 +4,7 @@ import unittest
 import sys
 
 sys.path.append('..')
-from ccp import CCP
+from klpbuild.ccp import CCP
 
 from tests import utils
 

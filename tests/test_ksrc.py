@@ -1,7 +1,7 @@
 import unittest
 import sys
 sys.path.append('..')
-from ksrc import GitHelper
+from klpbuild.ksrc import GitHelper
 
 class GitHelperTesting(unittest.TestCase):
     def test_multiline_upstream_commit_subject(self):

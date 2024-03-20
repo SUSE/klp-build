@@ -1,4 +1,18 @@
-# Setup
+# klp-build
+
+The kernel livepatching creation tool
+
+## Development
+
+To install the project and dependencies use:
+
+`pip install -e .`
+
+To run the project locally and test your changes use:
+
+`python -m klpbuild.main`
+
+## Setup
 To create a new "livepatch project", use the setup command:
 
 ```sh
@@ -27,7 +41,7 @@ Explaining some arguments:
 --work-dir and --data can be ommited the KLP_WORK_DIR and KLP_DATA_DIR env vars
 are set.
 
-# klp-ccp
+## klp-ccp
 At this point, klp-ccp will be run in parallel (nproc threads, one thread per
 codestream). If desired, the setup command can skip running klp-ccp if the
 --disable-ccp argument is passed. So, one can run klp-ccp alone by using:
@@ -46,8 +60,7 @@ klp-build --work-dir /livepatches --bsc 1197596 --codestream 15.2u12
 This command will create a new directory in the CWD named bsc1197596, containing
 the generated templates/sources.
 
-get-patches
-===========
+## get-patches
 
 For downloading all the fixes in all CVE branches of kernel-source:
 
