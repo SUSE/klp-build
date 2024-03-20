@@ -1,5 +1,5 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 from klpbuild.config import Config
 from klpbuild.utils import ARCH

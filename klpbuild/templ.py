@@ -1,12 +1,13 @@
+import shutil
 from datetime import datetime
 from pathlib import Path
-import shutil
 
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
 from klpbuild.config import Config
-from klpbuild.utils import ARCHS, ARCH
+from klpbuild.utils import ARCH
+from klpbuild.utils import ARCHS
 
 TEMPL_H = '''\
 #ifndef _${ fname.upper() }_H
@@ -593,4 +594,3 @@ class TemplateGen(Config):
         }
         with open(Path(self.bsc_path, 'commit.msg'), 'w') as f:
             f.write(Template(TEMPL_COMMIT).render(**render_vars))
-

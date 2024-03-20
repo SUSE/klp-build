@@ -1,24 +1,26 @@
 import concurrent.futures
 import errno
 import logging
-from operator import itemgetter
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
 import time
+from operator import itemgetter
+from pathlib import Path
 
+import requests
 from lxml import etree
-from lxml.objectify import fromstring, SubElement
+from lxml.objectify import fromstring
+from lxml.objectify import SubElement
 from natsort import natsorted
 from osctiny import Osc
-import requests
 
 from klpbuild.config import Config
 from klpbuild.ksrc import GitHelper
-from klpbuild.utils import ARCHS, ARCH
+from klpbuild.utils import ARCH
+from klpbuild.utils import ARCHS
 
 class IBS(Config):
     def __init__(self, bsc, bsc_filter, working_cs = {}):

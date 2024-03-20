@@ -1,16 +1,18 @@
-from collections import OrderedDict
 import copy
 import json
 import logging
 import os
-from pathlib import Path, PurePath
 import re
 import shutil
 import subprocess
+from collections import OrderedDict
+from pathlib import Path
+from pathlib import PurePath
 
 from natsort import natsorted
 
-from klpbuild.utils import ARCH, classify_codestreams
+from klpbuild.utils import ARCH
+from klpbuild.utils import classify_codestreams
 
 class Config:
     def __init__(self, bsc, bsc_filter, kdir = False, data_dir = None, skips = '', working_cs = {}):

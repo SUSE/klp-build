@@ -1,9 +1,9 @@
 import json
 import logging
-from pathlib import Path
 import os
 import sys
 import unittest
+from pathlib import Path
 
 from tests import utils
 

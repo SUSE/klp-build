@@ -1,8 +1,8 @@
 import argparse
 
-from klpbuild.ksrc import GitHelper
-from klpbuild.ibs import IBS
 from klpbuild.extractor import Extractor
+from klpbuild.ibs import IBS
+from klpbuild.ksrc import GitHelper
 from klpbuild.setup import Setup
 from klpbuild.utils import ARCHS
 

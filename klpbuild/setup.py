@@ -1,17 +1,17 @@
-from collections import OrderedDict
 import json
 import logging
-from pathlib import Path
 import platform
 import re
+from collections import OrderedDict
+from pathlib import Path
 
-from natsort import natsorted
 import requests
+from natsort import natsorted
 
+from klpbuild import utils
 from klpbuild.config import Config
 from klpbuild.ibs import IBS
 from klpbuild.ksrc import GitHelper
-from klpbuild import utils
 
 class Setup(Config):
     def __init__(self, bsc, bsc_filter, kdir, data_dir, cve, cs_arg, file_funcs,

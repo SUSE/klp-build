@@ -1,7 +1,7 @@
 import logging
 import os
-import unittest
 import sys
+import unittest
 
 sys.path.append('..')
 from klpbuild.ccp import CCP

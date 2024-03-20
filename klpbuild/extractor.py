@@ -1,21 +1,22 @@
-from collections import OrderedDict
 import concurrent.futures
+import difflib as dl
 import json
 import logging
 import os
-from pathlib import Path, PurePath
 import re
 import shutil
 import subprocess
+from collections import OrderedDict
+from pathlib import Path
+from pathlib import PurePath
 from threading import Lock
 
-import difflib as dl
 from natsort import natsorted
 
+from klpbuild import utils
 from klpbuild.ccp import CCP
 from klpbuild.ce import CE
 from klpbuild.config import Config
-from klpbuild import utils
 from klpbuild.templ import TemplateGen
 
 class Extractor(Config):

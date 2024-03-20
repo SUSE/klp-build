@@ -1,8 +1,8 @@
-from pathlib import Path
 import logging
 import os
-import unittest
 import sys
+import unittest
+from pathlib import Path
 
 sys.path.append('..')
 from klpbuild.ccp import CCP

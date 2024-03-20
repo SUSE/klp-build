@@ -1,8 +1,8 @@
 import os
-from pathlib import Path
 import shutil
 import sys
 import unittest
+from pathlib import Path
 
 sys.path.append('..')
 from klpbuild.setup import Setup
