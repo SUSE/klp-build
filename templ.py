@@ -1,9 +1,9 @@
 from datetime import datetime
+from pathlib import Path
+import shutil
+
 from mako.lookup import TemplateLookup
 from mako.template import Template
-from pathlib import Path, PurePath
-import os
-import shutil
 
 from config import Config
 from lp_utils import ARCHS, ARCH

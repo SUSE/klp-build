@@ -1,19 +1,20 @@
 import concurrent.futures
 import errno
 import logging
-from lxml import etree
-from lxml.objectify import fromstring, SubElement
-from natsort import natsorted
 from operator import itemgetter
 import os
-from osctiny import Osc
 from pathlib import Path
 import re
-import requests
 import shutil
 import subprocess
 import sys
 import time
+
+from lxml import etree
+from lxml.objectify import fromstring, SubElement
+from natsort import natsorted
+from osctiny import Osc
+import requests
 
 from config import Config
 from ksrc import GitHelper

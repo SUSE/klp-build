@@ -1,14 +1,14 @@
 from collections import OrderedDict
-from config import Config
 import json
 import logging
-from natsort import natsorted
 from pathlib import Path
 import platform
 import re
-import requests
-import sys
 
+from natsort import natsorted
+import requests
+
+from config import Config
 from ibs import IBS
 from ksrc import GitHelper
 import lp_utils

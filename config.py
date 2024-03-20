@@ -3,12 +3,12 @@ import copy
 import json
 import logging
 import os
+from pathlib import Path, PurePath
 import re
 import shutil
 import subprocess
 
 from natsort import natsorted
-from pathlib import Path, PurePath
 
 from .lp_utils import ARCH, classify_codestreams
 

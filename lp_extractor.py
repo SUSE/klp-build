@@ -1,15 +1,16 @@
 from collections import OrderedDict
 import concurrent.futures
-import difflib as dl
 import json
 import logging
-from natsort import natsorted
 import os
 from pathlib import Path, PurePath
 import re
 import shutil
 import subprocess
 from threading import Lock
+
+import difflib as dl
+from natsort import natsorted
 
 from ccp import CCP
 from ce import CE
