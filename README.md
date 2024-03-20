@@ -12,6 +12,10 @@ To run the project locally and test your changes use:
 
 `python -m klpbuild.main`
 
+To run tests use:
+
+`tox -e tests`
+
 ## Setup
 To create a new "livepatch project", use the setup command:
 
