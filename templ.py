@@ -411,6 +411,9 @@ class TemplateGen(Config):
     def refresh_codestreams(self, cs_list):
         self.codestreams = cs_list
 
+    def preproc_slashes(text):
+        return r"<%! BS='\\' %>" + text.replace("\\", "${BS}")
+
     def fix_mod_string(self, mod):
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
         # and in kallsyms lookup
@@ -475,7 +478,8 @@ class TemplateGen(Config):
         }
 
         with open(Path(lp_path, out_name), 'w') as f:
-            lpdir = TemplateLookup(directories=[lp_inc_dir])
+            lpdir = TemplateLookup(directories=[lp_inc_dir],
+                                   preprocessor=TemplateGen.preproc_slashes)
             temp_str = TEMPL_H
             # For C files, first add the LICENSE header template to the file
             if ext == 'c':
