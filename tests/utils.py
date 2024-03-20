@@ -4,35 +4,34 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.append('..')
+sys.path.append("..")
 from klpbuild.setup import Setup
 
-class TestUtils(unittest.TestCase):
 
+class TestUtils(unittest.TestCase):
     # default setup args
     def sargs(self):
         return {
-            'bsc' : '9999999',
-            'filter' : '',
-            'cve' : '1234-5678',
-            'cs' : '',
-            'file_funcs' : [],
-            'mod_file_funcs' : [],
-            'conf_mod_file_funcs' : [],
-            'module' : 'vmlinux',
-            'conf' : '',
-            'archs': ['x86_64', 'ppc64le', 's390x'],
-            'skips' : ''
+            "bsc": "9999999",
+            "filter": "",
+            "cve": "1234-5678",
+            "cs": "",
+            "file_funcs": [],
+            "mod_file_funcs": [],
+            "conf_mod_file_funcs": [],
+            "module": "vmlinux",
+            "conf": "",
+            "archs": ["x86_64", "ppc64le", "s390x"],
+            "skips": "",
         }
 
     def basedir(self, v):
-        return Path(os.getenv('KLP_WORK_DIR', ''), f'bsc{v["bsc"]}')
+        return Path(os.getenv("KLP_WORK_DIR", ""), f'bsc{v["bsc"]}')
 
     def lpdir(self, v, cs):
-        return Path(os.getenv('KLP_WORK_DIR', ''), f'bsc{v["bsc"]}', 'c', cs,
-        'lp')
+        return Path(os.getenv("KLP_WORK_DIR", ""), f'bsc{v["bsc"]}', "c", cs, "lp")
 
-    def setup(self, dargs, init = False):
+    def setup(self, dargs, init=False):
         shutil.rmtree(self.basedir(dargs), ignore_errors=True)
 
         s = Setup(*tuple(dargs.values()))
@@ -41,8 +40,8 @@ class TestUtils(unittest.TestCase):
 
         return s
 
-    def setup_nologs(self, dargs, init = False):
-        with self.assertNoLogs(level='WARNING'):
+    def setup_nologs(self, dargs, init=False):
+        with self.assertNoLogs(level="WARNING"):
             return self.setup(dargs, init)
 
     def setup_assert_logs(self, dargs, alevel, msg):
@@ -51,7 +50,7 @@ class TestUtils(unittest.TestCase):
 
         self.assertRegex(logs.output[0], msg)
 
-    def setup_and_assert(self, dargs, exc, msg = None):
+    def setup_and_assert(self, dargs, exc, msg=None):
         with self.assertRaises(exc) as ar:
             self.setup(dargs, True)
 

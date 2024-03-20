@@ -22,45 +22,45 @@ from klpbuild.ksrc import GitHelper
 from klpbuild.utils import ARCH
 from klpbuild.utils import ARCHS
 
+
 class IBS(Config):
-    def __init__(self, bsc, bsc_filter, working_cs = {}):
+    def __init__(self, bsc, bsc_filter, working_cs={}):
         super().__init__(bsc, bsc_filter, working_cs=working_cs)
-        self.osc = Osc(url='https://api.suse.de')
+        self.osc = Osc(url="https://api.suse.de")
 
         self.ibs_user = self.osc.username
-        self.prj_prefix = f'home:{self.ibs_user}:{self.bsc}-klp'
+        self.prj_prefix = f"home:{self.ibs_user}:{self.bsc}-klp"
 
-        self.kgraft_path = Path(Path().home(), 'kgr', 'kgraft-patches')
+        self.kgraft_path = Path(Path().home(), "kgr", "kgraft-patches")
         if not self.kgraft_path.is_dir():
-            raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches')
+            raise RuntimeError("Couldn't find ~/kgr/kgraft-patches")
 
-        self.kgraft_tests_path = Path(Path().home(), 'kgr',
-                                      'kgraft-patches_testscripts')
+        self.kgraft_tests_path = Path(Path().home(), "kgr", "kgraft-patches_testscripts")
         if not self.kgraft_tests_path.is_dir():
-            raise RuntimeError('Couldn\'t find ~/kgr/kgraft-patches_testscripts')
+            raise RuntimeError("Couldn't find ~/kgr/kgraft-patches_testscripts")
 
         self.ksrc = GitHelper(self.bsc_num, self.filter, False, None)
 
         # Download all sources for x86
         # For ppc64le and s390x only download vmlinux and the built modules
         self.cs_data = {
-                'ppc64le' : {
-                    'kernel-default' : '(kernel-default-(extra-)?[\d\.\-]+.ppc64le.rpm)',
-                },
-                's390x' : {
-                    'kernel-default' : '(kernel-default-(extra-)?[\d\.\-]+.s390x.rpm)',
-                },
-                'x86_64' : {
-                    'kernel-default' : '(kernel-(default|rt)\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)',
-                    'kernel-source' : '(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)'
-                }
+            "ppc64le": {
+                "kernel-default": "(kernel-default-(extra-)?[\d\.\-]+.ppc64le.rpm)",
+            },
+            "s390x": {
+                "kernel-default": "(kernel-default-(extra-)?[\d\.\-]+.s390x.rpm)",
+            },
+            "x86_64": {
+                "kernel-default": "(kernel-(default|rt)\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)",
+                "kernel-source": "(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
+            },
         }
 
         # Total number of work items
         self.total = 0
 
         # Skip osctiny INFO messages
-        logging.getLogger('osctiny').setLevel(logging.WARNING)
+        logging.getLogger("osctiny").setLevel(logging.WARNING)
 
     def do_work(self, func, args):
         if len(args) == 0:
@@ -77,8 +77,8 @@ class IBS(Config):
         prjs = []
         projects = self.osc.search.project(f"starts-with(@name, '{self.prj_prefix}')")
 
-        for prj in projects.findall('project'):
-            prj_name = prj.get('name')
+        for prj in projects.findall("project"):
+            prj_name = prj.get("name")
             cs = self.convert_prj_to_cs(prj_name)
 
             if self.filter and not re.match(self.filter, cs):
@@ -92,7 +92,7 @@ class IBS(Config):
         names = []
         i = 1
         for result in self.get_projects():
-            names.append((i, result.get('name')))
+            names.append((i, result.get("name")))
             i += 1
 
         return natsorted(names, key=itemgetter(1))
@@ -109,7 +109,7 @@ class IBS(Config):
                 pass
 
         if verbose:
-            logging.info(f'({i}/{self.total}) {prj} deleted')
+            logging.info(f"({i}/{self.total}) {prj} deleted")
 
     def delete_projects(self, prjs, verbose=True):
         for i, prj in prjs:
@@ -121,17 +121,17 @@ class IBS(Config):
         # We don't need to extract the -extra packages for non x86_64 archs.
         # These packages are only needed to be uploaded to the kgr-test
         # repos, since they aren't published, but we need them for testing.
-        if arch != 'x86_64' and '-extra' in rpm:
+        if arch != "x86_64" and "-extra" in rpm:
             return
 
         path_dest = self.get_data_dir(arch)
         path_dest.mkdir(exist_ok=True, parents=True)
 
         rpm_file = Path(dest, rpm)
-        cmd = f'rpm2cpio {rpm_file} | cpio --quiet -uidm'
+        cmd = f"rpm2cpio {rpm_file} | cpio --quiet -uidm"
         subprocess.check_output(cmd, shell=True, cwd=path_dest)
 
-        logging.info(f'({i}/{self.total}) extracted {cs} {rpm}: ok')
+        logging.info(f"({i}/{self.total}) extracted {cs} {rpm}: ok")
 
     def download_and_extract(self, args):
         i, cs, prj, repo, arch, pkg, rpm, dest = args
@@ -139,20 +139,20 @@ class IBS(Config):
         self.download_binary_rpms(args)
 
         # Do not extract kernel-macros rpm
-        if 'kernel-macros' not in rpm:
-            self.extract_rpms( (i, cs, arch, rpm, dest) )
+        if "kernel-macros" not in rpm:
+            self.extract_rpms((i, cs, arch, rpm, dest))
 
     def download_cs_data(self, cs_list):
         rpms = []
         extract = []
         i = 1
 
-        logging.info('Getting list of files...')
+        logging.info("Getting list of files...")
         for cs, data in cs_list.items():
-            prj = data['project']
-            repo = data['repo']
+            prj = data["project"]
+            repo = data["repo"]
 
-            path_dest = Path(self.data, 'kernel-rpms')
+            path_dest = Path(self.data, "kernel-rpms")
             path_dest.mkdir(exist_ok=True, parents=True)
 
             for arch, val in self.cs_data.items():
@@ -164,13 +164,13 @@ class IBS(Config):
 
                     # RT kernels have different package names
                     if self.cs_is_rt(cs):
-                        if pkg == 'kernel-default':
-                            pkg = 'kernel-rt'
-                        elif pkg == 'kernel-source':
-                            pkg = 'kernel-source-rt'
+                        if pkg == "kernel-default":
+                            pkg = "kernel-rt"
+                        elif pkg == "kernel-source":
+                            pkg = "kernel-source-rt"
 
-                    if repo != 'standard':
-                        pkg = f'{pkg}.{repo}'
+                    if repo != "standard":
+                        pkg = f"{pkg}.{repo}"
 
                     # arch is fixed for now
                     ret = self.osc.build.get_binary_list(prj, repo, arch, pkg)
@@ -184,13 +184,13 @@ class IBS(Config):
                         # Extract the source and kernel-devel in the current
                         # machine arch to make it possible to run klp-build in
                         # different architectures
-                        if 'kernel-source' in pkg or 'kernel-devel' in pkg:
+                        if "kernel-source" in pkg or "kernel-devel" in pkg:
                             arch = ARCH
 
-                        rpms.append( (i, cs, prj, repo, arch, pkg, rpm, path_dest) )
+                        rpms.append((i, cs, prj, repo, arch, pkg, rpm, path_dest))
                         i += 1
 
-        logging.info(f'Downloading {len(rpms)} rpms...')
+        logging.info(f"Downloading {len(rpms)} rpms...")
         self.total = len(rpms)
         self.do_work(self.download_and_extract, rpms)
 
@@ -199,41 +199,40 @@ class IBS(Config):
         for cs in cs_list:
             for arch in self.get_cs_archs(cs):
                 # Extract modules and vmlinux files that are compressed
-                mod_path= Path(self.get_data_dir(arch), 'lib', 'modules')
-                for fext, ecmd in [('zst', 'unzstd --rm -f -d'), ('xz', 'xz --quiet -d')]:
+                mod_path = Path(self.get_data_dir(arch), "lib", "modules")
+                for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d")]:
                     cmd = f'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
                 # Extract all gzipped files under arch//boot, including vmlinux,
                 # symvers and maybe others.
-                vmlinux_path = Path(self.get_data_dir(arch), 'boot')
-                subprocess.check_output(f'find {vmlinux_path} -name "*gz" -exec gzip -d -f {{}} \;',
-                                        shell=True)
+                vmlinux_path = Path(self.get_data_dir(arch), "boot")
+                subprocess.check_output(f'find {vmlinux_path} -name "*gz" -exec gzip -d -f {{}} \;', shell=True)
 
             # Use the SLE .config
-            shutil.copy(self.get_cs_boot_file(cs, 'config'), Path(self.get_odir(cs), '.config'))
+            shutil.copy(self.get_cs_boot_file(cs, "config"), Path(self.get_odir(cs), ".config"))
 
             # Recreate the build link to enable us to test the generated LP
-            mod_path = Path(self.get_mod_path(cs, ARCH), 'build')
+            mod_path = Path(self.get_mod_path(cs, ARCH), "build")
             mod_path.unlink()
             os.symlink(self.get_odir(cs), mod_path)
 
-        logging.info('Finished extract vmlinux and modules...')
+        logging.info("Finished extract vmlinux and modules...")
 
     def download_binary_rpms(self, args):
         i, cs, prj, repo, arch, pkg, rpm, dest = args
 
         try:
             self.osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
-            logging.info(f'({i}/{self.total}) {cs} {rpm}: ok')
+            logging.info(f"({i}/{self.total}) {cs} {rpm}: ok")
         except OSError as e:
             if e.errno == errno.EEXIST:
-                logging.info(f'({i}/{self.total}) {cs} {rpm}: already downloaded. skipping.')
+                logging.info(f"({i}/{self.total}) {cs} {rpm}: already downloaded. skipping.")
             else:
-                raise RuntimeError(f'download error on {prj}: {rpm}')
+                raise RuntimeError(f"download error on {prj}: {rpm}")
 
     def convert_prj_to_cs(self, prj):
-        return prj.replace(f'{self.prj_prefix}-', '').replace('_', '.')
+        return prj.replace(f"{self.prj_prefix}-", "").replace("_", ".")
 
     def apply_filter(self, item_list):
         if not self.filter:
@@ -250,149 +249,145 @@ class IBS(Config):
         return filtered
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):
-        vmlinux_path = self.get_cs_boot_file(cs, 'vmlinux', arch)
-        vmlinux_syms = subprocess.check_output(['nm', '--defined-only', str(vmlinux_path)],
-                                      stderr=subprocess.STDOUT).decode()
+        vmlinux_path = self.get_cs_boot_file(cs, "vmlinux", arch)
+        vmlinux_syms = subprocess.check_output(
+            ["nm", "--defined-only", str(vmlinux_path)], stderr=subprocess.STDOUT
+        ).decode()
 
         # Get list of UNDEFINED symbols from the livepatch module
-        out = subprocess.check_output(['nm', '--undefined-only', str(lp_mod_path)],
-                                      stderr=subprocess.STDOUT).decode()
+        out = subprocess.check_output(["nm", "--undefined-only", str(lp_mod_path)], stderr=subprocess.STDOUT).decode()
 
         # Remove the U flag from every line
-        lp_und_symbols = re.findall('\s+U\s([\w]+)', out)
+        lp_und_symbols = re.findall("\s+U\s([\w]+)", out)
 
         missing_syms = []
         # Find all UNDEFINED symbols that exists in the livepatch module that
         # aren't defined in the vmlinux
         for sym in lp_und_symbols:
-            if not re.search(f' {sym}', vmlinux_syms):
+            if not re.search(f" {sym}", vmlinux_syms):
                 missing_syms.append(sym)
 
         return missing_syms
 
     def validate_livepatch_module(self, cs, arch, rpm_dir, rpm):
-        match = re.search('(livepatch)-.*(default|rt)\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.', rpm)
+        match = re.search("(livepatch)-.*(default|rt)\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.", rpm)
         if match:
             dir_path = match.group(1)
             ktype = match.group(2)
-            lp_file = f'livepatch-{match.group(3)}-{match.group(4)}_{match.group(5)}_{match.group(6)}.ko'
+            lp_file = f"livepatch-{match.group(3)}-{match.group(4)}_{match.group(5)}_{match.group(6)}.ko"
         else:
-            ktype = 'default'
-            match = re.search('(kgraft)\-patch\-.*default\-(\d+)\-(\d+)\.(\d+)\.', rpm)
+            ktype = "default"
+            match = re.search("(kgraft)\-patch\-.*default\-(\d+)\-(\d+)\.(\d+)\.", rpm)
             if match:
                 dir_path = match.group(1)
-                lp_file = f'kgraft-patch-{match.group(2)}-{match.group(3)}_{match.group(4)}.ko'
+                lp_file = f"kgraft-patch-{match.group(2)}-{match.group(3)}_{match.group(4)}.ko"
 
         fdest = Path(rpm_dir, rpm)
         # Extract the livepatch module for later inspection
-        cmd = f'rpm2cpio {fdest} | cpio --quiet -uidm'
+        cmd = f"rpm2cpio {fdest} | cpio --quiet -uidm"
         subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
 
-        lp_mod_path = Path(rpm_dir, 'lib', 'modules',
-                           f'{self.get_cs_kernel(cs)}-{ktype}',
-                           dir_path, lp_file)
-        out = subprocess.check_output(['/sbin/modinfo', str(lp_mod_path)],
-                                      stderr=subprocess.STDOUT).decode()
+        lp_mod_path = Path(rpm_dir, "lib", "modules", f"{self.get_cs_kernel(cs)}-{ktype}", dir_path, lp_file)
+        out = subprocess.check_output(["/sbin/modinfo", str(lp_mod_path)], stderr=subprocess.STDOUT).decode()
 
         # Check depends field
         # At this point we found that our livepatch module depends on
         # exported functions from other modules. List the modules here.
-        match = re.search('depends:(.+)', out)
+        match = re.search("depends:(.+)", out)
         if match:
             deps = match.group(1).strip()
             if len(deps):
-                logging.warning(f'{cs}:{arch} has dependencies: {deps}.')
+                logging.warning(f"{cs}:{arch} has dependencies: {deps}.")
 
         funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
         if funcs:
-                logging.warning(f'Undefined functions: {" ".join(funcs)}')
+            logging.warning(f'Undefined functions: {" ".join(funcs)}')
 
-
-        shutil.rmtree(Path(rpm_dir, 'lib'), ignore_errors=True)
+        shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
 
     # Parse 15.2u25 to SLE15-SP2_Update_25
     def get_full_cs(self, cs):
         sle, sp, up, rt = self.get_cs_tuple(cs)
 
-        buf = f'SLE{sle}'
+        buf = f"SLE{sle}"
 
         if int(sp) > 0:
-            buf = f'{buf}-SP{sp}'
+            buf = f"{buf}-SP{sp}"
 
         if rt:
-            buf = f'{buf}-RT'
+            buf = f"{buf}-RT"
 
-        return f'{buf}_Update_{up}'
+        return f"{buf}_Update_{up}"
 
     def prepare_tests(self):
         # Download all built rpms
         self.download()
 
-        test_sh = Path(self.kgraft_tests_path,
-                       f'{self.bsc}_test_script.sh')
+        test_sh = Path(self.kgraft_tests_path, f"{self.bsc}_test_script.sh")
 
         for arch in ARCHS:
-            tests_path = Path(self.bsc_path, 'tests', arch)
+            tests_path = Path(self.bsc_path, "tests", arch)
             test_arch_path = Path(tests_path, self.bsc)
 
             # Remove previously created directory and archive
             shutil.rmtree(test_arch_path, ignore_errors=True)
-            shutil.rmtree(f'{str(test_arch_path)}.tar.xz', ignore_errors=True)
+            shutil.rmtree(f"{str(test_arch_path)}.tar.xz", ignore_errors=True)
 
             test_arch_path.mkdir(exist_ok=True, parents=True)
-            shutil.copy(Path(self.scripts, 'run-kgr-test.sh'),
-                        test_arch_path)
+            shutil.copy(Path(self.scripts, "run-kgr-test.sh"), test_arch_path)
 
-            for d in ['built', 'repro', 'tests.out']:
+            for d in ["built", "repro", "tests.out"]:
                 Path(test_arch_path, d).mkdir(exist_ok=True)
 
             build_cs = []
             for cs, data in self.filter_cs(verbose=False).items():
-                if arch not in data['archs']:
+                if arch not in data["archs"]:
                     continue
 
-                rpm_dir = Path(self.bsc_path, 'c', cs, arch, 'rpm')
+                rpm_dir = Path(self.bsc_path, "c", cs, arch, "rpm")
                 if not rpm_dir.exists():
-                    logging.info(f'{cs}/{arch}: rpm dir not found. Skipping.')
+                    logging.info(f"{cs}/{arch}: rpm dir not found. Skipping.")
                     continue
 
                 # TODO: there will be only one rpm, format it directly
                 rpm = os.listdir(rpm_dir)
                 if len(rpm) > 1:
-                    raise RuntimeError(f'ERROR: {cs}/{arch}. {len(rpm)} rpms found. Excepting to find only one')
+                    raise RuntimeError(f"ERROR: {cs}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
 
                 for rpm in os.listdir(rpm_dir):
                     # Check for dependencies
                     self.validate_livepatch_module(cs, arch, rpm_dir, rpm)
 
-                    shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, 'built'))
+                    shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, "built"))
 
-                if 'rt' in cs and arch != 'x86_64':
+                if "rt" in cs and arch != "x86_64":
                     continue
 
                 build_cs.append(self.get_full_cs(cs))
 
             # Prepare the config file used by kgr-test
-            config = Path(test_arch_path, 'repro', f'{self.bsc}_config.in')
-            with open(config, 'w') as f:
-                f.write('\n'.join(natsorted(build_cs)))
+            config = Path(test_arch_path, "repro", f"{self.bsc}_config.in")
+            with open(config, "w") as f:
+                f.write("\n".join(natsorted(build_cs)))
 
             if test_sh.is_file():
-                shutil.copy(test_sh, Path(test_arch_path, 'repro'))
+                shutil.copy(test_sh, Path(test_arch_path, "repro"))
             else:
-                logging.warning(f'missing {test_sh}')
+                logging.warning(f"missing {test_sh}")
 
-            subprocess.run(['tar', '-cJf', f'{self.bsc}.tar.xz',
-                                f'{self.bsc}'], cwd=tests_path,
-                                        stdout=sys.stdout,
-                                        stderr=subprocess.PIPE, check=True)
+            subprocess.run(
+                ["tar", "-cJf", f"{self.bsc}.tar.xz", f"{self.bsc}"],
+                cwd=tests_path,
+                stdout=sys.stdout,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
 
     # We can try delete a project that was removed, so don't bother with errors
     def delete_rpms(self, cs):
         try:
             for arch in self.get_cs_archs(cs):
-                shutil.rmtree(Path(self.bsc_path, 'c', cs, arch, 'rpm'),
-                              ignore_errors=True)
+                shutil.rmtree(Path(self.bsc_path, "c", cs, arch, "rpm"), ignore_errors=True)
         except KeyError:
             pass
 
@@ -400,31 +395,31 @@ class IBS(Config):
         rpms = []
         i = 1
         for result in self.get_projects():
-            prj = result.get('name')
+            prj = result.get("name")
             cs = self.convert_prj_to_cs(prj)
 
             # Remove previously downloaded rpms
             self.delete_rpms(cs)
 
-            archs = result.xpath('repository/arch')
+            archs = result.xpath("repository/arch")
             for arch in archs:
-                ret = self.osc.build.get_binary_list(prj, 'devbuild', arch, 'klp')
-                rpm_name = f'{arch}.rpm'
-                for rpm in ret.xpath('binary/@filename'):
+                ret = self.osc.build.get_binary_list(prj, "devbuild", arch, "klp")
+                rpm_name = f"{arch}.rpm"
+                for rpm in ret.xpath("binary/@filename"):
                     if not rpm.endswith(rpm_name):
                         continue
 
-                    if 'preempt' in rpm:
+                    if "preempt" in rpm:
                         continue
 
                     # Create a directory for each arch supported
-                    dest = Path(self.bsc_path, 'c', cs, str(arch), 'rpm')
+                    dest = Path(self.bsc_path, "c", cs, str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
-                    rpms.append( (i, prj, prj, 'devbuild', arch, 'klp', rpm, dest) )
+                    rpms.append((i, prj, prj, "devbuild", arch, "klp", rpm, dest))
                     i += 1
 
-        logging.info(f'Downloading {len(rpms)} packages')
+        logging.info(f"Downloading {len(rpms)} packages")
         self.total = len(rpms)
         self.do_work(self.download_binary_rpms, rpms)
 
@@ -438,13 +433,13 @@ class IBS(Config):
 
                 prjs[prj] = {}
 
-                for res in self.osc.build.get(prj).findall('result'):
-                    if not res.xpath('status/@code'):
+                for res in self.osc.build.get(prj).findall("result"):
+                    if not res.xpath("status/@code"):
                         continue
-                    code = res.xpath('status/@code')[0]
-                    prjs[prj][res.get('arch')] = code
+                    code = res.xpath("status/@code")[0]
+                    prjs[prj][res.get("arch")] = code
 
-            print(f'{len(prjs)} codestreams to finish')
+            print(f"{len(prjs)} codestreams to finish")
 
             for prj, archs in prjs.items():
                 st = []
@@ -453,52 +448,54 @@ class IBS(Config):
                 # in the next round.
                 finished = True
                 for k, v in archs.items():
-                    st.append(f'{k}: {v}')
-                    if v not in ['succeeded', 'unresolvable', 'failed']:
+                    st.append(f"{k}: {v}")
+                    if v not in ["succeeded", "unresolvable", "failed"]:
                         finished = False
 
                 if finished:
                     finished_prj.append(prj)
 
-                logging.info('{}\t{}'.format(prj, '\t'.join(st)))
+                logging.info("{}\t{}".format(prj, "\t".join(st)))
 
             if not wait or not prjs:
                 break
 
             # Wait 30 seconds before getting status again
             time.sleep(30)
-            logging.info('')
+            logging.info("")
 
     def cleanup(self):
         prjs = self.get_project_names()
 
         self.total = len(prjs)
         if self.total == 0:
-            logging.info('No projects found.')
+            logging.info("No projects found.")
             return
 
-        logging.info(f'Deleting {self.total} projects...')
+        logging.info(f"Deleting {self.total} projects...")
 
         self.delete_projects(prjs, True)
 
     def cs_to_project(self, cs):
-        return self.prj_prefix + '-' + cs.replace('.', '_')
+        return self.prj_prefix + "-" + cs.replace(".", "_")
 
     def create_prj_meta(self, cs):
         data = self.get_cs_data(cs)
 
-        prj = fromstring("<project name=''><title></title><description></description>" \
-                "<build><enable/></build><publish><disable/></publish>" \
-                "<debuginfo><disable/></debuginfo>" \
-                "<repository name=\"devbuild\">" \
-                f"<path project=\"{data['project']}\" repository=\"{data['repo']}\"/>" \
-                "</repository>" \
-                "</project>")
+        prj = fromstring(
+            "<project name=''><title></title><description></description>"
+            "<build><enable/></build><publish><disable/></publish>"
+            "<debuginfo><disable/></debuginfo>"
+            '<repository name="devbuild">'
+            f"<path project=\"{data['project']}\" repository=\"{data['repo']}\"/>"
+            "</repository>"
+            "</project>"
+        )
 
-        repo = prj.find('repository')
+        repo = prj.find("repository")
 
         for arch in self.get_cs_archs(cs):
-            ar = SubElement(repo, 'arch')
+            ar = SubElement(repo, "arch")
             ar._setText(arch)
 
         return prj
@@ -507,86 +504,87 @@ class IBS(Config):
         # get the kgraft branch related to this codestream
         branch = self.ksrc.get_cs_branch(cs)
         if not branch:
-            logging.info(f'Could not find git branch for {cs}. Skipping.')
+            logging.info(f"Could not find git branch for {cs}. Skipping.")
             return
 
-        logging.info(f'({i}/{self.total}) pushing {cs} using branch {branch}...')
+        logging.info(f"({i}/{self.total}) pushing {cs} using branch {branch}...")
 
         # If the project exists, drop it first
         prj = self.cs_to_project(cs)
         self.delete_project(i, prj, verbose=False)
 
         meta = self.create_prj_meta(cs)
-        prj_desc = f'Development of livepatches for {cs}'
+        prj_desc = f"Development of livepatches for {cs}"
 
         try:
-            self.osc.projects.set_meta(prj, metafile=meta, title='',
-                                       bugowner=self.ibs_user,
-                                       maintainer=self.ibs_user,
-                                       description=prj_desc)
+            self.osc.projects.set_meta(
+                prj, metafile=meta, title="", bugowner=self.ibs_user, maintainer=self.ibs_user, description=prj_desc
+            )
 
-            self.osc.packages.set_meta(prj, 'klp', title='', description='Test livepatch')
+            self.osc.packages.set_meta(prj, "klp", title="", description="Test livepatch")
 
         except Exception as e:
             logging.error(e, e.response.content)
-            raise RuntimeError('')
+            raise RuntimeError("")
 
-        base_path = Path(self.bsc_path, 'c', cs)
+        base_path = Path(self.bsc_path, "c", cs)
 
         # Remove previously created directories
-        prj_path = Path(base_path, 'checkout')
+        prj_path = Path(base_path, "checkout")
         if prj_path.exists():
             shutil.rmtree(prj_path)
 
-        code_path = Path(base_path, 'code')
+        code_path = Path(base_path, "code")
         if code_path.exists():
             shutil.rmtree(code_path)
 
-        self.osc.packages.checkout(prj, 'klp', prj_path)
+        self.osc.packages.checkout(prj, "klp", prj_path)
 
         # Get the code from codestream
-        subprocess.check_output(['/usr/bin/git', 'clone', '--single-branch',
-                                 '-b', branch,
-                                 str(self.kgraft_path), str(code_path)],
-                                stderr=subprocess.STDOUT)
+        subprocess.check_output(
+            ["/usr/bin/git", "clone", "--single-branch", "-b", branch, str(self.kgraft_path), str(code_path)],
+            stderr=subprocess.STDOUT,
+        )
 
         # Check if the directory related to this bsc exists
         if self.bsc not in os.listdir(code_path):
-            raise RuntimeError(f'Directory {self.bsc} not found on branch {branch}')
+            raise RuntimeError(f"Directory {self.bsc} not found on branch {branch}")
 
         # Fix RELEASE version
-        with open(Path(code_path, 'scripts', 'release-version.sh'), 'w') as f:
-            ver = self.get_full_cs(cs).replace('EMBARGO', '')
-            f.write(f'RELEASE={ver}')
+        with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
+            ver = self.get_full_cs(cs).replace("EMBARGO", "")
+            f.write(f"RELEASE={ver}")
 
         # Check how to push multiple files
         # TODO: this isn't supported by osctiny YET.
-        subprocess.check_output(['bash', './scripts/tar-up.sh', '-d', str(prj_path)],
-                            stderr=subprocess.STDOUT, cwd=code_path)
+        subprocess.check_output(
+            ["bash", "./scripts/tar-up.sh", "-d", str(prj_path)], stderr=subprocess.STDOUT, cwd=code_path
+        )
         shutil.rmtree(code_path)
 
-        subprocess.check_output(['osc', '-A', 'https://api.suse.de',
-                                 'addremove'], stderr=subprocess.STDOUT,
-                                cwd=prj_path)
+        subprocess.check_output(
+            ["osc", "-A", "https://api.suse.de", "addremove"], stderr=subprocess.STDOUT, cwd=prj_path
+        )
 
-        subprocess.check_output(['osc', '-A', 'https://api.suse.de', 'commit',
-                                '-m', f'Dump {branch}'],
-                                stderr=subprocess.STDOUT, cwd=prj_path)
+        subprocess.check_output(
+            ["osc", "-A", "https://api.suse.de", "commit", "-m", f"Dump {branch}"],
+            stderr=subprocess.STDOUT,
+            cwd=prj_path,
+        )
         shutil.rmtree(prj_path)
 
-        logging.info(f'({i}/{self.total}) {cs} done')
+        logging.info(f"({i}/{self.total}) {cs} done")
 
     def log(self, cs, arch):
-        logging.info(self.osc.build.get_log(self.cs_to_project(cs), 'devbuild', arch,
-                                     'klp'))
+        logging.info(self.osc.build.get_log(self.cs_to_project(cs), "devbuild", arch, "klp"))
 
     def push(self, wait=False):
         cs_list = self.apply_filter(self.codestreams.keys())
 
         if not cs_list:
-            raise RuntimeError(f'push: No codestreams found for {self.bsc}')
+            raise RuntimeError(f"push: No codestreams found for {self.bsc}")
 
-        logging.info(f'Preparing {len(cs_list)} projects on IBS...')
+        logging.info(f"Preparing {len(cs_list)} projects on IBS...")
 
         self.total = len(cs_list)
         i = 1
