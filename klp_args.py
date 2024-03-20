@@ -2,19 +2,19 @@
 
 import argparse
 
-from ksrc import GitHelper
-from lp_setup import Setup
-from ibs import IBS
-
-from lp_extractor import Extractor
-from lp_utils import ARCHS
+from .ksrc import GitHelper
+from .ibs import IBS
+from .lp_extractor import Extractor
+from .lp_setup import Setup
+from .lp_utils import ARCHS
 
 def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=False)
     parentparser.add_argument('-b', '--bsc', type=int, required=True,
-            help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')
+            help='The bsc number related to this livepatch. This will be the '
+                              'directory name of the resulting livepatches')
     parentparser.add_argument('--filter', type=str,
-            help='Filter out codestreams using a regex. Example: 15\.3u[0-9]+')
+            help=r'Filter out codestreams using a regex. Example: 15\.3u[0-9]+')
     parentparser.add_argument('--experimental', action='store_true',
             help='Enables functions that may not work as expected yet.')
 
@@ -56,7 +56,8 @@ def create_parser() -> argparse.ArgumentParser:
     extract_opts = sub.add_parser('extract', parents = [parentparser])
     extract_opts.add_argument('--avoid-ext', nargs='+', type=str, default=[],
             help='Functions to be copied into the LP instead of externalizing. '
-                 'Useful to make sure to include symbols that are optimized in different architectures')
+                 'Useful to make sure to include symbols that are optimized in '
+                 'different architectures')
     extract_opts.add_argument('--apply-patches', action='store_true',
                        help='Apply patches found by get-patches subcommand, if they exist')
     extract_opts.add_argument('--type', type=str, required=True, choices=['ccp', 'ce'],
@@ -71,19 +72,19 @@ def create_parser() -> argparse.ArgumentParser:
                                                                        'ce'],
             help='Choose between ccp and ce')
 
-    format = sub.add_parser('format-patches', parents = [parentparser],
+    fmt = sub.add_parser('format-patches', parents = [parentparser],
             help='Extract patches from kgraft-patches')
-    format.add_argument('-v', '--version', type=int, required=True,
+    fmt.add_argument('-v', '--version', type=int, required=True,
             help='Version to be added, like vX')
 
     patches = sub.add_parser('get-patches', parents = [parentparser])
     patches.add_argument('--cve', required=True,
             help='CVE number to search for related backported patches')
 
-    cleanup = sub.add_parser('cleanup', parents = [parentparser],
+    sub.add_parser('cleanup', parents = [parentparser],
                              help='Remove livepatch packages from IBS')
 
-    prep_tests = sub.add_parser('prepare-tests', parents = [parentparser],
+    sub.add_parser('prepare-tests', parents = [parentparser],
             help='Download the built tests and check for LP dependencies')
 
     push = sub.add_parser('push', parents = [parentparser],
