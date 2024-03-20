@@ -182,7 +182,7 @@ class IBS(Config):
                         # machine arch to make it possible to run klp-build in
                         # different architectures
                         if 'kernel-source' in pkg or 'kernel-devel' in pkg:
-                            arch = lp_utils.ARCH
+                            arch = ARCH
 
                         rpms.append( (i, cs, prj, repo, arch, pkg, rpm, path_dest) )
                         i += 1
@@ -211,7 +211,7 @@ class IBS(Config):
             shutil.copy(self.get_cs_boot_file(cs, 'config'), Path(self.get_odir(cs), '.config'))
 
             # Recreate the build link to enable us to test the generated LP
-            mod_path = Path(self.get_mod_path(cs, lp_utils.ARCH), 'build')
+            mod_path = Path(self.get_mod_path(cs, ARCH), 'build')
             mod_path.unlink()
             os.symlink(self.get_odir(cs), mod_path)
 
