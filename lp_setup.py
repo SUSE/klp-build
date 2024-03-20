@@ -23,7 +23,7 @@ class Setup(Config):
 
         # Check if the livepatch isn't enabled on some architectures, and so
         # require conf to be set, otherwise it can be a problem later
-        if archs != self.archs and not conf:
+        if archs != lp_utils.archs and not conf:
             raise ValueError('Please specify --conf when not all architectures are supported')
 
         if self.is_mod(mod_arg) and not conf:

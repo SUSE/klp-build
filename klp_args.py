@@ -7,10 +7,9 @@ from lp_setup import Setup
 from ibs import IBS
 
 from lp_extractor import Extractor
+from lp_utils import archs
 
 def create_parser() -> argparse.ArgumentParser:
-    archs = ['ppc64le', 's390x', 'x86_64']
-
     parentparser = argparse.ArgumentParser(add_help=False)
     parentparser.add_argument('-b', '--bsc', type=int, required=True,
             help='The bsc number related to this livepatch. This will be the directory name of the resulting livepatches')

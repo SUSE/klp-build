@@ -6,6 +6,7 @@ import os
 import shutil
 
 from config import Config
+from lp_utils import archs
 
 TEMPL_H = '''\
 #ifndef _${ fname.upper() }_H
@@ -402,7 +403,7 @@ class TemplateGen(Config):
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
-        self.check_enabled = self.conf['archs'] != self.archs
+        self.check_enabled = self.conf['archs'] != archs
         self.app = app
 
     # Things might have changed since TemplateGen was instantiated, so reassign

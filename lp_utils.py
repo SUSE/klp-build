@@ -1,3 +1,5 @@
+archs = ['ppc64le', 's390x', 'x86_64']
+
 # Group all codestreams that share code in a format like bellow:
 #   [15.2u10 15.2u11 15.3u10 15.3u12 ]
 # Will be converted to:

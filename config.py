@@ -30,8 +30,6 @@ class Config:
         self.skips = skips
         self.arch = platform.processor()
 
-        self.archs = ['ppc64le', 's390x', 'x86_64']
-
         self.working_cs = OrderedDict(working_cs)
         self.codestreams = OrderedDict()
         self.cs_file = Path(self.bsc_path, 'codestreams.json')

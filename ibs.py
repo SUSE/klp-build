@@ -17,6 +17,7 @@ import time
 
 from config import Config
 from ksrc import GitHelper
+from lp_utils import archs
 
 class IBS(Config):
     def __init__(self, bsc, bsc_filter, working_cs = {}):
@@ -327,7 +328,7 @@ class IBS(Config):
         test_sh = Path(self.kgraft_tests_path,
                        f'{self.bsc}_test_script.sh')
 
-        for arch in self.archs:
+        for arch in archs:
             tests_path = Path(self.bsc_path, 'tests', arch)
             test_arch_path = Path(tests_path, self.bsc)
 
