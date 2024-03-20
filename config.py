@@ -117,17 +117,9 @@ class Config:
         sle, sp, u, rt = self.get_cs_tuple(cs)
 
         if rt:
-            patch_dirs = [f'{sle}.{sp}{rt}']
-            csdir = f'{sle}.{sp}rtu{u}'
+            patch_dirs = [ f'{sle}.{sp}rtu{u}', f'{sle}.{sp}{rt}']
         else:
-            patch_dirs = [f'{sle}.{sp}']
-            csdir = f'{sle}.{sp}u{u}'
-
-        # csdir can exist to apply patches for specific codestreams, when
-        # required. This is useful if within the same SLE.SP we have different
-        # files paths between the updates
-        if Path(csdir).exists():
-            patch_dirs.append(csdir)
+            patch_dirs = [ f'{sle}.{sp}u{u}', f'{sle}.{sp}']
 
         if sle == 15 and sp < 4:
             patch_dirs.append('cve-5.3')
