@@ -107,7 +107,7 @@ class Extractor(Config):
         return None
 
     def get_cmd_from_json(self, fname):
-        with open(Path(self.get_data_dir(self.arch), 'compile_commands.json')) as f:
+        with open(Path(self.get_data_dir(lp_utils.ARCH), 'compile_commands.json')) as f:
             buf = f.read()
         data = json.loads(buf)
         for d in data:
@@ -281,7 +281,7 @@ class Extractor(Config):
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f'{self.get_data_dir(self.arch)}.+{file}', '', src)
+                src = re.sub(f'{self.get_data_dir(lp_utils.ARCH)}.+{file}', '', src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(f'\.lineno = \d+,', '', src)

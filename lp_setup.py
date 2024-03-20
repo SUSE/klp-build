@@ -23,7 +23,7 @@ class Setup(Config):
 
         # Check if the livepatch isn't enabled on some architectures, and so
         # require conf to be set, otherwise it can be a problem later
-        if archs != lp_utils.archs and not conf:
+        if archs != lp_utils.ARCHS and not conf:
             raise ValueError('Please specify --conf when not all architectures are supported')
 
         if self.is_mod(mod_arg) and not conf:
@@ -249,7 +249,7 @@ class Setup(Config):
                     'kernel' : platform.uname()[2],
                     'modules' : {},
                     'files' : self.file_funcs,
-                    'archs' : self.arch
+                    'archs' : lp_utils.ARCH
             }
         else:
             self.setup_codestreams()
@@ -277,7 +277,7 @@ class Setup(Config):
 
                 mod = fdata['module']
                 if not data['modules'].get(mod, ''):
-                    data['modules'][mod] = self.find_module_obj(self.arch, cs, mod, check_support=True)
+                    data['modules'][mod] = self.find_module_obj(lp_utils.ARCH, cs, mod, check_support=True)
 
                 mod_syms.setdefault(mod, [])
                 mod_syms[mod].extend(fdata['symbols'])

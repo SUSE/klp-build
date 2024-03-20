@@ -7,7 +7,7 @@ from lp_setup import Setup
 from ibs import IBS
 
 from lp_extractor import Extractor
-from lp_utils import archs
+from lp_utils import ARCHS
 
 def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=False)
@@ -49,7 +49,7 @@ def create_parser() -> argparse.ArgumentParser:
             'func2 --file-func conf2 module2 file/patch2 func1...')
     setup.add_argument('--module', type=str, default='vmlinux',
             help='The module that will be livepatched for all files')
-    setup.add_argument('--archs', required=True, choices=archs, nargs='+',
+    setup.add_argument('--archs', required=True, choices=ARCHS, nargs='+',
                        help='Supported architectures for this livepatch')
     setup.add_argument('--skips', help='List of codestreams to filter out')
 
@@ -100,7 +100,7 @@ def create_parser() -> argparse.ArgumentParser:
             help='Get build log from IBS')
     log.add_argument('--cs', type=str, required=True,
             help='The codestream to get the log from')
-    log.add_argument('--arch', type=str, default='x86_64', choices=archs,
+    log.add_argument('--arch', type=str, default='x86_64', choices=ARCHS,
                      help='Build architecture')
 
     return parser

@@ -4,12 +4,12 @@ import json
 import logging
 from natsort import natsorted
 from pathlib import Path, PurePath
-import platform
 import os
 import re
 import shutil
 import subprocess
 
+import lp_utils
 from lp_utils import classify_codestreams
 
 class Config:
@@ -28,7 +28,6 @@ class Config:
         self.scripts = Path(os.path.dirname(__file__), 'scripts')
         self.filter = bsc_filter
         self.skips = skips
-        self.arch = platform.processor()
 
         self.working_cs = OrderedDict(working_cs)
         self.codestreams = OrderedDict()
@@ -244,9 +243,9 @@ class Config:
             return Path(self.data, file)
 
         if not arch:
-            arch = self.arch
+            arch = lp_utils.ARCH
 
-        return Path(self.get_data_dir(self.arch), 'boot',
+        return Path(self.get_data_dir(lp_utils.ARCH), 'boot',
                     f'{file}-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}')
 
     def get_data_dir(self, arch):
@@ -263,13 +262,13 @@ class Config:
         ktype = f'-{self.get_ktype(cs)}'
         if ktype == '-default':
             ktype = ''
-        return Path(self.get_data_dir(self.arch), 'usr', 'src',
+        return Path(self.get_data_dir(lp_utils.ARCH), 'usr', 'src',
                         f"linux-{self.get_cs_kernel(cs)}{ktype}")
 
     def get_odir(self, cs):
         if self.kdir:
             return self.data
-        return Path(f'{self.get_sdir(cs)}-obj', self.arch, self.get_ktype(cs))
+        return Path(f'{self.get_sdir(cs)}-obj', lp_utils.ARCH, self.get_ktype(cs))
 
     def get_ipa_file(self, cs, fname):
         if self.kdir:
@@ -408,7 +407,7 @@ class Config:
         # Validate only architectures supported by the codestream
         for arch in data['archs']:
 
-            if arch == self.arch and skip_on_host:
+            if arch == lp_utils.ARCH and skip_on_host:
                 continue
 
             # Skip if the arch is not supported by the livepatch code

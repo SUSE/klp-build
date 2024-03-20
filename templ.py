@@ -6,7 +6,7 @@ import os
 import shutil
 
 from config import Config
-from lp_utils import archs
+from lp_utils import ARCHS, ARCH
 
 TEMPL_H = '''\
 #ifndef _${ fname.upper() }_H
@@ -403,7 +403,7 @@ class TemplateGen(Config):
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
-        self.check_enabled = self.conf['archs'] != archs
+        self.check_enabled = self.conf['archs'] != ARCHS
         self.app = app
 
     # Things might have changed since TemplateGen was instantiated, so reassign
@@ -511,7 +511,7 @@ class TemplateGen(Config):
         with open(lp_path, 'a') as f:
             f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
 
-        modpath = self.get_mod_path(cs, self.arch)
+        modpath = self.get_mod_path(cs, ARCH)
         if not self.kdir:
             modpath = Path(modpath, 'build')
 

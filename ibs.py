@@ -17,7 +17,7 @@ import time
 
 from config import Config
 from ksrc import GitHelper
-from lp_utils import archs
+from lp_utils import ARCHS, ARCH
 
 class IBS(Config):
     def __init__(self, bsc, bsc_filter, working_cs = {}):
@@ -182,7 +182,7 @@ class IBS(Config):
                         # machine arch to make it possible to run klp-build in
                         # different architectures
                         if 'kernel-source' in pkg or 'kernel-devel' in pkg:
-                            arch = self.arch
+                            arch = lp_utils.ARCH
 
                         rpms.append( (i, cs, prj, repo, arch, pkg, rpm, path_dest) )
                         i += 1
@@ -211,7 +211,7 @@ class IBS(Config):
             shutil.copy(self.get_cs_boot_file(cs, 'config'), Path(self.get_odir(cs), '.config'))
 
             # Recreate the build link to enable us to test the generated LP
-            mod_path = Path(self.get_mod_path(cs, self.arch), 'build')
+            mod_path = Path(self.get_mod_path(cs, lp_utils.ARCH), 'build')
             mod_path.unlink()
             os.symlink(self.get_odir(cs), mod_path)
 
@@ -328,7 +328,7 @@ class IBS(Config):
         test_sh = Path(self.kgraft_tests_path,
                        f'{self.bsc}_test_script.sh')
 
-        for arch in archs:
+        for arch in ARCHS:
             tests_path = Path(self.bsc_path, 'tests', arch)
             test_arch_path = Path(tests_path, self.bsc)
 

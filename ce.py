@@ -2,6 +2,7 @@ from pathlib import Path
 import shutil
 
 from config import Config
+from lp_utils import ARCH
 
 class CE(Config):
     def __init__(self, bsc, bsc_filter):
@@ -48,7 +49,7 @@ class CE(Config):
         ce_args = list(filter(None, ce_args))
 
         # Now add the macros to tell clang-extract what to do
-        ce_args.extend([f'-DCE_DEBUGINFO_PATH={self.get_module_obj(self.arch, cs, fdata["module"])}',
+        ce_args.extend([f'-DCE_DEBUGINFO_PATH={self.get_module_obj(ARCH, cs, fdata["module"])}',
                         f'-DCE_SYMVERS_PATH={self.get_cs_boot_file(cs, "symvers")}',
                         f'-DCE_OUTPUT_FILE={Path(out_dir, self.lp_out_file(fname))}',
                         f'-DCE_OUTPUT_FUNCTION_PROTOTYPE_HEADER={Path(out_dir, "proto.h")}',
