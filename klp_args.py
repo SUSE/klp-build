@@ -2,11 +2,11 @@
 
 import argparse
 
-from .ksrc import GitHelper
-from .ibs import IBS
-from .lp_extractor import Extractor
-from .lp_setup import Setup
-from .lp_utils import ARCHS
+from ksrc import GitHelper
+from ibs import IBS
+from lp_extractor import Extractor
+from lp_setup import Setup
+from lp_utils import ARCHS
 
 def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=False)
