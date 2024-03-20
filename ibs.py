@@ -24,7 +24,7 @@ class IBS(Config):
         super().__init__(bsc, bsc_filter, working_cs=working_cs)
         self.osc = Osc(url='https://api.suse.de')
 
-        self.ibs_user = re.search('(\w+)@', self.email).group(1)
+        self.ibs_user = self.osc.username
         self.prj_prefix = f'home:{self.ibs_user}:{self.bsc}-klp'
 
         self.kgraft_path = Path(Path().home(), 'kgr', 'kgraft-patches')
