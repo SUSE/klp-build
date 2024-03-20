@@ -61,7 +61,7 @@ class Extractor(Config):
         # also remove double quotes from macros like -D"KBUILD....=.."
         return re.sub('-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
 
-    def get_make_cmd(cc, out_dir, cs, filename, odir):
+    def get_make_cmd(out_dir, cs, filename, odir):
         filename = PurePath(filename)
         file_ = str(filename.with_suffix('.o'))
 
@@ -73,6 +73,17 @@ class Extractor(Config):
             # what is interesting for klp-build
             if filename.parent == PurePath('arch/x86/lib'):
                 file_ = str(filename.parent)
+
+            gcc_ver = int(subprocess.check_output(['gcc',
+                                                   '-dumpversion']).decode().strip())
+            # gcc12 and higher have a problem with kernel and xrealloc implementation
+            if gcc_ver < 12:
+                cc = 'gcc'
+            # if gcc12 or higher is the default compiler, check if gcc7 is available
+            elif shutil.which('gcc-7'):
+                cc = 'gcc-7'
+            else:
+                raise RuntimeError('Only gcc12 or higher are available, and it\'s problematic with kernel sources')
 
             make_args = ['make', '-sn', f'CC={cc}', f'KLP_CS={cs}',
                          f'HOSTCC={cc}', 'WERROR=0',
@@ -142,7 +153,7 @@ class Extractor(Config):
             if self.kdir:
                 cmd = self.get_cmd_from_json(fname)
             else:
-                cmd = Extractor.get_make_cmd(self.cc, out_dir, cs, fname, odir)
+                cmd = Extractor.get_make_cmd(out_dir, cs, fname, odir)
 
         args, lenv = self.runner.cmd_args(cs, fname, ','.join(fdata['symbols']), out_dir,
                                           fdata, cmd)
