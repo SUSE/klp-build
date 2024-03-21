@@ -1,45 +1,59 @@
-from collections import OrderedDict
 import json
 import logging
-from pathlib import Path
 import platform
 import re
+from collections import OrderedDict
+from pathlib import Path
 
-from natsort import natsorted
 import requests
+from natsort import natsorted
 
-from config import Config
-from ibs import IBS
-from ksrc import GitHelper
-import lp_utils
+from klpbuild import utils
+from klpbuild.config import Config
+from klpbuild.ibs import IBS
+from klpbuild.ksrc import GitHelper
+
 
 class Setup(Config):
-    def __init__(self, bsc, bsc_filter, kdir, data_dir, cve, cs_arg, file_funcs,
-                 mod_file_funcs, conf_mod_file_funcs, mod_arg, conf, archs,
-                 skips):
+    def __init__(
+        self,
+        bsc,
+        bsc_filter,
+        kdir,
+        data_dir,
+        cve,
+        cs_arg,
+        file_funcs,
+        mod_file_funcs,
+        conf_mod_file_funcs,
+        mod_arg,
+        conf,
+        archs,
+        skips,
+    ):
         super().__init__(bsc, bsc_filter, kdir, data_dir, skips=skips)
 
         archs.sort()
 
         # Check if the livepatch isn't enabled on some architectures, and so
         # require conf to be set, otherwise it can be a problem later
-        if archs != lp_utils.ARCHS and not conf:
-            raise ValueError('Please specify --conf when not all architectures are supported')
+        if archs != utils.ARCHS and not conf:
+            raise ValueError("Please specify --conf when not all architectures are supported")
 
         if self.is_mod(mod_arg) and not conf:
-            raise ValueError('Please specify --conf when a module is specified')
+            raise ValueError("Please specify --conf when a module is specified")
 
-        if conf and not conf.startswith('CONFIG_'):
-           raise ValueError('Please specify --conf with CONFIG_ prefix')
+        if conf and not conf.startswith("CONFIG_"):
+            raise ValueError("Please specify --conf with CONFIG_ prefix")
 
         if self.bsc_path.exists() and not self.bsc_path.is_dir():
-            raise ValueError('--bsc needs to be a directory, or not to exist')
+            raise ValueError("--bsc needs to be a directory, or not to exist")
 
         if not file_funcs and not mod_file_funcs and not conf_mod_file_funcs:
-            raise ValueError('You need to specify at least one of the file-funcs variants!')
+            raise ValueError("You need to specify at least one of the file-funcs variants!")
 
-        self.conf['archs'] = archs
-        self.conf['cve'] = re.search('([0-9]+\-[0-9]+)', cve).group(1)
+        self.conf["archs"] = archs
+        self.conf["cve"] = re.search("([0-9]+\-[0-9]+)", cve).group(1)
 
         self.codestream = cs_arg
         self.file_funcs = {}
@@ -48,22 +62,14 @@ class Setup(Config):
             filepath = f[0]
             funcs = f[1:]
 
-            self.file_funcs[filepath] = {
-                    'module' : mod_arg,
-                    'conf' : conf,
-                    'symbols' : funcs
-            }
+            self.file_funcs[filepath] = {"module": mod_arg, "conf": conf, "symbols": funcs}
 
         for f in mod_file_funcs:
             fmod = f[0]
             filepath = f[1]
             funcs = f[2:]
 
-            self.file_funcs[filepath] = {
-                    'module' : fmod,
-                    'conf' : conf,
-                    'symbols' : funcs
-            }
+            self.file_funcs[filepath] = {"module": fmod, "conf": conf, "symbols": funcs}
 
         for f in conf_mod_file_funcs:
             fconf = f[0]
@@ -71,27 +77,23 @@ class Setup(Config):
             filepath = f[2]
             funcs = f[3:]
 
-            self.file_funcs[filepath] = {
-                    'module' : fmod,
-                    'conf' : fconf,
-                    'symbols' : funcs
-            }
+            self.file_funcs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
 
     # Parse SLE15-SP2_Update_25 to 15.2u25
     def parse_cs_line(self, cs):
-        rt = 'rt' if '-RT' in cs else ''
+        rt = "rt" if "-RT" in cs else ""
 
-        sle, _, u = cs.replace('SLE', '').replace('-RT', '').split('_')
-        if '-SP' in sle:
-            sle, sp = sle.split('-SP')
+        sle, _, u = cs.replace("SLE", "").replace("-RT", "").split("_")
+        if "-SP" in sle:
+            sle, sp = sle.split("-SP")
         else:
-            sle, sp = sle, '0'
+            sle, sp = sle, "0"
 
         return int(sle), int(sp), int(u), rt
 
     def download_supported_file(self):
-        logging.info('Downloading codestreams file')
-        req = requests.get('https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv')
+        logging.info("Downloading codestreams file")
+        req = requests.get("https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv")
 
         # exit on error
         req.raise_for_status()
@@ -111,48 +113,48 @@ class Setup(Config):
             # remove the last two columns, which are dates of the line
             # and add a fifth field with the forth one + rpm- prefix, and
             # remove the build counter number
-            full_cs, proj, kernel_full, _, _= line.decode('utf-8').strip().split(',')
-            kernel = re.sub('\.\d+$', '', kernel_full)
+            full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
+            kernel = re.sub("\.\d+$", "", kernel_full)
 
             # Fill the majority of possible fields here
             sle, sp, u, rt = self.parse_cs_line(full_cs)
             if rt:
-                cs_key = f'{sle}.{sp}{rt}u{u}'
+                cs_key = f"{sle}.{sp}{rt}u{u}"
             else:
-                cs_key = f'{sle}.{sp}u{u}'
+                cs_key = f"{sle}.{sp}u{u}"
 
             codestreams[cs_key] = {
-                    'project' : proj,
-                    'kernel' : kernel,
-                    'build-counter' : kernel_full[-1],
-                    'branch' : '',
-                    'sle' : sle,
-                    'sp' : sp,
-                    'update' : u,
-                    'modules' : {}
+                "project": proj,
+                "kernel": kernel,
+                "build-counter": kernel_full[-1],
+                "branch": "",
+                "sle": sle,
+                "sp": sp,
+                "update": u,
+                "modules": {},
             }
 
             if rt:
-                codestreams[cs_key]['rt'] = True
+                codestreams[cs_key]["rt"] = True
 
         return codestreams
 
     def cs_repo(self, cs):
         sle, sp, up, rt = self.get_cs_tuple(cs)
         if up == 0:
-            return 'standard'
+            return "standard"
 
         repo = f"SUSE_SLE-{sle}"
         if sp != 0:
             repo = f"{repo}-SP{sp}"
 
-        repo = f'{repo}_Update'
+        repo = f"{repo}_Update"
 
         # On 15.5 the RT kernels and in the main codestreams
         if not rt or (sle >= 15 and sp >= 5):
             return repo
 
-        return f'{repo}_Products_SLERT_Update'
+        return f"{repo}_Products_SLERT_Update"
 
     # s390x is enabled on 12.5 for all updates.
     # s390x is not supported on 15.1
@@ -169,14 +171,14 @@ class Setup(Config):
         ksrc = GitHelper(self.bsc_num, self.filter, self.kdir, self.data)
 
         # Called at this point because codestreams is populated
-        self.conf['commits'] = ksrc.get_commits(self.conf['cve'])
+        self.conf["commits"] = ksrc.get_commits(self.conf["cve"])
 
         # do not get the commits twice
-        patched_kernels = self.conf.get('patched_kernels', [])
+        patched_kernels = self.conf.get("patched_kernels", [])
         if not patched_kernels:
-            patched_kernels = ksrc.get_patched_kernels(self.conf['commits'])
+            patched_kernels = ksrc.get_patched_kernels(self.conf["commits"])
 
-        self.conf['patched_kernels'] = patched_kernels
+        self.conf["patched_kernels"] = patched_kernels
 
         cs_data_missing = {}
 
@@ -190,23 +192,23 @@ class Setup(Config):
                 continue
 
             # Skip patched codestreams
-            if data['kernel'] in patched_kernels:
+            if data["kernel"] in patched_kernels:
                 patched_cs.append(cs)
                 continue
 
-            data['files'] = self.file_funcs
-            data['repo'] = self.cs_repo(cs)
+            data["files"] = self.file_funcs
+            data["repo"] = self.cs_repo(cs)
 
             # Set supported archs for the codestream
             # RT is supported only on x86_64 at the moment
-            archs = ['x86_64']
-            if not data.get('rt', False):
-                archs.append('ppc64le')
+            archs = ["x86_64"]
+            if not data.get("rt", False):
+                archs.append("ppc64le")
 
                 if self.is_s390_supported(cs):
-                    archs.append('s390x')
+                    archs.append("s390x")
 
-            data['archs'] = archs
+            data["archs"] = archs
 
             self.working_cs[cs] = data
 
@@ -214,13 +216,12 @@ class Setup(Config):
                 cs_data_missing[cs] = data
 
         if patched_cs:
-            cs_list = lp_utils.classify_codestreams(patched_cs)
-            logging.info('Skipping already patched codestreams:')
+            cs_list = utils.classify_codestreams(patched_cs)
+            logging.info("Skipping already patched codestreams:")
             logging.info(f'\t{" ".join(cs_list)}')
 
         # Add new codestreams to the already existing list, skipping duplicates
-        self.conf['patched_cs'] = natsorted(list(set(self.conf.get('patched_cs', []) +
-                                      patched_cs)))
+        self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs", []) + patched_cs)))
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
@@ -236,7 +237,7 @@ class Setup(Config):
 
         # Found missing cs data, downloading and extract
         if data_missing:
-            logging.info('Download the necessary data from the following codestreams:')
+            logging.info("Download the necessary data from the following codestreams:")
             logging.info(f'\t{" ".join(data_missing.keys())}\n')
             ibs = IBS(self.bsc_num, self.filter, self.working_cs)
             ibs.download_cs_data(data_missing)
@@ -245,11 +246,11 @@ class Setup(Config):
         self.bsc_path.mkdir(exist_ok=True)
 
         if self.kdir:
-            self.working_cs['linux'] = {
-                    'kernel' : platform.uname()[2],
-                    'modules' : {},
-                    'files' : self.file_funcs,
-                    'archs' : lp_utils.ARCH
+            self.working_cs["linux"] = {
+                "kernel": platform.uname()[2],
+                "modules": {},
+                "files": self.file_funcs,
+                "archs": utils.ARCH,
             }
         else:
             self.setup_codestreams()
@@ -258,29 +259,29 @@ class Setup(Config):
         for cs, data in self.working_cs.items():
             # Check if the files exist in the respective codestream directories
             mod_syms = {}
-            for f, fdata in data['files'].items():
+            for f, fdata in data["files"].items():
                 if not Path(self.get_sdir(cs), f).is_file():
-                    raise RuntimeError(f'{cs}: File {f} not found')
+                    raise RuntimeError(f"{cs}: File {f} not found")
 
                 ipa_f = self.get_ipa_file(cs, f)
                 if not ipa_f.is_file():
-                    msg = f'{cs}: File {ipa_f} not found.'
+                    msg = f"{cs}: File {ipa_f} not found."
                     if not self.kdir:
-                        msg += ' Creating an empty file.'
+                        msg += " Creating an empty file."
                         ipa_f.touch()
                     logging.warning(msg)
 
                 # Check if the CONFIG is enabled on all affected architectures
-                conf = fdata['conf']
+                conf = fdata["conf"]
                 if conf:
                     self.validate_config(cs, conf)
 
-                mod = fdata['module']
-                if not data['modules'].get(mod, ''):
-                    data['modules'][mod] = self.find_module_obj(lp_utils.ARCH, cs, mod, check_support=True)
+                mod = fdata["module"]
+                if not data["modules"].get(mod, ""):
+                    data["modules"][mod] = self.find_module_obj(utils.ARCH, cs, mod, check_support=True)
 
                 mod_syms.setdefault(mod, [])
-                mod_syms[mod].extend(fdata['symbols'])
+                mod_syms[mod].extend(fdata["symbols"])
 
             # Verify if the functions exist in the specified object
             for mod, syms in mod_syms.items():
@@ -296,5 +297,5 @@ class Setup(Config):
         self.flush_cs_file()
 
         # cpp will use this data in the next step
-        with open(self.conf_file, 'w') as f:
+        with open(self.conf_file, "w") as f:
             f.write(json.dumps(self.conf, indent=4))

@@ -1,14 +1,15 @@
+import shutil
 from datetime import datetime
 from pathlib import Path
-import shutil
 
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
-from config import Config
-from lp_utils import ARCHS, ARCH
+from klpbuild.config import Config
+from klpbuild.utils import ARCH
+from klpbuild.utils import ARCHS
 
-TEMPL_H = '''\
+TEMPL_H = """\
 #ifndef _${ fname.upper() }_H
 #define _${ fname.upper() }_H
 
@@ -35,9 +36,9 @@ static inline void ${ fname }_cleanup(void) {}
 % endif
 
 #endif /* _${ fname.upper() }_H */
-'''
+"""
 
-TEMPL_SUSE_HEADER = '''\
+TEMPL_SUSE_HEADER = """\
 <%
 def get_commits(cmts, cs):
     if not cmts.get(cs, ''):
@@ -90,9 +91,9 @@ ${get_commits(commits, '15.4')}
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
-'''
+"""
 
-TEMPL_PATCH_VMLINUX = '''\
+TEMPL_PATCH_VMLINUX = """\
 <%
 def get_exts(ext_vars):
         ext_list = []
@@ -162,9 +163,9 @@ int ${ fname }_init(void)
 
 #endif /* IS_ENABLED(${ config }) */
 % endif check_enabled
-'''
+"""
 
-TEMPL_PATCH_MODULE = '''\
+TEMPL_PATCH_MODULE = """\
 <%
 def get_exts(ext_vars):
         ext_list = []
@@ -310,9 +311,9 @@ void ${ fname }_cleanup(void)
 
 #endif /* IS_ENABLED(${ config }) */
 % endif check_enabled
-'''
+"""
 
-TEMPL_HOLLOW= '''\
+TEMPL_HOLLOW = """\
 % if check_enabled:
 #if IS_ENABLED(${ config })
 % endif # check_enabled
@@ -332,9 +333,9 @@ void ${ fname }_cleanup(void)
 
 #endif /* IS_ENABLED(${ config }) */
 % endif check_enabled
-'''
+"""
 
-TEMPL_COMMIT = '''\
+TEMPL_COMMIT = """\
 Fix for CVE-${cve} ("CHANGE ME!")
 
 Live patch for CVE-${cve}. ${msg}:
@@ -345,9 +346,9 @@ Live patch for CVE-${cve}. ${msg}:
 KLP: CVE-${cve}
 References: bsc#${bsc_num} CVE-${cve}
 Signed-off-by: ${user} <${email}>
-'''
+"""
 
-TEMPL_KBUILD = '''\
+TEMPL_KBUILD = """\
 <%
 from pathlib import PurePath
 def get_entries(lpdir, bsc, cs):
@@ -366,9 +367,9 @@ def get_entries(lpdir, bsc, cs):
     return "\\n".join(ret)
 %>\
 ${get_entries(lpdir, bsc, cs)}
-'''
+"""
 
-TEMPL_PATCHED = '''\
+TEMPL_PATCHED = """\
 <%
 def get_patched(cs_files, check_enabled):
     ret = []
@@ -384,9 +385,9 @@ def get_patched(cs_files, check_enabled):
     return "\\n".join(ret)
 %>\
 ${get_patched(cs_files, check_enabled)}
-'''
+"""
 
-TEMPL_MAKEFILE = '''\
+TEMPL_MAKEFILE = """\
 KDIR := ${ kdir }
 MOD_PATH := ${ pwd }
 obj-m := livepatch.o
@@ -395,29 +396,31 @@ modules:
 \tmake -C $(KDIR) modules M=$(MOD_PATH)
 clean:
 \tmake -C $(KDIR) clean M=$(MOD_PATH)
-'''
+"""
+
 
 class TemplateGen(Config):
-    def __init__(self, bsc, bsc_filter, app = 'c'):
+    def __init__(self, bsc, bsc_filter, app="c"):
         super().__init__(bsc, bsc_filter)
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
-        self.check_enabled = self.conf['archs'] != ARCHS
+        self.check_enabled = self.conf["archs"] != ARCHS
         self.app = app
 
         # We dont need author info when creating a LP using kdir
         if self.kdir:
-            self.user = ''
-            self.email = ''
+            self.user = ""
+            self.email = ""
         else:
             try:
                 import git
+
                 git_data = git.GitConfigParser()
-                self.user = git_data.get_value('user', 'name')
-                self.email = git_data.get_value('user', 'email')
+                self.user = git_data.get_value("user", "name")
+                self.email = git_data.get_value("user", "email")
             except:
-                raise ValueError('Please define name/email in global git config')
+                raise ValueError("Please define name/email in global git config")
 
     # Things might have changed since TemplateGen was instantiated, so reassign
     # it
@@ -430,18 +433,15 @@ class TemplateGen(Config):
     def fix_mod_string(self, mod):
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
         # and in kallsyms lookup
-        return mod.replace('-', '_')
+        return mod.replace("-", "_")
 
     def GeneratePatchedFuncs(self, lp_path, cs_files):
-        render_vars = {
-                'cs_files' : cs_files,
-                'check_enabled' : self.check_enabled
-        }
-        with open(Path(lp_path, 'patched_funcs.csv'), 'w') as f:
+        render_vars = {"cs_files": cs_files, "check_enabled": self.check_enabled}
+        with open(Path(lp_path, "patched_funcs.csv"), "w") as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
-   # 15.4 onwards we don't have module_mutex, so template generates
-   # different code
+    # 15.4 onwards we don't have module_mutex, so template generates
+    # different code
     def is_mod_mutex(self, cs):
         sle, sp, _, _ = self.get_cs_tuple(cs)
         return sle < 15 or (sle == 15 and sp < 4)
@@ -451,17 +451,17 @@ class TemplateGen(Config):
             lp_inc_dir = str(self.get_work_dir(cs, src_file, self.app))
             lp_file = self.lp_out_file(src_file)
             fdata = self.get_cs_files(cs)[str(src_file)]
-            mod = self.fix_mod_string(fdata['module'])
+            mod = self.fix_mod_string(fdata["module"])
             if not self.is_mod(mod):
-                mod = ''
-            fconf = fdata['conf']
-            exts = fdata['ext_symbols']
+                mod = ""
+            fconf = fdata["conf"]
+            exts = fdata["ext_symbols"]
 
         else:
-            lp_inc_dir = Path('non-existent')
+            lp_inc_dir = Path("non-existent")
             lp_file = None
-            mod = ''
-            fconf = ''
+            mod = ""
+            fconf = ""
             exts = {}
 
         # if use_src_name is True, the final file will be:
@@ -471,31 +471,30 @@ class TemplateGen(Config):
         if use_src_name:
             out_name = lp_file
         else:
-            out_name = f'livepatch_{self.bsc}.{ext}'
+            out_name = f"livepatch_{self.bsc}.{ext}"
 
         render_vars = {
-                'commits' : self.conf['commits'],
-                'include_header' : 'livepatch_' in out_name and ext == 'c',
-                'cve' : self.conf['cve'],
-                'bsc_num' : self.bsc_num,
-                'fname' : str(Path(out_name).with_suffix('')),
-                'year' : datetime.today().year,
-                'user' : self.user,
-                'email' : self.email,
-                'config' : fconf,
-                'mod' : mod,
-                'mod_mutex' : self.is_mod_mutex(cs),
-                'check_enabled' : self.check_enabled,
-                'ext_vars' : exts,
-                'inc_src_file' : lp_file
+            "commits": self.conf["commits"],
+            "include_header": "livepatch_" in out_name and ext == "c",
+            "cve": self.conf["cve"],
+            "bsc_num": self.bsc_num,
+            "fname": str(Path(out_name).with_suffix("")),
+            "year": datetime.today().year,
+            "user": self.user,
+            "email": self.email,
+            "config": fconf,
+            "mod": mod,
+            "mod_mutex": self.is_mod_mutex(cs),
+            "check_enabled": self.check_enabled,
+            "ext_vars": exts,
+            "inc_src_file": lp_file,
         }
 
-        with open(Path(lp_path, out_name), 'w') as f:
-            lpdir = TemplateLookup(directories=[lp_inc_dir],
-                                   preprocessor=TemplateGen.preproc_slashes)
+        with open(Path(lp_path, out_name), "w") as f:
+            lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
             temp_str = TEMPL_H
             # For C files, first add the LICENSE header template to the file
-            if ext == 'c':
+            if ext == "c":
                 f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
 
                 # If we have multiple source files for the same livepatch,
@@ -516,28 +515,25 @@ class TemplateGen(Config):
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
 
     def get_cs_lp_dir(self, cs):
-        return Path(self.get_cs_dir(cs, self.app), 'lp')
+        return Path(self.get_cs_dir(cs, self.app), "lp")
 
     def CreateMakefile(self, cs, fname):
         work_dir = self.get_work_dir(cs, fname, self.app)
-        lp_path = Path(work_dir, 'livepatch.c')
+        lp_path = Path(work_dir, "livepatch.c")
 
         # Add more data to make it compile correctly
         shutil.copy(Path(work_dir, self.lp_out_file(fname)), lp_path)
 
-        with open(lp_path, 'a') as f:
+        with open(lp_path, "a") as f:
             f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
 
         modpath = self.get_mod_path(cs, ARCH)
         if not self.kdir:
-            modpath = Path(modpath, 'build')
+            modpath = Path(modpath, "build")
 
-        render_vars = {
-            'kdir' : modpath,
-            'pwd' : work_dir
-        }
+        render_vars = {"kdir": modpath, "pwd": work_dir}
 
-        with open(Path(work_dir, 'Makefile'), 'w') as f:
+        with open(Path(work_dir, "Makefile"), "w") as f:
             f.write(Template(TEMPL_MAKEFILE).render(**render_vars))
 
     def GenerateLivePatches(self, cs):
@@ -551,46 +547,41 @@ class TemplateGen(Config):
         # be names livepatch_XXXX
         if len(files.keys()) == 1:
             src = Path(list(files.keys())[0])
-            self.__GenerateLivepatchFile(lp_path, cs, 'c', src)
-            self.__GenerateLivepatchFile(lp_path, cs, 'h', src)
+            self.__GenerateLivepatchFile(lp_path, cs, "c", src)
+            self.__GenerateLivepatchFile(lp_path, cs, "h", src)
             return
 
         # If there are more then one source file, we cannot fully infer what are
         # the correct configs and mods to be livepatched, so leave the mod and
         # config entries empty
-        self.__GenerateLivepatchFile(lp_path, cs, 'h', None)
+        self.__GenerateLivepatchFile(lp_path, cs, "h", None)
 
         # Run the template engine for each touched source file.
         for src_file, _ in files.items():
-            self.__GenerateLivepatchFile(lp_path, cs, 'c', src_file, True)
+            self.__GenerateLivepatchFile(lp_path, cs, "c", src_file, True)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        self.__GenerateLivepatchFile(lp_path, cs, 'c', None)
+        self.__GenerateLivepatchFile(lp_path, cs, "c", None)
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
         lpdir = self.get_cs_lp_dir(cs)
-        render_vars = {
-            'bsc' : self.bsc_num,
-            'cs' : cs,
-            'lpdir' : lpdir
-        }
-        with open(Path(lpdir, 'Kbuild.inc'), 'w') as f:
+        render_vars = {"bsc": self.bsc_num, "cs": cs, "lpdir": lpdir}
+        with open(Path(lpdir, "Kbuild.inc"), "w") as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
     def generate_commit_msg_file(self):
-        cmts = self.conf['commits'].get('upstream', {})
+        cmts = self.conf["commits"].get("upstream", {})
         if cmts:
-            cmts = cmts['commits']
+            cmts = cmts["commits"]
         render_vars = {
-            'bsc_num' : self.bsc_num,
-            'user' : self.user,
-            'email' : self.email,
-            'cve' : self.conf['cve'],
-            'commits' : cmts,
-            'msg' : 'Upstream commits' if len(cmts) > 1 else 'Upstream commit'
+            "bsc_num": self.bsc_num,
+            "user": self.user,
+            "email": self.email,
+            "cve": self.conf["cve"],
+            "commits": cmts,
+            "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
         }
-        with open(Path(self.bsc_path, 'commit.msg'), 'w') as f:
+        with open(Path(self.bsc_path, "commit.msg"), "w") as f:
             f.write(Template(TEMPL_COMMIT).render(**render_vars))
-

@@ -1,8 +1,1 @@
-GitPython
-lxml
-mako
-git+https://github.com/SethMMorton/natsort
-git+https://github.com/crazyscientist/osc-tiny.git
-requests
-cached_property
-markupsafe
+.

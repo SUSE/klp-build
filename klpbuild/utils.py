@@ -1,7 +1,8 @@
 import platform
 
 ARCH = platform.processor()
-ARCHS = ['ppc64le', 's390x', 'x86_64']
+ARCHS = ["ppc64le", "s390x", "x86_64"]
+
 
 # Group all codestreams that share code in a format like bellow:
 #   [15.2u10 15.2u11 15.3u10 15.3u12 ]
@@ -15,8 +16,8 @@ def classify_codestreams(cs_list):
     # later
     cs_group = {}
     for cs in cs_list:
-        prefix, up = cs.split('u')
-        if not cs_group.get(prefix, ''):
+        prefix, up = cs.split("u")
+        if not cs_group.get(prefix, ""):
             cs_group[prefix] = [int(up)]
         else:
             cs_group[prefix].append(int(up))
@@ -24,7 +25,7 @@ def classify_codestreams(cs_list):
     ret_list = []
     for cs, ups in cs_group.items():
         if len(ups) == 1:
-            ret_list.append(f'{cs}u{ups[0]}')
+            ret_list.append(f"{cs}u{ups[0]}")
             continue
 
         sim = []
@@ -41,17 +42,17 @@ def classify_codestreams(cs_list):
 
             # they are different, print them
             if len(sim) == 1:
-                ret_list.append(f'{cs}u{sim[0]}')
+                ret_list.append(f"{cs}u{sim[0]}")
             else:
-                ret_list.append(f'{cs}u{sim[0]}-{last_item}')
+                ret_list.append(f"{cs}u{sim[0]}-{last_item}")
 
             sim = [cur]
 
         # Loop finished, check what's in similar list to print
         if len(sim) == 1:
-            ret_list.append(f'{cs}u{sim[0]}')
+            ret_list.append(f"{cs}u{sim[0]}")
         elif len(sim) > 1:
             last_item = sim[len(sim) - 1]
-            ret_list.append(f'{cs}u{sim[0]}-{last_item}')
+            ret_list.append(f"{cs}u{sim[0]}-{last_item}")
 
     return ret_list

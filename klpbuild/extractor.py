@@ -1,49 +1,51 @@
-from collections import OrderedDict
 import concurrent.futures
+import difflib as dl
 import json
 import logging
 import os
-from pathlib import Path, PurePath
 import re
 import shutil
 import subprocess
+from collections import OrderedDict
+from pathlib import Path
+from pathlib import PurePath
 from threading import Lock
 
-import difflib as dl
 from natsort import natsorted
 
-from ccp import CCP
-from ce import CE
-from config import Config
-import lp_utils
-from templ import TemplateGen
+from klpbuild import utils
+from klpbuild.ccp import CCP
+from klpbuild.ce import CE
+from klpbuild.config import Config
+from klpbuild.templ import TemplateGen
+
 
 class Extractor(Config):
-    def __init__(self, bsc, bsc_filter, apply_patches, app, workers = 4, avoid_ext = ''):
+    def __init__(self, bsc, bsc_filter, apply_patches, app, workers=4, avoid_ext=""):
         super().__init__(bsc, bsc_filter)
 
         self.workers = workers
 
         if apply_patches and not self.get_patches_dir().exists():
-            raise ValueError('--apply-patches specified without patches. Run get-patches!')
+            raise ValueError("--apply-patches specified without patches. Run get-patches!")
         self.apply_patches = apply_patches
 
         if self.kdir:
             if self.apply_patches:
-                logging.warning(f'Disabling --apply-patches when using with --kdir')
+                logging.warning(f"Disabling --apply-patches when using with --kdir")
                 self.apply_patches = False
 
             self.quilt_log = None
         else:
-            self.quilt_log = open(Path(self.get_patches_dir(), 'quilt.log'), 'w')
+            self.quilt_log = open(Path(self.get_patches_dir(), "quilt.log"), "w")
             self.quilt_log.truncate()
 
         self.total = 0
         self.make_lock = Lock()
 
-        if app == 'ccp':
+        if app == "ccp":
             if self.kdir:
-                raise ValueError('ccp with --kdir isn\'t supported')
+                raise ValueError("ccp with --kdir isn't supported")
             self.runner = CCP(bsc, bsc_filter, avoid_ext)
         else:
             self.runner = CE(bsc, bsc_filter)
@@ -52,79 +54,85 @@ class Extractor(Config):
         self.tem = TemplateGen(self.bsc_num, self.filter, self.app)
 
     def unquote_output(matchobj):
-        return matchobj.group(0).replace('"', '')
+        return matchobj.group(0).replace('"', "")
 
     def process_make_output(output):
         # some strings  have single quotes around double quotes, so remove the
         # outer quotes
-        output = output.replace('\'', '')
+        output = output.replace("'", "")
 
         # also remove double quotes from macros like -D"KBUILD....=.."
         return re.sub('-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
 
     def get_make_cmd(out_dir, cs, filename, odir):
         filename = PurePath(filename)
-        file_ = str(filename.with_suffix('.o'))
+        file_ = str(filename.with_suffix(".o"))
 
-        with open(Path(out_dir, 'make.out.txt'), 'w') as f:
+        with open(Path(out_dir, "make.out.txt"), "w") as f:
             # Corner case for lib directory, that fails with the conventional
             # way of grabbing the gcc args used to compile the file. If then
             # need to ask the make to show the commands for all files inside the
             # directory. Later process_make_output will take care of picking
             # what is interesting for klp-build
-            if filename.parent == PurePath('arch/x86/lib'):
+            if filename.parent == PurePath("arch/x86/lib"):
                 file_ = str(filename.parent)
 
-            gcc_ver = int(subprocess.check_output(['gcc',
-                                                   '-dumpversion']).decode().strip())
+            gcc_ver = int(subprocess.check_output(["gcc", "-dumpversion"]).decode().strip())
             # gcc12 and higher have a problem with kernel and xrealloc implementation
             if gcc_ver < 12:
-                cc = 'gcc'
+                cc = "gcc"
             # if gcc12 or higher is the default compiler, check if gcc7 is available
-            elif shutil.which('gcc-7'):
-                cc = 'gcc-7'
+            elif shutil.which("gcc-7"):
+                cc = "gcc-7"
             else:
-                raise RuntimeError('Only gcc12 or higher are available, and it\'s problematic with kernel sources')
+                raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
 
-            make_args = ['make', '-sn', f'CC={cc}', f'KLP_CS={cs}',
-                         f'HOSTCC={cc}', 'WERROR=0',
-                         'CFLAGS_REMOVE_objtool=-Werror', file_]
+            make_args = [
+                "make",
+                "-sn",
+                f"CC={cc}",
+                f"KLP_CS={cs}",
+                f"HOSTCC={cc}",
+                "WERROR=0",
+                "CFLAGS_REMOVE_objtool=-Werror",
+                file_,
+            ]
 
-            f.write(f'Executing make on {odir}\n')
-            f.write(' '.join(make_args))
-            f.write('\n')
+            f.write(f"Executing make on {odir}\n")
+            f.write(" ".join(make_args))
+            f.write("\n")
             f.flush()
 
-            completed = subprocess.check_output(make_args, cwd=odir,
-                                                stderr=f).decode()
+            completed = subprocess.check_output(make_args, cwd=odir, stderr=f).decode()
 
-            ofname = '.' + filename.name.replace('.c', '.o.d')
+            ofname = "." + filename.name.replace(".c", ".o.d")
             ofname = Path(filename.parent, ofname)
 
             # 15.4 onwards changes the regex a little: -MD -> -MMD
-            result = re.search(f'(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});'
-                      , str(completed).strip())
+            result = re.search(
+                f"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});", str(completed).strip()
+            )
             if not result:
-                raise RuntimeError(f'Failed to get the kernel cmdline for file {str(ofname)} in {cs}')
+                raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs}")
 
             ret = Extractor.process_make_output(result.group(1))
             # save the cmdline
             f.write(ret)
 
-            if not ' -pg ' in ret:
-                logging.warning(f'{cs}:{file_} is not compiled with livepatch support (-pg flag)')
+            if not " -pg " in ret:
+                logging.warning(f"{cs}:{file_} is not compiled with livepatch support (-pg flag)")
 
             return ret
 
         return None
 
     def get_cmd_from_json(self, fname):
-        with open(Path(self.get_data_dir(lp_utils.ARCH), 'compile_commands.json')) as f:
+        with open(Path(self.get_data_dir(utils.ARCH), "compile_commands.json")) as f:
             buf = f.read()
         data = json.loads(buf)
         for d in data:
-            if fname in d['file']:
-                output = d['command']
+            if fname in d["file"]:
+                output = d["command"]
                 return Extractor.process_make_output(output)
 
         return None
@@ -136,10 +144,10 @@ class Extractor(Config):
         odir = self.get_odir(cs)
 
         # The header text has two tabs
-        cs_info = cs.ljust(15, ' ')
-        idx = f'({i}/{self.total})'.rjust(15, ' ')
+        cs_info = cs.ljust(15, " ")
+        idx = f"({i}/{self.total})".rjust(15, " ")
 
-        logging.info(f'{idx} {cs_info} {fname}')
+        logging.info(f"{idx} {cs_info} {fname}")
 
         out_dir = self.get_work_dir(cs, fname, self.app)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -156,34 +164,32 @@ class Extractor(Config):
             else:
                 cmd = Extractor.get_make_cmd(out_dir, cs, fname, odir)
 
-        args, lenv = self.runner.cmd_args(cs, fname, ','.join(fdata['symbols']), out_dir,
-                                          fdata, cmd)
+        args, lenv = self.runner.cmd_args(cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
 
-        with open(Path(out_dir, f'{self.app}.out.txt'), 'w') as f:
+        with open(Path(out_dir, f"{self.app}.out.txt"), "w") as f:
             # Write the command line used
-            f.write('\n'.join(args) + '\n')
+            f.write("\n".join(args) + "\n")
             f.flush()
-            subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv,
-                           check=True)
+            subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
 
-        self.codestreams[cs]['files'][fname]['ext_symbols'] = self.runner.get_symbol_list(out_dir)
+        self.codestreams[cs]["files"][fname]["ext_symbols"] = self.runner.get_symbol_list(out_dir)
 
         lp_out = Path(out_dir, self.lp_out_file(fname))
 
-		# Remove the local path prefix of the klp-ccp generated comments
+        # Remove the local path prefix of the klp-ccp generated comments
         # Open the file, read, seek to the beginning, write the new data, and
         # then truncate (which will use the current position in file as the
         # size)
-        with open(str(lp_out), 'r+') as f:
+        with open(str(lp_out), "r+") as f:
             file_buf = f.read()
             f.seek(0)
-            f.write(file_buf.replace(f'from {str(sdir)}/', 'from '))
+            f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
             f.truncate()
 
         self.tem.CreateMakefile(cs, fname)
 
     def run(self):
-        logging.info(f'Work directory: {self.bsc_path}')
+        logging.info(f"Work directory: {self.bsc_path}")
 
         working_cs = self.filter_cs(verbose=True)
 
@@ -200,20 +206,19 @@ class Extractor(Config):
             if self.apply_patches:
                 self.apply_all_patches(cs, self.quilt_log)
 
-            for fname, fdata in data['files'].items():
+            for fname, fdata in data["files"].items():
                 args.append((i, fname, cs, fdata))
                 i += 1
 
         self.total = len(args)
-        logging.info(f'\nGenerating livepatches for {len(args)} file(s) using'
-                     f'{self.workers} workers...')
-        logging.info('\t\tCodestream\tFile')
+        logging.info(f"\nGenerating livepatches for {len(args)} file(s) using" f"{self.workers} workers...")
+        logging.info("\t\tCodestream\tFile")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as executor:
             results = executor.map(self.process, args)
             for result in results:
                 if result:
-                    logging.error(f'{cs}: {result}')
+                    logging.error(f"{cs}: {result}")
 
         # Save the ext_symbols set by execute
         self.flush_cs_file()
@@ -230,7 +235,7 @@ class Extractor(Config):
 
         self.tem.generate_commit_msg_file()
 
-        logging.info('Checking the externalized symbols in other architectures...')
+        logging.info("Checking the externalized symbols in other architectures...")
 
         missing_syms = OrderedDict()
 
@@ -248,7 +253,7 @@ class Extractor(Config):
             # of nm only once per object
             obj_syms = {}
             for f, fdata in self.get_cs_files(cs).items():
-                for obj, syms in fdata['ext_symbols'].items():
+                for obj, syms in fdata["ext_symbols"].items():
                     obj_syms.setdefault(obj, [])
                     obj_syms[obj].extend(syms)
 
@@ -264,10 +269,10 @@ class Extractor(Config):
             self.tem.CreateKbuildFile(cs)
 
         if missing_syms:
-            with open(Path(self.bsc_path, 'missing_syms'), 'w') as f:
+            with open(Path(self.bsc_path, "missing_syms"), "w") as f:
                 f.write(json.dumps(missing_syms, indent=4))
 
-            logging.warning('Symbols not found:')
+            logging.warning("Symbols not found:")
             logging.warn(json.dumps(missing_syms, indent=4))
 
     def get_work_lp_file(self, cs, fname):
@@ -282,30 +287,30 @@ class Extractor(Config):
             cs_files.setdefault(cs, [])
 
             fpath = self.get_work_lp_file(cs, file)
-            with open(fpath, 'r+') as fi:
+            with open(fpath, "r+") as fi:
                 src = fi.read()
 
-                src = re.sub('#include \".+kconfig\.h\"', '', src)
+                src = re.sub('#include ".+kconfig\.h"', "", src)
                 # Since 15.4 klp-ccp includes a compiler-version.h header
-                src = re.sub('#include \".+compiler\-version\.h\"', '', src)
+                src = re.sub('#include ".+compiler\-version\.h"', "", src)
                 # Since RT variants, there is now an definition for auto_type
-                src = src.replace('#define __auto_type int\n', '')
+                src = src.replace("#define __auto_type int\n", "")
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f'{self.get_data_dir(lp_utils.ARCH)}.+{file}', '', src)
+                src = re.sub(f"{self.get_data_dir(utils.ARCH)}.+{file}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
-                src = re.sub(f'\.lineno = \d+,', '', src)
+                src = re.sub(f"\.lineno = \d+,", "", src)
 
                 # Remove any mentions to klpr_trace, since it's currently
                 # buggy in klp-ccp
-                src = re.sub('.+klpr_trace.+', '', src)
+                src = re.sub(".+klpr_trace.+", "", src)
 
                 # Remove clang-extract comments
-                src = re.sub('clang-extract: .+', '', src)
+                src = re.sub("clang-extract: .+", "", src)
 
-                cs_files[cs].append((file , src ))
+                cs_files[cs].append((file, src))
 
         return cs_files
 
@@ -322,14 +327,13 @@ class Extractor(Config):
         f1 = cs_code.get(cs_list[0])
         f2 = cs_code.get(cs_list[1])
 
-        assert(len(f1) == len(f2))
+        assert len(f1) == len(f2)
 
         for i in range(len(f1)):
             content1 = f1[i][1].splitlines()
             content2 = f2[i][1].splitlines()
 
-            for l in dl.unified_diff(content1, content2, fromfile=f1[i][0],
-                                     tofile=f2[i][0]):
+            for l in dl.unified_diff(content1, content2, fromfile=f1[i][0], tofile=f2[i][0]):
                 print(l)
 
     # Get the code for each codestream, removing boilerplate code
@@ -391,11 +395,11 @@ class Extractor(Config):
         # same code
         groups = []
         for cs_list in cs_equal:
-            groups.append(' '.join(lp_utils.classify_codestreams(cs_list)))
+            groups.append(" ".join(utils.classify_codestreams(cs_list)))
 
-        with open(Path(self.bsc_path, self.app, 'groups'), 'w') as f:
-            f.write('\n'.join(groups))
+        with open(Path(self.bsc_path, self.app, "groups"), "w") as f:
+            f.write("\n".join(groups))
 
-        logging.info('\nGrouping codestreams that share the same content and files:')
+        logging.info("\nGrouping codestreams that share the same content and files:")
         for group in groups:
-            logging.info(f'\t{group}')
+            logging.info(f"\t{group}")
