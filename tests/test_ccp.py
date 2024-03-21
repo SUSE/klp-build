@@ -1,12 +1,8 @@
 import logging
 import os
-import sys
 import unittest
-from pathlib import Path
 
-sys.path.append("..")
 from klpbuild.ccp import CCP
-
 from tests import utils
 
 
@@ -28,7 +24,7 @@ class CcpTesting(utils.TestUtils):
             ccp = CCP(v["bsc"], cs, [])
             ccp.run_ccp()
 
-        self.assertRegex(logs.output[0], "lib/seq_buf.o is not compiled with livepatch support \(\-pg flag\)")
+        self.assertRegex(logs.output[0], r"lib/seq_buf.o is not compiled with livepatch support \(\-pg flag\)")
 
     def test_group_classify(self):
         group = CCP.classify_codestreams(["15.2u10", "15.2u11", "15.3u10", "15.3u12"])

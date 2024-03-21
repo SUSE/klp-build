@@ -67,7 +67,8 @@ class GitHelper(Config):
                 # RT one.
                 if rt and "rtu" not in b:
                     continue
-                elif not rt and "rtu" in b:
+
+                if not rt and "rtu" in b:
                     continue
 
                 sle, u = b.split(separator)
@@ -172,8 +173,8 @@ class GitHelper(Config):
 
         # Search for Subject until a blank line, since commit messages can be
         # seen in multiple lines.
-        msg = re.search("Subject: (.*?)(?:(\n\n))", req.text, re.DOTALL).group(1).replace("\n", "")
-        dstr = re.search("Date: ([\w\s,:]+)", req.text).group(1)
+        msg = re.search(r"Subject: (.*?)(?:(\n\n))", req.text, re.DOTALL).group(1).replace("\n", "")
+        dstr = re.search(r"Date: ([\w\s,:]+)", req.text).group(1)
         d = datetime.strptime(dstr.strip(), "%a, %d %b %Y %H:%M:%S")
 
         return d, msg
@@ -186,8 +187,9 @@ class GitHelper(Config):
         # do not get the commits twice
         if self.conf.get("commits", ""):
             return self.conf["commits"]
+
         # ensure that the user informed the commits at least once per 'project'
-        elif not cve:
+        if not cve:
             raise RuntimeError(f"No CVE informed or no upstream commits found. Use " "--cve option")
 
         print("Fetching changes from all supported branches...")
@@ -270,7 +272,7 @@ class GitHelper(Config):
                 # In this case add a note for the livepatch author to fill the
                 # blank when finishing the livepatch
                 ups = ""
-                m = re.search("Git-commit: ([\w]+)", pfile)
+                m = re.search(r"Git-commit: ([\w]+)", pfile)
                 if m:
                     ups = m.group(1)[:12]
 

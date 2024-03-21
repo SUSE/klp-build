@@ -53,7 +53,7 @@ class Setup(Config):
             raise ValueError("You need to specify at least one of the file-funcs variants!")
 
         self.conf["archs"] = archs
-        self.conf["cve"] = re.search("([0-9]+\-[0-9]+)", cve).group(1)
+        self.conf["cve"] = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
         self.codestream = cs_arg
         self.file_funcs = {}
@@ -114,7 +114,7 @@ class Setup(Config):
             # and add a fifth field with the forth one + rpm- prefix, and
             # remove the build counter number
             full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
-            kernel = re.sub("\.\d+$", "", kernel_full)
+            kernel = re.sub(r"\.\d+$", "", kernel_full)
 
             # Fill the majority of possible fields here
             sle, sp, u, rt = self.parse_cs_line(full_cs)

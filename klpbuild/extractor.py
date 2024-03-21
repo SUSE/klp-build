@@ -53,17 +53,20 @@ class Extractor(Config):
         self.app = app
         self.tem = TemplateGen(self.bsc_num, self.filter, self.app)
 
+    @classmethod
     def unquote_output(matchobj):
         return matchobj.group(0).replace('"', "")
 
+    @classmethod
     def process_make_output(output):
         # some strings  have single quotes around double quotes, so remove the
         # outer quotes
         output = output.replace("'", "")
 
         # also remove double quotes from macros like -D"KBUILD....=.."
-        return re.sub('-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
+        return re.sub(r'-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
 
+    @classmethod
     def get_make_cmd(out_dir, cs, filename, odir):
         filename = PurePath(filename)
         file_ = str(filename.with_suffix(".o"))
@@ -110,7 +113,7 @@ class Extractor(Config):
 
             # 15.4 onwards changes the regex a little: -MD -> -MMD
             result = re.search(
-                f"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});", str(completed).strip()
+                rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});", str(completed).strip()
             )
             if not result:
                 raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs}")
@@ -290,25 +293,25 @@ class Extractor(Config):
             with open(fpath, "r+") as fi:
                 src = fi.read()
 
-                src = re.sub('#include ".+kconfig\.h"', "", src)
+                src = re.sub(r'#include ".+kconfig\.h"', "", src)
                 # Since 15.4 klp-ccp includes a compiler-version.h header
-                src = re.sub('#include ".+compiler\-version\.h"', "", src)
+                src = re.sub(r'#include ".+compiler\-version\.h"', "", src)
                 # Since RT variants, there is now an definition for auto_type
-                src = src.replace("#define __auto_type int\n", "")
+                src = src.replace(r"#define __auto_type int\n", "")
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
                 src = re.sub(f"{self.get_data_dir(utils.ARCH)}.+{file}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
-                src = re.sub(f"\.lineno = \d+,", "", src)
+                src = re.sub(rf"\.lineno = \d+,", "", src)
 
                 # Remove any mentions to klpr_trace, since it's currently
                 # buggy in klp-ccp
-                src = re.sub(".+klpr_trace.+", "", src)
+                src = re.sub(r".+klpr_trace.+", "", src)
 
                 # Remove clang-extract comments
-                src = re.sub("clang-extract: .+", "", src)
+                src = re.sub(r"clang-extract: .+", "", src)
 
                 cs_files[cs].append((file, src))
 

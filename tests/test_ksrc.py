@@ -1,7 +1,5 @@
-import sys
 import unittest
 
-sys.path.append("..")
 from klpbuild.ksrc import GitHelper
 
 
