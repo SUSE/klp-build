@@ -45,14 +45,14 @@ class IBS(Config):
         # For ppc64le and s390x only download vmlinux and the built modules
         self.cs_data = {
             "ppc64le": {
-                "kernel-default": "(kernel-default-(extra-)?[\d\.\-]+.ppc64le.rpm)",
+                "kernel-default": r"(kernel-default-(extra-)?[\d\.\-]+.ppc64le.rpm)",
             },
             "s390x": {
-                "kernel-default": "(kernel-default-(extra-)?[\d\.\-]+.s390x.rpm)",
+                "kernel-default": r"(kernel-default-(extra-)?[\d\.\-]+.s390x.rpm)",
             },
             "x86_64": {
-                "kernel-default": "(kernel-(default|rt)\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)",
-                "kernel-source": "(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
+                "kernel-default": r"(kernel-(default|rt)\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)",
+                "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
             },
         }
 
@@ -201,13 +201,13 @@ class IBS(Config):
                 # Extract modules and vmlinux files that are compressed
                 mod_path = Path(self.get_data_dir(arch), "lib", "modules")
                 for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d")]:
-                    cmd = f'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
+                    cmd = rf'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
                 # Extract all gzipped files under arch//boot, including vmlinux,
                 # symvers and maybe others.
                 vmlinux_path = Path(self.get_data_dir(arch), "boot")
-                subprocess.check_output(f'find {vmlinux_path} -name "*gz" -exec gzip -d -f {{}} \;', shell=True)
+                subprocess.check_output(rf'find {vmlinux_path} -name "*gz" -exec gzip -d -f {{}} \;', shell=True)
 
             # Use the SLE .config
             shutil.copy(self.get_cs_boot_file(cs, "config"), Path(self.get_odir(cs), ".config"))
@@ -258,7 +258,7 @@ class IBS(Config):
         out = subprocess.check_output(["nm", "--undefined-only", str(lp_mod_path)], stderr=subprocess.STDOUT).decode()
 
         # Remove the U flag from every line
-        lp_und_symbols = re.findall("\s+U\s([\w]+)", out)
+        lp_und_symbols = re.findall(r"\s+U\s([\w]+)", out)
 
         missing_syms = []
         # Find all UNDEFINED symbols that exists in the livepatch module that
@@ -270,14 +270,14 @@ class IBS(Config):
         return missing_syms
 
     def validate_livepatch_module(self, cs, arch, rpm_dir, rpm):
-        match = re.search("(livepatch)-.*(default|rt)\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.", rpm)
+        match = re.search(r"(livepatch)-.*(default|rt)\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.", rpm)
         if match:
             dir_path = match.group(1)
             ktype = match.group(2)
             lp_file = f"livepatch-{match.group(3)}-{match.group(4)}_{match.group(5)}_{match.group(6)}.ko"
         else:
             ktype = "default"
-            match = re.search("(kgraft)\-patch\-.*default\-(\d+)\-(\d+)\.(\d+)\.", rpm)
+            match = re.search(r"(kgraft)\-patch\-.*default\-(\d+)\-(\d+)\.(\d+)\.", rpm)
             if match:
                 dir_path = match.group(1)
                 lp_file = f"kgraft-patch-{match.group(2)}-{match.group(3)}_{match.group(4)}.ko"

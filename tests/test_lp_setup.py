@@ -1,13 +1,10 @@
 import json
 import logging
 import os
-import sys
 import unittest
 from pathlib import Path
 
 from tests import utils
-
-sys.path.append("..")
 
 
 class LpSetupTest(utils.TestUtils):

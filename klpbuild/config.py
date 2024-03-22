@@ -168,7 +168,7 @@ class Config:
         return self.get_cs_data(cs)["files"]
 
     def get_cs_tuple(self, cs):
-        match = re.search("(\d+)\.(\d+)(rt)?u(\d+)", cs)
+        match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
 
         return (int(match.group(1)), int(match.group(2)), int(match.group(4)), match.group(3))
 
@@ -176,7 +176,7 @@ class Config:
         if self.kdir:
             kconf = Path(self.data, ".config")
             with open(kconf) as f:
-                match = re.search(f"{conf}=[ym]", f.read())
+                match = re.search(rf"{conf}=[ym]", f.read())
                 if not match:
                     raise RuntimeError(f"Config {conf} not enabled")
             return
@@ -184,7 +184,7 @@ class Config:
         for arch in self.get_cs_archs(cs):
             kconf = self.get_cs_boot_file(cs, "config", arch)
             with open(kconf) as f:
-                match = re.search(f"{conf}=[ym]", f.read())
+                match = re.search(rf"{conf}=[ym]", f.read())
                 if not match:
                     raise RuntimeError(f"{cs}:{arch}: Config {conf} not enabled")
 
@@ -272,7 +272,7 @@ class Config:
 
         mod_path = self.get_mod_path(cs, arch, mod)
         with open(Path(mod_path, "modules.order")) as f:
-            obj = re.search(f"([\w\/\-]+\/{mod}.k?o)", f.read())
+            obj = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
             if not obj:
                 raise RuntimeError(f"{cs}: Module not found: {mod}")
 
@@ -284,7 +284,7 @@ class Config:
             # Validate if the module being livepatches is supported or not
             out = subprocess.check_output(["/sbin/modinfo", obj], cwd=mod_path, stderr=subprocess.STDOUT).decode()
 
-            if re.search("supported:\s+no", out):
+            if re.search(r"supported:\s+no", out):
                 print(f"WARN: {cs}: Module {mod} is not supported by SLE")
 
         return obj
