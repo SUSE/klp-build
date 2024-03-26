@@ -53,11 +53,11 @@ class Extractor(Config):
         self.app = app
         self.tem = TemplateGen(self.bsc_num, self.filter, self.app)
 
-    @classmethod
+    @staticmethod
     def unquote_output(matchobj):
         return matchobj.group(0).replace('"', "")
 
-    @classmethod
+    @staticmethod
     def process_make_output(output):
         # some strings  have single quotes around double quotes, so remove the
         # outer quotes
@@ -66,7 +66,7 @@ class Extractor(Config):
         # also remove double quotes from macros like -D"KBUILD....=.."
         return re.sub(r'-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
 
-    @classmethod
+    @staticmethod
     def get_make_cmd(out_dir, cs, filename, odir):
         filename = PurePath(filename)
         file_ = str(filename.with_suffix(".o"))
