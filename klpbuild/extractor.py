@@ -77,8 +77,9 @@ class Extractor(Config):
             # need to ask the make to show the commands for all files inside the
             # directory. Later process_make_output will take care of picking
             # what is interesting for klp-build
-            if filename.parent == PurePath("arch/x86/lib"):
-                file_ = str(filename.parent)
+            if filename.parent == PurePath("arch/x86/lib") or \
+                    filename.parent == PurePath("drivers/block/aoe"):
+                file_ = str(filename.parent) + '/'
 
             gcc_ver = int(subprocess.check_output(["gcc", "-dumpversion"]).decode().strip())
             # gcc12 and higher have a problem with kernel and xrealloc implementation
@@ -106,15 +107,22 @@ class Extractor(Config):
             f.write("\n")
             f.flush()
 
-            completed = subprocess.check_output(make_args, cwd=odir, stderr=f).decode()
-
             ofname = "." + filename.name.replace(".c", ".o.d")
             ofname = Path(filename.parent, ofname)
 
+            completed = subprocess.check_output(make_args, cwd=odir, stderr=f).decode()
+            f.write("Full output of the make command:\n")
+            f.write(str(completed).strip())
+            f.write("\n")
+            f.flush()
+
+            regex_str = rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});"
+
+            f.write(f"Searching for the pattern: {regex_str}\n")
+            f.flush()
+
             # 15.4 onwards changes the regex a little: -MD -> -MMD
-            result = re.search(
-                rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});", str(completed).strip()
-            )
+            result = re.search(regex_str, str(completed).strip())
             if not result:
                 raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs}")
 
