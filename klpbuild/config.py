@@ -100,10 +100,12 @@ class Config:
 
         sle, sp, u, rt = self.get_cs_tuple(cs)
 
+        patch_dirs = []
+
         if rt:
-            patch_dirs = [f"{sle}.{sp}rtu{u}", f"{sle}.{sp}{rt}"]
-        else:
-            patch_dirs = [f"{sle}.{sp}u{u}", f"{sle}.{sp}"]
+            patch_dirs.extend([f"{sle}.{sp}rtu{u}", f"{sle}.{sp}{rt}"])
+
+        patch_dirs.extend([f"{sle}.{sp}u{u}", f"{sle}.{sp}"])
 
         if sle == 15 and sp < 4:
             patch_dirs.append("cve-5.3")
