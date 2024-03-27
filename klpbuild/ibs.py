@@ -9,6 +9,7 @@ import sys
 import time
 from operator import itemgetter
 from pathlib import Path
+import pkg_resources
 
 import requests
 from lxml import etree
@@ -324,6 +325,7 @@ class IBS(Config):
         self.download()
 
         test_sh = Path(self.kgraft_tests_path, f"{self.bsc}_test_script.sh")
+        run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
 
         for arch in ARCHS:
             tests_path = Path(self.bsc_path, "tests", arch)
@@ -334,7 +336,7 @@ class IBS(Config):
             shutil.rmtree(f"{str(test_arch_path)}.tar.xz", ignore_errors=True)
 
             test_arch_path.mkdir(exist_ok=True, parents=True)
-            shutil.copy(Path(self.scripts, "run-kgr-test.sh"), test_arch_path)
+            shutil.copy(run_test, test_arch_path)
 
             for d in ["built", "repro", "tests.out"]:
                 Path(test_arch_path, d).mkdir(exist_ok=True)

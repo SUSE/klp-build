@@ -28,7 +28,6 @@ class Config:
         self.bsc_num = bsc
         self.bsc = "bsc" + str(bsc)
         self.bsc_path = Path(work, self.bsc)
-        self.scripts = Path(os.path.dirname(__file__), "scripts")
         self.filter = bsc_filter
         self.skips = skips
 

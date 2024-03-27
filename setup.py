@@ -14,6 +14,11 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://gitlab.suse.de/live-patching/klp-build",
     packages=setuptools.find_packages(exclude=["tests"]),
+    package_data={
+        "scripts" : [
+            "run-kgr-test.sh"
+        ]
+    },
     python_requires=">=3.6",
     classifiers=[
         "Programming Language :: Python :: 3",
