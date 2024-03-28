@@ -24,6 +24,10 @@ void ${ fname }_cleanup(void);
 static inline void ${ fname }_cleanup(void) {}
 % endif %
 
+% for p in proto_files:
+<%include file="${ p }"/>
+% endfor
+
 % if check_enabled:
 #else /* !IS_ENABLED(${ config }) */
 % endif
@@ -446,6 +450,27 @@ class TemplateGen(Config):
         sle, sp, _, _ = self.get_cs_tuple(cs)
         return sle < 15 or (sle == 15 and sp < 4)
 
+    def __GenerateHeaderFile(self, lp_path, cs):
+        out_name = f"livepatch_{self.bsc}.h"
+
+        lp_inc_dir = Path()
+        proto_files = []
+        if self.app == 'ce':
+            lp_inc_dir = self.get_cs_dir(cs, self.app)
+
+            for f, _ in self.get_cs_files(cs).items():
+                proto_files.append(str(Path(self.get_work_dirname(f), "proto.h")))
+
+        render_vars = {
+            "fname": str(Path(out_name).with_suffix("")),
+            "check_enabled": self.check_enabled,
+            "proto_files" : proto_files
+        }
+
+        with open(Path(lp_path, out_name), "w") as f:
+            lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
+            f.write(Template(TEMPL_H, lookup=lpdir).render(**render_vars))
+
     def __GenerateLivepatchFile(self, lp_path, cs, ext, src_file, use_src_name=False):
         if src_file:
             lp_inc_dir = str(self.get_work_dir(cs, src_file, self.app))
@@ -548,13 +573,13 @@ class TemplateGen(Config):
         if len(files.keys()) == 1:
             src = Path(list(files.keys())[0])
             self.__GenerateLivepatchFile(lp_path, cs, "c", src)
-            self.__GenerateLivepatchFile(lp_path, cs, "h", src)
+            self.__GenerateHeaderFile(lp_path, cs)
             return
 
         # If there are more then one source file, we cannot fully infer what are
         # the correct configs and mods to be livepatched, so leave the mod and
         # config entries empty
-        self.__GenerateLivepatchFile(lp_path, cs, "h", None)
+        self.__GenerateHeaderFile(lp_path, cs)
 
         # Run the template engine for each touched source file.
         for src_file, _ in files.items():
