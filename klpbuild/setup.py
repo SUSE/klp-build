@@ -287,7 +287,7 @@ class Setup(Config):
 
             # Verify if the functions exist in the specified object
             for mod, syms in mod_syms.items():
-                arch_syms = self.check_symbol_archs(cs, mod, syms, True)
+                arch_syms = self.check_symbol_archs(cs, mod, syms, False)
                 if arch_syms:
                     for arch, syms in arch_syms.items():
                         logging.warning(f'{cs}({arch}): Symbols {",".join(syms)} not found on {mod} object')
