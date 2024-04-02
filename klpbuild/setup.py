@@ -245,12 +245,14 @@ class Setup(Config):
     def setup_project_files(self):
         self.bsc_path.mkdir(exist_ok=True)
 
+        # When kdir is used, the only supported architecture is the HOST
+        # architecture.
         if self.kdir:
             self.working_cs["linux"] = {
                 "kernel": platform.uname()[2],
                 "modules": {},
                 "files": self.file_funcs,
-                "archs": utils.ARCH,
+                "archs": [utils.ARCH]
             }
         else:
             self.setup_codestreams()
