@@ -210,7 +210,7 @@ class Config:
         if not arch:
             arch = ARCH
 
-        return Path(self.get_data_dir(ARCH), "boot", f"{file}-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
+        return Path(self.get_data_dir(arch), "boot", f"{file}-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
 
     def get_data_dir(self, arch):
         if self.kdir:
