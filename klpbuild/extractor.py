@@ -132,6 +132,13 @@ class Extractor(Config):
                 raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs}")
 
             ret = Extractor.process_make_output(result.group(1))
+
+            # WORKAROUND: tomoyo security module uses a generated file that is
+            # not part of kernel-source. For this reason, add a new option for
+            # the backend process to ignore the inclusion of the missing file
+            if 'tomoyo' in file_:
+                ret += ' -DCONFIG_SECURITY_TOMOYO_INSECURE_BUILTIN_SETTING'
+
             # save the cmdline
             f.write(ret)
 
