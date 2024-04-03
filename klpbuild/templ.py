@@ -455,17 +455,30 @@ class TemplateGen(Config):
 
         lp_inc_dir = Path()
         proto_files = []
-        if self.app == 'ce':
+        configs = set()
+        config = ""
+
+        for f, data in self.get_cs_files(cs).items():
+            configs.add(data["conf"])
+            if self.app == "ce":
+                proto_files.append(str(Path(self.get_work_dirname(f), "proto.h")))
+
+        # Only add the inc_dir if CE is used, since it's the only backend that
+        # produces the proto.h headers
+        if len(proto_files) > 0:
             lp_inc_dir = self.get_cs_dir(cs, self.app)
 
-            for f, _ in self.get_cs_files(cs).items():
-                proto_files.append(str(Path(self.get_work_dirname(f), "proto.h")))
+        # Only populate the config check in the header if the livepatch is
+        # patching code under only one config. Otherwise let the developer to
+        # fill it.
+        if len(configs) == 1:
+            config = configs.pop()
 
         render_vars = {
             "fname": str(Path(out_name).with_suffix("")),
             "check_enabled": self.check_enabled,
             "proto_files" : proto_files,
-            "config" : ""
+            "config" : config
         }
 
         with open(Path(lp_path, out_name), "w") as f:
