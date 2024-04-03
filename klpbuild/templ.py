@@ -485,7 +485,7 @@ class TemplateGen(Config):
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
             f.write(Template(TEMPL_H, lookup=lpdir).render(**render_vars))
 
-    def __GenerateLivepatchFile(self, lp_path, cs, ext, src_file, use_src_name=False):
+    def __GenerateLivepatchFile(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
             lp_inc_dir = str(self.get_work_dir(cs, src_file, self.app))
             lp_file = self.lp_out_file(src_file)
@@ -510,11 +510,11 @@ class TemplateGen(Config):
         if use_src_name:
             out_name = lp_file
         else:
-            out_name = f"livepatch_{self.bsc}.{ext}"
+            out_name = f"livepatch_{self.bsc}.c"
 
         render_vars = {
             "commits": self.conf["commits"],
-            "include_header": "livepatch_" in out_name and ext == "c",
+            "include_header": "livepatch_" in out_name,
             "cve": self.conf["cve"],
             "bsc_num": self.bsc_num,
             "fname": str(Path(out_name).with_suffix("")),
@@ -531,25 +531,23 @@ class TemplateGen(Config):
 
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
-            temp_str = TEMPL_H
             # For C files, first add the LICENSE header template to the file
-            if ext == "c":
-                f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
+            f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
 
-                # If we have multiple source files for the same livepatch,
-                # create one hollow file to wire-up the multiple _init and
-                # _clean functions
-                #
-                # If we are patching a module, we should have the
-                # module_notifier armed to signal whenever the module comes on
-                # in order to do the symbol lookups. Otherwise only _init is
-                # needed, and only if there are externalized symbols being used.
-                if not lp_file:
-                    temp_str = TEMPL_HOLLOW
-                elif mod:
-                    temp_str = TEMPL_PATCH_MODULE
-                else:
-                    temp_str = TEMPL_PATCH_VMLINUX
+            # If we have multiple source files for the same livepatch,
+            # create one hollow file to wire-up the multiple _init and
+            # _clean functions
+            #
+            # If we are patching a module, we should have the
+            # module_notifier armed to signal whenever the module comes on
+            # in order to do the symbol lookups. Otherwise only _init is
+            # needed, and only if there are externalized symbols being used.
+            if not lp_file:
+                temp_str = TEMPL_HOLLOW
+            elif mod:
+                temp_str = TEMPL_PATCH_MODULE
+            else:
+                temp_str = TEMPL_PATCH_VMLINUX
 
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
 
@@ -586,7 +584,7 @@ class TemplateGen(Config):
         # be names livepatch_XXXX
         if len(files.keys()) == 1:
             src = Path(list(files.keys())[0])
-            self.__GenerateLivepatchFile(lp_path, cs, "c", src)
+            self.__GenerateLivepatchFile(lp_path, cs, src)
             self.__GenerateHeaderFile(lp_path, cs)
             return
 
@@ -597,11 +595,11 @@ class TemplateGen(Config):
 
         # Run the template engine for each touched source file.
         for src_file, _ in files.items():
-            self.__GenerateLivepatchFile(lp_path, cs, "c", src_file, True)
+            self.__GenerateLivepatchFile(lp_path, cs, src_file, True)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        self.__GenerateLivepatchFile(lp_path, cs, "c", None)
+        self.__GenerateLivepatchFile(lp_path, cs, None)
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
