@@ -32,7 +32,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     setup = sub.add_parser("setup", parents=[parentparser])
     setup.add_argument("--cve", type=str, required=True, help="The CVE assigned to this livepatch")
-    setup.add_argument("--conf", type=str, default="", help="The kernel CONFIG used to be build the livepatch")
+    setup.add_argument("--conf", type=str, required=True, help="The kernel CONFIG used to be build the livepatch")
     setup.add_argument(
         "--kdir", action="store_true", help="Change the lookup procedure to search in a compiled kernel directory"
     )
@@ -83,7 +83,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--module", type=str, default="vmlinux", help="The module that will be livepatched for all files"
     )
     setup.add_argument(
-        "--archs", required=True, choices=ARCHS, nargs="+", help="Supported architectures for this livepatch"
+        "--archs", default=ARCHS, choices=ARCHS, nargs="+", help="Supported architectures for this livepatch"
     )
     setup.add_argument("--skips", help="List of codestreams to filter out")
 

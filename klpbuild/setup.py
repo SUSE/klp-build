@@ -40,14 +40,6 @@ class Setup(Config):
 
         archs.sort()
 
-        # Check if the livepatch isn't enabled on some architectures, and so
-        # require conf to be set, otherwise it can be a problem later
-        if archs != utils.ARCHS and not conf:
-            raise ValueError("Please specify --conf when not all architectures are supported")
-
-        if self.is_mod(mod_arg) and not conf:
-            raise ValueError("Please specify --conf when a module is specified")
-
         if conf and not conf.startswith("CONFIG_"):
             raise ValueError("Please specify --conf with CONFIG_ prefix")
 
@@ -279,9 +271,13 @@ class Setup(Config):
                     logging.warning(msg)
 
                 # Check if the CONFIG is enabled on all affected architectures
-                conf = fdata["conf"]
-                if conf:
-                    self.validate_config(cs, conf)
+                self.validate_config(cs, fdata["conf"])
+
+                # If the config was enabled on all supported architectures,
+                # there is no point in leaving the conf being set, since the
+                # feature will be available everywhere.
+                if self.conf["archs"] == utils.ARCHS:
+                    fdata["conf"] = ""
 
                 mod = fdata["module"]
                 if not data["modules"].get(mod, ""):

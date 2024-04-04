@@ -148,6 +148,7 @@ class Config:
         if not patched:
             raise RuntimeError(f"{cs}: Failed to apply patches. Aborting")
 
+    # All architectures supported by the codestream
     def get_cs_archs(self, cs):
         return self.get_cs_data(cs)["archs"]
 
@@ -190,7 +191,8 @@ class Config:
                     raise RuntimeError(f"Config {conf} not enabled")
             return
 
-        for arch in self.get_cs_archs(cs):
+        # Validate only the specified architectures
+        for arch in self.conf.get("archs"):
             kconf = self.get_cs_boot_file(cs, "config", arch)
             with open(kconf) as f:
                 match = re.search(rf"{conf}=[ym]", f.read())
