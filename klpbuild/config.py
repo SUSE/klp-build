@@ -191,8 +191,13 @@ class Config:
                     raise RuntimeError(f"Config {conf} not enabled")
             return
 
-        # Validate only the specified architectures
+        # Validate only the specified architectures, but check if the codestream
+        # is supported on that arch (like RT that is currently supported only on
+        # x86_64)
         for arch in self.conf.get("archs"):
+            if arch not in self.get_cs_archs(cs):
+                continue
+
             kconf = self.get_cs_boot_file(cs, "config", arch)
             with open(kconf) as f:
                 match = re.search(rf"{conf}=[ym]", f.read())
