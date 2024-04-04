@@ -90,7 +90,12 @@ class Setup(Config):
 
     def download_supported_file(self):
         logging.info("Downloading codestreams file")
-        req = requests.get("https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv")
+        cs_url = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
+        suse_cert = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
+        if suse_cert.exists():
+            req = requests.get(cs_url, verify=suse_cert)
+        else:
+            req = requests.get(cs_url)
 
         # exit on error
         req.raise_for_status()
