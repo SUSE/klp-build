@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (C) 2021-2024 SUSE
+# Author: Marcos Paulo de Souza <mpdesouza@suse.com>
+
 import concurrent.futures
 import difflib as dl
 import json
