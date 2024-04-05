@@ -216,11 +216,11 @@ def get_exts(ext_vars):
 
 % if check_enabled:
 #if IS_ENABLED(${ config })
-% endif # check_enabled
 
 #if !IS_MODULE(${ config })
 #error "Live patch supports only CONFIG=m"
 #endif
+% endif # check_enabled
 
 <%include file="${ inc_src_file }"/>
 
