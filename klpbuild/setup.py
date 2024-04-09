@@ -244,6 +244,10 @@ class Setup(Config):
             ibs = IBS(self.bsc_num, self.filter, self.working_cs)
             ibs.download_cs_data(data_missing)
 
+        logging.info("All affected codestreams:")
+        cs_list = utils.classify_codestreams(self.working_cs.keys())
+        logging.info(f'\t{" ".join(cs_list)}')
+
     def setup_project_files(self):
         self.bsc_path.mkdir(exist_ok=True)
 
