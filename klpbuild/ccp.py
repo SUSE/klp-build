@@ -78,6 +78,7 @@ class CCP(Config):
             "mutex_lock_nested",
             "rcu_read_lock_held",
             "__bad_unaligned_access_size",
+            "__builtin_alloca",
         ]
         # The backlist tells the klp-ccp to always copy the symbol code,
         # instead of externalizing. This helps in cases where different archs
