@@ -24,9 +24,9 @@ TEMPL_H = """\
 
 int ${ fname }_init(void);
 % if mod is UNDEFINED:
-void ${ fname }_cleanup(void);
-% else:
 static inline void ${ fname }_cleanup(void) {}
+% else:
+void ${ fname }_cleanup(void);
 % endif %
 
 % for p in proto_files:
