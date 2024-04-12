@@ -450,19 +450,28 @@ class IBS(Config):
 
             for prj, archs in prjs.items():
                 st = []
-                # Check each arch build results and if all of them are finished,
-                # add the prj to the finished_prj list to avoid showing it again
-                # in the next round.
-                finished = True
+                finished = False
+                # Save the status of all architecture build, and set to fail if
+                # an error happens in any of the supported architectures
                 for k, v in archs.items():
                     st.append(f"{k}: {v}")
-                    if v not in ["succeeded", "unresolvable", "failed"]:
-                        finished = False
+                    if v in ["unresolvable", "failed"]:
+                        finished = True
+
+                # Only set finished is all architectures supported by the
+                # codestreams built without issues
+                if not finished:
+                    states = set(archs.values())
+                    if len(states) == 1 and states.pop() == "succeeded":
+                        finished = True
 
                 if finished:
                     finished_prj.append(prj)
 
                 logging.info("{}\t{}".format(prj, "\t".join(st)))
+
+            for p in finished_prj:
+                prjs.pop(p)
 
             if not wait or not prjs:
                 break
