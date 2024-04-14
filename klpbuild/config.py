@@ -21,7 +21,7 @@ from klpbuild.utils import classify_codestreams
 
 
 class Config:
-    def __init__(self, bsc, bsc_filter, kdir=False, data_dir=None, skips="", working_cs={}):
+    def __init__(self, bsc, lp_filter, kdir=False, data_dir=None, skips="", working_cs={}):
         work_dir = os.getenv("KLP_WORK_DIR")
         if not work_dir:
             raise ValueError("KLP_WORK_DIR should be defined")
@@ -32,22 +32,22 @@ class Config:
 
         self.bsc_num = bsc
         self.bsc = "bsc" + str(bsc)
-        self.bsc_path = Path(work, self.bsc)
-        self.filter = bsc_filter
+        self.lp_path = Path(work, self.bsc)
+        self.filter = lp_filter
         self.skips = skips
 
         self.working_cs = OrderedDict(working_cs)
         self.codestreams = OrderedDict()
-        self.cs_file = Path(self.bsc_path, "codestreams.json")
+        self.cs_file = Path(self.lp_path, "codestreams.json")
         if self.cs_file.is_file():
             with open(self.cs_file) as f:
                 self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
         self.conf = OrderedDict(
-            {"bsc": str(self.bsc_num), "work_dir": str(self.bsc_path), "data": str(data_dir), "kdir": kdir}
+            {"bsc": str(self.bsc_num), "work_dir": str(self.lp_path), "data": str(data_dir), "kdir": kdir}
         )
 
-        self.conf_file = Path(self.bsc_path, "conf.json")
+        self.conf_file = Path(self.lp_path, "conf.json")
         if self.conf_file.is_file():
             with open(self.conf_file) as f:
                 self.conf = json.loads(f.read(), object_pairs_hook=OrderedDict)
@@ -74,7 +74,7 @@ class Config:
         return f"{self.bsc}_{fpath}"
 
     def get_patches_dir(self):
-        return Path(self.bsc_path, "fixes")
+        return Path(self.lp_path, "fixes")
 
     def remove_patches(self, cs, fil):
         if self.kdir:
@@ -153,7 +153,7 @@ class Config:
         return self.get_cs_data(cs)["archs"]
 
     def get_cs_dir(self, cs, app):
-        return Path(self.bsc_path, app, cs)
+        return Path(self.lp_path, app, cs)
 
     def get_work_dirname(self, fname):
         return f'work_{str(fname).replace("/", "_")}'

@@ -23,7 +23,7 @@ class Setup(Config):
     def __init__(
         self,
         bsc,
-        bsc_filter,
+        lp_filter,
         kdir,
         data_dir,
         cve,
@@ -36,14 +36,14 @@ class Setup(Config):
         archs,
         skips,
     ):
-        super().__init__(bsc, bsc_filter, kdir, data_dir, skips=skips)
+        super().__init__(bsc, lp_filter, kdir, data_dir, skips=skips)
 
         archs.sort()
 
         if conf and not conf.startswith("CONFIG_"):
             raise ValueError("Please specify --conf with CONFIG_ prefix")
 
-        if self.bsc_path.exists() and not self.bsc_path.is_dir():
+        if self.lp_path.exists() and not self.lp_path.is_dir():
             raise ValueError("--bsc needs to be a directory, or not to exist")
 
         if not file_funcs and not mod_file_funcs and not conf_mod_file_funcs:
@@ -249,7 +249,7 @@ class Setup(Config):
         logging.info(f'\t{" ".join(cs_list)}')
 
     def setup_project_files(self):
-        self.bsc_path.mkdir(exist_ok=True)
+        self.lp_path.mkdir(exist_ok=True)
 
         # When kdir is used, the only supported architecture is the HOST
         # architecture.

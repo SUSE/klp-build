@@ -26,8 +26,8 @@ from klpbuild.templ import TemplateGen
 
 
 class Extractor(Config):
-    def __init__(self, bsc, bsc_filter, apply_patches, app, workers=4, avoid_ext=""):
-        super().__init__(bsc, bsc_filter)
+    def __init__(self, bsc, lp_filter, apply_patches, app, workers=4, avoid_ext=""):
+        super().__init__(bsc, lp_filter)
 
         self.workers = workers
 
@@ -51,9 +51,9 @@ class Extractor(Config):
         if app == "ccp":
             if self.kdir:
                 raise ValueError("ccp with --kdir isn't supported")
-            self.runner = CCP(bsc, bsc_filter, avoid_ext)
+            self.runner = CCP(bsc, lp_filter, avoid_ext)
         else:
-            self.runner = CE(bsc, bsc_filter)
+            self.runner = CE(bsc, lp_filter)
 
         self.app = app
         self.tem = TemplateGen(self.bsc_num, self.filter, self.app)
@@ -217,7 +217,7 @@ class Extractor(Config):
         self.tem.CreateMakefile(cs, fname)
 
     def run(self):
-        logging.info(f"Work directory: {self.bsc_path}")
+        logging.info(f"Work directory: {self.lp_path}")
 
         working_cs = self.filter_cs(verbose=True)
 
@@ -297,7 +297,7 @@ class Extractor(Config):
             self.tem.CreateKbuildFile(cs)
 
         if missing_syms:
-            with open(Path(self.bsc_path, "missing_syms"), "w") as f:
+            with open(Path(self.lp_path, "missing_syms"), "w") as f:
                 f.write(json.dumps(missing_syms, indent=4))
 
             logging.warning("Symbols not found:")
@@ -425,7 +425,7 @@ class Extractor(Config):
         for cs_list in cs_equal:
             groups.append(" ".join(utils.classify_codestreams(cs_list)))
 
-        with open(Path(self.bsc_path, self.app, "groups"), "w") as f:
+        with open(Path(self.lp_path, self.app, "groups"), "w") as f:
             f.write("\n".join(groups))
 
         logging.info("\nGrouping codestreams that share the same content and files:")

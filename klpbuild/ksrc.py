@@ -21,8 +21,8 @@ from klpbuild.config import Config
 
 
 class GitHelper(Config):
-    def __init__(self, bsc, bsc_filter, kdir, data_dir):
-        super().__init__(bsc, bsc_filter, kdir, data_dir)
+    def __init__(self, bsc, lp_filter, kdir, data_dir):
+        super().__init__(bsc, lp_filter, kdir, data_dir)
 
         self.kern_src = os.getenv("KLP_KERNEL_SOURCE", "")
         if self.kern_src and not Path(self.kern_src).is_dir():
@@ -112,7 +112,7 @@ class GitHelper(Config):
             raise RuntimeError("Couldn't find ~/kgr/kgraft-patches_testscripts")
 
         # Remove dir to avoid leftover patches with different names
-        patches_dir = Path(self.bsc_path, "patches")
+        patches_dir = Path(self.lp_path, "patches")
         shutil.rmtree(patches_dir, ignore_errors=True)
 
         # Ensure that a testfile was created before preparing the patches
@@ -211,7 +211,7 @@ class GitHelper(Config):
         # List of upstream commits, in creation date order
         ucommits = []
 
-        upatches = Path(self.bsc_path, "upstream")
+        upatches = Path(self.lp_path, "upstream")
         upatches.mkdir(exist_ok=True, parents=True)
 
         # Get backported commits from all possible branches, in order to get
@@ -256,7 +256,7 @@ class GitHelper(Config):
                     continue
 
                 idx += 1
-                branch_path = Path(self.bsc_path, "fixes", bc)
+                branch_path = Path(self.lp_path, "fixes", bc)
                 branch_path.mkdir(exist_ok=True, parents=True)
 
                 pfile = subprocess.check_output(

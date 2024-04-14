@@ -30,8 +30,8 @@ from klpbuild.utils import ARCHS
 
 
 class IBS(Config):
-    def __init__(self, bsc, bsc_filter, working_cs={}):
-        super().__init__(bsc, bsc_filter, working_cs=working_cs)
+    def __init__(self, bsc, lp_filter, working_cs={}):
+        super().__init__(bsc, lp_filter, working_cs=working_cs)
         self.osc = Osc(url="https://api.suse.de")
 
         self.ibs_user = self.osc.username
@@ -333,7 +333,7 @@ class IBS(Config):
         run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
 
         for arch in ARCHS:
-            tests_path = Path(self.bsc_path, "tests", arch)
+            tests_path = Path(self.lp_path, "tests", arch)
             test_arch_path = Path(tests_path, self.bsc)
 
             # Remove previously created directory and archive
@@ -351,7 +351,7 @@ class IBS(Config):
                 if arch not in data["archs"]:
                     continue
 
-                rpm_dir = Path(self.bsc_path, "c", cs, arch, "rpm")
+                rpm_dir = Path(self.lp_path, "c", cs, arch, "rpm")
                 if not rpm_dir.exists():
                     logging.info(f"{cs}/{arch}: rpm dir not found. Skipping.")
                     continue
@@ -394,7 +394,7 @@ class IBS(Config):
     def delete_rpms(self, cs):
         try:
             for arch in self.get_cs_archs(cs):
-                shutil.rmtree(Path(self.bsc_path, "c", cs, arch, "rpm"), ignore_errors=True)
+                shutil.rmtree(Path(self.lp_path, "c", cs, arch, "rpm"), ignore_errors=True)
         except KeyError:
             pass
 
@@ -420,7 +420,7 @@ class IBS(Config):
                         continue
 
                     # Create a directory for each arch supported
-                    dest = Path(self.bsc_path, "c", cs, str(arch), "rpm")
+                    dest = Path(self.lp_path, "c", cs, str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
                     rpms.append((i, prj, prj, "devbuild", arch, "klp", rpm, dest))
@@ -543,7 +543,7 @@ class IBS(Config):
             logging.error(e, e.response.content)
             raise RuntimeError("")
 
-        base_path = Path(self.bsc_path, "c", cs)
+        base_path = Path(self.lp_path, "c", cs)
 
         # Remove previously created directories
         prj_path = Path(base_path, "checkout")

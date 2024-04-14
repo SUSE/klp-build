@@ -11,8 +11,8 @@ from klpbuild.utils import ARCH
 
 
 class CE(Config):
-    def __init__(self, bsc, bsc_filter):
-        super().__init__(bsc, bsc_filter)
+    def __init__(self, bsc, lp_filter):
+        super().__init__(bsc, lp_filter)
 
         self.app = "ce"
 

@@ -409,8 +409,8 @@ clean:
 
 
 class TemplateGen(Config):
-    def __init__(self, bsc, bsc_filter, app="c"):
-        super().__init__(bsc, bsc_filter)
+    def __init__(self, bsc, lp_filter, app="c"):
+        super().__init__(bsc, lp_filter)
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
@@ -625,5 +625,5 @@ class TemplateGen(Config):
             "commits": cmts,
             "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
         }
-        with open(Path(self.bsc_path, "commit.msg"), "w") as f:
+        with open(Path(self.lp_path, "commit.msg"), "w") as f:
             f.write(Template(TEMPL_COMMIT).render(**render_vars))

@@ -11,8 +11,8 @@ from klpbuild.utils import ARCH
 
 
 class CCP(Config):
-    def __init__(self, bsc, bsc_filter, avoid_ext):
-        super().__init__(bsc, bsc_filter)
+    def __init__(self, bsc, lp_filter, avoid_ext):
+        super().__init__(bsc, lp_filter)
 
         self.env = os.environ
 
