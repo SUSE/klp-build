@@ -40,11 +40,15 @@ class Setup(Config):
 
         archs.sort()
 
+        if not kdir and not lp_name.startswith("bsc"):
+            raise ValueError("Please use prefix 'bsc' when creating a "
+                             "livepatch for codestreams")
+
         if conf and not conf.startswith("CONFIG_"):
             raise ValueError("Please specify --conf with CONFIG_ prefix")
 
         if self.lp_path.exists() and not self.lp_path.is_dir():
-            raise ValueError("--bsc needs to be a directory, or not to exist")
+            raise ValueError("--name needs to be a directory, or not to exist")
 
         if not file_funcs and not mod_file_funcs and not conf_mod_file_funcs:
             raise ValueError("You need to specify at least one of the file-funcs variants!")

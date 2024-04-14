@@ -35,7 +35,7 @@ class IBS(Config):
         self.osc = Osc(url="https://api.suse.de")
 
         self.ibs_user = self.osc.username
-        self.prj_prefix = f"home:{self.ibs_user}:{self.bsc}-klp"
+        self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
         self.kgraft_path = Path(Path().home(), "kgr", "kgraft-patches")
         if not self.kgraft_path.is_dir():
@@ -329,12 +329,12 @@ class IBS(Config):
         # Download all built rpms
         self.download()
 
-        test_sh = Path(self.kgraft_tests_path, f"{self.bsc}_test_script.sh")
+        test_sh = Path(self.kgraft_tests_path, f"{self.lp_name}_test_script.sh")
         run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
 
         for arch in ARCHS:
             tests_path = Path(self.lp_path, "tests", arch)
-            test_arch_path = Path(tests_path, self.bsc)
+            test_arch_path = Path(tests_path, self.lp_name)
 
             # Remove previously created directory and archive
             shutil.rmtree(test_arch_path, ignore_errors=True)
@@ -373,7 +373,7 @@ class IBS(Config):
                 build_cs.append(self.get_full_cs(cs))
 
             # Prepare the config file used by kgr-test
-            config = Path(test_arch_path, "repro", f"{self.bsc}_config.in")
+            config = Path(test_arch_path, "repro", f"{self.lp_name}_config.in")
             with open(config, "w") as f:
                 f.write("\n".join(natsorted(build_cs)))
 
@@ -383,7 +383,7 @@ class IBS(Config):
                 logging.warning(f"missing {test_sh}")
 
             subprocess.run(
-                ["tar", "-cJf", f"{self.bsc}.tar.xz", f"{self.bsc}"],
+                ["tar", "-cJf", f"{self.lp_name}.tar.xz", f"{self.lp_name}"],
                 cwd=tests_path,
                 stdout=sys.stdout,
                 stderr=subprocess.PIPE,
@@ -563,8 +563,8 @@ class IBS(Config):
         )
 
         # Check if the directory related to this bsc exists
-        if self.bsc not in os.listdir(code_path):
-            raise RuntimeError(f"Directory {self.bsc} not found on branch {branch}")
+        if self.lp_name not in os.listdir(code_path):
+            raise RuntimeError(f"Directory {self.lp_name} not found on branch {branch}")
 
         # Fix RELEASE version
         with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
@@ -598,7 +598,7 @@ class IBS(Config):
         cs_list = self.apply_filter(self.codestreams.keys())
 
         if not cs_list:
-            raise RuntimeError(f"push: No codestreams found for {self.bsc}")
+            raise RuntimeError(f"push: No codestreams found for {self.lp_name}")
 
         logging.info(f"Preparing {len(cs_list)} projects on IBS...")
 

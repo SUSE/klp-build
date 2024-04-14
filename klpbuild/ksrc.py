@@ -21,8 +21,8 @@ from klpbuild.config import Config
 
 
 class GitHelper(Config):
-    def __init__(self, bsc, lp_filter, kdir, data_dir):
-        super().__init__(bsc, lp_filter, kdir, data_dir)
+    def __init__(self, lp_name, lp_filter, kdir, data_dir):
+        super().__init__(lp_name, lp_filter, kdir, data_dir)
 
         self.kern_src = os.getenv("KLP_KERNEL_SOURCE", "")
         if self.kern_src and not Path(self.kern_src).is_dir():
@@ -46,7 +46,7 @@ class GitHelper(Config):
         repo = git.Repo(self.kgr_patches).branches
         self.branches = []
         for r in repo:
-            if r.name.startswith(self.bsc):
+            if r.name.startswith(self.lp_name):
                 self.branches.append(r.name)
 
     def get_cs_branch(self, cs):
@@ -66,7 +66,7 @@ class GitHelper(Config):
 
             # First check if the branch has more than code stream sharing
             # the same code
-            for b in branch.replace(self.bsc + "_", "").split("_"):
+            for b in branch.replace(self.lp_name+ "_", "").split("_"):
                 # Only check the branches that are the same type of the branch
                 # being searched. Only check RT branches if the codestream is a
                 # RT one.
@@ -116,7 +116,7 @@ class GitHelper(Config):
         shutil.rmtree(patches_dir, ignore_errors=True)
 
         # Ensure that a testfile was created before preparing the patches
-        test_sh = Path(kgraft_tests_path, f"{self.bsc}_test_script.sh")
+        test_sh = Path(kgraft_tests_path, f"{self.lp_name}_test_script.sh")
         if not test_sh.is_file():
             logging.warning(f"Test file {test_sh} not created.")
         else:
@@ -141,9 +141,9 @@ class GitHelper(Config):
         # Filter only the branches related to this BSC
         for branch in self.branches:
             print(branch)
-            bname = branch.replace(self.bsc + "_", "")
+            bname = branch.replace(self.lp_name+ "_", "")
             bs = " ".join(bname.split("_"))
-            bsc = self.bsc.replace("bsc", "bsc#")
+            bsc = self.lp_name.replace("bsc", "bsc#")
 
             prefix = f"PATCH {ver} {bsc} {bs}"
 

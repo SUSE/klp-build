@@ -15,12 +15,13 @@ from klpbuild.utils import ARCHS
 def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=False)
     parentparser.add_argument(
-        "-b",
-        "--bsc",
-        type=int,
+        "-n",
+        "--name",
+        type=str,
         required=True,
-        help="The bsc number related to this livepatch. This will be the "
-        "directory name of the resulting livepatches",
+        help="The livepatch name. This will be the directory name of the "
+        "resulting livepatches. On setup, if --kdir is missing, the "
+        "livepatch name should contain 'bsc' prefix."
     )
     parentparser.add_argument("--filter", type=str, help=r"Filter out codestreams using a regex. Example: 15\.3u[0-9]+")
     parentparser.add_argument(
@@ -141,7 +142,7 @@ def main_func(main_args):
 
     if args.cmd == "setup":
         setup = Setup(
-            args.bsc,
+            args.name,
             args.filter,
             args.kdir,
             args.data_dir,
@@ -158,28 +159,28 @@ def main_func(main_args):
         setup.setup_project_files()
 
     elif args.cmd == "extract":
-        Extractor(args.bsc, args.filter, args.apply_patches, args.type, args.workers, args.avoid_ext).run()
+        Extractor(args.name, args.filter, args.apply_patches, args.type, args.workers, args.avoid_ext).run()
 
     elif args.cmd == "cs-diff":
-        Extractor(args.bsc, "", False, args.type).diff_cs(args.codestreams)
+        Extractor(args.name, "", False, args.type).diff_cs(args.codestreams)
 
     elif args.cmd == "get-patches":
-        GitHelper(args.bsc, args.filter, False, None).get_commits(args.cve)
+        GitHelper(args.name, args.filter, False, None).get_commits(args.cve)
 
     elif args.cmd == "format-patches":
-        GitHelper(args.bsc, args.filter, False, None).format_patches(args.version)
+        GitHelper(args.name, args.filter, False, None).format_patches(args.version)
 
     elif args.cmd == "status":
-        IBS(args.bsc, args.filter).status(args.wait)
+        IBS(args.name, args.filter).status(args.wait)
 
     elif args.cmd == "push":
-        IBS(args.bsc, args.filter).push(args.wait)
+        IBS(args.name, args.filter).push(args.wait)
 
     elif args.cmd == "log":
-        IBS(args.bsc, args.filter).log(args.cs, args.arch)
+        IBS(args.name, args.filter).log(args.cs, args.arch)
 
     elif args.cmd == "cleanup":
-        IBS(args.bsc, args.filter).cleanup()
+        IBS(args.name, args.filter).cleanup()
 
     elif args.cmd == "prepare-tests":
-        IBS(args.bsc, args.filter).prepare_tests()
+        IBS(args.name, args.filter).prepare_tests()

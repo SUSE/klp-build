@@ -66,7 +66,7 @@ def get_commits(cmts, cs):
 /*
  * ${fname}
  *
- * Fix for CVE-${cve}, bsc#${lp_name}
+ * Fix for CVE-${cve}, bsc#${lp_num}
  *
 % if include_header:
  *  Upstream commit:
@@ -148,7 +148,7 @@ def get_exts(ext_vars):
 
 <%include file="${ inc_src_file }"/>
 
-#include "livepatch_bsc${ lp_name }.h"
+#include "livepatch_${ lp_name }.h"
 
 % if ext_vars:
 #include <linux/kernel.h>
@@ -224,7 +224,7 @@ def get_exts(ext_vars):
 
 <%include file="${ inc_src_file }"/>
 
-#include "livepatch_bsc${ lp_name }.h"
+#include "livepatch_${ lp_name }.h"
 
 % if ext_vars:
 #include <linux/kernel.h>
@@ -327,7 +327,7 @@ TEMPL_HOLLOW = """\
 #if IS_ENABLED(${ config })
 % endif # check_enabled
 
-#include "livepatch_bsc${ lp_name }.h"
+#include "livepatch_${ lp_name }.h"
 
 int ${ fname }_init(void)
 {
@@ -456,7 +456,7 @@ class TemplateGen(Config):
         return sle < 15 or (sle == 15 and sp < 4)
 
     def __GenerateHeaderFile(self, lp_path, cs):
-        out_name = f"livepatch_{self.bsc}.h"
+        out_name = f"livepatch_{self.lp_name}.h"
 
         lp_inc_dir = Path()
         proto_files = []
@@ -515,13 +515,14 @@ class TemplateGen(Config):
         if use_src_name:
             out_name = lp_file
         else:
-            out_name = f"livepatch_{self.bsc}.c"
+            out_name = f"livepatch_{self.lp_name}.c"
 
         render_vars = {
             "commits": self.conf["commits"],
             "include_header": "livepatch_" in out_name,
             "cve": self.conf["cve"],
             "lp_name": self.lp_name,
+            "lp_num": self.lp_name.replace("bsc", ""),
             "fname": str(Path(out_name).with_suffix("")),
             "year": datetime.today().year,
             "user": self.user,
@@ -618,7 +619,7 @@ class TemplateGen(Config):
         if cmts:
             cmts = cmts["commits"]
         render_vars = {
-            "lp_name": self.lp_name,
+            "lp_name": self.lp_name.replace("bsc", ""),
             "user": self.user,
             "email": self.email,
             "cve": self.conf["cve"],

@@ -21,7 +21,7 @@ from klpbuild.utils import classify_codestreams
 
 
 class Config:
-    def __init__(self, bsc, lp_filter, kdir=False, data_dir=None, skips="", working_cs={}):
+    def __init__(self, lp_name, lp_filter, kdir=False, data_dir=None, skips="", working_cs={}):
         work_dir = os.getenv("KLP_WORK_DIR")
         if not work_dir:
             raise ValueError("KLP_WORK_DIR should be defined")
@@ -30,9 +30,8 @@ class Config:
         if not work.is_dir():
             raise ValueError("Work dir should be a directory")
 
-        self.lp_name = bsc
-        self.bsc = "bsc" + str(bsc)
-        self.lp_path = Path(work, self.bsc)
+        self.lp_name = lp_name
+        self.lp_path = Path(work, self.lp_name)
         self.filter = lp_filter
         self.skips = skips
 
@@ -44,7 +43,7 @@ class Config:
                 self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
         self.conf = OrderedDict(
-            {"bsc": str(self.lp_name), "work_dir": str(self.lp_path), "data": str(data_dir), "kdir": kdir}
+            {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data": str(data_dir), "kdir": kdir}
         )
 
         self.conf_file = Path(self.lp_path, "conf.json")
@@ -71,7 +70,7 @@ class Config:
 
     def lp_out_file(self, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
-        return f"{self.bsc}_{fpath}"
+        return f"{self.lp_name}_{fpath}"
 
     def get_patches_dir(self):
         return Path(self.lp_path, "fixes")
