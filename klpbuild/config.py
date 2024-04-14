@@ -30,7 +30,7 @@ class Config:
         if not work.is_dir():
             raise ValueError("Work dir should be a directory")
 
-        self.bsc_num = bsc
+        self.lp_name = bsc
         self.bsc = "bsc" + str(bsc)
         self.lp_path = Path(work, self.bsc)
         self.filter = lp_filter
@@ -44,7 +44,7 @@ class Config:
                 self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
         self.conf = OrderedDict(
-            {"bsc": str(self.bsc_num), "work_dir": str(self.lp_path), "data": str(data_dir), "kdir": kdir}
+            {"bsc": str(self.lp_name), "work_dir": str(self.lp_path), "data": str(data_dir), "kdir": kdir}
         )
 
         self.conf_file = Path(self.lp_path, "conf.json")

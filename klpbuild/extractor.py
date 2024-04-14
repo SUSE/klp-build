@@ -26,8 +26,8 @@ from klpbuild.templ import TemplateGen
 
 
 class Extractor(Config):
-    def __init__(self, bsc, lp_filter, apply_patches, app, workers=4, avoid_ext=""):
-        super().__init__(bsc, lp_filter)
+    def __init__(self, lp_name, lp_filter, apply_patches, app, workers=4, avoid_ext=""):
+        super().__init__(lp_name, lp_filter)
 
         self.workers = workers
 
@@ -51,12 +51,12 @@ class Extractor(Config):
         if app == "ccp":
             if self.kdir:
                 raise ValueError("ccp with --kdir isn't supported")
-            self.runner = CCP(bsc, lp_filter, avoid_ext)
+            self.runner = CCP(lp_name, lp_filter, avoid_ext)
         else:
-            self.runner = CE(bsc, lp_filter)
+            self.runner = CE(lp_name, lp_filter)
 
         self.app = app
-        self.tem = TemplateGen(self.bsc_num, self.filter, self.app)
+        self.tem = TemplateGen(self.lp_name, self.filter, self.app)
 
     @staticmethod
     def unquote_output(matchobj):

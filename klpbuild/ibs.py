@@ -30,8 +30,8 @@ from klpbuild.utils import ARCHS
 
 
 class IBS(Config):
-    def __init__(self, bsc, lp_filter, working_cs={}):
-        super().__init__(bsc, lp_filter, working_cs=working_cs)
+    def __init__(self, lp_name, lp_filter, working_cs={}):
+        super().__init__(lp_name, lp_filter, working_cs=working_cs)
         self.osc = Osc(url="https://api.suse.de")
 
         self.ibs_user = self.osc.username
@@ -45,7 +45,7 @@ class IBS(Config):
         if not self.kgraft_tests_path.is_dir():
             raise RuntimeError("Couldn't find ~/kgr/kgraft-patches_testscripts")
 
-        self.ksrc = GitHelper(self.bsc_num, self.filter, False, None)
+        self.ksrc = GitHelper(self.lp_name, self.filter, False, None)
 
         # Download all sources for x86
         # For ppc64le and s390x only download vmlinux and the built modules

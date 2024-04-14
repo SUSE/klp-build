@@ -66,7 +66,7 @@ def get_commits(cmts, cs):
 /*
  * ${fname}
  *
- * Fix for CVE-${cve}, bsc#${bsc_num}
+ * Fix for CVE-${cve}, bsc#${lp_name}
  *
 % if include_header:
  *  Upstream commit:
@@ -148,7 +148,7 @@ def get_exts(ext_vars):
 
 <%include file="${ inc_src_file }"/>
 
-#include "livepatch_bsc${ bsc_num }.h"
+#include "livepatch_bsc${ lp_name }.h"
 
 % if ext_vars:
 #include <linux/kernel.h>
@@ -224,7 +224,7 @@ def get_exts(ext_vars):
 
 <%include file="${ inc_src_file }"/>
 
-#include "livepatch_bsc${ bsc_num }.h"
+#include "livepatch_bsc${ lp_name }.h"
 
 % if ext_vars:
 #include <linux/kernel.h>
@@ -327,7 +327,7 @@ TEMPL_HOLLOW = """\
 #if IS_ENABLED(${ config })
 % endif # check_enabled
 
-#include "livepatch_bsc${ bsc_num }.h"
+#include "livepatch_bsc${ lp_name }.h"
 
 int ${ fname }_init(void)
 {
@@ -353,7 +353,7 @@ Live patch for CVE-${cve}. ${msg}:
 % endfor
 
 KLP: CVE-${cve}
-References: bsc#${bsc_num} CVE-${cve}
+References: bsc#${ lp_name } CVE-${cve}
 Signed-off-by: ${user} <${email}>
 """
 
@@ -409,8 +409,8 @@ clean:
 
 
 class TemplateGen(Config):
-    def __init__(self, bsc, lp_filter, app="c"):
-        super().__init__(bsc, lp_filter)
+    def __init__(self, lp_name, lp_filter, app="c"):
+        super().__init__(lp_name, lp_filter)
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
@@ -521,7 +521,7 @@ class TemplateGen(Config):
             "commits": self.conf["commits"],
             "include_header": "livepatch_" in out_name,
             "cve": self.conf["cve"],
-            "bsc_num": self.bsc_num,
+            "lp_name": self.lp_name,
             "fname": str(Path(out_name).with_suffix("")),
             "year": datetime.today().year,
             "user": self.user,
@@ -609,7 +609,7 @@ class TemplateGen(Config):
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
         lpdir = self.get_cs_lp_dir(cs)
-        render_vars = {"bsc": self.bsc_num, "cs": cs, "lpdir": lpdir}
+        render_vars = {"bsc": self.lp_name, "cs": cs, "lpdir": lpdir}
         with open(Path(lpdir, "Kbuild.inc"), "w") as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
@@ -618,7 +618,7 @@ class TemplateGen(Config):
         if cmts:
             cmts = cmts["commits"]
         render_vars = {
-            "bsc_num": self.bsc_num,
+            "lp_name": self.lp_name,
             "user": self.user,
             "email": self.email,
             "cve": self.conf["cve"],

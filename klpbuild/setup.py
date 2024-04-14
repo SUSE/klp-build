@@ -22,7 +22,7 @@ from klpbuild.ksrc import GitHelper
 class Setup(Config):
     def __init__(
         self,
-        bsc,
+        lp_name,
         lp_filter,
         kdir,
         data_dir,
@@ -36,7 +36,7 @@ class Setup(Config):
         archs,
         skips,
     ):
-        super().__init__(bsc, lp_filter, kdir, data_dir, skips=skips)
+        super().__init__(lp_name, lp_filter, kdir, data_dir, skips=skips)
 
         archs.sort()
 
@@ -170,7 +170,7 @@ class Setup(Config):
         # against the codestreams informed by the user
         all_codestreams = self.download_supported_file()
 
-        ksrc = GitHelper(self.bsc_num, self.filter, self.kdir, self.data)
+        ksrc = GitHelper(self.lp_name, self.filter, self.kdir, self.data)
 
         # Called at this point because codestreams is populated
         self.conf["commits"] = ksrc.get_commits(self.conf["cve"])
@@ -241,7 +241,7 @@ class Setup(Config):
         if data_missing:
             logging.info("Download the necessary data from the following codestreams:")
             logging.info(f'\t{" ".join(data_missing.keys())}\n')
-            ibs = IBS(self.bsc_num, self.filter, self.working_cs)
+            ibs = IBS(self.lp_name, self.filter, self.working_cs)
             ibs.download_cs_data(data_missing)
 
         logging.info("All affected codestreams:")
