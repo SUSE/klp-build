@@ -70,7 +70,7 @@ class Extractor(Config):
 
         # Remove the compiler name used to compile the object. TODO: resolve
         # when clang is used, or other cross-compilers.
-        if output.startswith('gcc '):
+        if output.startswith("gcc "):
             output = output[4:]
 
         # also remove double quotes from macros like -D"KBUILD....=.."
@@ -87,9 +87,8 @@ class Extractor(Config):
             # need to ask the make to show the commands for all files inside the
             # directory. Later process_make_output will take care of picking
             # what is interesting for klp-build
-            if filename.parent == PurePath("arch/x86/lib") or \
-                    filename.parent == PurePath("drivers/block/aoe"):
-                file_ = str(filename.parent) + '/'
+            if filename.parent == PurePath("arch/x86/lib") or filename.parent == PurePath("drivers/block/aoe"):
+                file_ = str(filename.parent) + "/"
 
             gcc_ver = int(subprocess.check_output(["gcc", "-dumpversion"]).decode().strip())
             # gcc12 and higher have a problem with kernel and xrealloc implementation
@@ -141,8 +140,8 @@ class Extractor(Config):
             # WORKAROUND: tomoyo security module uses a generated file that is
             # not part of kernel-source. For this reason, add a new option for
             # the backend process to ignore the inclusion of the missing file
-            if 'tomoyo' in file_:
-                ret += ' -DCONFIG_SECURITY_TOMOYO_INSECURE_BUILTIN_SETTING'
+            if "tomoyo" in file_:
+                ret += " -DCONFIG_SECURITY_TOMOYO_INSECURE_BUILTIN_SETTING"
 
             # save the cmdline
             f.write(ret)

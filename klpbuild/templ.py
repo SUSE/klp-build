@@ -482,8 +482,8 @@ class TemplateGen(Config):
         render_vars = {
             "fname": str(Path(out_name).with_suffix("")),
             "check_enabled": self.check_enabled,
-            "proto_files" : proto_files,
-            "config" : config
+            "proto_files": proto_files,
+            "config": config,
         }
 
         with open(Path(lp_path, out_name), "w") as f:

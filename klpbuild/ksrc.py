@@ -66,7 +66,7 @@ class GitHelper(Config):
 
             # First check if the branch has more than code stream sharing
             # the same code
-            for b in branch.replace(self.lp_name+ "_", "").split("_"):
+            for b in branch.replace(self.lp_name + "_", "").split("_"):
                 # Only check the branches that are the same type of the branch
                 # being searched. Only check RT branches if the codestream is a
                 # RT one.
@@ -141,7 +141,7 @@ class GitHelper(Config):
         # Filter only the branches related to this BSC
         for branch in self.branches:
             print(branch)
-            bname = branch.replace(self.lp_name+ "_", "")
+            bname = branch.replace(self.lp_name + "_", "")
             bs = " ".join(bname.split("_"))
             bsc = self.lp_name.replace("bsc", "bsc#")
 

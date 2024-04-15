@@ -21,7 +21,7 @@ def create_parser() -> argparse.ArgumentParser:
         required=True,
         help="The livepatch name. This will be the directory name of the "
         "resulting livepatches. On setup, if --kdir is missing, the "
-        "livepatch name should contain 'bsc' prefix."
+        "livepatch name should contain 'bsc' prefix.",
     )
     parentparser.add_argument("--filter", type=str, help=r"Filter out codestreams using a regex. Example: 15\.3u[0-9]+")
     parentparser.add_argument(
@@ -112,19 +112,27 @@ def create_parser() -> argparse.ArgumentParser:
     )
     diff_opts.add_argument("--type", type=str, required=True, choices=["ccp", "ce"], help="Choose between ccp and ce")
 
-    fmt = sub.add_parser("format-patches", parents=[parentparser], help="SLE specific. Extract patches from kgraft-patches")
+    fmt = sub.add_parser(
+        "format-patches", parents=[parentparser], help="SLE specific. Extract patches from kgraft-patches"
+    )
     fmt.add_argument("-v", "--version", type=int, required=True, help="Version to be added, like vX")
 
     patches = sub.add_parser("get-patches", parents=[parentparser])
-    patches.add_argument("--cve", required=True, help="SLE specific. CVE number to search for related backported patches")
+    patches.add_argument(
+        "--cve", required=True, help="SLE specific. CVE number to search for related backported patches"
+    )
 
     sub.add_parser("cleanup", parents=[parentparser], help="SLE specific. Remove livepatch packages from IBS")
 
     sub.add_parser(
-        "prepare-tests", parents=[parentparser], help="SLE specific. Download the built tests and check for LP dependencies"
+        "prepare-tests",
+        parents=[parentparser],
+        help="SLE specific. Download the built tests and check for LP dependencies",
     )
 
-    push = sub.add_parser("push", parents=[parentparser], help="SLE specific. Push livepatch packages to IBS to be built")
+    push = sub.add_parser(
+        "push", parents=[parentparser], help="SLE specific. Push livepatch packages to IBS to be built"
+    )
     push.add_argument("--wait", action="store_true", help="Wait until all codestreams builds are finished")
 
     status = sub.add_parser("status", parents=[parentparser], help="SLE specific. Check livepatch build status on IBS")
