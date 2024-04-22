@@ -32,7 +32,7 @@ def create_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="cmd")
 
     setup = sub.add_parser("setup", parents=[parentparser])
-    setup.add_argument("--cve", type=str, required=True, help="The CVE assigned to this livepatch")
+    setup.add_argument("--cve", type=str, required=True, help="SLE specific. The CVE assigned to this livepatch")
     setup.add_argument("--conf", type=str, required=True, help="The kernel CONFIG used to be build the livepatch")
     setup.add_argument(
         "--kdir", action="store_true", help="Change the lookup procedure to search in a compiled kernel directory"
@@ -48,7 +48,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--codestreams",
         type=str,
         default="",
-        help="Codestreams affected by the CVE. Can be used a regex, like, 15.u[34]",
+        help="SLE specific. Codestreams affected by the CVE. Can be used a regex, like, 15.u[34]",
     )
     setup.add_argument(
         "--file-funcs",
@@ -84,7 +84,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--module", type=str, default="vmlinux", help="The module that will be livepatched for all files"
     )
     setup.add_argument(
-        "--archs", default=ARCHS, choices=ARCHS, nargs="+", help="Supported architectures for this livepatch"
+        "--archs", default=ARCHS, choices=ARCHS, nargs="+", help="SLE specific. Supported architectures for this livepatch"
     )
     setup.add_argument("--skips", help="List of codestreams to filter out")
 
