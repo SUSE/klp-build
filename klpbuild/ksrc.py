@@ -189,13 +189,14 @@ class GitHelper(Config):
             logging.info("KLP_KERNEL_SOURCE not defined, skip getting SUSE commits")
             return {}
 
+        # ensure that the user informed the commits at least once per 'project'
+        if not cve:
+            logging.info(f"No CVE informed, skipping the processing of getting the patches.")
+            return {}
+
         # do not get the commits twice
         if self.conf.get("commits", ""):
             return self.conf["commits"]
-
-        # ensure that the user informed the commits at least once per 'project'
-        if not cve:
-            raise RuntimeError(f"No CVE informed or no upstream commits found. Use " "--cve option")
 
         print("Fetching changes from all supported branches...")
 

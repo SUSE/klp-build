@@ -32,7 +32,7 @@ def create_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="cmd")
 
     setup = sub.add_parser("setup", parents=[parentparser])
-    setup.add_argument("--cve", type=str, required=True, help="SLE specific. The CVE assigned to this livepatch")
+    setup.add_argument("--cve", type=str, help="SLE specific. The CVE assigned to this livepatch")
     setup.add_argument("--conf", type=str, required=True, help="The kernel CONFIG used to be build the livepatch")
     setup.add_argument(
         "--no-check",
@@ -172,7 +172,7 @@ def main_func(main_args):
             args.conf,
             args.archs,
             args.skips,
-            args.no_check
+            args.no_check,
         )
         setup.setup_project_files()
 

@@ -520,7 +520,7 @@ class TemplateGen(Config):
         render_vars = {
             "commits": self.conf["commits"],
             "include_header": "livepatch_" in out_name,
-            "cve": self.conf["cve"],
+            "cve": self.conf.get("cve", "XXXX-XXXX"),
             "lp_name": self.lp_name,
             "lp_num": self.lp_name.replace("bsc", ""),
             "fname": str(Path(out_name).with_suffix("")),
@@ -622,7 +622,7 @@ class TemplateGen(Config):
             "lp_name": self.lp_name.replace("bsc", ""),
             "user": self.user,
             "email": self.email,
-            "cve": self.conf["cve"],
+            "cve": self.conf.get("cve", "XXXX-XXXX"),
             "commits": cmts,
             "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
         }

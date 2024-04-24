@@ -54,7 +54,8 @@ class Setup(Config):
             raise ValueError("You need to specify at least one of the file-funcs variants!")
 
         self.conf["archs"] = archs
-        self.conf["cve"] = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
+        if cve:
+            self.conf["cve"] = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
         self.no_check = no_check
         self.codestream = cs_arg
@@ -178,7 +179,7 @@ class Setup(Config):
         ksrc = GitHelper(self.lp_name, self.filter, self.kdir, self.data)
 
         # Called at this point because codestreams is populated
-        self.conf["commits"] = ksrc.get_commits(self.conf["cve"])
+        self.conf["commits"] = ksrc.get_commits(self.conf.get("cve", ""))
 
         # do not get the commits twice
         patched_kernels = self.conf.get("patched_kernels", [])

@@ -31,18 +31,15 @@ class Extractor(Config):
 
         self.workers = workers
 
-        if apply_patches and not self.get_patches_dir().exists():
-            raise ValueError("--apply-patches specified without patches. Run get-patches!")
+        patches = self.get_patches_dir()
         self.apply_patches = apply_patches
 
-        if self.kdir:
-            if self.apply_patches:
-                logging.warning(f"Disabling --apply-patches when using with --kdir")
-                self.apply_patches = False
+        if self.apply_patches and not patches.exists():
+            raise ValueError("--apply-patches specified without patches. Run get-patches!")
 
-            self.quilt_log = None
-        else:
-            self.quilt_log = open(Path(self.get_patches_dir(), "quilt.log"), "w")
+        self.quilt_log = None
+        if patches.exists():
+            self.quilt_log = open(Path(patches, "quilt.log"), "w")
             self.quilt_log.truncate()
 
         self.total = 0
