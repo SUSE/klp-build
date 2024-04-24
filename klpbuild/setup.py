@@ -35,6 +35,7 @@ class Setup(Config):
         conf,
         archs,
         skips,
+        no_check,
     ):
         super().__init__(lp_name, lp_filter, kdir, data_dir, skips=skips)
 
@@ -55,6 +56,7 @@ class Setup(Config):
         self.conf["archs"] = archs
         self.conf["cve"] = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
+        self.no_check = no_check
         self.codestream = cs_arg
         self.file_funcs = {}
 
@@ -191,13 +193,16 @@ class Setup(Config):
         self.working_cs = OrderedDict()
         patched_cs = []
 
+        if self.no_check:
+            logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
+
         for cs, data in all_codestreams.items():
             # Only process codestreams that are related to the argument
             if not re.match(self.codestream, cs):
                 continue
 
             # Skip patched codestreams
-            if data["kernel"] in patched_kernels:
+            if data["kernel"] in patched_kernels and not self.no_check:
                 patched_cs.append(cs)
                 continue
 
