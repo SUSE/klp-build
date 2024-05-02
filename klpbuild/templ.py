@@ -23,10 +23,10 @@ TEMPL_H = """\
 % endif
 
 int ${ fname }_init(void);
-% if mod is UNDEFINED:
-static inline void ${ fname }_cleanup(void) {}
-% else:
+% if mod:
 void ${ fname }_cleanup(void);
+% else:
+static inline void ${ fname }_cleanup(void) {}
 % endif %
 
 % for p in proto_files:
@@ -462,9 +462,13 @@ class TemplateGen(Config):
         proto_files = []
         configs = set()
         config = ""
+        mod = ""
 
         for f, data in self.get_cs_files(cs).items():
             configs.add(data["conf"])
+            # At this point we only care to know if we are livepatching a module
+            # or not, so we can overwrite the module.
+            mod = data["module"]
             if self.app == "ce":
                 proto_files.append(str(Path(self.get_work_dirname(f), "proto.h")))
 
@@ -484,6 +488,7 @@ class TemplateGen(Config):
             "check_enabled": self.check_enabled,
             "proto_files": proto_files,
             "config": config,
+            "mod": mod,
         }
 
         with open(Path(lp_path, out_name), "w") as f:
