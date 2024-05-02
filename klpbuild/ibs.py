@@ -471,7 +471,7 @@ class IBS(Config):
                 logging.info("{}\t{}".format(prj, "\t".join(st)))
 
             for p in finished_prj:
-                prjs.pop(p)
+                prjs.pop(p, None)
 
             if not wait or not prjs:
                 break
