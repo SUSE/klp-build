@@ -9,6 +9,7 @@ import platform
 import re
 from collections import OrderedDict
 from pathlib import Path
+import sys
 
 import requests
 from natsort import natsorted
@@ -231,6 +232,14 @@ class Setup(Config):
             logging.info("Skipping already patched codestreams:")
             logging.info(f'\t{" ".join(cs_list)}')
 
+        if not self.working_cs.keys():
+            logging.info("All supported codestreams are already patched. Exiting klp-build")
+            sys.exit(0)
+
+        logging.info("All affected codestreams:")
+        cs_list = utils.classify_codestreams(self.working_cs.keys())
+        logging.info(f'\t{" ".join(cs_list)}')
+
         # Add new codestreams to the already existing list, skipping duplicates
         self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs", []) + patched_cs)))
 
@@ -252,10 +261,6 @@ class Setup(Config):
             logging.info(f'\t{" ".join(data_missing.keys())}\n')
             ibs = IBS(self.lp_name, self.filter, self.working_cs)
             ibs.download_cs_data(data_missing)
-
-        logging.info("All affected codestreams:")
-        cs_list = utils.classify_codestreams(self.working_cs.keys())
-        logging.info(f'\t{" ".join(cs_list)}')
 
     def setup_project_files(self):
         self.lp_path.mkdir(exist_ok=True)
