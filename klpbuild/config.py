@@ -145,7 +145,7 @@ class Config:
             break
 
         if not patched:
-            raise RuntimeError(f"{cs}: Failed to apply patches. Aborting")
+            raise RuntimeError(f"{cs}({kernel}): Failed to apply patches. Aborting")
 
     # All architectures supported by the codestream
     def get_cs_archs(self, cs):
