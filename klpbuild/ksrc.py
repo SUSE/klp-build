@@ -40,6 +40,7 @@ class GitHelper(Config):
             "15.5": "SLE15-SP5",
             "15.5rt": "SLE15-SP5-RT",
             "cve-5.3": "cve/linux-5.3-LTSS",
+            "cve-5.14": "cve/linux-5.14-LTSS",
         }
 
         # Filter only the branches related to this BSC

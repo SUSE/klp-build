@@ -562,9 +562,13 @@ class IBS(Config):
             stderr=subprocess.STDOUT,
         )
 
-        # Check if the directory related to this bsc exists
+        # Check if the directory related to this bsc exists.
+        # Otherwise only warn the caller about this fact.
+        # This scenario can occur in case of LPing function that is already
+        # part of different LP in which case we modify the existing one.
         if self.lp_name not in os.listdir(code_path):
-            raise RuntimeError(f"Directory {self.lp_name} not found on branch {branch}")
+            logging.warning(f"Warning: Directory {self.lp_name} not found on branch {branch}")
+
 
         # Fix RELEASE version
         with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
