@@ -313,7 +313,9 @@ class Setup(Config):
                 arch_syms = self.check_symbol_archs(cs, mod, syms, False)
                 if arch_syms:
                     for arch, syms in arch_syms.items():
-                        logging.warning(f'{cs}({arch}): Symbols {",".join(syms)} not found on {mod} object')
+                        m_syms = ",".join(syms)
+                        cs_ = f"{cs}-{arch} ({self.get_cs_kernel(cs)})"
+                        logging.warning(f'{cs_}: Symbols {m_syms} not found on {mod} object')
 
         # Update and save codestreams data
         for cs, data in self.working_cs.items():
