@@ -293,8 +293,7 @@ class Setup(Config):
                         ipa_f.touch()
                     logging.warning(msg)
 
-                # Check if the CONFIG is enabled on all affected architectures
-                self.validate_config(cs, fdata["conf"])
+                self.validate_config(cs, fdata["conf"], fdata["module"])
 
                 # If the config was enabled on all supported architectures,
                 # there is no point in leaving the conf being set, since the

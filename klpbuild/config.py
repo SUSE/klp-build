@@ -181,7 +181,12 @@ class Config:
 
         return (int(match.group(1)), int(match.group(2)), int(match.group(4)), match.group(3))
 
-    def validate_config(self, cs, conf):
+    def validate_config(self, cs, conf, mod):
+        '''
+        Check if the CONFIG is enabled on the codestream. If the configuration
+        entry is set as M, check if a module was specified (different from
+        vmlinux).
+        '''
         if self.kdir:
             kconf = Path(self.data, ".config")
             with open(kconf) as f:
@@ -189,6 +194,8 @@ class Config:
                 if not match:
                     raise RuntimeError(f"Config {conf} not enabled")
             return
+
+        configs = {}
 
         # Validate only the specified architectures, but check if the codestream
         # is supported on that arch (like RT that is currently supported only on
@@ -199,9 +206,23 @@ class Config:
 
             kconf = self.get_cs_boot_file(cs, "config", arch)
             with open(kconf) as f:
-                match = re.search(rf"{conf}=[ym]", f.read())
+                match = re.search(rf"{conf}=([ym])", f.read())
                 if not match:
                     raise RuntimeError(f"{cs}:{arch}: Config {conf} not enabled")
+
+            conf_entry = match.group(1)
+            if conf_entry == "m" and mod == "vmlinux":
+                    raise RuntimeError(f"{cs}:{arch}: Config {conf} is set as module, but no module was specified")
+            elif conf_entry == "y" and mod != "vmlinux":
+                    raise RuntimeError(f"{cs}:{arch}: Config {conf} is set as builtin, but a module {mod} was specified")
+
+            configs.setdefault(conf_entry, [])
+            configs[conf_entry].append(f"{cs}:{arch}")
+
+        if len(configs.keys()) > 1:
+            print(configs["y"])
+            print(configs["m"])
+            raise RuntimeError(f"Configuration mismtach between codestreams. Aborting.")
 
     def missing_codestream(self, cs):
         return not self.get_cs_boot_file(cs, "config").exists()
