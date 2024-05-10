@@ -28,10 +28,6 @@ class GitHelper(Config):
         if self.kern_src and not Path(self.kern_src).is_dir():
             raise ValueError("KLP_KERNEL_SOURCE should point to a directory")
 
-        self.kgr_patches = Path(Path().home(), "kgr", "kgraft-patches")
-        if not self.kgr_patches.is_dir():
-            raise RuntimeError("kgraft-patches does not exists in ~/kgr")
-
         self.kernel_branches = {
             "12.5": "SLE12-SP5",
             "15.2": "SLE15-SP2-LTSS",
@@ -43,15 +39,24 @@ class GitHelper(Config):
             "cve-5.14": "cve/linux-5.14-LTSS",
         }
 
-        # Filter only the branches related to this BSC
-        repo = git.Repo(self.kgr_patches).branches
         self.branches = []
-        for r in repo:
-            if r.name.startswith(self.lp_name):
-                self.branches.append(r.name)
+
+        self.kgr_patches = Path(Path().home(), "kgr", "kgraft-patches")
+        if not self.kgr_patches.is_dir():
+            logging.warning("kgraft-patches does not exists in ~/kgr")
+        else:
+            # Filter only the branches related to this BSC
+            repo = git.Repo(self.kgr_patches).branches
+            for r in repo:
+                if r.name.startswith(self.lp_name):
+                    self.branches.append(r.name)
 
     def get_cs_branch(self, cs):
         cs_sle, sp, cs_up, rt = self.get_cs_tuple(cs)
+
+        if not self.kgr_patches.is_dir():
+            logging.warning("kgraft-patches does not exists in ~/kgr")
+            return ""
 
         branch_name = ""
 
@@ -107,6 +112,9 @@ class GitHelper(Config):
         ver = f"v{version}"
         # index 1 will be the test file
         index = 2
+
+        if not self.kgr_patches.is_dir():
+            logging.warning("kgraft-patches does not exists in ~/kgr, patches will be incomplete")
 
         # Remove dir to avoid leftover patches with different names
         patches_dir = Path(self.lp_path, "patches")
