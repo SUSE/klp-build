@@ -334,6 +334,9 @@ class Extractor(Config):
                 # Remove clang-extract comments
                 src = re.sub(r"clang-extract: .+", "", src)
 
+                # Reduce the noise from klp-ccp when expanding macros
+                src = re.sub(r"__compiletime_assert_\d+", "__compiletime_assert", src)
+
                 cs_files[cs].append((file, src))
 
         return cs_files
