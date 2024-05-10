@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from collections import OrderedDict
 from pathlib import Path
 from pathlib import PurePath
@@ -190,11 +191,16 @@ class Extractor(Config):
 
         args, lenv = self.runner.cmd_args(cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
 
-        with open(Path(out_dir, f"{self.app}.out.txt"), "w") as f:
+        out_log = Path(out_dir, f"{self.app}.out.txt")
+        with open(out_log, "w") as f:
             # Write the command line used
             f.write("\n".join(args) + "\n")
             f.flush()
-            subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
+            try:
+                subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
+            except Exception:
+                logging.warn(f"Error when processing {cs}:{fname}. Check file {out_log} for details.")
+                raise
 
         self.codestreams[cs]["files"][fname]["ext_symbols"] = self.runner.get_symbol_list(out_dir)
 
@@ -240,9 +246,13 @@ class Extractor(Config):
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as executor:
             results = executor.map(self.process, args)
-            for result in results:
-                if result:
-                    logging.error(f"{cs}: {result}")
+            try:
+                for result in results:
+                    if result:
+                        logging.error(f"{cs}: {result}")
+            except:
+                executor.shutdown()
+                sys.exit(1)
 
         # Save the ext_symbols set by execute
         self.flush_cs_file()
