@@ -429,7 +429,9 @@ class TemplateGen(Config):
                 self.user = git_data.get_value("user", "name")
                 self.email = git_data.get_value("user", "email")
             except:
-                raise ValueError("Please define name/email in global git config")
+                # it couldn't find the default user and email
+                self.user = "Change me"
+                self.email = "change@me"
 
     # Things might have changed since TemplateGen was instantiated, so reassign
     # it
