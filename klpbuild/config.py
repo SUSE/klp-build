@@ -177,6 +177,10 @@ class Config:
         return self.get_cs_data(cs)["files"]
 
     def get_cs_tuple(self, cs):
+        # There aren't codestreams with kdir
+        if self.kdir:
+            return (99, 99, 0, 99)
+
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
 
         return (int(match.group(1)), int(match.group(2)), int(match.group(4)), match.group(3))
