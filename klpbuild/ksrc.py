@@ -108,15 +108,12 @@ class GitHelper(Config):
         # index 1 will be the test file
         index = 2
 
-        kgraft_tests_path = Path(Path().home(), "kgr", "kgraft-patches_testscripts")
-        if not kgraft_tests_path.is_dir():
-            raise RuntimeError("Couldn't find ~/kgr/kgraft-patches_testscripts")
-
         # Remove dir to avoid leftover patches with different names
         patches_dir = Path(self.lp_path, "patches")
         shutil.rmtree(patches_dir, ignore_errors=True)
 
         # Ensure that a testfile was created before preparing the patches
+        kgraft_tests_path = Path(Path().home(), "kgr", "kgraft-patches_testscripts")
         test_sh = Path(kgraft_tests_path, f"{self.lp_name}_test_script.sh")
         if not test_sh.is_file():
             logging.warning(f"Test file {test_sh} not created.")
