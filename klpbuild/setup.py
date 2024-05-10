@@ -315,7 +315,7 @@ class Setup(Config):
                     for arch, syms in arch_syms.items():
                         m_syms = ",".join(syms)
                         cs_ = f"{cs}-{arch} ({self.get_cs_kernel(cs)})"
-                        logging.warning(f'{cs_}: Symbols {m_syms} not found on {mod} object')
+                        logging.warning(f"{cs_}: Symbols {m_syms} not found on {mod} object")
 
         # Update and save codestreams data
         for cs, data in self.working_cs.items():

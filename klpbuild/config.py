@@ -182,11 +182,11 @@ class Config:
         return (int(match.group(1)), int(match.group(2)), int(match.group(4)), match.group(3))
 
     def validate_config(self, cs, conf, mod):
-        '''
+        """
         Check if the CONFIG is enabled on the codestream. If the configuration
         entry is set as M, check if a module was specified (different from
         vmlinux).
-        '''
+        """
         if self.kdir:
             kconf = Path(self.data, ".config")
             with open(kconf) as f:
@@ -212,9 +212,9 @@ class Config:
 
             conf_entry = match.group(1)
             if conf_entry == "m" and mod == "vmlinux":
-                    raise RuntimeError(f"{cs}:{arch}: Config {conf} is set as module, but no module was specified")
+                raise RuntimeError(f"{cs}:{arch}: Config {conf} is set as module, but no module was specified")
             elif conf_entry == "y" and mod != "vmlinux":
-                    raise RuntimeError(f"{cs}:{arch}: Config {conf} is set as builtin, but a module {mod} was specified")
+                raise RuntimeError(f"{cs}:{arch}: Config {conf} is set as builtin, but a module {mod} was specified")
 
             configs.setdefault(conf_entry, [])
             configs[conf_entry].append(f"{cs}:{arch}")

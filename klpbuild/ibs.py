@@ -569,7 +569,6 @@ class IBS(Config):
         if self.lp_name not in os.listdir(code_path):
             logging.warning(f"Warning: Directory {self.lp_name} not found on branch {branch}")
 
-
         # Fix RELEASE version
         with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
             ver = self.get_full_cs(cs).replace("EMBARGO", "")
