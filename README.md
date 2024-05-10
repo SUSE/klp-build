@@ -17,7 +17,7 @@ To run tests use:
 `tox -e tests`
 
 ## Settings
-There are three environment variables that can be set before running the
+There are two environment variables that can be set before running the
 klp-build commands.
 
 ### KLP_WORK_DIR
@@ -28,102 +28,106 @@ creation.
 ### KLP_DATA_DIR
 Optional. This is the place where the source code is placed. To create a
 livepatch for upstream kernel, this needs to point to a kernel tree with the
-sources built, and the compile_commands.json is generated.
+sources built and the compile_commands.json file generated.
 
 Instead of setting this environment variables you can set --data-dir on the
 setup phase of the livepatch creation.
 
-### KLP_KERNEL_SOURCE
-Optional. If you are creating a livepatch for upstream kernel, you can ignore
-this option.
 
-This is only used for SLE kernels. This should contain the path to the
-[kernel-source tree](https://github.com/SUSE/kernel-source) in order to check
-which codestreams already contains the fix the CVE that the developer is trying
-to fix, and so skip the not affected codestreams.
+# Creating a livepatch for upstream kernels - Not production ready yet
 
-# Creating a livepatch for multiple SUSE Linux Enterprise codestreams
-To create a new "livepatch project", use the setup command:
+__IMPORTANT__: Some patches are needed in order to make it work in your kernel.
+Check the patches directory for what is needed.
 
-
-## Setup
-```sh
-klp-build setup --name bsc1197597 --cve 2022-1048 --mod snd-pcm --conf CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream snd_pcm_detach_substream --codestreams '15.5'
-```
-
-This command create a new directory in __$KLP_WOTK_DIR__, and the directory
-name will be the bsc argument. There will checking if the configuration is
-enabled to all codestreams an all achitectures.
-
-Explaining some arguments:
---mod: The module to be livepatched. If empty, vmlinux will be livepatched
-       instead.
---file-funcs: Lists the symbols (hence funcs) from each file. These symbols will
-be extracted into the livepatching.
-
-## Extraction
-At this point we support two different backends to perform the code extraction:
-[klp-ccp](https://github.com/SUSE/klp-ccp) and [clang-extract](https://github.com/SUSE/clang-extract).
-
-To extract the livepatches, run the command below:
-
-```sh
-klp-build extract --name bsc1197597 --type <ccp|ce>
-```
-
-Depending of the __type__ chosen, it will use klp-ccp or clang-extract to
-extract the livepatch from the sources. The resulting livepatched will be placed
-on __$KLP_WORK_DIR__/<name>/__<type>__/__$codestream__/lp, for example:
-
-```
-/home/john/livepatches/ccp/15.5u40/lp
-```
-
-## get-patches
-
-For downloading all the fixes in all CVE branches of kernel-source:
-
-```sh
-klp-build get-patches --name bsc1111111 --cve 2022-1048
-```
-
-It will create a directory called fixes inside __$KLP_WORK_DIR__/bsc1111111,
-containing the fixes for all current codestream families related to the CVE in
-question.
-
-# Creating a liveaptch for upstream kernels - Not ready yet for use
-Currently klp-build expects the kernel tree with compiles sources, and the
-compile_commands.json generated after the compilation is finished.
-
-To create the compile_commands.json, please run the command below inside the
-kernel tree:
+The current approach to create for upstream kernels needs a directory with the
+source code, and the compiled sources in the same location, with the
+compile_commands.json file generated. To generate the file, run:
 
 ```sh
 ./scripts/clang-tools/gen_compile_commands.py
 ```
 
-The setup process is the same, but it needs the --kdir and --data-dir arguments.
-While --kdir is a boolean flag, --data-dir expects the git tree to contain the
-vmlinux and the compiled modules, like:
+## Setup
 
 ```sh
-klp-build setup --kdir --data-dir /home/mpdesouza/git/linux --name 1197597 --cve 2022-1048 --mod snd-pcm --conf CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream snd_pcm_detach_substream --codestreams '15.5'
+klp-build setup --kdir --data-dir /home/mpdesouza/git/linux --name sound_lp --mod snd-pcm --conf CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream snd_pcm_detach_substream
 ```
 
-And the extraction is the same as for SLE, but we only support clang-extract:
+This command creates a new directory __$KLP_WORK_DIR__/sound_lp. The setup phase
+checks if the configuration entry is set, and if the symbol being extracted is
+present in the module.
+
+Explaining some arguments:
+--mod: The module to be livepatched. If empty, vmlinux will be livepatched
+       instead.
+--file-funcs: Lists the symbols (hence funcs) from each file. These
+              symbols will be extracted into the livepatching.
+
+
+## Extraction
+
+For upstream kernels we only support using [clang-extract](https://github.com/SUSE/clang-extract)
+for code extraction:
 ```sh
-klp-build extract --name 1197597 --type ce
+klp-build extract --name sound_lp --type ce
 ```
 
 The contents of the generated file are placed
-on __$KLP_WORK_DIR__/<name>/__<type>__/__$codestream__/lp.
+on __$KLP_WORK_DIR__/sound_lp/ce/__$codestream__/lp.
 
-The current approach for using the livepatches generated by klp-build are only
-used on SLE kernels. Some things would need to be adjusted in order to have
-upstream kernels as first class citizens of this solutions, like:
+
+__IMPORTANT__: Do not use it on production. klp-build is still only used to
+create livepatches on SLE kernels using klp-ccp. The tool needs more tests in
+order to rely on this process to create livepatches for upstream kernels. More
+work needs to be done before it happens, like:
 
 * Generate a template to include and generate a compilable livepatch
 * Use klp-convert-mini instead of rely on kallsyms
 * Simplify the setup/extraction in just one pass in order to make it even easier
   for the livepatch developer.
-* Many many other things.
+* Many other small adjustments
+
+
+# Creating a livepatch for multiple SUSE Linux Enterprise codestreams
+
+
+## Settings
+
+Along with the environment variables mentioned earlier, we also need
+KLP_KERNEL_SOURCE.
+
+### KLP_KERNEL_SOURCE
+Optional. This is only used for SLE kernels. This should contain the path to the
+[kernel-source tree](https://github.com/SUSE/kernel-source) in order to check
+which codestreams already contains the fix and don't need the livepatch. It also
+gets the fix for the CVE being livepatched.
+
+## Setup
+To create a new "livepatch project", use the setup command:
+
+```sh
+klp-build setup --name bsc1197597 --cve 2022-1048 --mod snd-pcm --conf CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream snd_pcm_detach_substream --codestreams '15.5' --archs x86_64 ppc64le
+```
+
+klp-build will check if the configuration is enabled, if the symbol is present
+on the module being livepatched. The check will be done in all architectures
+informed as argument. If the argument is not informed, it will return an error
+if configuration is not available on any of them.
+
+
+## Extraction
+
+At this point we support two different backends to perform the code extraction:
+[klp-ccp](https://github.com/SUSE/klp-ccp) and
+[clang-extract](https://github.com/SUSE/clang-extract), but only klp-ccp is
+being used in production. To extract the livepatches, run the command below:
+
+```sh
+klp-build extract --name bsc1197597 --type ccp
+```
+
+Depending of the __type__ chosen, it will use klp-ccp or clang-extract to
+extract the livepatch from the sources. The resulting livepatched will be placed
+on __$KLP_WORK_DIR__/__bsc1197597__/__ccp__/__$codestream__/lp, for example:
+
+``/home/john/livepatches/bsc1197597/ccp/15.5u40/lp``
