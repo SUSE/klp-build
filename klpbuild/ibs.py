@@ -41,10 +41,6 @@ class IBS(Config):
         if not self.kgraft_path.is_dir():
             raise RuntimeError("Couldn't find ~/kgr/kgraft-patches")
 
-        self.kgraft_tests_path = Path(Path().home(), "kgr", "kgraft-patches_testscripts")
-        if not self.kgraft_tests_path.is_dir():
-            raise RuntimeError("Couldn't find ~/kgr/kgraft-patches_testscripts")
-
         self.ksrc = GitHelper(self.lp_name, self.filter, False, None)
 
         # Download all sources for x86
@@ -328,6 +324,10 @@ class IBS(Config):
     def prepare_tests(self):
         # Download all built rpms
         self.download()
+
+        self.kgraft_tests_path = Path(Path().home(), "kgr", "kgraft-patches_testscripts")
+        if not self.kgraft_tests_path.is_dir():
+            raise RuntimeError("Couldn't find ~/kgr/kgraft-patches_testscripts")
 
         test_sh = Path(self.kgraft_tests_path, f"{self.lp_name}_test_script.sh")
         run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
