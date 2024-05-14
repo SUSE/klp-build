@@ -3,6 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import copy
 import json
 import logging
 import platform
@@ -208,7 +209,7 @@ class Setup(Config):
                 patched_cs.append(cs)
                 continue
 
-            data["files"] = self.file_funcs
+            data["files"] = copy.deepcopy(self.file_funcs)
             data["repo"] = self.cs_repo(cs)
 
             # Set supported archs for the codestream
