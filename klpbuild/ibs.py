@@ -303,7 +303,7 @@ class IBS(Config):
 
         funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
         if funcs:
-            logging.warning(f'Undefined functions: {" ".join(funcs)}')
+            logging.warning(f'{cs}:{arch} Undefined functions: {" ".join(funcs)}')
 
         shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
 
