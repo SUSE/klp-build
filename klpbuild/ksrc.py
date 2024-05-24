@@ -200,10 +200,6 @@ class GitHelper(Config):
             logging.info(f"No CVE informed, skipping the processing of getting the patches.")
             return {}
 
-        # do not get the commits twice
-        if self.conf.get("commits", ""):
-            return self.conf["commits"]
-
         print("Fetching changes from all supported branches...")
 
         # Mount the command to fetch all branches for supported codestreams

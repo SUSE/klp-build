@@ -183,10 +183,7 @@ class Setup(Config):
         # Called at this point because codestreams is populated
         self.conf["commits"] = ksrc.get_commits(self.conf.get("cve", ""))
 
-        # do not get the commits twice
-        patched_kernels = self.conf.get("patched_kernels", [])
-        if not patched_kernels:
-            patched_kernels = ksrc.get_patched_kernels(self.conf["commits"])
+        patched_kernels = ksrc.get_patched_kernels(self.conf["commits"])
 
         self.conf["patched_kernels"] = patched_kernels
 
