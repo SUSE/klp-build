@@ -351,7 +351,7 @@ class IBS(Config):
                 if arch not in data["archs"]:
                     continue
 
-                rpm_dir = Path(self.lp_path, "c", cs, arch, "rpm")
+                rpm_dir = Path(self.lp_path, "ccp", cs, arch, "rpm")
                 if not rpm_dir.exists():
                     logging.info(f"{cs}/{arch}: rpm dir not found. Skipping.")
                     continue
@@ -394,7 +394,7 @@ class IBS(Config):
     def delete_rpms(self, cs):
         try:
             for arch in self.get_cs_archs(cs):
-                shutil.rmtree(Path(self.lp_path, "c", cs, arch, "rpm"), ignore_errors=True)
+                shutil.rmtree(Path(self.lp_path, "ccp", cs, arch, "rpm"), ignore_errors=True)
         except KeyError:
             pass
 
@@ -420,7 +420,7 @@ class IBS(Config):
                         continue
 
                     # Create a directory for each arch supported
-                    dest = Path(self.lp_path, "c", cs, str(arch), "rpm")
+                    dest = Path(self.lp_path, "ccp", cs, str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
                     rpms.append((i, prj, prj, "devbuild", arch, "klp", rpm, dest))
@@ -543,7 +543,7 @@ class IBS(Config):
             logging.error(e, e.response.content)
             raise RuntimeError("")
 
-        base_path = Path(self.lp_path, "c", cs)
+        base_path = Path(self.lp_path, "ccp", cs)
 
         # Remove previously created directories
         prj_path = Path(base_path, "checkout")

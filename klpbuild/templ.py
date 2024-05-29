@@ -409,7 +409,7 @@ clean:
 
 
 class TemplateGen(Config):
-    def __init__(self, lp_name, lp_filter, app="c"):
+    def __init__(self, lp_name, lp_filter, app="ccp"):
         super().__init__(lp_name, lp_filter)
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
