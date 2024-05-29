@@ -240,6 +240,11 @@ class Extractor(Config):
                 args.append((i, fname, cs, fdata))
                 i += 1
 
+        if self.kdir:
+            logging.info("Refreshing compile_commands.json...")
+            subprocess.check_output('./scripts/clang-tools/gen_compile_commands.py',
+                                    cwd=self.data)
+
         self.total = len(args)
         logging.info(f"\nGenerating livepatches for {len(args)} file(s) using" f"{self.workers} workers...")
         logging.info("\t\tCodestream\tFile")
