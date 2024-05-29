@@ -246,7 +246,7 @@ class Extractor(Config):
                                     cwd=self.data)
 
         self.total = len(args)
-        logging.info(f"\nGenerating livepatches for {len(args)} file(s) using" f"{self.workers} workers...")
+        logging.info(f"\nGenerating livepatches for {len(args)} file(s) using {self.workers} workers...")
         logging.info("\t\tCodestream\tFile")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as executor:
@@ -264,9 +264,13 @@ class Extractor(Config):
 
         self.tem.refresh_codestreams(self.codestreams)
 
-        # For kdir setup, do not execute additional checks
         # TODO: change the templates so we generate a similar code than we
         # already do for SUSE livepatches
+        # Create the livepatches per codestream
+        for cs, _ in working_cs.items():
+            self.tem.GenerateLivePatches(cs)
+
+        # For kdir setup, do not execute additional checks
         if self.kdir:
             return
 
@@ -280,10 +284,7 @@ class Extractor(Config):
 
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
-        # While we are at it, create the livepatches per codestream
         for cs, _ in working_cs.items():
-            self.tem.GenerateLivePatches(cs)
-
             # Cleanup patches after the LPs were created if they were applied
             if self.apply_patches:
                 self.remove_patches(cs, self.quilt_log)

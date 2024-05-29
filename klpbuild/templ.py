@@ -525,7 +525,6 @@ class TemplateGen(Config):
             out_name = f"livepatch_{self.lp_name}.c"
 
         render_vars = {
-            "commits": self.conf["commits"],
             "include_header": "livepatch_" in out_name,
             "cve": self.conf.get("cve", "XXXX-XXXX"),
             "lp_name": self.lp_name,
@@ -542,10 +541,14 @@ class TemplateGen(Config):
             "inc_src_file": lp_file,
         }
 
+        if not self.kdir:
+            render_vars['commits'] = self.conf["commits"]
+
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
-            # For C files, first add the LICENSE header template to the file
-            f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
+            if not self.kdir:
+                # For C files, first add the LICENSE header template to the file
+                f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
 
             # If we have multiple source files for the same livepatch,
             # create one hollow file to wire-up the multiple _init and
