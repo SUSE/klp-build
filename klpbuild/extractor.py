@@ -191,10 +191,14 @@ class Extractor(Config):
 
         args, lenv = self.runner.cmd_args(cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
 
+        # Detect and set ibt information. It will be used in the TemplateGen
+        if '-fcf-protection' in cmd:
+            self.codestreams[cs]["files"][fname]["ibt"] = True
+
         out_log = Path(out_dir, f"{self.app}.out.txt")
         with open(out_log, "w") as f:
             # Write the command line used
-            f.write(f"Executing {} on {odir}\n")
+            f.write(f"Executing {self.app} on {odir}\n")
             f.write("\n".join(args) + "\n")
             f.flush()
             try:
