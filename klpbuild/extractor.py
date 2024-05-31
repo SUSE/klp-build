@@ -194,6 +194,7 @@ class Extractor(Config):
         out_log = Path(out_dir, f"{self.app}.out.txt")
         with open(out_log, "w") as f:
             # Write the command line used
+            f.write(f"Executing {} on {odir}\n")
             f.write("\n".join(args) + "\n")
             f.flush()
             try:
