@@ -170,6 +170,7 @@ class CCP(Config):
             if sp >= 4:
                 cmd += " -D__auto_type=int"
                 cmd += " -D__has_attribute(x)=0"
+                cmd += " -D__builtin_bswap16="
                 cmd += " -Dcpu_to_be16(x)=x"
 
         ccp_args.extend(cmd.split(" "))
