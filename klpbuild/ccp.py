@@ -79,6 +79,7 @@ class CCP(Config):
             "rcu_read_lock_held",
             "__bad_unaligned_access_size",
             "__builtin_alloca",
+            "tls_validate_xmit_skb_sw",
         ]
         # The backlist tells the klp-ccp to always copy the symbol code,
         # instead of externalizing. This helps in cases where different archs
@@ -171,7 +172,6 @@ class CCP(Config):
                 cmd += " -D__auto_type=int"
                 cmd += " -D__has_attribute(x)=0"
                 cmd += " -D__builtin_bswap16="
-                cmd += " -Dcpu_to_be16(x)=x"
 
         ccp_args.extend(cmd.split(" "))
 
