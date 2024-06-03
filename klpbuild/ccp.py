@@ -164,6 +164,7 @@ class CCP(Config):
         ]:
             cmd = cmd.replace(opt, "")
 
+        cmd += " -D__builtin_bswap16="
         sle, sp, _, _ = self.get_cs_tuple(cs)
         if sle >= 15:
             if sp >= 2:
@@ -171,7 +172,6 @@ class CCP(Config):
             if sp >= 4:
                 cmd += " -D__auto_type=int"
                 cmd += " -D__has_attribute(x)=0"
-                cmd += " -D__builtin_bswap16="
 
         ccp_args.extend(cmd.split(" "))
 
