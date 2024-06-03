@@ -86,6 +86,9 @@ class Config:
         if not patches_dir.exists():
             return
 
+        if not fil:
+            fil = subprocess.DEVNULL
+
         fil.write(f"\nRemoving patches from {cs}({kernel})\n")
         fil.flush()
         err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=fil, stdout=fil)
