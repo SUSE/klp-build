@@ -557,15 +557,8 @@ class TemplateGen(Config):
         lp_path.mkdir(exist_ok=True)
 
         files = self.get_cs_files(cs)
+        is_multi_files = len(files.keys()) > 1
         self.GeneratePatchedFuncs(lp_path, files)
-
-        # If the livepatch touches only one file the final livepatch file will
-        # be names livepatch_XXXX
-        if len(files.keys()) == 1:
-            src = Path(list(files.keys())[0])
-            self.__GenerateLivepatchFile(lp_path, cs, src)
-            self.__GenerateHeaderFile(lp_path, cs)
-            return
 
         # If there are more then one source file, we cannot fully infer what are
         # the correct configs and mods to be livepatched, so leave the mod and
@@ -574,11 +567,12 @@ class TemplateGen(Config):
 
         # Run the template engine for each touched source file.
         for src_file, _ in files.items():
-            self.__GenerateLivepatchFile(lp_path, cs, src_file, True)
+            self.__GenerateLivepatchFile(lp_path, cs, src_file, is_multi_files)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
-        self.__GenerateLivepatchFile(lp_path, cs, None)
+        if is_multi_files:
+            self.__GenerateLivepatchFile(lp_path, cs, None, False)
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
