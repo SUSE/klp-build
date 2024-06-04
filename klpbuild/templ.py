@@ -102,7 +102,7 @@ ${get_commits(commits, '15.4')}
  */
 """
 
-TEMPL_PATCH_VMLINUX = """\
+TEMPL_GET_EXTS = """\
 <%
 def get_exts(ext_vars):
         ext_list = []
@@ -141,7 +141,9 @@ def get_exts(ext_vars):
                             ext_list.append(f'\\t {mod}')
         return '\\n'.join(ext_list)
 %>\
+"""
 
+TEMPL_PATCH_VMLINUX = """\
 % if check_enabled:
 #if IS_ENABLED(${ config })
 % endif # check_enabled
@@ -175,45 +177,6 @@ int ${ fname }_init(void)
 """
 
 TEMPL_PATCH_MODULE = """\
-<%
-def get_exts(ext_vars):
-        ext_list = []
-        for obj, syms in ext_vars.items():
-            if obj == 'vmlinux':
-                mod = ''
-            else:
-                mod = obj
-
-            for sym in syms:
-                lsym = f'\\t{{ "{sym}",'
-                prefix_var = f'klpe_{sym}'
-                if not mod:
-                    var = f' (void *)&{prefix_var} }},'
-                else:
-                    var = f' (void *)&{prefix_var},'
-                    mod = f' "{obj}" }},'
-
-                # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
-                # our goal when splitting these lines
-                if len(lsym + var + mod) < 73:
-                    ext_list.append(lsym + var + mod)
-
-                elif len(lsym + var) < 73:
-                    ext_list.append(lsym + var)
-                    if mod:
-                        ext_list.append('\\t ' + mod)
-
-                else:
-                    ext_list.append(lsym)
-                    if len(var + mod) < 73:
-                        ext_list.append(f'\\t {var}{mod}')
-                    else:
-                        ext_list.append(f'\\t {var}')
-                        if mod:
-                            ext_list.append(f'\\t {mod}')
-        return '\\n'.join(ext_list)
-%>\
-
 % if check_enabled:
 #if IS_ENABLED(${ config })
 
@@ -561,9 +524,9 @@ class TemplateGen(Config):
             if not lp_file:
                 temp_str = TEMPL_HOLLOW
             elif mod:
-                temp_str = TEMPL_PATCH_MODULE
+                temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_MODULE
             else:
-                temp_str = TEMPL_PATCH_VMLINUX
+                temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
 
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
 
