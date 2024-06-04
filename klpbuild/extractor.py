@@ -194,6 +194,7 @@ class Extractor(Config):
         # Detect and set ibt information. It will be used in the TemplateGen
         if '-fcf-protection' in cmd:
             self.codestreams[cs]["files"][fname]["ibt"] = True
+            args.extend(['-D__USE_IBT__'])
 
         out_log = Path(out_dir, f"{self.app}.out.txt")
         with open(out_log, "w") as f:
