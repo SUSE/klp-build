@@ -102,6 +102,53 @@ ${get_commits(commits, '15.4')}
  */
 """
 
+TEMPL_KLP_LONE_FILE = """\
+<%include file="${ inc_src_file }"/>
+
+% for obj, funcs in klp_objs.items():
+static struct klp_func ${ obj }_funcs[] = {
+% for func in funcs:
+    {
+        .old_name = "${ func }",
+        .new_func = klpp_${ func },
+    },
+% endfor
+% endfor
+    {}
+};
+
+static struct klp_obj objs[] = {
+% for obj, _ in klp_objs.items():
+    {
+%if obj != "vmlinux":
+        .name = "${ obj }",
+%endif
+        .funcs = ${ obj }_funcs
+    },
+% endfor
+    {}
+};
+
+static struct klp_patch patch = {
+    .mod = THIS_MODULE,
+    .objs = objs,
+};
+
+static int ${ fname }_init(void)
+{
+    return klp_enable_patch(&patch);
+}
+
+static void ${ fname }_cleanup(void)
+{
+}
+
+module_init(${ fname }_init);
+module_exit(${ fname }_clenaup);
+MODULE_LICENSE("GPL");
+MODULE_INFO(livepatch, "Y");
+"""
+
 TEMPL_GET_EXTS = """\
 <%
 def get_exts(ext_vars):
@@ -140,7 +187,7 @@ def get_exts(ext_vars):
                         if mod:
                             ext_list.append(f'\\t {mod}')
         return '\\n'.join(ext_list)
-%>\
+%>
 """
 
 TEMPL_PATCH_VMLINUX = """\
@@ -173,7 +220,7 @@ int ${ fname }_init(void)
 % if check_enabled:
 
 #endif /* IS_ENABLED(${ config }) */
-% endif check_enabled
+% endif # check_enabled
 """
 
 TEMPL_PATCH_MODULE = """\
@@ -282,7 +329,7 @@ void ${ fname }_cleanup(void)
 % if check_enabled:
 
 #endif /* IS_ENABLED(${ config }) */
-% endif check_enabled
+% endif # check_enabled
 """
 
 TEMPL_HOLLOW = """\
@@ -304,7 +351,7 @@ void ${ fname }_cleanup(void)
 % if check_enabled:
 
 #endif /* IS_ENABLED(${ config }) */
-% endif check_enabled
+% endif # check_enabled
 """
 
 TEMPL_COMMIT = """\
@@ -460,6 +507,18 @@ class TemplateGen(Config):
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
             f.write(Template(TEMPL_H, lookup=lpdir).render(**render_vars))
 
+    def __BuildKlpObjs(self, cs, src):
+        objs = {}
+
+        for src_file, fdata in self.get_cs_files(cs).items():
+            if src and src != src_file:
+                continue
+            mod = fdata["module"]
+            objs.setdefault(mod, [])
+            objs[mod].extend(fdata["symbols"])
+
+        return objs
+
     def __GenerateLivepatchFile(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
             lp_inc_dir = str(self.get_work_dir(cs, src_file, self.app))
@@ -470,6 +529,7 @@ class TemplateGen(Config):
                 mod = ""
             fconf = fdata["conf"]
             exts = fdata["ext_symbols"]
+            ibt = fdata.get("ibt", False)
 
         else:
             lp_inc_dir = Path("non-existent")
@@ -477,6 +537,7 @@ class TemplateGen(Config):
             mod = ""
             fconf = ""
             exts = {}
+            ibt = False
 
         # if use_src_name is True, the final file will be:
         #       bscXXXXXXX_{src_name}.c
@@ -513,6 +574,13 @@ class TemplateGen(Config):
                 # For C files, first add the LICENSE header template to the file
                 f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
 
+            # For IBT we don't need fancy kallsyms, and we can reoly only on
+            # klp-convert, so the generated templates is much simpler.
+            if ibt:
+                render_vars["klp_objs"] = self.__BuildKlpObjs(cs, src_file)
+                # FIXME: handle multiple livepatch files
+                temp_str = TEMPL_KLP_LONE_FILE
+
             # If we have multiple source files for the same livepatch,
             # create one hollow file to wire-up the multiple _init and
             # _clean functions
@@ -521,7 +589,7 @@ class TemplateGen(Config):
             # module_notifier armed to signal whenever the module comes on
             # in order to do the symbol lookups. Otherwise only _init is
             # needed, and only if there are externalized symbols being used.
-            if not lp_file:
+            elif not lp_file:
                 temp_str = TEMPL_HOLLOW
             elif mod:
                 temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_MODULE
