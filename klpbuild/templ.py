@@ -117,7 +117,7 @@ static struct klp_func ${ obj }_funcs[] = {
     {}
 };
 
-static struct klp_obj objs[] = {
+static struct klp_object objs[] = {
 % for obj, _ in klp_objs.items():
     {
 %if obj != "vmlinux":
@@ -144,7 +144,7 @@ static void ${ fname }_cleanup(void)
 }
 
 module_init(${ fname }_init);
-module_exit(${ fname }_clenaup);
+module_exit(${ fname }_cleanup);
 MODULE_LICENSE("GPL");
 MODULE_INFO(livepatch, "Y");
 """
