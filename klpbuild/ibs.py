@@ -601,7 +601,8 @@ class IBS(Config):
         cs_list = self.apply_filter(self.codestreams.keys())
 
         if not cs_list:
-            raise RuntimeError(f"push: No codestreams found for {self.lp_name}")
+            logging.error(f"push: No codestreams found for {self.lp_name}")
+            sys.exit(1)
 
         logging.info(f"Preparing {len(cs_list)} projects on IBS...")
 

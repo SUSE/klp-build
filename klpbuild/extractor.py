@@ -229,6 +229,10 @@ class Extractor(Config):
 
         working_cs = self.filter_cs(verbose=True)
 
+        if len(working_cs) == 0:
+            logging.error(f"No codestreams found")
+            sys.exit(1)
+
         # Make it perform better by spawning a process function per
         # cs/file/funcs tuple, instead of spawning a thread per codestream
         args = []
