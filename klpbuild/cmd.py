@@ -180,7 +180,7 @@ def main_func(main_args):
         Extractor(args.name, args.filter, args.apply_patches, args.type, args.avoid_ext, args.workers).run()
 
     elif args.cmd == "cs-diff":
-        Extractor(args.name, "", False, args.type).diff_cs(args.codestreams)
+        Extractor(args.name, "", False, args.type, []).diff_cs(args.codestreams)
 
     elif args.cmd == "get-patches":
         GitHelper(args.name, args.filter, False, None).get_commits(args.cve)
