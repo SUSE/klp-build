@@ -11,10 +11,12 @@ from klpbuild.utils import ARCH
 
 
 class CE(Config):
-    def __init__(self, lp_name, lp_filter):
+    def __init__(self, lp_name, lp_filter, avoid_ext):
         super().__init__(lp_name, lp_filter)
 
         self.app = "ce"
+
+        self.avoid_externalize = avoid_ext
 
         self.ce_path = shutil.which("clang-extract")
         if not self.ce_path:
@@ -51,6 +53,9 @@ class CE(Config):
     def cmd_args(self, cs, fname, funcs, out_dir, fdata, cmd):
         ce_args = [self.ce_path]
         ce_args.extend(cmd.split(" "))
+
+        if self.avoid_externalize:
+            funcs += "," + ",".join(self.avoid_externalize)
 
         ce_args = list(filter(None, ce_args))
 

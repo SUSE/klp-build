@@ -177,7 +177,7 @@ def main_func(main_args):
         setup.setup_project_files()
 
     elif args.cmd == "extract":
-        Extractor(args.name, args.filter, args.apply_patches, args.type, args.workers, args.avoid_ext).run()
+        Extractor(args.name, args.filter, args.apply_patches, args.type, args.avoid_ext, args.workers).run()
 
     elif args.cmd == "cs-diff":
         Extractor(args.name, "", False, args.type).diff_cs(args.codestreams)
