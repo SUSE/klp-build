@@ -46,9 +46,12 @@ class Extractor(Config):
         self.total = 0
         self.make_lock = Lock()
 
+        if self.kdir:
+            if app == "ccp":
+                logging.info("Forcing the use of ce since --kdir was set.")
+            app = "ce"
+
         if app == "ccp":
-            if self.kdir:
-                raise ValueError("ccp with --kdir isn't supported")
             self.runner = CCP(lp_name, lp_filter, avoid_ext)
         else:
             self.runner = CE(lp_name, lp_filter, avoid_ext)
@@ -255,6 +258,7 @@ class Extractor(Config):
             subprocess.check_output('./scripts/clang-tools/gen_compile_commands.py',
                                     cwd=self.data)
 
+        logging.info(f"Extracting code using {self.app}")
         self.total = len(args)
         logging.info(f"\nGenerating livepatches for {len(args)} file(s) using {self.workers} workers...")
         logging.info("\t\tCodestream\tFile")

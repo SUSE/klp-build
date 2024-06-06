@@ -111,7 +111,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--apply-patches", action="store_true", help="Apply patches found by get-patches subcommand, if they exist"
     )
     extract_opts.add_argument(
-        "--type", type=str, required=True, choices=["ccp", "ce"], help="Choose between ccp and ce"
+        "--type", type=str, choices=["ccp", "ce"], default="ccp", help="Choose between ccp and ce"
     )
     extract_opts.add_argument("--workers", type=int, default=4, help="Number of processes for ccp and ce. Default is 4")
 
@@ -119,7 +119,7 @@ def create_parser() -> argparse.ArgumentParser:
     diff_opts.add_argument(
         "--codestreams", nargs=2, type=str, required=True, help="SLE specific. Apply diff on two different codestreams"
     )
-    diff_opts.add_argument("--type", type=str, required=True, choices=["ccp", "ce"], help="Choose between ccp and ce")
+    diff_opts.add_argument("--type", type=str, choices=["ccp", "ce"], default="ccp", help="Choose between ccp and ce")
 
     fmt = sub.add_parser(
         "format-patches", parents=[parentparser], help="SLE specific. Extract patches from kgraft-patches"
