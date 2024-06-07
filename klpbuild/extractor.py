@@ -30,6 +30,9 @@ class Extractor(Config):
     def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, workers=4):
         super().__init__(lp_name, lp_filter)
 
+        if not self.lp_path.exists():
+            raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
+
         self.workers = workers
 
         patches = self.get_patches_dir()
