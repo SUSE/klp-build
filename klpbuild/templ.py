@@ -105,6 +105,8 @@ ${get_commits(commits, '15.4')}
 TEMPL_KLP_LONE_FILE = """\
 <%include file="${ inc_src_file }"/>
 
+#include <linux/livepatch.h>
+
 % for obj, funcs in klp_objs.items():
 static struct klp_func ${ obj }_funcs[] = {
 % for func in funcs:
