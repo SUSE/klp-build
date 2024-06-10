@@ -28,7 +28,7 @@ creation.
 ### KLP_DATA_DIR
 Optional. This is the place where the source code is placed. To create a
 livepatch for upstream kernel, this needs to point to a kernel tree with the
-sources built and the compile_commands.json file generated.
+sources built.
 
 Instead of setting this environment variables you can set --data-dir on the
 setup phase of the livepatch creation.
@@ -36,21 +36,22 @@ setup phase of the livepatch creation.
 
 # Creating a livepatch for upstream kernels - Not production ready yet
 
-__IMPORTANT__: Some patches are needed in order to make it work in your kernel.
-Check the patches directory for what is needed.
+__IMPORTANT__: There are some still out-of-tree patches needed to make it to
+work (klp-convert) tool. Check the patches directory for what is needed.
 
 The current approach to create for upstream kernels needs a directory with the
-source code, and the compiled sources in the same location, with the
-compile_commands.json file generated. To generate the file, run:
+source code, and the compiled sources in the same location.
 
-```sh
-./scripts/clang-tools/gen_compile_commands.py
-```
 
 ## Setup
 
 ```sh
-klp-build setup --kdir --data-dir /home/mpdesouza/git/linux --name sound_lp --mod snd-pcm --conf CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream snd_pcm_detach_substream
+klp-build setup --kdir \
+                --data-dir /home/mpdesouza/git/linux \
+                --name sound_lp \
+                --mod snd-pcm \
+                --conf CONFIG_SND_PCM \
+                --file-funcs sound/core/pcm.c snd_pcm_attach_substream
 ```
 
 This command creates a new directory __$KLP_WORK_DIR__/sound_lp. The setup phase
@@ -69,7 +70,7 @@ Explaining some arguments:
 For upstream kernels we only support using [clang-extract](https://github.com/SUSE/clang-extract)
 for code extraction:
 ```sh
-klp-build extract --name sound_lp --type ce
+klp-build extract --name sound_lp
 ```
 
 The contents of the generated file are placed
@@ -82,7 +83,6 @@ order to rely on this process to create livepatches for upstream kernels. More
 work needs to be done before it happens, like:
 
 * Generate a template to include and generate a compilable livepatch
-* Use klp-convert-mini instead of rely on kallsyms
 * Simplify the setup/extraction in just one pass in order to make it even easier
   for the livepatch developer.
 * Many other small adjustments
