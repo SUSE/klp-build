@@ -628,7 +628,10 @@ class TemplateGen(Config):
 
         files = self.get_cs_files(cs)
         is_multi_files = len(files.keys()) > 1
-        self.GeneratePatchedFuncs(lp_path, files)
+
+        # This file is only consumed by the SLE kernels
+        if not self.kdir:
+            self.GeneratePatchedFuncs(lp_path, files)
 
         # If there are more then one source file, we cannot fully infer what are
         # the correct configs and mods to be livepatched, so leave the mod and
