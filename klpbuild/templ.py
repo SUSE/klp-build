@@ -653,7 +653,8 @@ class TemplateGen(Config):
             self.__GenerateLivepatchFile(lp_path, cs, None, False)
         else:
             # FIXME: Create Makefiles for multifile livepatches for kdir as well
-            self.CreateMakefile(cs, "", True)
+            if self.kdir:
+                self.CreateMakefile(cs, "", True)
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
