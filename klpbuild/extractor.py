@@ -228,7 +228,7 @@ class Extractor(Config):
             f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
             f.truncate()
 
-        self.tem.CreateMakefile(cs, fname)
+        self.tem.CreateMakefile(cs, fname, False)
 
     def run(self):
         logging.info(f"Work directory: {self.lp_path}")

@@ -411,7 +411,8 @@ ${get_patched(cs_files, check_enabled)}
 TEMPL_MAKEFILE = """\
 KDIR := ${ kdir }
 MOD_PATH := ${ pwd }
-obj-m := livepatch.o
+obj-m := ${ obj }
+CFLAGS_${ obj } = -Wno-missing-declarations -Wno-missing-prototypes
 
 modules:
 \tmake -C $(KDIR) modules M=$(MOD_PATH)
@@ -603,21 +604,25 @@ class TemplateGen(Config):
     def get_cs_lp_dir(self, cs):
         return Path(self.get_cs_dir(cs, self.app), "lp")
 
-    def CreateMakefile(self, cs, fname):
-        work_dir = self.get_work_dir(cs, fname, self.app)
-        lp_path = Path(work_dir, "livepatch.c")
+    def CreateMakefile(self, cs, fname, final):
+        if not final:
+            work_dir = self.get_work_dir(cs, fname, self.app)
+            obj = "livepatch.o"
+            lp_path = Path(work_dir, "livepatch.c")
 
-        # Add more data to make it compile correctly
-        shutil.copy(Path(work_dir, self.lp_out_file(fname)), lp_path)
-
-        with open(lp_path, "a") as f:
-            f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
+            # Add more data to make it compile correctly
+            shutil.copy(Path(work_dir, self.lp_out_file(fname)), lp_path)
+            with open(lp_path, "a") as f:
+                f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
+        else:
+            work_dir = self.get_cs_lp_dir(cs)
+            obj = f"livepatch_{self.lp_name}.o"
 
         modpath = self.get_mod_path(cs, ARCH)
         if not self.kdir:
             modpath = Path(modpath, "build")
 
-        render_vars = {"kdir": modpath, "pwd": work_dir}
+        render_vars = {"kdir": modpath, "pwd": work_dir, "obj": obj}
 
         with open(Path(work_dir, "Makefile"), "w") as f:
             f.write(Template(TEMPL_MAKEFILE).render(**render_vars))
@@ -646,6 +651,9 @@ class TemplateGen(Config):
         # of the other source files
         if is_multi_files:
             self.__GenerateLivepatchFile(lp_path, cs, None, False)
+        else:
+            # FIXME: Create Makefiles for multifile livepatches for kdir as well
+            self.CreateMakefile(cs, "", True)
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
