@@ -5,6 +5,7 @@
 
 import os
 from pathlib import Path
+import shutil
 
 from klpbuild.config import Config
 from klpbuild.utils import ARCH
@@ -22,11 +23,9 @@ class CCP(Config):
             raise RuntimeError("KLP_CCP_PATH does not point to a file")
 
         elif not ccp_path:
-            ccp_path = Path(Path().home(), "kgr", "ccp", "build", "klp-ccp")
-            if not ccp_path.exists():
-                raise RuntimeError(
-                    "klp-ccp not found in ~/kgr/ccp/build/klp-ccp. Please set KLP_CCP_PATH env var to a valid klp-ccp binary"
-                )
+            ccp_path = shutil.which("klp-ccp")
+            if not ccp_path:
+                raise RuntimeError("klp-ccp not found. Aborting.")
 
         self.ccp_path = str(ccp_path)
 
