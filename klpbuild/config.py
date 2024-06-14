@@ -116,6 +116,8 @@ class Config:
 
         if sle == 15 and sp < 4:
             patch_dirs.append("cve-5.3")
+        elif sle == 15 and sp <= 5:
+            patch_dirs.append("cve-5.14")
 
         sdir = self.get_sdir(cs)
         kernel = self.get_cs_kernel(cs)
