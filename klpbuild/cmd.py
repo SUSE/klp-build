@@ -7,6 +7,7 @@ import argparse
 
 from klpbuild.extractor import Extractor
 from klpbuild.ibs import IBS
+from klpbuild.inline import Inliner
 from klpbuild.ksrc import GitHelper
 from klpbuild.setup import Setup
 from klpbuild.utils import ARCHS
@@ -97,6 +98,27 @@ def create_parser() -> argparse.ArgumentParser:
     )
     setup.add_argument("--skips", help="List of codestreams to filter out")
 
+    check_inline = sub.add_parser("check-inline", parents=[parentparser])
+    check_inline.add_argument(
+        "--codestream",
+        type=str,
+        default="",
+        required=True,
+        help="SLE specific. Codestream to check the inlined symbol.",
+    )
+    check_inline.add_argument(
+        "--file",
+        type=str,
+        required=True,
+        help="File to be checked.",
+    )
+    check_inline.add_argument(
+        "--symbol",
+        type=str,
+        required=True,
+        help="Symbol to be found",
+    )
+
     extract_opts = sub.add_parser("extract", parents=[parentparser])
     extract_opts.add_argument(
         "--avoid-ext",
@@ -181,6 +203,9 @@ def main_func(main_args):
 
     elif args.cmd == "cs-diff":
         Extractor(args.name, "", False, args.type, []).diff_cs(args.codestreams)
+
+    elif args.cmd == "check-inline":
+        Inliner(args.name).check_inline(args.codestream, args.file, args.symbol)
 
     elif args.cmd == "get-patches":
         GitHelper(args.name, args.filter, False, None).get_commits(args.cve)
