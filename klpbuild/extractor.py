@@ -166,7 +166,8 @@ class Extractor(Config):
                 output = d["command"]
                 return Extractor.process_make_output(output)
 
-        return None
+        logging.error(f"Couldn't find cmdline for {fname}. Aborting")
+        raise
 
     def process(self, args):
         i, fname, cs, fdata = args
