@@ -386,7 +386,8 @@ class Config:
                 ret.append(symbol)
 
             elif len(syms) > 1:
-                print(f"WARNING: {cs}: symbol {symbol} duplicated on {mod}")
+                kernel = self.get_cs_kernel(cs)
+                print(f"WARNING: {cs}({kernel}): symbol {symbol} duplicated on {mod}")
 
             # If len(syms) == 1 means that we found a unique symbol, which is
             # what we expect, and nothing need to be done.
