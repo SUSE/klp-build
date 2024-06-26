@@ -382,7 +382,7 @@ def get_entries(lpdir, bsc, cs):
         # Add both the older and the new format to apply flags to objects
         fname = PurePath(fname).with_suffix('.o')
         ret.append(f'CFLAGS_{fname} += -Werror')
-        fname = f'bsc{bsc}/{fname}'
+        fname = f'{bsc}/{fname}'
         ret.append(f'CFLAGS_{fname} += -Werror')
 
     return "\\n".join(ret)
