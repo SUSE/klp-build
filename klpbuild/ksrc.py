@@ -35,6 +35,7 @@ class GitHelper(Config):
             "15.4": "SLE15-SP4-LTSS",
             "15.5": "SLE15-SP5",
             "15.5rt": "SLE15-SP5-RT",
+            "15.6": "SLE15-SP6",
             "cve-5.3": "cve/linux-5.3-LTSS",
             "cve-5.14": "cve/linux-5.14-LTSS",
         }
