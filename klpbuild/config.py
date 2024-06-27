@@ -330,7 +330,7 @@ class Config:
             out = subprocess.check_output(["/sbin/modinfo", obj], cwd=mod_path, stderr=subprocess.STDOUT).decode()
 
             if re.search(r"supported:\s+no", out):
-                print(f"WARN: {cs}: Module {mod} is not supported by SLE")
+                print(f"WARN: {cs}-{arch} ({kernel}): Module {mod} is not supported by SLE")
 
         return obj
 
