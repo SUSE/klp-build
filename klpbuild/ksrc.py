@@ -204,7 +204,7 @@ class GitHelper(Config):
         print("Fetching changes from all supported branches...")
 
         # Mount the command to fetch all branches for supported codestreams
-        args = ["/usr/bin/git", "-C", self.kern_src, "fetch", "origin"]
+        args = ["/usr/bin/git", "-C", self.kern_src, "fetch", "--tags", "origin"]
         args.extend(self.kernel_branches.values())
         subprocess.check_output(args)
 
