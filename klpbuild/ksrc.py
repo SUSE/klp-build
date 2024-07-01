@@ -186,6 +186,10 @@ class GitHelper(Config):
         # Search for Subject until a blank line, since commit messages can be
         # seen in multiple lines.
         msg = re.search(r"Subject: (.*?)(?:(\n\n))", req.text, re.DOTALL).group(1).replace("\n", "")
+        # Sometimes the MIME-Version string comes right after the commit
+        # message, so we should remove it as well
+        if 'MIME-Version:' in msg:
+            msg = re.sub(r"MIME-Version(.*)", "", msg)
         dstr = re.search(r"Date: ([\w\s,:]+)", req.text).group(1)
         d = datetime.strptime(dstr.strip(), "%a, %d %b %Y %H:%M:%S")
 
