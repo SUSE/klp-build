@@ -1,0 +1,276 @@
+.\" SPDX-License-Identifier: GPL-2.0-only
+.\"
+.\" Copyright (C) 2021-2024 SUSE
+.\" Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
+.\"
+
+.TH klp-build 1
+.SH NAME
+klp-build \- the kernel livepatching creation tool
+.SH SYNOPSIS
+.B klp-build
+<command> [-h] [-n NAME] [--filter FILTER] [--experimental]
+.SH DESCRIPTION
+.B klp-build
+is a tool meant for automating the whole process of creating and testing
+livepatches for the Linux kernel.
+To reduce the burden of livepatch developement,
+.B klp-build
+is also capable of checking which codestreams are vulnerable, batching multiple
+codestreams in parallel, and remotely building and running tests.
+.SH OPTIONS
+Generic options available for all commands:
+.TP
+.B "-h, --help"
+Show command's help message and exit.
+.TP
+.BI "-n, --name" " NAME"
+The livepatch name. This will be the directory name of the resulting
+livepatches. If
+.B --kdir
+is not set, the livepatch name should contain 'bsc' prefix.
+.TP
+.BI --filter " FILTER"
+Filter out codestreams using a regex. Example: "15\.3u[0-9]+"
+.TP
+.B --experimental
+Enables functions that may not work as expected yet.
+.SH COMMANDS
+.TP
+.B setup
+During the setup,
+.B klp-build
+analysis each codestream in order to identify those affected by
+the indicated CVE. Note that in this phase a lot of per-codestream
+data is generated and stored for future use.
+.RS 7
+.TP
+.BI --cve " CVE"
+SLE specific. The CVE assigned to this livepatch.
+.TP
+.BI --conf " CONF"
+The kernel CONFIG used to build the object to be livepatched.
+.TP
+.B --no-check
+SLE specific. Do not check for already patched codestreams, do the setup for
+all non filtered codestreams.
+.TP
+.B --kdir
+Change the lookup procedure to search in a compiled kernel directory.
+.TP
+.BI --data-dir " DATA_DIR"
+The path where source files and modules will be found.
+.TP
+.BI --codestreams " CODESTREAMS"
+SLE specific. Codestreams affected by the CVE. Can be used as a regex, like,
+"15.u[34]".
+.TP
+.BI --file-funcs " [FILE_FUNCS ...]"
+File and functions to be livepatched. Can be set multiple times. The format is:
+.BI --file-funcs " file/path.c func1 func2"
+.BI --file-func " file/patch2 func1..."
+.TP
+.BI --mod-file-funcs " [MOD_FILE_FUNCS ...]"
+Module, file and functions to be livepatched. Can be set multiple times. The
+format is:
+.BI --file-funcs " module1 file/path.c func1 func2"
+.BI --file-funcs " module2 file/patch2 func1..."
+.TP
+.BI --conf-mod-file-funcs " [CONF_MOD_FILE_FUNCS ...]"
+Conf, module, file and functions to be livepatched. Can be set multiple times.
+The format is:
+.BI --file-funcs " conf1 module1 file/path.c func1 func2"
+.BI --file-func " conf2 module2 file/patch2 func1..."
+.TP
+.BI --module " MODULE"
+The module that will be livepatched for all files. If empty,
+.I vmlinux
+will be livepatched instead.
+.TP
+.BI --archs " {ppc64le,s390x,x86_64} [{ppc64le,s390x,x86_64} ...]"
+SLE specific. Supported architectures for this livepatch.
+.TP
+.BI --skips " SKIPS"
+List of codestreams to filter out.
+.RE
+.B check-inline
+.RS 7
+.TP
+.BI --codestreams " CODESTREAMS"
+SLE specific. Codestream to check the inlined symbol.
+.TP
+.BI --file " FILE"
+File to be checked.
+.TP
+.BI --symbol " SYMBOL"
+Symbol to be found.
+.RE
+.TP
+.B extract
+In this phase
+.B klp-build
+creates the livepatch for each affected codestream based on the data generated
+during the
+.BR setup "."
+Results may differ greatly depending on the back-end tool selected for the
+livepatch creation.
+.RS 7
+.TP
+.BI --avoid-ext " AVOID_EXT [AVOID_EXT ...]"
+Functions to be copied into the livepatch instead of externalizing them.
+Useful to make sure to include symbols that are optimized in
+different architectures.
+.TP
+.B --apply-patches
+Apply patches found by
+.B get-patches
+command, if they exist.
+.TP
+.BI --type " {ccp,ce}"
+Choose between
+.BR klp-ccp (1)
+and
+.BR clang-extract (1)
+back-ends.
+.TP
+.BI --workers " WORKERS"
+Number of processes for
+.BR klp-ccp "(1)"
+and
+.BR clang-extract "(1)."
+Default:
+.BR 4 "."
+.RE
+.B cs-diff
+.RS 7
+.TP
+.BI --codestreams " CODESTREAMS CODESTREAMS"
+SLE specific. Apply diff on two different codestreams.
+.TP
+.BI --type " {ccp,ce}"
+Choose between
+.BR klp-ccp (1)
+and
+.BR clang-extract "(1)."
+.RE
+.TP
+.B format-patches
+SLE specific. Extract patches from kgraft-patches (see the
+.BR "SEE ALSO" " section)."
+.RS 7
+.TP
+.BI "-v , --version" " VERSION"
+Version to be added, like vX.
+.RE
+.TP
+.B get-patches
+Find and list the kernel versions with a backported fix to the indicated CVE.
+.RS 7
+.TP
+.BI --cve " CVE"
+SLE specific. CVE number to search for related backported patches.
+.RE
+.TP
+.B cleanup
+SLE specific. Remove livepatch packages from SUSE's Build Service.
+.TP
+.B prepare-tests
+Generates a tar archive per supported architecture containing
+scripts and files that can later be used to run tests in the desired test benchs.
+.TP
+.B push
+SLE specific. Push the generated livetpatch packages to SUSE's Build Service.
+By doing so,
+.B klp-build
+can automate the building phase for each codestream and architecture.
+.RS 7
+.TP
+.B --wait
+Wait until all codestreams builds are finished.
+.RE
+.TP
+.B status
+SLE specific. Check the status of the livepatch building phase initiated by the
+.B push
+command.
+.RS 7
+.TP
+.B --wait
+Wait until all codestreams builds are finished.
+.RE
+.TP
+.B log
+SLE specific. Get build logs from SUSE'S Build Service.
+.RS 7
+.TP
+.BI --cs " CS"
+The codestream to get the log from.
+.TP
+.BI --arch " {ppc64le,s390x,x86_64}"
+Build architecture.
+.RE
+.SH ENVIRONMENT
+There are several environment variables that must be set before running
+.B klp-build.
+.TP
+.B KLP_WORK_DIR
+Path to directory where the livepatch data will be
+placed, including the data generated by the different stages of the livepatch
+creation.
+.TP
+.B KLP_DATA_DIR
+Path to directory where the dowloaded source code will be placed. To create a
+livepatch for upstream kernel, it has to point to a kernel tree with the
+sources already built. Option
+.BR --data-dir ,
+if set, will overwrite the path specified here.
+.TP
+.B KLP_KERNEL_SOURCE
+Must be used only for SLE kernels. Path to the kernel-source tree (see the
+.B SEE ALSO
+section) that
+.B klp-build
+needs in order to check which codestreams are already fixed and don't need the
+livepatch. For those not yet fixed,
+.B klp-build
+gets the fix for the CVE being livepatched from here.
+.TP
+.B KLP_CCP_POL_PATH
+Path to
+.BR klp-ccp (1)
+scripts. Needed only when option
+.BI --type " ccp"
+is set.
+.SH EXAMPLES
+Check if the codestreams for SLE 15.5 x86_64 and ppc64le are affected by
+CVE-2022-1048. This CVE affects
+.I snd_pcm_attach_substream()
+and
+.I snd_pcm_detach_substream()
+functions, located in the
+kernel module
+.IR snd-pcm .
+.IP
+$
+.B klp-build
+setup --name bsc1197597 --cve 2022-1048 --mod snd-pcm --conf
+CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream
+snd_pcm_detach_substream --codestreams '15.5' --archs x86_64 ppc64le
+.PP
+.SH SEE ALSO
+SUSE's kgraft-patches public repository:
+.I https://github.com/SUSE/kernel-livepatch
+.PP
+SUSE's kernel-source public repository:
+.I https://github.com/SUSE/kernel-source
+.PP
+.BR klp-ccp "(1) "
+.BR clang-extract (1)
+.SH AUTHOR
+Contributors to the
+.B klp-build
+project. See the project’s GIT history for the complete list.
+.SH DISTRIBUTION
+The latest version of
+.B klp-build
+may be downloaded from https://github.com/SUSE/klp-build
