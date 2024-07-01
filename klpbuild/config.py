@@ -205,6 +205,7 @@ class Config:
             return
 
         configs = {}
+        kernel = self.get_cs_kernel(cs)
 
         # Validate only the specified architectures, but check if the codestream
         # is supported on that arch (like RT that is currently supported only on
@@ -217,13 +218,13 @@ class Config:
             with open(kconf) as f:
                 match = re.search(rf"{conf}=([ym])", f.read())
                 if not match:
-                    raise RuntimeError(f"{cs}:{arch}: Config {conf} not enabled")
+                    raise RuntimeError(f"{cs}:{arch} ({kernel}): Config {conf} not enabled")
 
             conf_entry = match.group(1)
             if conf_entry == "m" and mod == "vmlinux":
-                raise RuntimeError(f"{cs}:{arch}: Config {conf} is set as module, but no module was specified")
+                raise RuntimeError(f"{cs}:{arch} ({kernel}): Config {conf} is set as module, but no module was specified")
             elif conf_entry == "y" and mod != "vmlinux":
-                raise RuntimeError(f"{cs}:{arch}: Config {conf} is set as builtin, but a module {mod} was specified")
+                raise RuntimeError(f"{cs}:{arch} ({kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
 
             configs.setdefault(conf_entry, [])
             configs[conf_entry].append(f"{cs}:{arch}")
@@ -319,7 +320,7 @@ class Config:
         with open(Path(mod_path, "modules.order")) as f:
             obj = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
             if not obj:
-                raise RuntimeError(f"{cs}: Module not found: {mod}")
+                raise RuntimeError(f"{cs}-{arch} ({kernel}): Module not found: {mod}")
 
         # if kdir if set, modules.order will show the module with suffix .o, so
         # make sure the extension
