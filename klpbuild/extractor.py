@@ -102,7 +102,8 @@ class Extractor(Config):
             elif shutil.which("gcc-7"):
                 cc = "gcc-7"
             else:
-                raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
+                logging.error("Only gcc12 or higher are available, and it's problematic with kernel sources")
+                raise
 
             make_args = [
                 "make",
@@ -137,7 +138,9 @@ class Extractor(Config):
             # 15.4 onwards changes the regex a little: -MD -> -MMD
             result = re.search(regex_str, str(completed).strip())
             if not result:
-                raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs}")
+                logging.error(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs}. "
+                              f"Check file {str(log_path)} for more details.")
+                return None
 
             ret = Extractor.process_make_output(result.group(1))
 
@@ -167,7 +170,7 @@ class Extractor(Config):
                 return Extractor.process_make_output(output)
 
         logging.error(f"Couldn't find cmdline for {fname}. Aborting")
-        raise
+        return None
 
     def process(self, args):
         i, fname, cs, fdata = args
@@ -195,6 +198,9 @@ class Extractor(Config):
                 cmd = self.get_cmd_from_json(fname)
             else:
                 cmd = Extractor.get_make_cmd(out_dir, cs, fname, odir)
+
+        if not cmd:
+            raise
 
         args, lenv = self.runner.cmd_args(cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
 
