@@ -81,11 +81,12 @@ class Extractor(Config):
         return re.sub(r'-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
 
     @staticmethod
-    def get_make_cmd(out_dir, cs, filename, odir):
+    def get_make_cmd(out_dir, cs, filename, odir, sdir):
         filename = PurePath(filename)
         file_ = str(filename.with_suffix(".o"))
 
-        with open(Path(out_dir, "make.out.txt"), "w") as f:
+        log_path = Path(out_dir, "make.out.txt")
+        with open(log_path, "w") as f:
             # Corner case for lib directory, that fails with the conventional
             # way of grabbing the gcc args used to compile the file. If then
             # need to ask the make to show the commands for all files inside the
@@ -130,13 +131,24 @@ class Extractor(Config):
             f.write("\n")
             f.flush()
 
-            regex_str = rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});"
-
-            f.write(f"Searching for the pattern: {regex_str}\n")
-            f.flush()
-
             # 15.4 onwards changes the regex a little: -MD -> -MMD
-            result = re.search(regex_str, str(completed).strip())
+            # 15.6 onwards we don't have -isystem.
+            #      Also, it's more difficult to eliminate the objtool command
+            #      line, so try to search until the fixdep script
+            for regex in [
+                    rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});",
+                    rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+.*-c -o {file_} {sdir}/{filename})\s+;.*fixdep"
+                    ]:
+                f.write(f"Searching for the pattern: {regex}\n")
+                f.flush()
+
+                result = re.search(regex, str(completed).strip())
+                if result:
+                    break
+
+                f.write(f"Not found\n")
+                f.flush()
+
             if not result:
                 logging.error(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs}. "
                               f"Check file {str(log_path)} for more details.")
@@ -197,7 +209,7 @@ class Extractor(Config):
             if self.kdir:
                 cmd = self.get_cmd_from_json(fname)
             else:
-                cmd = Extractor.get_make_cmd(out_dir, cs, fname, odir)
+                cmd = Extractor.get_make_cmd(out_dir, cs, fname, odir, sdir)
 
         if not cmd:
             raise
