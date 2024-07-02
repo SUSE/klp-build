@@ -229,8 +229,8 @@ class Extractor(Config):
             f.flush()
             try:
                 subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
-            except Exception:
-                logging.warn(f"Error when processing {cs}:{fname}. Check file {out_log} for details.")
+            except:
+                logging.error(f"Error when processing {cs}:{fname}. Check file {out_log} for details.")
                 raise
 
         self.codestreams[cs]["files"][fname]["ext_symbols"] = self.runner.get_symbol_list(out_dir)
