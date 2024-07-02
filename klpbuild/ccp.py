@@ -153,6 +153,8 @@ class CCP(Config):
         # -mindirect-branch-cs-prefix appear in 15.4u1
         # more options to be removed
         # -mharden-sls=all
+        # 15.6 options
+        # -fmin-function-alignment=16
         for opt in [
             "-flive-patching=inline-clone",
             "-fdump-ipa-clones",
@@ -160,6 +162,7 @@ class CCP(Config):
             "-Wno-zero-length-bounds",
             "-mindirect-branch-cs-prefix",
             "-mharden-sls=all",
+            "-fmin-function-alignment=16",
         ]:
             cmd = cmd.replace(opt, "")
 
