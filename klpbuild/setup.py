@@ -166,13 +166,6 @@ class Setup(Config):
 
         return f"{repo}_Products_SLERT_Update"
 
-    # s390x is enabled on 12.5 for all updates.
-    # s390x is not supported on 15.1
-    # s390x is supported from 15.2 onwards.
-    def is_s390_supported(self, cs):
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        return sle == 12 or (sle == 15 and sp >= 2)
-
     def setup_codestreams(self):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
@@ -213,10 +206,7 @@ class Setup(Config):
             # RT is supported only on x86_64 at the moment
             archs = ["x86_64"]
             if not data.get("rt", False):
-                archs.append("ppc64le")
-
-                if self.is_s390_supported(cs):
-                    archs.append("s390x")
+                archs.extend(["ppc64le", "s390x"])
 
             data["archs"] = archs
 
