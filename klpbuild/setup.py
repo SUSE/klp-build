@@ -279,13 +279,14 @@ class Setup(Config):
         for cs, data in self.working_cs.items():
             # Check if the files exist in the respective codestream directories
             mod_syms = {}
+            kernel = self.get_cs_kernel(cs)
             for f, fdata in data["files"].items():
                 if not Path(self.get_sdir(cs), f).is_file():
-                    raise RuntimeError(f"{cs}: File {f} not found")
+                    raise RuntimeError(f"{cs} ({kernel}): File {f} not found")
 
                 ipa_f = self.get_ipa_file(cs, f)
                 if not ipa_f.is_file():
-                    msg = f"{cs}: File {ipa_f} not found."
+                    msg = f"{cs} ({kernel}): File {ipa_f} not found."
                     if not self.kdir:
                         msg += " Creating an empty file."
                         ipa_f.touch()
