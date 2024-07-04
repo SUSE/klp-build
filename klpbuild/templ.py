@@ -81,6 +81,9 @@ ${get_commits(commits, 'cve-5.3')}
  *  SLE15-SP4 and -SP5 commit:
 ${get_commits(commits, '15.4')}
  *
+ *  SLE15-SP6 commit:
+${get_commits(commits, '15.6')}
+ *
 % endif
  *  Copyright (c) ${year} SUSE
  *  Author: ${ user } <${ email }>
