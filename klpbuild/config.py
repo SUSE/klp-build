@@ -214,7 +214,7 @@ class Config:
             if arch not in self.get_cs_archs(cs):
                 continue
 
-            kconf = self.get_cs_boot_file(cs, "config", arch)
+            kconf = self.get_cs_boot_file(cs, ".config", arch)
             with open(kconf) as f:
                 match = re.search(rf"{conf}=([ym])", f.read())
                 if not match:
@@ -235,7 +235,7 @@ class Config:
             raise RuntimeError(f"Configuration mismtach between codestreams. Aborting.")
 
     def missing_codestream(self, cs):
-        return not self.get_cs_boot_file(cs, "config").exists()
+        return not self.get_cs_boot_file(cs, ".config").exists()
 
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get("rt", False)
@@ -244,15 +244,12 @@ class Config:
         return "rt" if self.cs_is_rt(cs) else "default"
 
     def get_cs_boot_file(self, cs, file, arch=""):
-        if self.kdir:
-            if file == "symvers":
-                return Path(self.data, "Module.symvers")
-            return Path(self.data, file)
+        if file == "vmlinux":
+            if self.kdir:
+                return Path(self.get_data_dir(arch), file)
+            return Path(self.get_data_dir(arch), "boot", f"{file}-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
 
-        if not arch:
-            arch = ARCH
-
-        return Path(self.get_data_dir(arch), "boot", f"{file}-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
+        return Path(self.get_odir(cs, arch), file)
 
     def get_data_dir(self, arch):
         if self.kdir:
@@ -260,7 +257,7 @@ class Config:
 
         return Path(self.data, arch)
 
-    def get_sdir(self, cs):
+    def get_sdir(self, cs, arch=""):
         if self.kdir:
             return self.data
 
@@ -268,12 +265,16 @@ class Config:
         ktype = f"-{self.get_ktype(cs)}"
         if ktype == "-default":
             ktype = ""
-        return Path(self.get_data_dir(ARCH), "usr", "src", f"linux-{self.get_cs_kernel(cs)}{ktype}")
 
-    def get_odir(self, cs):
+        if not arch:
+            arch = ARCH
+
+        return Path(self.get_data_dir(arch), "usr", "src", f"linux-{self.get_cs_kernel(cs)}{ktype}")
+
+    def get_odir(self, cs, arch=""):
         if self.kdir:
             return self.data
-        return Path(f"{self.get_sdir(cs)}-obj", ARCH, self.get_ktype(cs))
+        return Path(f"{self.get_sdir(cs, arch)}-obj", ARCH, self.get_ktype(cs))
 
     def get_ipa_file(self, cs, fname):
         if self.kdir:

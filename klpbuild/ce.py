@@ -63,7 +63,7 @@ class CE(Config):
         ce_args.extend(
             [
                 f'-DCE_DEBUGINFO_PATH={self.get_module_obj(ARCH, cs, fdata["module"])}',
-                f'-DCE_SYMVERS_PATH={self.get_cs_boot_file(cs, "symvers")}',
+                f'-DCE_SYMVERS_PATH={self.get_cs_boot_file(cs, "Module.symvers")}',
                 f"-DCE_OUTPUT_FILE={Path(out_dir, self.lp_out_file(fname))}",
                 f'-DCE_OUTPUT_FUNCTION_PROTOTYPE_HEADER={Path(out_dir, "proto.h")}',
                 f'-DCE_DSC_OUTPUT={Path(out_dir, "lp.dsc")}',
