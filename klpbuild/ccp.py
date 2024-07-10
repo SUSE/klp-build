@@ -123,7 +123,7 @@ class CCP(Config):
 
         return symbols
 
-    def cmd_args(self, cs, fname, funcs, out_dir, fdata, cmd):
+    def cmd_args(self, needs_ibt, cs, fname, funcs, out_dir, fdata, cmd):
         sdir = self.get_sdir(cs)
         odir = self.get_odir(cs)
 
@@ -182,6 +182,7 @@ class CCP(Config):
         # Needed, otherwise threads would interfere with each other
         env = self.env.copy()
 
+        env["KCP_KLP_CONVERT_EXTS"] = "1" if needs_ibt else "0"
         env["KCP_MOD_SYMVERS"] = str(self.get_cs_boot_file(cs, "Module.symvers"))
         env["KCP_KBUILD_ODIR"] = str(odir)
         env["KCP_PATCHED_OBJ"] = self.get_module_obj(ARCH, cs, fdata["module"])

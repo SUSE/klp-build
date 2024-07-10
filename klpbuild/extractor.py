@@ -214,17 +214,16 @@ class Extractor(Config):
         if not cmd:
             raise
 
-        args, lenv = self.runner.cmd_args(cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
-
         # SLE15-SP6 doesn't enabled CET, but we would like to start using
         # klp-convert either way.
         sle, sp, _, _ = self.get_cs_tuple(cs)
         needs_ibt = sle > 15 or (sle == 15 and sp >= 6)
 
+        args, lenv = self.runner.cmd_args(needs_ibt, cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
+
         # Detect and set ibt information. It will be used in the TemplateGen
         if '-fcf-protection' in cmd or needs_ibt:
             self.codestreams[cs]["files"][fname]["ibt"] = True
-            args.extend(['-D__USE_IBT__'])
 
         out_log = Path(out_dir, f"{self.app}.out.txt")
         with open(out_log, "w") as f:

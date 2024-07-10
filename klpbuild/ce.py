@@ -50,7 +50,7 @@ class CE(Config):
 
         return symbols
 
-    def cmd_args(self, cs, fname, funcs, out_dir, fdata, cmd):
+    def cmd_args(self, needs_ibt, cs, fname, funcs, out_dir, fdata, cmd):
         ce_args = [self.ce_path]
         ce_args.extend(cmd.split(" "))
 
@@ -70,6 +70,9 @@ class CE(Config):
                 f"-DCE_EXTRACT_FUNCTIONS={funcs}",
             ]
         )
+
+        if needs_ibt:
+            ce_args.extend(["-D__USE_IBT__"])
 
         # clang-extract works without ipa-clones, so don't hard require it
         ipa_f = self.get_ipa_file(cs, fname)
