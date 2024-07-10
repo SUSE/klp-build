@@ -156,7 +156,11 @@ MODULE_INFO(livepatch, "Y");
 
 TEMPL_GET_EXTS = """\
 <%
-def get_exts(ext_vars):
+def get_exts(app, ibt_mod, ext_vars):
+        # CE doesn't need any additional externalization
+        if ibt_mod and app == 'ce':
+            return
+
         ext_list = []
         for obj, syms in ext_vars.items():
             if obj == 'vmlinux':
@@ -164,33 +168,56 @@ def get_exts(ext_vars):
             else:
                 mod = obj
 
-            for sym in syms:
-                lsym = f'\\t{{ "{sym}",'
-                prefix_var = f'klpe_{sym}'
-                if not mod:
-                    var = f' (void *)&{prefix_var} }},'
-                else:
-                    var = f' (void *)&{prefix_var},'
-                    mod = f' "{obj}" }},'
-
-                # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
-                # our goal when splitting these lines
-                if len(lsym + var + mod) < 73:
-                    ext_list.append(lsym + var + mod)
-
-                elif len(lsym + var) < 73:
-                    ext_list.append(lsym + var)
-                    if mod:
-                        ext_list.append('\\t ' + mod)
-
-                else:
-                    ext_list.append(lsym)
-                    if len(var + mod) < 73:
-                        ext_list.append(f'\\t {var}{mod}')
+            # ibt_mod is only used with IBT
+            if not ibt_mod:
+                for sym in syms:
+                    lsym = f'\\t{{ "{sym}",'
+                    prefix_var = f'klpe_{sym}'
+                    if not mod:
+                        var = f' (void *)&{prefix_var} }},'
                     else:
-                        ext_list.append(f'\\t {var}')
+                        var = f' (void *)&{prefix_var},'
+                        mod = f' "{obj}" }},'
+
+                    # 73 here is because a tab is 8 spaces, so 72 + 8 == 80, which is
+                    # our goal when splitting these lines
+                    if len(lsym + var + mod) < 73:
+                        ext_list.append(lsym + var + mod)
+
+                    elif len(lsym + var) < 73:
+                        ext_list.append(lsym + var)
                         if mod:
-                            ext_list.append(f'\\t {mod}')
+                            ext_list.append('\\t ' + mod)
+
+                    else:
+                        ext_list.append(lsym)
+                        if len(var + mod) < 73:
+                            ext_list.append(f'\\t {var}{mod}')
+                        else:
+                            ext_list.append(f'\\t {var}')
+                            if mod:
+                                ext_list.append(f'\\t {mod}')
+            else:
+                for sym in syms:
+                    start = f"extern typeof({sym})"
+                    lsym = f"{sym}"
+                    end = f"KLP_RELOC_SYMBOL({ibt_mod},{obj},{sym});"
+
+                    if len(start + lsym + end) < 80:
+                        ext_list.append(f"{start} {lsym} {end}")
+
+                    elif len(start + lsym) < 80:
+                        ext_list.append(f"{start} {lsym}")
+                        ext_list.append(f"\\t {end}")
+
+                    else:
+                        ext_list.append(start)
+                        if len(lsym + end) < 80:
+                            ext_list.append(f"\\t {lsym} {end}")
+                        else:
+                            ext_list.append(f"\\t {lsym}")
+                            ext_list.append(f"\\t {end}")
+
         return '\\n'.join(ext_list)
 %>
 """
@@ -205,11 +232,14 @@ TEMPL_PATCH_VMLINUX = """\
 #include "livepatch_${ lp_name }.h"
 
 % if ext_vars:
+% if ibt:
+${get_exts(app, "vmlinux", ext_vars)}
+% else: # ibt
 #include <linux/kernel.h>
 #include "../kallsyms_relocs.h"
 
 static struct klp_kallsyms_reloc klp_funcs[] = {
-${get_exts(ext_vars)}
+${get_exts(app, "", ext_vars)}
 };
 
 int ${ fname }_init(void)
@@ -221,6 +251,7 @@ int ${ fname }_init(void)
 % endif # mod_mutex
 }
 
+% endif # ibt
 % endif # ext_vars
 % if check_enabled:
 
@@ -242,6 +273,9 @@ TEMPL_PATCH_MODULE = """\
 #include "livepatch_${ lp_name }.h"
 
 % if ext_vars:
+% if ibt:
+${get_exts(app, mod, ext_vars)}
+% else: # ibt
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include "../kallsyms_relocs.h"
@@ -249,7 +283,7 @@ TEMPL_PATCH_MODULE = """\
 #define LP_MODULE "${ mod }"
 
 static struct klp_kallsyms_reloc klp_funcs[] = {
-${get_exts(ext_vars)}
+${get_exts(app, "", ext_vars)}
 };
 
 static int module_notify(struct notifier_block *nb,
@@ -330,6 +364,7 @@ void ${ fname }_cleanup(void)
 {
 	unregister_module_notifier(&module_nb);
 }
+% endif # ibt
 % endif # ext_vars
 % if check_enabled:
 
@@ -569,6 +604,8 @@ class TemplateGen(Config):
             "check_enabled": self.check_enabled,
             "ext_vars": exts,
             "inc_src_file": lp_file,
+            "ibt": ibt,
+            "app": self.app,
         }
 
         if not self.kdir:
@@ -580,9 +617,10 @@ class TemplateGen(Config):
                 # For C files, first add the LICENSE header template to the file
                 f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
 
-            # For IBT we don't need fancy kallsyms, and we can reoly only on
-            # klp-convert, so the generated templates is much simpler.
-            if ibt:
+            # For IBT we don't need fancy kallsyms, and we can really only on klp-convert, so
+            # the generated templates is much simpler. Use this only if kdir is
+            # specified
+            if ibt and self.kdir:
                 render_vars["klp_objs"] = self.__BuildKlpObjs(cs, src_file)
                 # FIXME: handle multiple livepatch files
                 temp_str = TEMPL_KLP_LONE_FILE
