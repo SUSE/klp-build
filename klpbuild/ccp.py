@@ -103,7 +103,7 @@ class CCP(Config):
             with open(ext_path) as f:
                 for l in f:
                     l = l.strip()
-                    if not l.startswith("KALLSYMS"):
+                    if not l.startswith("KALLSYMS") and not l.startswith("KLP_CONVERT"):
                         continue
 
                     _, sym, var, mod = l.split(" ")
