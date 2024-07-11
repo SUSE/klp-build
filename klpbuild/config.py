@@ -269,6 +269,10 @@ class Config:
         if not arch:
             arch = ARCH
 
+        # FIXME: For now we only download kernel-source for x86_64, but we
+        # should change it to download it from the currently running
+        # architecture
+        arch = "x86_64"
         return Path(self.get_data_dir(arch), "usr", "src", f"linux-{self.get_cs_kernel(cs)}{ktype}")
 
     def get_odir(self, cs, arch=""):
