@@ -43,21 +43,6 @@ class IBS(Config):
 
         self.ksrc = GitHelper(self.lp_name, self.filter, False, None)
 
-        # Download all sources for x86
-        # For ppc64le and s390x only download vmlinux and the built modules
-        self.cs_data = {
-            "ppc64le": {
-                "kernel-default": r"(kernel-default-(extra-)?[\d\.\-]+.ppc64le.rpm)",
-            },
-            "s390x": {
-                "kernel-default": r"(kernel-default-(extra-)?[\d\.\-]+.s390x.rpm)",
-            },
-            "x86_64": {
-                "kernel-default": r"(kernel-(default|rt)\-(extra|(livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.x86_64.rpm)",
-                "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
-            },
-        }
-
         # Total number of work items
         self.total = 0
 
@@ -146,8 +131,12 @@ class IBS(Config):
 
     def download_cs_data(self, cs_list):
         rpms = []
-        extract = []
         i = 1
+
+        cs_data = {
+            "kernel-default": r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)",
+            "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
+        }
 
         logging.info("Getting list of files...")
         for cs, data in cs_list.items():
@@ -157,13 +146,8 @@ class IBS(Config):
             path_dest = Path(self.data, "kernel-rpms")
             path_dest.mkdir(exist_ok=True, parents=True)
 
-            for arch, val in self.cs_data.items():
-                if arch not in self.get_cs_archs(cs):
-                    continue
-
-                for k, regex in val.items():
-                    pkg = k
-
+            for arch in self.get_cs_archs(cs):
+                for pkg, regex in cs_data.items():
                     # RT kernels have different package names
                     if self.cs_is_rt(cs):
                         if pkg == "kernel-default":
@@ -174,7 +158,6 @@ class IBS(Config):
                     if repo != "standard":
                         pkg = f"{pkg}.{repo}"
 
-                    # arch is fixed for now
                     ret = self.osc.build.get_binary_list(prj, repo, arch, pkg)
                     for file in re.findall(regex, str(etree.tostring(ret))):
                         # FIXME: adjust the regex to only deal with strings
@@ -183,11 +166,17 @@ class IBS(Config):
                         else:
                             rpm = file[0]
 
+                        # Download all packages for the HOST arch
+                        # For the others only download kernel-default
+                        if arch != ARCH and not re.search("kernel-default-\d", rpm):
+                            continue
+
                         # Extract the source and kernel-devel in the current
                         # machine arch to make it possible to run klp-build in
                         # different architectures
-                        if "kernel-source" in pkg or "kernel-devel" in pkg:
-                            arch = ARCH
+                        if "kernel-source" in rpm or "kernel-default-devel" in rpm:
+                            if arch != ARCH:
+                                continue
 
                         rpms.append((i, cs, prj, repo, arch, pkg, rpm, path_dest))
                         i += 1
