@@ -82,7 +82,7 @@ class CE(Config):
         # Keep includes is necessary so don't end up expanding all headers,
         # generating a huge amount of code. This only makes sense for the
         # kernel so far.
-        ce_args.extend(["-DCE_KEEP_INCLUDES", "-DCE_RENAME_SYMBOLS"])
+        ce_args.extend(["-DCE_KEEP_INCLUDES", "-DCE_RENAME_SYMBOLS", "-DCE_LATE_EXTERNALIZE"])
 
         # For debug purposes. Uncomment for dumping clang-extract passes
         # ce_args.extend(['-DCE_DUMP_PASSES'])
