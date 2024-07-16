@@ -537,7 +537,7 @@ class TemplateGen(Config):
             config = configs.pop()
 
         render_vars = {
-            "fname": str(Path(out_name).with_suffix("")),
+            "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
             "check_enabled": self.check_enabled,
             "proto_files": proto_files,
             "config": config,
@@ -594,7 +594,7 @@ class TemplateGen(Config):
             "cve": self.conf.get("cve", "XXXX-XXXX"),
             "lp_name": self.lp_name,
             "lp_num": self.lp_name.replace("bsc", ""),
-            "fname": str(Path(out_name).with_suffix("")),
+            "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
             "year": datetime.today().year,
             "user": self.user,
             "email": self.email,
