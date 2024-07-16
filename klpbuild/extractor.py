@@ -312,6 +312,8 @@ class Extractor(Config):
 
         # For kdir setup, do not execute additional checks
         if self.kdir:
+            if self.apply_patches:
+                self.remove_patches(cs, self.quilt_log)
             return
 
         self.group_equal_files(args)

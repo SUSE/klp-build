@@ -73,12 +73,11 @@ class Config:
         return f"{self.lp_name}_{fpath}"
 
     def get_patches_dir(self):
+        if self.kdir:
+            return Path(self.data, "fixes")
         return Path(self.lp_path, "fixes")
 
     def remove_patches(self, cs, fil):
-        if self.kdir:
-            return
-
         sdir = self.get_sdir(cs)
         kernel = self.get_cs_kernel(cs)
         # Check if there were patches applied previously
@@ -101,28 +100,31 @@ class Config:
 
     def apply_all_patches(self, cs, fil=subprocess.STDOUT):
         if self.kdir:
-            return
+            patch_dirs = [self.get_patches_dir()]
+        else:
+            sle, sp, u, rt = self.get_cs_tuple(cs)
+
+            dirs = []
+
+            if rt:
+                dirs.extend([f"{sle}.{sp}rtu{u}", f"{sle}.{sp}{rt}"])
+
+            dirs.extend([f"{sle}.{sp}u{u}", f"{sle}.{sp}"])
+
+            if sle == 15 and sp < 4:
+                dirs.append("cve-5.3")
+            elif sle == 15 and sp <= 5:
+                dirs.append("cve-5.14")
+
+            patch_dirs = []
+
+            for d in dirs:
+                patch_dirs.append(Path(self.get_patches_dir(), d))
 
         patched = False
-
-        sle, sp, u, rt = self.get_cs_tuple(cs)
-
-        patch_dirs = []
-
-        if rt:
-            patch_dirs.extend([f"{sle}.{sp}rtu{u}", f"{sle}.{sp}{rt}"])
-
-        patch_dirs.extend([f"{sle}.{sp}u{u}", f"{sle}.{sp}"])
-
-        if sle == 15 and sp < 4:
-            patch_dirs.append("cve-5.3")
-        elif sle == 15 and sp <= 5:
-            patch_dirs.append("cve-5.14")
-
         sdir = self.get_sdir(cs)
         kernel = self.get_cs_kernel(cs)
-        for d in patch_dirs:
-            pdir = Path(self.get_patches_dir(), d)
+        for pdir in patch_dirs:
             if not pdir.exists():
                 fil.write(f"\nPatches dir {pdir} doesnt exists\n")
                 continue
@@ -131,6 +133,9 @@ class Config:
             fil.flush()
 
             for patch in sorted(pdir.iterdir(), reverse=True):
+                if not str(patch).endswith(".patch"):
+                    continue
+
                 err = subprocess.run(["quilt", "import", str(patch)], cwd=sdir, stderr=fil, stdout=fil)
                 if err.returncode != 0:
                     fil.write("\nFailed to import patches, remove applied and try again\n")
