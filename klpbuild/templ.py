@@ -159,7 +159,7 @@ TEMPL_GET_EXTS = """\
 def get_exts(app, ibt_mod, ext_vars):
         # CE doesn't need any additional externalization
         if ibt_mod and app == 'ce':
-            return
+            return ''
 
         ext_list = []
         for obj, syms in ext_vars.items():
