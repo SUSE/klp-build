@@ -30,10 +30,17 @@ if [ ! -f "$CONF_IN" ]; then
 	CONF_IN=repro/${bsc}_config.in
 fi
 
-# Always check if he have the same settings on Nicolai's home
-VMSDIR="$HOME/vms"
+# Check multiple places where an updated version of the VMs can be found
+for VMSDIR in "$HOME/kgr-test/vms" "$HOME/vms" "/home/nstange/vms"; do
+	if [ -d "$VMSDIR" ]; then
+		echo "Using VMS from $VMSDIR"
+		break
+	fi
+done
+
 if [ ! -d "$VMSDIR" ]; then
-	VMSDIR="/home/nstange/vms"
+	echo "Missing VMs directory. Aborting."
+	exit 1
 fi
 
 # grab all vm.xml files regarding each main codestream
