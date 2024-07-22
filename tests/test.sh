@@ -42,7 +42,8 @@ setup_extract_count()
 
 	nlines=$(cat $KLP_WORK_DIR/$patch_/ce/linux/lp/livepatch_${patch_}.c | wc -l)
 	if [ "$nlines" -gt "$max_lines" ]; then
-		echo "WARNING: Generated file for $patch_ contains $nlines LoC, but should contain < $max_lines LoC"
+		echo "ERROR: Generated file for $patch_ contains $nlines LoC, but should contain < $max_lines LoC"
+		exit 1
 	fi
 }
 
@@ -52,13 +53,12 @@ setup_extract_count "640" lp_cve_2021_22600	CONFIG_UNIX	af_packet  net/packet/af
 
 setup_extract_count "700" lp_ipv6_route_multipath_add	CONFIG_IPV6	ipv6	net/ipv6/route.c	ip6_route_multipath_add
 
-# FIXME: complains about missing KLP_RELOC_SYM while the cases above work as expected
-#setup_extract_count "10" lp_cve_2024_27398	CONFIG_BT	bluetooth  net/bluetooth/sco.c sco_sock_timeout
+setup_extract_count "88" lp_cve_2024_27398	CONFIG_BT	bluetooth  net/bluetooth/sco.c sco_sock_timeout
 
 setup_extract_count "170" lp_cve_2024_26923	CONFIG_UNIX	""	net/unix/garbage.c	unix_gc
 
-# FIXME: complains about missing KLP_RELOC_SYM while the cases above work as expected
-#setup_extract_count "10" lp_cve_2024_35950	CONFIG_DRM	""	drivers/gpu/drm/drm_client_modeset.c	drm_client_modeset_probe
+# FIXME: we should take a look into it to reduce the number of lines generated.
+setup_extract_count "830" lp_cve_2024_35950	CONFIG_DRM	""	drivers/gpu/drm/drm_client_modeset.c	drm_client_modeset_probe
 
-# FIXME: The case below is expanding headers, should be fixed by late externalization
+# FIXME: we should take a look into it to reduce the number of lines generated.
 setup_extract_count "2832" lp_cve_2021_47378	CONFIG_NVME_RDMA	nvme-rdma	drivers/nvme/host/rdma.c	nvme_rdma_free_queue nvme_rdma_cm_handler
