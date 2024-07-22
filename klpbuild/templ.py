@@ -554,7 +554,7 @@ class TemplateGen(Config):
         for src_file, fdata in self.get_cs_files(cs).items():
             if src and src != src_file:
                 continue
-            mod = fdata["module"]
+            mod = fdata["module"].replace("-", "_")
             objs.setdefault(mod, [])
             objs[mod].extend(fdata["symbols"])
 
