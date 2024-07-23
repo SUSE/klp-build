@@ -16,6 +16,7 @@ from collections import OrderedDict
 from pathlib import Path
 from pathlib import PurePath
 from threading import Lock
+from filelock import FileLock
 
 from natsort import natsorted
 
@@ -29,6 +30,9 @@ from klpbuild.templ import TemplateGen
 class Extractor(Config):
     def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, workers=4):
         super().__init__(lp_name, lp_filter)
+
+        self.sdir_lock = FileLock(Path(self.get_data_dir("x86_64"), "sdir.lock"))
+        self.sdir_lock.acquire()
 
         if not self.lp_path.exists():
             raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
@@ -61,6 +65,11 @@ class Extractor(Config):
 
         self.app = app
         self.tem = TemplateGen(self.lp_name, self.filter, self.app)
+
+    def __del__(self):
+        if self.sdir_lock:
+            self.sdir_lock.release()
+            os.remove(self.sdir_lock.lock_file)
 
     @staticmethod
     def unquote_output(matchobj):
