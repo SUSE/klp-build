@@ -121,29 +121,24 @@ class GitHelper(Config):
         patches_dir = Path(self.lp_path, "patches")
         shutil.rmtree(patches_dir, ignore_errors=True)
 
-        # Ensure that a testfile was created before preparing the patches
-        kgraft_tests_path = Path(Path().home(), "kgr", "kgraft-patches_testscripts")
-        test_sh = Path(kgraft_tests_path, f"{self.lp_name}_test_script.sh")
-        if not test_sh.is_file():
-            logging.warning(f"Test file {test_sh} not created.")
-        else:
-            subprocess.check_output(
-                [
-                    "/usr/bin/git",
-                    "-C",
-                    str(kgraft_tests_path),
-                    "format-patch",
-                    "-1",
-                    f"{test_sh}",
-                    "--cover-letter",
-                    "--start-number",
-                    "1",
-                    "--subject-prefix",
-                    f"PATCH {ver}",
-                    "--output-directory",
-                    f"{patches_dir}",
-                ]
-            )
+        test_src = self.get_tests_path()
+        subprocess.check_output(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(self.kgraft_tests_path),
+                "format-patch",
+                "-1",
+                f"{test_src}",
+                "--cover-letter",
+                "--start-number",
+                "1",
+                "--subject-prefix",
+                f"PATCH {ver}",
+                "--output-directory",
+                f"{patches_dir}",
+            ]
+        )
 
         # Filter only the branches related to this BSC
         for branch in self.branches:
