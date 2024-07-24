@@ -14,20 +14,21 @@ fi
 # directory of the current script is the bsc number
 bsc=$(basename "$(pwd)")
 
-TEST_SCRIPT="repro/${bsc}_test_script.sh"
-if [ ! -f "$TEST_SCRIPT" ]; then
-	echo "Missing $TEST_SCRIPT. Aborting."
-	exit 1
-fi
-
 # Remove any previous test output
 rm -rf tests.out/*
 
 # If the test has multiple files, it should be contained in a directory under
 # repro/$bsc, otherwise it's only one file under repro
-CONF_IN=repro/$bsc/config.in
-if [ ! -f "$CONF_IN" ]; then
-	CONF_IN=repro/${bsc}_config.in
+TEST_SCRIPT=repro/${bsc}_test_script.sh
+CONF_IN=repro/${bsc}_config.in
+if [ -d "repro/$bsc" ]; then
+	TEST_SCRIPT=repro/${bsc}/test_script.sh
+	CONF_IN=repro/$bsc/config.in
+fi
+
+if [ ! -f "$TEST_SCRIPT" ]; then
+	echo "Missing $TEST_SCRIPT. Aborting."
+	exit 1
 fi
 
 # Check multiple places where an updated version of the VMs can be found

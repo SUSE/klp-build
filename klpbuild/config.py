@@ -299,6 +299,26 @@ class Config:
             return Path(self.get_data_dir(arch), "lib", "modules", f"{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
         return self.get_data_dir(arch)
 
+    def get_tests_path(self):
+        self.kgraft_tests_path = Path(Path().home(), "kgr", "kgraft-patches_testscripts")
+        if not self.kgraft_tests_path.is_dir():
+            raise RuntimeError(f"Couldn't find {self.kgraft_tests_path}")
+
+        test_sh = Path(self.kgraft_tests_path, f"{self.lp_name}_test_script.sh")
+        test_dir_sh = Path(self.kgraft_tests_path, f"{self.lp_name}/test_script.sh")
+
+        if test_sh.is_file():
+            test_src = test_sh
+        elif test_dir_sh.is_file():
+            # For more complex tests we support using a directory containing
+            # as much files as needed. A `test_script.sh` is still required
+            # as an entry point.
+            test_src = Path(os.path.dirname(test_dir_sh))
+        else:
+            raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
+
+        return test_src
+
     def flush_cs_file(self):
         with open(self.cs_file, "w") as f:
             f.write(json.dumps(self.codestreams, indent=4))

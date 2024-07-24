@@ -314,11 +314,7 @@ class IBS(Config):
         # Download all built rpms
         self.download()
 
-        self.kgraft_tests_path = Path(Path().home(), "kgr", "kgraft-patches_testscripts")
-        if not self.kgraft_tests_path.is_dir():
-            raise RuntimeError("Couldn't find ~/kgr/kgraft-patches_testscripts")
-
-        test_sh = Path(self.kgraft_tests_path, f"{self.lp_name}_test_script.sh")
+        test_src = self.get_tests_path()
         run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
 
         for arch in ARCHS:
@@ -361,15 +357,19 @@ class IBS(Config):
 
                 build_cs.append(self.get_full_cs(cs))
 
-            # Prepare the config file used by kgr-test
-            config = Path(test_arch_path, "repro", f"{self.lp_name}_config.in")
+            # Prepare the config and test files used by kgr-test
+            test_dst = Path(test_arch_path, f"repro/{self.lp_name}")
+            if test_src.is_file():
+                shutil.copy(test_src, f"{test_dst}_test_script.sh")
+                config = f"{test_dst}_config.in"
+            else:
+                # Alternatively, we create test_dst as a directory containing
+                # at least a test_script.sh and a config.in
+                shutil.copytree(test_src, test_dst)
+                config = Path(test_dst, "config.in")
+
             with open(config, "w") as f:
                 f.write("\n".join(natsorted(build_cs)))
-
-            if test_sh.is_file():
-                shutil.copy(test_sh, Path(test_arch_path, "repro"))
-            else:
-                logging.warning(f"missing {test_sh}")
 
             subprocess.run(
                 ["tar", "-cJf", f"{self.lp_name}.tar.xz", f"{self.lp_name}"],
