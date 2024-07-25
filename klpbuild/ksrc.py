@@ -200,6 +200,11 @@ class GitHelper(Config):
             logging.info(f"No CVE informed, skipping the processing of getting the patches.")
             return {}
 
+        # Support CVEs from 2020 up to 2029
+        if not re.match(r"^202[0-9]-[0-9]{4,7}$", cve):
+            logging.info(f"Invalid CVE number {cve}, skipping the processing of getting the patches.")
+            return {}
+
         print("Fetching changes from all supported branches...")
 
         # Mount the command to fetch all branches for supported codestreams
