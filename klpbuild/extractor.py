@@ -31,7 +31,7 @@ class Extractor(Config):
     def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, workers=4):
         super().__init__(lp_name, lp_filter)
 
-        self.sdir_lock = FileLock(Path(self.get_data_dir("x86_64"), "sdir.lock"))
+        self.sdir_lock = FileLock(Path(self.get_data_dir(utils.ARCH), "sdir.lock"))
         self.sdir_lock.acquire()
 
         if not self.lp_path.exists():
