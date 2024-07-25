@@ -32,5 +32,6 @@ setuptools.setup(
         "natsort",
         "osc-tiny",
         "requests",
+        "filelock"
     ],
 )
