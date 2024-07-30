@@ -201,7 +201,7 @@ def get_exts(app, ibt_mod, ext_vars):
                 for sym in syms:
                     start = f"extern typeof({sym})"
                     lsym = f"{sym}"
-                    end = f"KLP_RELOC_SYMBOL({ibt_mod},{obj},{sym});"
+                    end = f"KLP_RELOC_SYMBOL({ibt_mod}, {obj}, {sym});"
 
                     if len(start + lsym + end) < 80:
                         ext_list.append(f"{start} {lsym} {end}")
