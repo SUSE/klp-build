@@ -201,7 +201,7 @@ class IBS(Config):
                 subprocess.check_output(rf'find {vmlinux_path} -name "*gz" -exec gzip -d -f {{}} \;', shell=True)
 
             # Use the SLE .config
-            shutil.copy(self.get_cs_boot_file(cs, ".config"), Path(self.get_odir(cs), ".config"))
+            shutil.copy(self.get_cs_kernel_config(cs, ARCH), Path(self.get_odir(cs), ".config"))
 
             # Recreate the build link to enable us to test the generated LP
             mod_path = Path(self.get_mod_path(cs, ARCH), "build")

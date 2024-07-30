@@ -248,6 +248,13 @@ class Config:
     def get_ktype(self, cs):
         return "rt" if self.cs_is_rt(cs) else "default"
 
+    # The config file is copied from boot/config-<version> to linux-obj when we
+    # extract the code, and after that we always check for the config on the
+    # -obj dir. Return the original path here so we can use this function on the
+    # extraction code.
+    def get_cs_kernel_config(self, cs, arch):
+        return Path(self.get_data_dir(arch), "boot", f"config-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
+
     def get_cs_boot_file(self, cs, file, arch=""):
         if file == "vmlinux":
             if self.kdir:
