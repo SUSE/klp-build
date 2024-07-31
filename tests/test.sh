@@ -52,13 +52,23 @@ setup_extract_count()
 #	lp_cve_2024_35950
 #	lp_cve_2021_47378
 LPS=$(cat << EOF
-lp_proc_cmdline_show		105 CONFIG_PROC_FS	vmlinux		fs/proc/cmdline.c cmdline_proc_show
-lp_cve_2021_22600		640 CONFIG_UNIX		af_packet	net/packet/af_packet.c	packet_set_ring
-lp_ipv6_route_multipath_add	700 CONFIG_IPV6		ipv6		net/ipv6/route.c	ip6_route_multipath_add
-lp_cve_2024_27398		88  CONFIG_BT		bluetooth	net/bluetooth/sco.c sco_sock_timeout
-lp_cve_2024_26923		170 CONFIG_UNIX		vmlinux		net/unix/garbage.c	unix_gc
-lp_cve_2024_35950		830 CONFIG_DRM		vmlinux		drivers/gpu/drm/drm_client_modeset.c	drm_client_modeset_probe
-lp_cve_2021_47378		2832 CONFIG_NVME_RDMA	nvme-rdma	drivers/nvme/host/rdma.c	nvme_rdma_free_queue nvme_rdma_cm_handler
+lp_proc_cmdline_show		105	CONFIG_PROC_FS	vmlinux		fs/proc/cmdline.c \
+									cmdline_proc_show
+lp_cve_2021_22600		640	CONFIG_UNIX	af_packet	net/packet/af_packet.c \
+									packet_set_ring
+lp_ipv6_route_multipath_add	700	CONFIG_IPV6	ipv6		net/ipv6/route.c \
+									ip6_route_multipath_add
+lp_cve_2024_27398		88	CONFIG_BT	bluetooth	net/bluetooth/sco.c \
+									sco_sock_timeout
+lp_cve_2024_26923		170	CONFIG_UNIX	vmlinux		net/unix/garbage.c \
+									unix_gc
+lp_cve_2024_35950		830	CONFIG_DRM	vmlinux		drivers/gpu/drm/drm_client_modeset.c \
+									drm_client_modeset_probe
+lp_cve_2021_47378		2832	CONFIG_NVME_RDMA nvme-rdma	drivers/nvme/host/rdma.c \
+									nvme_rdma_free_queue \
+									nvme_rdma_cm_handler
+lp_cve_2021_47402		194    CONFIG_NET_CLS_FLOWER cls_flower net/sched/cls_flower.c \
+									fl_walk
 EOF
 )
 
