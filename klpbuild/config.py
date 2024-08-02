@@ -19,6 +19,8 @@ from natsort import natsorted
 from klpbuild.utils import ARCH
 from klpbuild.utils import classify_codestreams
 
+from elftools.elf.elffile import ELFFile
+from elftools.elf.sections import SymbolTableSection
 
 class Config:
     def __init__(self, lp_name, lp_filter, kdir=False, data_dir=None, skips="", working_cs={}):
@@ -62,9 +64,9 @@ class Config:
         if not self.data.is_dir():
             raise ValueError("Data dir should be a directory")
 
-        # will contain the nm output from the to be livepatched object
-        # cache nm calls for the codestream : object
-        self.nm_out = {}
+        # will contain the symbols from the to be livepatched object
+        # cached by the codestream : object
+        self.obj_symbols = {}
 
         logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -405,25 +407,45 @@ class Config:
         keys = natsorted(full_cs.keys())
         return OrderedDict((k, full_cs[k]) for k in keys)
 
+    # Load the ELF object and return all symbols
+    def get_all_symbols_from_object(self, obj):
+        syms = []
+
+        with open(obj, "rb") as f:
+            elffile = ELFFile(f)
+            symbol_tables = [(idx, s) for idx, s in enumerate(elffile.iter_sections())
+                                 if isinstance(s, SymbolTableSection)]
+            for section_index, section in symbol_tables:
+                if not isinstance(section, SymbolTableSection):
+                    continue
+
+                if section['sh_entsize'] == 0:
+                    continue
+
+                for nsym, symbol in enumerate(section.iter_symbols()):
+                    syms.append(symbol.name)
+
+        return syms
+
     # Cache the output of nm by using the object path. It differs for each
     # codestream and architecture
     # Return all the symbols not found per arch/obj
     def check_symbol(self, arch, cs, mod, symbols):
-        self.nm_out.setdefault(arch, {})
-        self.nm_out[arch].setdefault(cs, {})
+        self.obj_symbols.setdefault(arch, {})
+        self.obj_symbols[arch].setdefault(cs, {})
 
-        if not self.nm_out[arch][cs].get(mod, ""):
+        if not self.obj_symbols[arch][cs].get(mod, ""):
             obj = self.get_module_obj(arch, cs, mod)
-            self.nm_out[arch][cs][mod] = subprocess.check_output(["nm", "--defined-only", obj]).decode().strip()
+            self.obj_symbols[arch][cs][mod] = self.get_all_symbols_from_object(obj)
 
         ret = []
 
         for symbol in symbols:
-            syms = re.findall(r"[\w]+ \w {}\n".format(symbol), self.nm_out[arch][cs][mod])
-            if len(syms) == 0:
+            nsyms = self.obj_symbols[arch][cs][mod].count(symbol)
+            if nsyms == 0:
                 ret.append(symbol)
 
-            elif len(syms) > 1:
+            elif nsyms > 1:
                 kernel = self.get_cs_kernel(cs)
                 print(f"WARNING: {cs}-{arch} ({kernel}): symbol {symbol} duplicated on {mod}")
 
