@@ -4,6 +4,8 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import copy
+import gzip
+import io
 import json
 import logging
 import os
@@ -342,7 +344,13 @@ class Config:
         if not obj:
             obj = self.find_module_obj(arch, cs, module)
 
-        return str(Path(self.get_mod_path(cs, arch, module), obj))
+        tmp_path = Path(self.get_mod_path(cs, arch, module), obj)
+        if not tmp_path.exists():
+            # For vmlinux files, we can have it uncompress it decompressed
+            if not self.is_mod(module):
+                return Path(str(tmp_path) + ".gz")
+
+        return tmp_path
 
     # Return only the name of the module to be livepatched
     def find_module_obj(self, arch, cs, mod, check_support=False):
@@ -412,20 +420,28 @@ class Config:
         syms = []
 
         with open(obj, "rb") as f:
-            elffile = ELFFile(f)
+            data = f.read()
 
-            for sec in elffile.iter_sections():
-                if not isinstance(sec, SymbolTableSection):
-                    continue
+        # FIXME: use magic lib instead of checking the file extension
+        if str(obj).endswith(".gz"):
+            io_bytes = io.BytesIO(gzip.decompress(data))
+        else:
+            io_bytes = io.BytesIO(data)
 
-                if sec['sh_entsize'] == 0:
-                    continue
+        elffile = ELFFile(io_bytes)
 
-                for symbol in sec.iter_symbols():
-                    if str(symbol["st_shndx"]) == "SHN_UNDEF" and not defined:
-                        syms.append(symbol.name)
-                    elif str(symbol["st_shndx"]) != "SHN_UNDEF" and defined:
-                        syms.append(symbol.name)
+        for sec in elffile.iter_sections():
+            if not isinstance(sec, SymbolTableSection):
+                continue
+
+            if sec['sh_entsize'] == 0:
+                continue
+
+            for symbol in sec.iter_symbols():
+                if str(symbol["st_shndx"]) == "SHN_UNDEF" and not defined:
+                    syms.append(symbol.name)
+                elif str(symbol["st_shndx"]) != "SHN_UNDEF" and defined:
+                    syms.append(symbol.name)
 
         return syms
 
