@@ -340,8 +340,8 @@ class Extractor(Config):
             if self.apply_patches:
                 self.remove_patches(cs, self.quilt_log)
 
-            # Map all symbols related to each obj, to make it check the output
-            # of nm only once per object
+            # Map all symbols related to each obj, to make it check the symbols
+            # only once per object
             obj_syms = {}
             for f, fdata in self.get_cs_files(cs).items():
                 for obj, syms in fdata["ext_symbols"].items():

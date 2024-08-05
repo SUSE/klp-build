@@ -408,26 +408,28 @@ class Config:
         return OrderedDict((k, full_cs[k]) for k in keys)
 
     # Load the ELF object and return all symbols
-    def get_all_symbols_from_object(self, obj):
+    def get_all_symbols_from_object(self, obj, defined):
         syms = []
 
         with open(obj, "rb") as f:
             elffile = ELFFile(f)
-            symbol_tables = [(idx, s) for idx, s in enumerate(elffile.iter_sections())
-                                 if isinstance(s, SymbolTableSection)]
-            for section_index, section in symbol_tables:
-                if not isinstance(section, SymbolTableSection):
+
+            for sec in elffile.iter_sections():
+                if not isinstance(sec, SymbolTableSection):
                     continue
 
-                if section['sh_entsize'] == 0:
+                if sec['sh_entsize'] == 0:
                     continue
 
-                for nsym, symbol in enumerate(section.iter_symbols()):
-                    syms.append(symbol.name)
+                for symbol in sec.iter_symbols():
+                    if str(symbol["st_shndx"]) == "SHN_UNDEF" and not defined:
+                        syms.append(symbol.name)
+                    elif str(symbol["st_shndx"]) != "SHN_UNDEF" and defined:
+                        syms.append(symbol.name)
 
         return syms
 
-    # Cache the output of nm by using the object path. It differs for each
+    # Cache the symbols using the object path. It differs for each
     # codestream and architecture
     # Return all the symbols not found per arch/obj
     def check_symbol(self, arch, cs, mod, symbols):
@@ -436,7 +438,7 @@ class Config:
 
         if not self.obj_symbols[arch][cs].get(mod, ""):
             obj = self.get_module_obj(arch, cs, mod)
-            self.obj_symbols[arch][cs][mod] = self.get_all_symbols_from_object(obj)
+            self.obj_symbols[arch][cs][mod] = self.get_all_symbols_from_object(obj, True)
 
         ret = []
 

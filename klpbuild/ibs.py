@@ -241,21 +241,16 @@ class IBS(Config):
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):
         vmlinux_path = self.get_cs_boot_file(cs, "vmlinux", arch)
-        vmlinux_syms = subprocess.check_output(
-            ["nm", "--defined-only", str(vmlinux_path)], stderr=subprocess.STDOUT
-        ).decode()
+        vmlinux_syms = self.get_all_symbols_from_object(vmlinux_path, True)
 
         # Get list of UNDEFINED symbols from the livepatch module
-        out = subprocess.check_output(["nm", "--undefined-only", str(lp_mod_path)], stderr=subprocess.STDOUT).decode()
-
-        # Remove the U flag from every line
-        lp_und_symbols = re.findall(r"\s+U\s([\w]+)", out)
+        lp_und_symbols = self.get_all_symbols_from_object(lp_mod_path, False)
 
         missing_syms = []
         # Find all UNDEFINED symbols that exists in the livepatch module that
         # aren't defined in the vmlinux
         for sym in lp_und_symbols:
-            if not re.search(f" {sym}", vmlinux_syms):
+            if sym not in vmlinux_syms:
                 missing_syms.append(sym)
 
         return missing_syms
