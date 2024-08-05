@@ -273,17 +273,14 @@ class IBS(Config):
         cmd = f"rpm2cpio {fdest} | cpio --quiet -uidm"
         subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
 
-        lp_mod_path = Path(rpm_dir, "lib", "modules", f"{self.get_cs_kernel(cs)}-{ktype}", dir_path, lp_file)
-        out = subprocess.check_output(["/sbin/modinfo", str(lp_mod_path)], stderr=subprocess.STDOUT).decode()
-
         # Check depends field
         # At this point we found that our livepatch module depends on
         # exported functions from other modules. List the modules here.
-        match = re.search("depends:(.+)", out)
-        if match:
-            deps = match.group(1).strip()
-            if len(deps):
-                logging.warning(f"{cs}:{arch} has dependencies: {deps}.")
+        lp_mod_path = Path(rpm_dir, "lib", "modules", f"{self.get_cs_kernel(cs)}-{ktype}", dir_path, lp_file)
+        elffile = self.get_elf_object(lp_mod_path)
+        deps = self.get_modinfo_entry(elffile, "depends")
+        if len(deps):
+            logging.warning(f"{cs}:{arch} has dependencies: {deps}.")
 
         funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
         if funcs:

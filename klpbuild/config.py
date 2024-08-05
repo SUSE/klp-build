@@ -21,6 +21,7 @@ from natsort import natsorted
 from klpbuild.utils import ARCH
 from klpbuild.utils import classify_codestreams
 
+from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
@@ -375,9 +376,8 @@ class Config:
 
         if check_support:
             # Validate if the module being livepatches is supported or not
-            out = subprocess.check_output(["/sbin/modinfo", obj], cwd=mod_path, stderr=subprocess.STDOUT).decode()
-
-            if re.search(r"supported:\s+no", out):
+            elffile = self.get_elf_object(Path(mod_path, obj))
+            if "no" == self.get_elf_modinfo_entry(elffile, "supported"):
                 print(f"WARN: {cs}-{arch} ({kernel}): Module {mod} is not supported by SLE")
 
         return obj
@@ -415,10 +415,20 @@ class Config:
         keys = natsorted(full_cs.keys())
         return OrderedDict((k, full_cs[k]) for k in keys)
 
-    # Load the ELF object and return all symbols
-    def get_all_symbols_from_object(self, obj, defined):
-        syms = []
+    def get_elf_modinfo_entry(self, elffile, conf):
+        sec = elffile.get_section_by_name(".modinfo")
+        if not sec:
+            return None
 
+        # Iterate over all info on modinfo section
+        for line in bytes2str(sec.data()).split("\0"):
+            if conf in line:
+                key, val = line.split("=")
+                return val.strip()
+
+        return ""
+
+    def get_elf_object(self, obj):
         with open(obj, "rb") as f:
             data = f.read()
 
@@ -428,8 +438,13 @@ class Config:
         else:
             io_bytes = io.BytesIO(data)
 
-        elffile = ELFFile(io_bytes)
+        return ELFFile(io_bytes)
 
+    # Load the ELF object and return all symbols
+    def get_all_symbols_from_object(self, obj, defined):
+        syms = []
+
+        elffile = self.get_elf_object(obj)
         for sec in elffile.iter_sections():
             if not isinstance(sec, SymbolTableSection):
                 continue
