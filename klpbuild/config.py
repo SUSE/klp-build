@@ -25,6 +25,8 @@ from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
+import zstandard
+
 class Config:
     def __init__(self, lp_name, lp_filter, kdir=False, data_dir=None, skips="", working_cs={}):
         work_dir = os.getenv("KLP_WORK_DIR")
@@ -366,13 +368,17 @@ class Config:
 
         mod_path = self.get_mod_path(cs, arch, mod)
         with open(Path(mod_path, "modules.order")) as f:
-            obj = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
-            if not obj:
+            obj_match = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
+            if not obj_match:
                 raise RuntimeError(f"{cs}-{arch} ({kernel}): Module not found: {mod}")
 
         # if kdir if set, modules.order will show the module with suffix .o, so
-        # make sure the extension
-        obj = str(PurePath(obj.group(1)).with_suffix(".ko"))
+        # make sure the extension. Also check for multiple extensions since we
+        # can have modules being compressed using different algorithms.
+        for ext in [".ko", ".ko.zst", ".ko.gz"]:
+            obj = str(PurePath(obj_match.group(1)).with_suffix(ext))
+            if Path(mod_path, obj).exists():
+                break
 
         if check_support:
             # Validate if the module being livepatches is supported or not
@@ -435,6 +441,9 @@ class Config:
         # FIXME: use magic lib instead of checking the file extension
         if str(obj).endswith(".gz"):
             io_bytes = io.BytesIO(gzip.decompress(data))
+        elif str(obj).endswith(".zst"):
+            dctx = zstandard.ZstdDecompressor()
+            io_bytes = io.BytesIO(dctx.decompress(data))
         else:
             io_bytes = io.BytesIO(data)
 

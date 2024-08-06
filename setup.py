@@ -33,6 +33,7 @@ setuptools.setup(
         "osc-tiny",
         "requests",
         "filelock",
-        "pyelftools"
+        "pyelftools",
+        "zstandard"
     ],
 )
