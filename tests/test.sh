@@ -65,6 +65,8 @@ lp_cve_2021_47378		958	CONFIG_NVME_RDMA nvme-rdma	drivers/nvme/host/rdma.c \
 									nvme_rdma_cm_handler
 lp_cve_2021_47402		197    CONFIG_NET_CLS_FLOWER cls_flower net/sched/cls_flower.c \
 									fl_walk
+lp_cve_2024_40909		155	CONFIG_BPF_SYSCALL  vmlinux	kernel/bpf/syscall.c \
+									bpf_link_free
 EOF
 )
 
