@@ -373,22 +373,33 @@ class GitHelper(Config):
             if not suse_commits:
                 continue
 
+            tag_commits = {}
+
             # Grab only the first commit, since they would be put together
             # in a release either way. The order of the array is backards, the
             # first entry will be the last patch found.
-            suse_commit = suse_commits[-1]
+            for su in suse_commits:
+                tag_commits[su] = []
 
-            tags = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "tag",
-                                            f"--contains={suse_commit}",
-                                            "rpm-*"])
+                tags = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "tag",
+                                                f"--contains={su}",
+                                                "rpm-*"])
 
-            for tag in tags.decode().splitlines():
-                # Remove noise around the kernel version, like
-                # rpm-5.3.18-150200.24.112--sle15-sp2-ltss-updates
-                if "--" in tag:
-                    continue
+                for tag in tags.decode().splitlines():
+                    # Remove noise around the kernel version, like
+                    # rpm-5.3.18-150200.24.112--sle15-sp2-ltss-updates
+                    if "--" in tag:
+                        continue
 
-                patched.append(tag.replace("rpm-", ""))
+                    tag = tag.replace("rpm-", "")
+                    tag_commits.setdefault(tag, [])
+                    tag_commits[tag].append(su)
+
+            # "patched branches" are those who contain all commits
+            total_commits = len(suse_commits)
+            for tag, b in tag_commits.items():
+                if len(b) == total_commits:
+                    patched.append(tag)
 
         # remove duplicates
         return natsorted(list(set(patched)))
