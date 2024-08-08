@@ -378,19 +378,17 @@ class GitHelper(Config):
             # first entry will be the last patch found.
             suse_commit = suse_commits[-1]
 
-            tags = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "tag", f"--contains={suse_commit}"])
+            tags = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "tag",
+                                            f"--contains={suse_commit}",
+                                            "rpm-*"])
 
             for tag in tags.decode().splitlines():
-                tag = tag.strip()
-                if not tag.startswith("rpm-"):
-                    continue
-
                 # Remove noise around the kernel version, like
                 # rpm-5.3.18-150200.24.112--sle15-sp2-ltss-updates
-                tag = tag.replace("rpm-", "")
-                tag = re.sub("--.*", "", tag)
+                if "--" in tag:
+                    continue
 
-                patched.append(tag)
+                patched.append(tag.replace("rpm-", ""))
 
         # remove duplicates
         return natsorted(list(set(patched)))
