@@ -3,6 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import configparser
 import copy
 import gzip
 import io
@@ -29,13 +30,22 @@ import zstandard
 
 class Config:
     def __init__(self, lp_name, lp_filter, kdir=False, data_dir=None, skips="", working_cs={}):
-        work_dir = os.getenv("KLP_WORK_DIR")
-        if not work_dir:
-            raise ValueError("KLP_WORK_DIR should be defined")
+        # FIXME: Config is instantiated multiple times, meaning that the
+        # config file gets loaded and the logs are printed as many times.
 
-        work = Path(work_dir)
-        if not work.is_dir():
-            raise ValueError("Work dir should be a directory")
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+        home = Path.home()
+        self.user_conf_file = Path(home, ".config/klp-build/config")
+        if not self.user_conf_file.is_file():
+            logging.warning(f"Warning: user configuration file not found")
+            # If there's no configuration file assume fresh install.
+            # Prepare the system with a default environment and conf.
+            self.setup_user_env(Path(home, "klp"))
+
+        self.load_user_conf()
+
+        work = self.get_user_path('work_dir')
 
         self.lp_name = lp_name
         self.lp_path = Path(work, self.lp_name)
@@ -61,19 +71,56 @@ class Config:
         self.kdir = self.conf.get("kdir", False)
         self.data = Path(self.conf.get("data", "non-existent"))
         if not self.data.exists():
-            data_dir = os.getenv("KLP_DATA_DIR", "")
-            if not data_dir:
-                raise ValueError("KLP_DATA_DIR should be defined")
-            self.data = Path(data_dir)
-
-        if not self.data.is_dir():
-            raise ValueError("Data dir should be a directory")
+            self.data = self.get_user_path('data_dir')
 
         # will contain the symbols from the to be livepatched object
         # cached by the codestream : object
         self.obj_symbols = {}
 
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    def setup_user_env(self, basedir):
+        workdir = Path(basedir, "livepatches")
+        datadir = Path(basedir, "data")
+
+        config = configparser.ConfigParser(allow_no_value=True)
+        config['Paths'] = {'work_dir': workdir,
+                           'data_dir': datadir,
+                           '## SUSE internal use only ##': None}
+
+        logging.info(f"Creating default user configuration: '{self.user_conf_file}'")
+        os.makedirs(os.path.dirname(self.user_conf_file), exist_ok=True)
+        with open(self.user_conf_file, 'w') as f:
+            config.write(f)
+
+        os.makedirs(workdir, exist_ok=True)
+        os.makedirs(datadir, exist_ok=True)
+
+    def load_user_conf(self):
+        config = configparser.ConfigParser()
+        logging.info(f"Loading user configuration from '{self.user_conf_file}'")
+        config.read(self.user_conf_file)
+
+        # Check mandatory fields
+        if 'Paths' not in config:
+            raise ValueError(f"config: 'Paths' section not found")
+
+        self.user_conf = config
+
+    def get_user_path(self, entry, isdir=True, isopt=False):
+        if entry not in self.user_conf['Paths']:
+            if isopt:
+                return ""
+            raise ValueError(f"config: '{entry}' entry not found")
+
+        p = Path(self.user_conf['Paths'][entry])
+        if not p.exists():
+            raise ValueError(f"'{p}' file or directory not found")
+        if isdir and not p.is_dir():
+                 raise ValueError("{p} should be a directory")
+        if not isdir and not p.is_file():
+                 raise ValueError("{p} should be a file")
+
+        return p
 
     def lp_out_file(self, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'

@@ -24,6 +24,7 @@ setuptools.setup(
         "console_scripts": ["klp-build=klpbuild.main:main"],
     },
     install_requires=[
+        "configparser",
         "cached_property",
         "GitPython",
         "lxml",
