@@ -462,6 +462,9 @@ class Config:
                 continue
 
             for symbol in sec.iter_symbols():
+                # Somehow we end up receiving an empty symbol
+                if not symbol.name:
+                    continue
                 if str(symbol["st_shndx"]) == "SHN_UNDEF" and not defined:
                     syms.append(symbol.name)
                 elif str(symbol["st_shndx"]) != "SHN_UNDEF" and defined:
