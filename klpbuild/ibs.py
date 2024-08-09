@@ -278,7 +278,7 @@ class IBS(Config):
         # exported functions from other modules. List the modules here.
         lp_mod_path = Path(rpm_dir, "lib", "modules", f"{self.get_cs_kernel(cs)}-{ktype}", dir_path, lp_file)
         elffile = self.get_elf_object(lp_mod_path)
-        deps = self.get_modinfo_entry(elffile, "depends")
+        deps = self.get_elf_modinfo_entry(elffile, "depends")
         if len(deps):
             logging.warning(f"{cs}:{arch} has dependencies: {deps}.")
 
