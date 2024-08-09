@@ -166,6 +166,15 @@ class Setup(Config):
 
         return f"{repo}_Products_SLERT_Update"
 
+    def cs_is_affected(self, cs):
+        sle, sp, up, rt = self.get_cs_tuple(cs)
+
+        to_check = f"{sle}.{sp}"
+        if rt:
+            to_check = f"{sle}.{sp}rt"
+
+        return len(self.conf["commits"][to_check]["commits"]) > 0
+
     def setup_codestreams(self):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
@@ -185,6 +194,7 @@ class Setup(Config):
         # list of codestreams that matches the file-funcs argument
         self.working_cs = OrderedDict()
         patched_cs = []
+        unaffected_cs = []
 
         if self.no_check:
             logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
@@ -195,9 +205,14 @@ class Setup(Config):
                 continue
 
             # Skip patched codestreams
-            if data["kernel"] in patched_kernels and not self.no_check:
-                patched_cs.append(cs)
-                continue
+            if not self.no_check:
+                if data["kernel"] in patched_kernels:
+                    patched_cs.append(cs)
+                    continue
+
+                if not self.cs_is_affected(cs):
+                    unaffected_cs.append(cs)
+                    continue
 
             data["files"] = copy.deepcopy(self.file_funcs)
             data["repo"] = self.cs_repo(cs)
@@ -218,6 +233,11 @@ class Setup(Config):
         if patched_cs:
             cs_list = utils.classify_codestreams(patched_cs)
             logging.info("Skipping already patched codestreams:")
+            logging.info(f'\t{" ".join(cs_list)}')
+
+        if unaffected_cs:
+            cs_list = utils.classify_codestreams(unaffected_cs)
+            logging.info("Skipping unaffected codestreams (missing backports):")
             logging.info(f'\t{" ".join(cs_list)}')
 
         if not self.working_cs.keys():
