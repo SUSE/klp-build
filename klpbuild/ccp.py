@@ -17,15 +17,9 @@ class CCP(Config):
 
         self.env = os.environ
 
-        # Prefer the env var to the HOME directory location
-        ccp_path = os.getenv("KLP_CCP_PATH", "")
-        if ccp_path and not Path(ccp_path).is_file():
-            raise RuntimeError("KLP_CCP_PATH does not point to a file")
-
-        elif not ccp_path:
-            ccp_path = shutil.which("klp-ccp")
-            if not ccp_path:
-                raise RuntimeError("klp-ccp not found. Aborting.")
+        ccp_path = shutil.which("klp-ccp")
+        if not ccp_path:
+            raise RuntimeError("klp-ccp not found. Aborting.")
 
         self.ccp_path = str(ccp_path)
 
