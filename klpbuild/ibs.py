@@ -189,14 +189,14 @@ class IBS(Config):
             for arch in self.get_cs_archs(cs):
                 # Extract modules and vmlinux files that are compressed
                 mod_path = Path(self.get_data_dir(arch), "lib", "modules")
-                for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d")]:
+                for fext, ecmd in [("zst", "unzstd -f -d"), ("xz", "xz --quiet -d -k")]:
                     cmd = rf'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
                 # Extract all gzipped files under arch//boot, including vmlinux,
                 # symvers and maybe others.
                 vmlinux_path = Path(self.get_data_dir(arch), "boot")
-                subprocess.check_output(rf'find {vmlinux_path} -name "*gz" -exec gzip -d -f {{}} \;', shell=True)
+                subprocess.check_output(rf'find {vmlinux_path} -name "*gz" -exec gzip -k -d -f {{}} \;', shell=True)
 
             # Use the SLE .config
             shutil.copy(self.get_cs_kernel_config(cs, ARCH), Path(self.get_odir(cs), ".config"))
