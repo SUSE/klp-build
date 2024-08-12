@@ -37,8 +37,6 @@ class IBS(Config):
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
-        self.kgraft_path = self.get_user_path('kgraft-patches')
-
         self.ksrc = GitHelper(self.lp_name, self.filter, False, None)
 
         # Total number of work items
@@ -535,9 +533,11 @@ class IBS(Config):
 
         self.osc.packages.checkout(prj, "klp", prj_path)
 
+        kgraft_path = self.get_user_path('kgraft-patches')
+
         # Get the code from codestream
         subprocess.check_output(
-            ["/usr/bin/git", "clone", "--single-branch", "-b", branch, str(self.kgraft_path), str(code_path)],
+            ["/usr/bin/git", "clone", "--single-branch", "-b", branch, str(kgraft_path), str(code_path)],
             stderr=subprocess.STDOUT,
         )
 
