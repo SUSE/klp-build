@@ -13,8 +13,6 @@ from tests import utils
 
 class TemplTesting(utils.TestUtils):
     def setUp(self):
-        os.environ["KLP_KERNEL_SOURCE"] = ""
-
         logging.disable(logging.INFO)
         logging.disable(logging.WARNING)
 

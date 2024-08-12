@@ -17,30 +17,13 @@ class CCP(Config):
 
         self.env = os.environ
 
-        # Prefer the env var to the HOME directory location
-        ccp_path = os.getenv("KLP_CCP_PATH", "")
-        if ccp_path and not Path(ccp_path).is_file():
-            raise RuntimeError("KLP_CCP_PATH does not point to a file")
-
-        elif not ccp_path:
-            ccp_path = shutil.which("klp-ccp")
-            if not ccp_path:
-                raise RuntimeError("klp-ccp not found. Aborting.")
+        ccp_path = shutil.which("klp-ccp")
+        if not ccp_path:
+            raise RuntimeError("klp-ccp not found. Aborting.")
 
         self.ccp_path = str(ccp_path)
 
-        pol_path = os.getenv("KLP_CCP_POL_PATH")
-        if pol_path and not Path(pol_path).is_dir():
-            raise RuntimeError("KLP_CCP_POL_PATH does not point to a directory")
-
-        elif not pol_path:
-            pol_path = Path(Path().home(), "kgr", "scripts", "ccp-pol")
-            if not pol_path.is_dir():
-                raise RuntimeError(
-                    "ccp-pol not found at ~/kgr/scripts/ccp-pol/.  Please set KLP_CCP_POL_PATH env var to a valid ccp-pol directory"
-                )
-
-        self.pol_path = str(pol_path)
+        self.pol_path = self.get_user_path('ccp_pol_dir')
 
         # List of symbols that are currently not resolvable for klp-ccp
         avoid_syms = [

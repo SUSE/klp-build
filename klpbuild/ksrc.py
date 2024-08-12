@@ -24,9 +24,7 @@ class GitHelper(Config):
     def __init__(self, lp_name, lp_filter, kdir, data_dir):
         super().__init__(lp_name, lp_filter, kdir, data_dir)
 
-        self.kern_src = os.getenv("KLP_KERNEL_SOURCE", "")
-        if self.kern_src and not Path(self.kern_src).is_dir():
-            raise ValueError("KLP_KERNEL_SOURCE should point to a directory")
+        self.kern_src = self.get_user_path('kernel_src_dir', isopt=True)
 
         self.kernel_branches = {
             "12.5": "SLE12-SP5",
@@ -43,9 +41,9 @@ class GitHelper(Config):
 
         self.branches = []
 
-        self.kgr_patches = Path(Path().home(), "kgr", "kgraft-patches")
-        if not self.kgr_patches.is_dir():
-            logging.warning("kgraft-patches does not exists in ~/kgr")
+        self.kgr_patches = self.get_user_path('kgraft-patches', isopt=True)
+        if not self.kgr_patches:
+            logging.warning("patches_dir not found")
         else:
             # Filter only the branches related to this BSC
             repo = git.Repo(self.kgr_patches).branches
@@ -56,8 +54,8 @@ class GitHelper(Config):
     def get_cs_branch(self, cs):
         cs_sle, sp, cs_up, rt = self.get_cs_tuple(cs)
 
-        if not self.kgr_patches.is_dir():
-            logging.warning("kgraft-patches does not exists in ~/kgr")
+        if not self.kgr_patches:
+            logging.warning("patches_dir not found")
             return ""
 
         branch_name = ""
@@ -115,8 +113,8 @@ class GitHelper(Config):
         # index 1 will be the test file
         index = 2
 
-        if not self.kgr_patches.is_dir():
-            logging.warning("kgraft-patches does not exists in ~/kgr, patches will be incomplete")
+        if not self.kgr_patches:
+            logging.warning("patches_dir not found, patches will be incomplete")
 
         # Remove dir to avoid leftover patches with different names
         patches_dir = Path(self.lp_path, "patches")
@@ -193,7 +191,7 @@ class GitHelper(Config):
 
     def get_commits(self, cve):
         if not self.kern_src:
-            logging.info("KLP_KERNEL_SOURCE not defined, skip getting SUSE commits")
+            logging.info("kernel_src_dir not found, skip getting SUSE commits")
             return {}
 
         # ensure that the user informed the commits at least once per 'project'
@@ -363,7 +361,7 @@ class GitHelper(Config):
             return []
 
         if not self.kern_src:
-            logging.info("KLP_KERNEL_SOURCE not defined, skip getting SUSE commits")
+            logging.info("kernel_src_dir not found, skip getting SUSE commits")
             return []
 
         print("Searching for already patched codestreams...")

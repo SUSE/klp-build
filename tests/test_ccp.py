@@ -13,8 +13,6 @@ from tests import utils
 
 class CcpTesting(utils.TestUtils):
     def setUp(self):
-        os.environ["KLP_KERNEL_SOURCE"] = ""
-
         logging.disable(logging.INFO)
 
     def test_detect_file_without_ftrace_support(self):
