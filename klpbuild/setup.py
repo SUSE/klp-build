@@ -167,6 +167,12 @@ class Setup(Config):
         return f"{repo}_Products_SLERT_Update"
 
     def cs_is_affected(self, cs):
+        # We can only check if the cs is affected or not if the CVE was informed
+        # (so we can get all commits related to that specific CVE). Otherwise we
+        # consider all codestreams as affected.
+        if not self.conf.get("cve", ""):
+            return True
+
         sle, sp, up, rt = self.get_cs_tuple(cs)
 
         to_check = f"{sle}.{sp}"
