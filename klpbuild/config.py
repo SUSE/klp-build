@@ -428,7 +428,7 @@ class Config:
 
         # Iterate over all info on modinfo section
         for line in bytes2str(sec.data()).split("\0"):
-            if conf in line:
+            if line.startswith(conf):
                 key, val = line.split("=")
                 return val.strip()
 
