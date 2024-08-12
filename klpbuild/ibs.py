@@ -37,9 +37,7 @@ class IBS(Config):
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
-        self.kgraft_path = Path(Path().home(), "kgr", "kgraft-patches")
-        if not self.kgraft_path.is_dir():
-            raise RuntimeError("Couldn't find ~/kgr/kgraft-patches")
+        self.kgraft_path = self.get_user_path('kgraft-patches')
 
         self.ksrc = GitHelper(self.lp_name, self.filter, False, None)
 

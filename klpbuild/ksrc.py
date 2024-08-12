@@ -41,9 +41,9 @@ class GitHelper(Config):
 
         self.branches = []
 
-        self.kgr_patches = Path(Path().home(), "kgr", "kgraft-patches")
-        if not self.kgr_patches.is_dir():
-            logging.warning("kgraft-patches does not exists in ~/kgr")
+        self.kgr_patches = self.get_user_path('kgraft-patches', isopt=True)
+        if not self.kgr_patches:
+            logging.warning("patches_dir not found")
         else:
             # Filter only the branches related to this BSC
             repo = git.Repo(self.kgr_patches).branches
@@ -54,8 +54,8 @@ class GitHelper(Config):
     def get_cs_branch(self, cs):
         cs_sle, sp, cs_up, rt = self.get_cs_tuple(cs)
 
-        if not self.kgr_patches.is_dir():
-            logging.warning("kgraft-patches does not exists in ~/kgr")
+        if not self.kgr_patches:
+            logging.warning("patches_dir not found")
             return ""
 
         branch_name = ""
@@ -113,8 +113,8 @@ class GitHelper(Config):
         # index 1 will be the test file
         index = 2
 
-        if not self.kgr_patches.is_dir():
-            logging.warning("kgraft-patches does not exists in ~/kgr, patches will be incomplete")
+        if not self.kgr_patches:
+            logging.warning("patches_dir not found, patches will be incomplete")
 
         # Remove dir to avoid leftover patches with different names
         patches_dir = Path(self.lp_path, "patches")

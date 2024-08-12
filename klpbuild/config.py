@@ -86,6 +86,7 @@ class Config:
 
         config['Paths'] = {'work_dir': workdir,
                            'data_dir': datadir,
+                           '#patches_dir': 'kgraft-patches/',
                            '## SUSE internal use only ##': None,
                            '#kernel_src_dir': 'kernel-src/',
                            '#ccp_pol_dir': 'kgr-scripts/ccp-pol/',
