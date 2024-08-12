@@ -87,7 +87,8 @@ class Config:
         config['Paths'] = {'work_dir': workdir,
                            'data_dir': datadir,
                            '## SUSE internal use only ##': None,
-                           '#kernel_src_dir': 'kernel-src/'}
+                           '#kernel_src_dir': 'kernel-src/',
+                           '#ccp_pol_dir': 'kgr-scripts/ccp-pol/'}
 
         logging.info(f"Creating default user configuration: '{self.user_conf_file}'")
         os.makedirs(os.path.dirname(self.user_conf_file), exist_ok=True)
