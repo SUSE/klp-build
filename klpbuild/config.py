@@ -83,9 +83,11 @@ class Config:
         datadir = Path(basedir, "data")
 
         config = configparser.ConfigParser(allow_no_value=True)
+
         config['Paths'] = {'work_dir': workdir,
                            'data_dir': datadir,
-                           '## SUSE internal use only ##': None}
+                           '## SUSE internal use only ##': None,
+                           '#kernel_src_dir': 'kernel-src/'}
 
         logging.info(f"Creating default user configuration: '{self.user_conf_file}'")
         os.makedirs(os.path.dirname(self.user_conf_file), exist_ok=True)

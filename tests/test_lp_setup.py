@@ -14,9 +14,6 @@ from tests import utils
 
 class LpSetupTest(utils.TestUtils):
     def setUp(self):
-        # Avoid searching for patches kernels
-        os.environ["KLP_KERNEL_SOURCE"] = ""
-
         logging.disable(logging.INFO)
 
     def test_missing_conf_archs(self):
