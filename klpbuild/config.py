@@ -88,7 +88,8 @@ class Config:
                            'data_dir': datadir,
                            '## SUSE internal use only ##': None,
                            '#kernel_src_dir': 'kernel-src/',
-                           '#ccp_pol_dir': 'kgr-scripts/ccp-pol/'}
+                           '#ccp_pol_dir': 'kgr-scripts/ccp-pol/',
+                           '#patches_tests_dir': 'kgraft-patches_testscripts/'}
 
         logging.info(f"Creating default user configuration: '{self.user_conf_file}'")
         os.makedirs(os.path.dirname(self.user_conf_file), exist_ok=True)
@@ -364,9 +365,7 @@ class Config:
         return self.get_data_dir(arch)
 
     def get_tests_path(self):
-        self.kgraft_tests_path = Path(Path().home(), "kgr", "kgraft-patches_testscripts")
-        if not self.kgraft_tests_path.is_dir():
-            raise RuntimeError(f"Couldn't find {self.kgraft_tests_path}")
+        self.kgraft_tests_path = self.get_user_path('patches_tests_dir')
 
         test_sh = Path(self.kgraft_tests_path, f"{self.lp_name}_test_script.sh")
         test_dir_sh = Path(self.kgraft_tests_path, f"{self.lp_name}/test_script.sh")
