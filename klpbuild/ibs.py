@@ -533,7 +533,7 @@ class IBS(Config):
 
         self.osc.packages.checkout(prj, "klp", prj_path)
 
-        kgraft_path = self.get_user_path('kgraft-patches')
+        kgraft_path = self.get_user_path('kgr_patches_dir')
 
         # Get the code from codestream
         subprocess.check_output(

@@ -86,11 +86,11 @@ class Config:
 
         config['Paths'] = {'work_dir': workdir,
                            'data_dir': datadir,
-                           '#patches_dir': 'kgraft-patches/',
                            '## SUSE internal use only ##': None,
+                           '#kgr_patches_dir': 'kgraft-patches/',
+                           '#kgr_patches_tests_dir': 'kgraft-patches_testscripts/',
                            '#kernel_src_dir': 'kernel-src/',
-                           '#ccp_pol_dir': 'kgr-scripts/ccp-pol/',
-                           '#patches_tests_dir': 'kgraft-patches_testscripts/'}
+                           '#ccp_pol_dir': 'kgr-scripts/ccp-pol/'}
 
         logging.info(f"Creating default user configuration: '{self.user_conf_file}'")
         os.makedirs(os.path.dirname(self.user_conf_file), exist_ok=True)
@@ -366,7 +366,7 @@ class Config:
         return self.get_data_dir(arch)
 
     def get_tests_path(self):
-        self.kgraft_tests_path = self.get_user_path('patches_tests_dir')
+        self.kgraft_tests_path = self.get_user_path('kgr_patches_tests_dir')
 
         test_sh = Path(self.kgraft_tests_path, f"{self.lp_name}_test_script.sh")
         test_dir_sh = Path(self.kgraft_tests_path, f"{self.lp_name}/test_script.sh")
