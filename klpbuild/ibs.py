@@ -183,18 +183,23 @@ class IBS(Config):
 
         # Create a list of paths pointing to lib/modules for each downloaded
         # codestream
-        for cs in cs_list:
+        for cs, data in cs_list.items():
             for arch in self.get_cs_archs(cs):
+                kname = data["kernel"] + "-default"
+                if data.get("rt", ""):
+                    kname = data['kernel'] + "-rt"
+
                 # Extract modules and vmlinux files that are compressed
-                mod_path = Path(self.get_data_dir(arch), "lib", "modules")
+                mod_path = Path(self.get_data_dir(arch), "lib", "modules", kname)
                 for fext, ecmd in [("zst", "unzstd -f -d"), ("xz", "xz --quiet -d -k")]:
                     cmd = rf'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
-                # Extract all gzipped files under arch//boot, including vmlinux,
-                # symvers and maybe others.
-                vmlinux_path = Path(self.get_data_dir(arch), "boot")
-                subprocess.check_output(rf'find {vmlinux_path} -name "*gz" -exec gzip -k -d -f {{}} \;', shell=True)
+                # Extract gzipped vmlinux per arch
+                vmlinux_path = Path(self.get_data_dir(arch), "boot", f"vmlinux-{kname}.gz")
+                # ppc64le doesn't gzips vmlinux
+                if vmlinux_path.exists():
+                    subprocess.check_output(rf'gzip -k -d -f {vmlinux_path}', shell=True)
 
             # Use the SLE .config
             shutil.copy(self.get_cs_kernel_config(cs, ARCH), Path(self.get_odir(cs), ".config"))
