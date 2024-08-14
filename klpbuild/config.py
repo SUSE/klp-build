@@ -152,7 +152,7 @@ class Config:
         err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=fil, stdout=fil)
 
         if err.returncode not in [0, 2]:
-            raise RuntimeError(f"{cs}: quilt pop failed: {err.stderr}")
+            raise RuntimeError(f"{cs}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
 
         shutil.rmtree(patches_dir, ignore_errors=True)
         shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
