@@ -275,6 +275,7 @@ class Setup(Config):
             logging.info(f'\t{" ".join(data_missing.keys())}\n')
             ibs = IBS(self.lp_name, self.filter, self.working_cs)
             ibs.download_cs_data(data_missing)
+            logging.info("Done.")
 
     def setup_project_files(self):
         self.lp_path.mkdir(exist_ok=True)
@@ -291,6 +292,7 @@ class Setup(Config):
         else:
             self.setup_codestreams()
 
+        logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed
         for cs, data in self.working_cs.items():
             # Check if the files exist in the respective codestream directories
@@ -341,3 +343,5 @@ class Setup(Config):
         # cpp will use this data in the next step
         with open(self.conf_file, "w") as f:
             f.write(json.dumps(self.conf, indent=4))
+
+        logging.info("Done. Setup finished.")
