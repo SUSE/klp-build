@@ -9,7 +9,7 @@ set -e
 
 # KLP_WORK_DIR is used bu klp-build tool, that should contain the patches
 # mentioned in the README, plus having the compiled modules and vmlinux
-export KLP_WORK_DIR=/home/mpdesouza/kgr/livepatches
+export KLP_WORK_DIR=/home/mpdesouza/klp/livepatches
 KLP_GIT_SOURCE=/home/mpdesouza/git/linux
 
 setup_extract_count()
@@ -41,6 +41,8 @@ setup_extract_count()
 	make -C $KLP_WORK_DIR/$lp_name/ce/linux/lp
 
 	nlines=$(cat $KLP_WORK_DIR/$lp_name/ce/linux/lp/livepatch_${lp_name}.c | wc -l)
+	echo "LoC: $nlines"
+	echo "LoC expected: $max_lines"
 	if [ "$nlines" -gt "$max_lines" ]; then
 		echo "ERROR: Generated file for $lp_name contains $nlines LoC, but should contain < $max_lines LoC"
 		exit 1
@@ -65,7 +67,7 @@ lp_cve_2021_47378		958	CONFIG_NVME_RDMA nvme-rdma	drivers/nvme/host/rdma.c \
 									nvme_rdma_cm_handler
 lp_cve_2021_47402		197    CONFIG_NET_CLS_FLOWER cls_flower net/sched/cls_flower.c \
 									fl_walk
-lp_cve_2024_40909		155	CONFIG_BPF_SYSCALL  vmlinux	kernel/bpf/syscall.c \
+lp_cve_2024_40909		143	CONFIG_BPF_SYSCALL  vmlinux	kernel/bpf/syscall.c \
 									bpf_link_free
 EOF
 )
