@@ -106,7 +106,6 @@ ${get_commits(commits, '15.6')}
 """
 
 TEMPL_KLP_LONE_FILE = """\
-<%include file="${ inc_src_file }"/>
 
 #include <linux/livepatch.h>
 
@@ -222,12 +221,14 @@ def get_exts(app, ibt_mod, ext_vars):
 %>
 """
 
-TEMPL_PATCH_VMLINUX = """\
+TEMPL_PATCH_VMLINUX_CHECK = """\
 % if check_enabled:
 #if IS_ENABLED(${ config })
 % endif # check_enabled
 
-<%include file="${ inc_src_file }"/>
+"""
+
+TEMPL_PATCH_VMLINUX = """\
 
 #include "livepatch_${ lp_name }.h"
 
@@ -259,7 +260,7 @@ int ${ fname }_init(void)
 % endif # check_enabled
 """
 
-TEMPL_PATCH_MODULE = """\
+TEMPL_PATCH_MOD_CHECK = """\
 % if check_enabled:
 #if IS_ENABLED(${ config })
 
@@ -268,7 +269,9 @@ TEMPL_PATCH_MODULE = """\
 #endif
 % endif # check_enabled
 
-<%include file="${ inc_src_file }"/>
+"""
+
+TEMPL_PATCH_MODULE = """\
 
 #include "livepatch_${ lp_name }.h"
 
@@ -611,6 +614,11 @@ class TemplateGen(Config):
         if not self.kdir:
             render_vars['commits'] = self.conf["commits"]
 
+        file_content = ""
+        if Path(lp_inc_dir, lp_file).exists():
+            with open(Path(lp_inc_dir, lp_file)) as lp_file_content:
+                file_content = lp_file_content.read()
+
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
             if not self.kdir:
@@ -623,7 +631,9 @@ class TemplateGen(Config):
             if ibt and self.kdir:
                 render_vars["klp_objs"] = self.__BuildKlpObjs(cs, src_file)
                 # FIXME: handle multiple livepatch files
-                temp_str = TEMPL_KLP_LONE_FILE
+                f.write(file_content)
+                f.write(Template(TEMPL_KLP_LONE_FILE, lookup=lpdir).render(**render_vars))
+                return
 
             # If we have multiple source files for the same livepatch,
             # create one hollow file to wire-up the multiple _init and
@@ -634,13 +644,17 @@ class TemplateGen(Config):
             # in order to do the symbol lookups. Otherwise only _init is
             # needed, and only if there are externalized symbols being used.
             elif not lp_file:
-                temp_str = TEMPL_HOLLOW
-            elif mod:
-                temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_MODULE
-            else:
-                temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
+                f.write(Template(TEMPL_HOLLOW, lookup=lpdir).render(**render_vars))
+                return
 
-            f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
+            if mod:
+                f.write(Template(TEMPL_PATCH_MOD_CHECK, lookup=lpdir).render(**render_vars))
+                f.write(file_content)
+                f.write(Template(TEMPL_GET_EXTS + TEMPL_PATCH_MODULE, lookup=lpdir).render(**render_vars))
+            else:
+                f.write(Template(TEMPL_PATCH_VMLINUX_CHECK, lookup=lpdir).render(**render_vars))
+                f.write(file_content)
+                f.write(Template(TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX, lookup=lpdir).render(**render_vars))
 
     def get_cs_lp_dir(self, cs):
         return Path(self.get_cs_dir(cs, self.app), "lp")
