@@ -13,11 +13,3 @@ IPA-clones
 
 To correctly find where symbols were inlined we use a feature from gcc to
 generate a report of Inter Process Analysis (IPA). This is why we have this [patch](./0001-Add-ipa-clones-and-flive-patching-GCC-flags-for-live.patch).
-
-clang-extract vs LLVM problems
-------------------------------
-
-While testing clang-extract on upstream kernels, we found an issue while parsing
-file ``include/linux/compiler_attributes.h``. We opened a bug on LLVM project
-but we haven't heard from them yet. For now we disable the macro ``c
-__compiletime_error`` macro to avoid this problem using this [patch](./0001-compiler_attributes.h-Disable-__compiletime_error-ma.patch).
