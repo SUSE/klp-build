@@ -69,6 +69,8 @@ lp_cve_2021_47402		197    CONFIG_NET_CLS_FLOWER cls_flower net/sched/cls_flower.
 									fl_walk
 lp_cve_2024_40909		143	CONFIG_BPF_SYSCALL  vmlinux	kernel/bpf/syscall.c \
 									bpf_link_free
+lp_cve_2024_0775		2112	CONFIG_EXT4_FS	ext4		fs/ext4/super.c \
+									ext4_reconfigure
 EOF
 )
 
