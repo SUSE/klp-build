@@ -259,7 +259,7 @@ class GitHelper(Config):
             #   branch:file/path
             idx = 0
             for patch in patch_files.splitlines():
-                if not patch.endswith(".patch"):
+                if patch.strip().startswith("#"):
                     continue
 
                 idx += 1
