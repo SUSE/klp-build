@@ -50,9 +50,9 @@ setup_extract_count()
 }
 
 LPS=$(cat << EOF
-lp_proc_cmdline_show		105	CONFIG_PROC_FS	vmlinux		fs/proc/cmdline.c \
+lp_proc_cmdline_show		68	CONFIG_PROC_FS	vmlinux		fs/proc/cmdline.c \
 									cmdline_proc_show
-lp_cve_2021_22600		654	CONFIG_UNIX	af_packet	net/packet/af_packet.c \
+lp_cve_2021_22600		655	CONFIG_UNIX	af_packet	net/packet/af_packet.c \
 									packet_set_ring
 lp_ipv6_route_multipath_add	443	CONFIG_IPV6	ipv6		net/ipv6/route.c \
 									ip6_route_multipath_add
@@ -69,7 +69,7 @@ lp_cve_2021_47402		197    CONFIG_NET_CLS_FLOWER cls_flower net/sched/cls_flower.
 									fl_walk
 lp_cve_2024_40909		143	CONFIG_BPF_SYSCALL  vmlinux	kernel/bpf/syscall.c \
 									bpf_link_free
-lp_cve_2024_0775		2112	CONFIG_EXT4_FS	ext4		fs/ext4/super.c \
+lp_cve_2024_0775		2113	CONFIG_EXT4_FS	ext4		fs/ext4/super.c \
 									ext4_reconfigure
 EOF
 )
