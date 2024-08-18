@@ -490,7 +490,8 @@ class TemplateGen(Config):
         self.codestreams = cs_list
 
     def preproc_slashes(text):
-        return r"<%! BS='\\' %>" + text.replace("\\", "${BS}")
+        txt = r"<%! BS='\\' %>" + text.replace("\\", "${BS}")
+        return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
 
     def fix_mod_string(self, mod):
         # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
