@@ -558,22 +558,16 @@ class IBS(Config):
             ver = self.get_full_cs(cs).replace("EMBARGO", "")
             f.write(f"RELEASE={ver}")
 
-        # Check how to push multiple files
-        # TODO: this isn't supported by osctiny YET.
         subprocess.check_output(
             ["bash", "./scripts/tar-up.sh", "-d", str(prj_path)], stderr=subprocess.STDOUT, cwd=code_path
         )
         shutil.rmtree(code_path)
 
-        subprocess.check_output(
-            ["osc", "-A", "https://api.suse.de", "addremove"], stderr=subprocess.STDOUT, cwd=prj_path
-        )
-
-        subprocess.check_output(
-            ["osc", "-A", "https://api.suse.de", "commit", "-m", f"Dump {branch}"],
-            stderr=subprocess.STDOUT,
-            cwd=prj_path,
-        )
+        # Add all files to the project, commit the changes and delete the directory.
+        for fname in prj_path.iterdir():
+            with open(fname, "rb") as fdata:
+                self.osc.packages.push_file(prj, "klp", fname.name, fdata.read())
+        self.osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
         shutil.rmtree(prj_path)
 
         logging.info(f"({i}/{self.total}) {cs} done")
