@@ -71,6 +71,8 @@ lp_cve_2024_40909		143	CONFIG_BPF_SYSCALL  vmlinux	kernel/bpf/syscall.c \
 									bpf_link_free
 lp_cve_2024_0775		2113	CONFIG_EXT4_FS	ext4		fs/ext4/super.c \
 									ext4_reconfigure
+lp_cve_2024_36921		2075	CONFIG_IWLMVM	iwlmvm		drivers/net/wireless/intel/iwlwifi/mvm/mld-sta.c \
+									iwl_mvm_mld_rm_sta_id
 EOF
 )
 
