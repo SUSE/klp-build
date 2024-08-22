@@ -26,6 +26,7 @@ from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
+import lzma
 import zstandard
 
 class Config:
@@ -494,6 +495,8 @@ class Config:
         elif str(obj).endswith(".zst"):
             dctx = zstandard.ZstdDecompressor()
             io_bytes = io.BytesIO(dctx.decompress(data))
+        elif str(obj).endswith(".xz"):
+            io_bytes = io.BytesIO(lzma.decompress(data))
         else:
             io_bytes = io.BytesIO(data)
 
