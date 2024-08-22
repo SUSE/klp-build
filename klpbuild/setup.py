@@ -320,7 +320,13 @@ class Setup(Config):
 
                 mod = fdata["module"]
                 if not data["modules"].get(mod, ""):
-                    data["modules"][mod] = self.find_module_obj(utils.ARCH, cs, mod, check_support=True)
+                    if self.is_mod(mod):
+                        mod_path = str(self.find_module_obj(utils.ARCH, cs, mod,
+                                                            check_support=True))
+                    else:
+                        mod_path = str(self.get_kernel_path(utils.ARCH, cs))
+
+                    data["modules"][mod] = mod_path
 
                 mod_syms.setdefault(mod, [])
                 mod_syms[mod].extend(fdata["symbols"])

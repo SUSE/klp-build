@@ -344,14 +344,19 @@ class Config:
         return Path(self.get_odir(cs, arch), file)
 
     def get_data_dir(self, arch):
-        if self.kdir:
+        # kdir will have self.data pointing to a kernel-source directory
+        # for host, it should be /
+        if self.kdir or self.host:
             return self.data
 
+        # For the SLE usage, it should point to the place where the codestreams
+        # are downloaded
         return Path(self.data, arch)
 
     def get_sdir(self, cs, arch=""):
+        init_path = self.get_data_dir(arch)
         if self.kdir:
-            return self.data
+            return init_path
 
         # Only -rt codestreams have a suffix for source directory
         ktype = f"-{self.get_ktype(cs)}"
@@ -365,7 +370,7 @@ class Config:
         # should change it to download it from the currently running
         # architecture
         arch = "x86_64"
-        return Path(self.get_data_dir(arch), "usr", "src", f"linux-{self.get_cs_kernel(cs)}{ktype}")
+        return Path(init_path, "usr", "src", f"linux-{self.get_cs_kernel(cs)}{ktype}")
 
     def get_odir(self, cs, arch=""):
         if self.kdir:
@@ -411,28 +416,58 @@ class Config:
     def is_mod(self, mod):
         return mod != "vmlinux"
 
+    def get_kernel_path(self, arch, cs):
+        prefix = self.get_data_dir(arch)
+        # For compiled kernel directories it creates vmlinux, so we can grab it
+        # directly from there
+        if self.kdir:
+            return Path(prefix, "vmlinux")
+
+        kver = self.get_cs_kernel(cs)
+        # Search for vmlinux on /boot, lib/modules
+        if self.host:
+            kpath = Path(f"{kver}-{self.get_ktype(cs)}")
+            kernel_paths = [
+                    "boot",
+                    f"lib/modules/{kpath}",
+                    f"usr/lib/modules/{kpath}"
+                    ]
+
+            for p in kernel_paths:
+                vmpath = list(Path(prefix, p).glob("vmlinux*"))
+                if len(vmpath) == 0:
+                    continue
+
+                if len(vmpath) == 1:
+                    return vmpath[0]
+
+                # When the glob reaches a directory where it contains vmlinux of
+                # different kernels, so filter by the same kernel version that
+                # we are running
+                return list(Path(prefix, p).glob(f"vmlinux-{kver}*"))[0]
+
+            raise RuntimeError("Couldn't find the hosts kernel")
+
+        # Got get SLE kernel, decompressed
+        return Path(prefix, f"boot/vmlinux-{kver}-{self.get_ktype(cs)}")
+
     # This function can be called to get the path to a module that has symbols
     # that were externalized, so we need to find the path to the module as well.
     def get_module_obj(self, arch, cs, module):
+        if not self.is_mod(module):
+            return self.get_kernel_path(arch, cs)
+
         obj = self.get_cs_modules(cs).get(module, "")
         if not obj:
             obj = self.find_module_obj(arch, cs, module)
 
-        tmp_path = Path(self.get_mod_path(cs, arch, module), obj)
-        if not tmp_path.exists():
-            # For vmlinux files, we can have it uncompress it decompressed
-            if not self.is_mod(module):
-                return Path(str(tmp_path) + ".gz")
-
-        return tmp_path
+        return Path(self.get_mod_path(cs, arch, module), obj)
 
     # Return only the name of the module to be livepatched
     def find_module_obj(self, arch, cs, mod, check_support=False):
+        assert mod != "vmlinux"
+
         kernel = self.get_cs_kernel(cs)
-        if not self.is_mod(mod):
-            if self.kdir:
-                return "vmlinux"
-            return f"boot/vmlinux-{kernel}-{self.get_ktype(cs)}"
 
         # Module name use underscores, but the final module object uses hyphens.
         mod = mod.replace("_", "[-_]")
