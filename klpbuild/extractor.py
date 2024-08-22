@@ -31,8 +31,9 @@ class Extractor(Config):
     def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, workers=4):
         super().__init__(lp_name, lp_filter)
 
-        self.sdir_lock = FileLock(Path(self.get_data_dir(utils.ARCH), "sdir.lock"))
-        self.sdir_lock.acquire()
+        if not self.kdir and not self.host:
+            self.sdir_lock = FileLock(Path(self.get_data_dir(utils.ARCH), "sdir.lock"))
+            self.sdir_lock.acquire()
 
         if not self.lp_path.exists():
             raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
@@ -67,7 +68,7 @@ class Extractor(Config):
         self.tem = TemplateGen(self.lp_name, self.filter, self.app)
 
     def __del__(self):
-        if self.sdir_lock:
+        if not self.kdir and not self.host and self.sdir_lock:
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
 
@@ -181,8 +182,12 @@ class Extractor(Config):
 
         return None
 
-    def get_cmd_from_json(self, fname):
-        with open(Path(self.get_data_dir(utils.ARCH), "compile_commands.json")) as f:
+    def get_cmd_from_json(self, cs, fname):
+        cc_file = Path(self.get_odir(cs), "compile_commands.json")
+        if not cc_file.exists():
+            return None
+
+        with open(cc_file) as f:
             buf = f.read()
         data = json.loads(buf)
         for d in data:
@@ -215,9 +220,8 @@ class Extractor(Config):
         # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
         # calls. Make is pretty fast, so there isn't a real slow down here.
         with self.make_lock:
-            if self.kdir:
-                cmd = self.get_cmd_from_json(fname)
-            else:
+            cmd = self.get_cmd_from_json(cs, fname)
+            if not cmd:
                 cmd = Extractor.get_make_cmd(out_dir, cs, fname, odir, sdir)
 
         if not cmd:
@@ -288,7 +292,7 @@ class Extractor(Config):
                 args.append((i, fname, cs, fdata))
                 i += 1
 
-        if self.kdir:
+        if self.kdir and not self.host:
             logging.info("Refreshing compile_commands.json...")
             subprocess.check_output('./scripts/clang-tools/gen_compile_commands.py',
                                     cwd=self.data)
@@ -320,7 +324,7 @@ class Extractor(Config):
             self.tem.GenerateLivePatches(cs)
 
         # For kdir setup, do not execute additional checks
-        if self.kdir:
+        if self.kdir or self.host:
             if self.apply_patches:
                 self.remove_patches(cs, self.quilt_log)
             return
