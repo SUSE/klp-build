@@ -30,7 +30,7 @@ import lzma
 import zstandard
 
 class Config:
-    def __init__(self, lp_name, lp_filter, kdir=False, data_dir=None, skips="", working_cs={}):
+    def __init__(self, lp_name, lp_filter, data_dir=None, skips="", working_cs={}):
         # FIXME: Config is instantiated multiple times, meaning that the
         # config file gets loaded and the logs are printed as many times.
 
@@ -61,7 +61,7 @@ class Config:
                 self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
         self.conf = OrderedDict(
-            {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data": str(data_dir), "kdir": kdir}
+            {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data": str(data_dir), "kdir": False}
         )
 
         self.conf_file = Path(self.lp_path, "conf.json")
@@ -69,10 +69,19 @@ class Config:
             with open(self.conf_file) as f:
                 self.conf = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
-        self.kdir = self.conf.get("kdir", False)
+
         self.data = Path(self.conf.get("data", "non-existent"))
         if not self.data.exists():
             self.data = self.get_user_path('data_dir')
+
+        self.kdir = self.conf.get("kdir", False)
+        if not self.kdir:
+            # kdir happens when the vmlinux is in on data-dir, meaning that we
+            # are extracting code from a kernel-source directory
+            self.kdir = Path(self.data, "vmlinux").exists()
+            # assign kdir back to conf file so it's stored for later use of
+            # different klp-build subcommands
+            self.conf["kdir"] = self.kdir
 
         # will contain the symbols from the to be livepatched object
         # cached by the codestream : object

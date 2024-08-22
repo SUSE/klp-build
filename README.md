@@ -46,8 +46,7 @@ source code, and the compiled sources in the same location.
 ## Setup
 
 ```sh
-klp-build setup --kdir \
-                --data-dir /home/mpdesouza/git/linux \
+klp-build setup --data-dir /home/mpdesouza/git/linux \
                 --name sound_lp \
                 --mod snd-pcm \
                 --conf CONFIG_SND_PCM \

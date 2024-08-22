@@ -21,8 +21,8 @@ from klpbuild.config import Config
 
 
 class GitHelper(Config):
-    def __init__(self, lp_name, lp_filter, kdir, data_dir):
-        super().__init__(lp_name, lp_filter, kdir, data_dir)
+    def __init__(self, lp_name, lp_filter, data_dir):
+        super().__init__(lp_name, lp_filter, data_dir)
 
         self.kern_src = self.get_user_path('kernel_src_dir', isopt=True)
 

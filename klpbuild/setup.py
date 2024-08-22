@@ -26,7 +26,6 @@ class Setup(Config):
         self,
         lp_name,
         lp_filter,
-        kdir,
         data_dir,
         cve,
         cs_arg,
@@ -39,11 +38,11 @@ class Setup(Config):
         skips,
         no_check,
     ):
-        super().__init__(lp_name, lp_filter, kdir, data_dir, skips=skips)
+        super().__init__(lp_name, lp_filter, data_dir, skips=skips)
 
         archs.sort()
 
-        if not kdir and not lp_name.startswith("bsc"):
+        if not self.kdir and not lp_name.startswith("bsc"):
             raise ValueError("Please use prefix 'bsc' when creating a livepatch for codestreams")
 
         if conf and not conf.startswith("CONFIG_"):
@@ -186,7 +185,7 @@ class Setup(Config):
         # against the codestreams informed by the user
         all_codestreams = self.download_supported_file()
 
-        ksrc = GitHelper(self.lp_name, self.filter, self.kdir, self.data)
+        ksrc = GitHelper(self.lp_name, self.filter, self.data)
 
         # Called at this point because codestreams is populated
         self.conf["commits"] = ksrc.get_commits(self.conf.get("cve", ""))

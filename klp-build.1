@@ -27,9 +27,6 @@ Show command's help message and exit.
 .BI "-n, --name" " NAME"
 The livepatch name. This will be the directory name of the resulting
 livepatches. If
-.B --kdir
-is not set, the livepatch name should contain 'bsc' prefix.
-.TP
 .BI --filter " FILTER"
 Filter out codestreams using a regex. Example: "15\.3u[0-9]+"
 .TP
@@ -54,9 +51,6 @@ The kernel CONFIG used to build the object to be livepatched.
 .B --no-check
 SLE specific. Do not check for already patched codestreams, do the setup for
 all non filtered codestreams.
-.TP
-.B --kdir
-Change the lookup procedure to search in a compiled kernel directory.
 .TP
 .BI --data-dir " DATA_DIR"
 The path where source files and modules will be found.

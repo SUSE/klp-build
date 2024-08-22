@@ -21,8 +21,7 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         required=True,
         help="The livepatch name. This will be the directory name of the "
-        "resulting livepatches. On setup, if --kdir is missing, the "
-        "livepatch name should contain 'bsc' prefix.",
+        "resulting livepatches.",
     )
     parentparser.add_argument("--filter", type=str, help=r"Filter out codestreams using a regex. Example: 15\.3u[0-9]+")
     parentparser.add_argument(
@@ -39,9 +38,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--no-check",
         action="store_true",
         help="SLE specific. Do not check for already patched codestreams, do the setup for all non filtered codestreams.",
-    )
-    setup.add_argument(
-        "--kdir", action="store_true", help="Change the lookup procedure to search in a compiled kernel directory"
     )
     setup.add_argument(
         "--data-dir",
@@ -183,7 +179,6 @@ def main_func(main_args):
         setup = Setup(
             args.name,
             args.filter,
-            args.kdir,
             args.data_dir,
             args.cve,
             args.codestreams,
@@ -208,10 +203,10 @@ def main_func(main_args):
         Inliner(args.name).check_inline(args.codestream, args.file, args.symbol)
 
     elif args.cmd == "get-patches":
-        GitHelper(args.name, args.filter, False, None).get_commits(args.cve)
+        GitHelper(args.name, args.filter, None).get_commits(args.cve)
 
     elif args.cmd == "format-patches":
-        GitHelper(args.name, args.filter, False, None).format_patches(args.version)
+        GitHelper(args.name, args.filter, None).format_patches(args.version)
 
     elif args.cmd == "status":
         IBS(args.name, args.filter).status(args.wait)

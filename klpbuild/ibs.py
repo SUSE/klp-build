@@ -37,7 +37,7 @@ class IBS(Config):
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
-        self.ksrc = GitHelper(self.lp_name, self.filter, False, None)
+        self.ksrc = GitHelper(self.lp_name, self.filter, None)
 
         # Total number of work items
         self.total = 0
