@@ -9,6 +9,7 @@ import gzip
 import io
 import json
 import logging
+import platform
 import os
 import re
 import shutil
@@ -61,7 +62,8 @@ class Config:
                 self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
         self.conf = OrderedDict(
-            {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data": str(data_dir), "kdir": False}
+            {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data":
+             str(data_dir), "kdir": False, "host": False,}
         )
 
         self.conf_file = Path(self.lp_path, "conf.json")
@@ -74,14 +76,18 @@ class Config:
         if not self.data.exists():
             self.data = self.get_user_path('data_dir')
 
-        self.kdir = self.conf.get("kdir", False)
-        if not self.kdir:
+        if self.data == Path("/"):
+            self.conf["host"] = True
+            self.host = True
+            self.kdir = False
+        else:
             # kdir happens when the vmlinux is in on data-dir, meaning that we
             # are extracting code from a kernel-source directory
             self.kdir = Path(self.data, "vmlinux").exists()
             # assign kdir back to conf file so it's stored for later use of
             # different klp-build subcommands
             self.conf["kdir"] = self.kdir
+            self.host = False
 
         # will contain the symbols from the to be livepatched object
         # cached by the codestream : object
@@ -257,7 +263,7 @@ class Config:
 
     def get_cs_tuple(self, cs):
         # There aren't codestreams with kdir
-        if self.kdir:
+        if self.kdir or self.host:
             return (99, 99, 0, 99)
 
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
@@ -315,6 +321,11 @@ class Config:
         return self.get_cs_data(cs).get("rt", False)
 
     def get_ktype(self, cs):
+        if self.host:
+            ktype = platform.uname()[2]
+
+            return "default" if "-default" in ktype else "rt"
+
         return "rt" if self.cs_is_rt(cs) else "default"
 
     # The config file is copied from boot/config-<version> to linux-obj when we

@@ -42,7 +42,7 @@ class Setup(Config):
 
         archs.sort()
 
-        if not self.kdir and not lp_name.startswith("bsc"):
+        if not self.kdir and not self.host and not lp_name.startswith("bsc"):
             raise ValueError("Please use prefix 'bsc' when creating a livepatch for codestreams")
 
         if conf and not conf.startswith("CONFIG_"):
@@ -281,7 +281,7 @@ class Setup(Config):
 
         # When kdir is used, the only supported architecture is the HOST
         # architecture.
-        if self.kdir:
+        if self.kdir or self.host:
             self.working_cs["linux"] = {
                 "kernel": platform.uname()[2].replace("-default", ""),
                 "modules": {},
@@ -298,13 +298,14 @@ class Setup(Config):
             mod_syms = {}
             kernel = self.get_cs_kernel(cs)
             for f, fdata in data["files"].items():
-                if not Path(self.get_sdir(cs), f).is_file():
-                    raise RuntimeError(f"{cs} ({kernel}): File {f} not found")
+                sdir = self.get_sdir(cs)
+                if not Path(sdir, f).is_file():
+                    raise RuntimeError(f"{cs} ({kernel}): File {f} not found on {str(sdir)}")
 
                 ipa_f = self.get_ipa_file(cs, f)
                 if not ipa_f.is_file():
                     msg = f"{cs} ({kernel}): File {ipa_f} not found."
-                    if not self.kdir:
+                    if not self.kdir and not self.host:
                         msg += " Creating an empty file."
                         ipa_f.touch()
                     logging.warning(msg)
