@@ -284,7 +284,7 @@ class Setup(Config):
         # architecture.
         if self.kdir:
             self.working_cs["linux"] = {
-                "kernel": platform.uname()[2],
+                "kernel": platform.uname()[2].replace("-default", ""),
                 "modules": {},
                 "files": self.file_funcs,
                 "archs": [utils.ARCH],
