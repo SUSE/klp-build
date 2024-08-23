@@ -71,7 +71,6 @@ class Config:
             with open(self.conf_file) as f:
                 self.conf = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
-
         self.data = Path(self.conf.get("data", "non-existent"))
         if not self.data.exists():
             self.data = self.get_user_path('data_dir')
@@ -315,7 +314,9 @@ class Config:
             raise RuntimeError(f"Configuration mismtach between codestreams. Aborting.")
 
     def missing_codestream(self, cs):
-        return not self.get_cs_boot_file(cs, ".config").exists()
+        # Check if the config exists for the current ARCH since we extract code
+        # for all of them when a codestream is missing.
+        return not self.get_cs_boot_file(cs, ".config", ARCH).exists()
 
     def cs_is_rt(self, cs):
         return self.get_cs_data(cs).get("rt", False)
@@ -341,6 +342,12 @@ class Config:
                 return Path(self.get_data_dir(arch), file)
             return Path(self.get_data_dir(arch), "boot", f"{file}-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
 
+        # we currently download kernel-source only or the curent arch (ARCH), so
+        # whether we have to check for the config of a different arch try to
+        # check the config file on boot dir:
+        if file == ".config" and arch != ARCH:
+            return Path(self.get_data_dir(arch), "boot", f"config-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
+
         return Path(self.get_odir(cs, arch), file)
 
     def get_data_dir(self, arch):
@@ -354,6 +361,9 @@ class Config:
         return Path(self.data, arch)
 
     def get_sdir(self, cs, arch=""):
+        if not arch:
+            arch = ARCH
+
         init_path = self.get_data_dir(arch)
         if self.kdir:
             return init_path
@@ -363,13 +373,6 @@ class Config:
         if ktype == "-default":
             ktype = ""
 
-        if not arch:
-            arch = ARCH
-
-        # FIXME: For now we only download kernel-source for x86_64, but we
-        # should change it to download it from the currently running
-        # architecture
-        arch = "x86_64"
         return Path(init_path, "usr", "src", f"linux-{self.get_cs_kernel(cs)}{ktype}")
 
     def get_odir(self, cs, arch=""):
