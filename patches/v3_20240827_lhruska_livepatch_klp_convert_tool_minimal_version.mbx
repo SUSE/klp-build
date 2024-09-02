@@ -1,8 +1,8 @@
 From git@z Thu Jan  1 00:00:00 1970
-Subject: [PATCH v2 1/6] livepatch: Create and include UAPI headers
+Subject: [PATCH v3 1/6] livepatch: Create and include UAPI headers
 From: Josh Poimboeuf <jpoimboe@redhat.com>
-Date: Thu, 16 May 2024 15:30:04 +0200
-Message-Id: <20240516133009.20224-2-lhruska@suse.cz>
+Date: Tue, 27 Aug 2024 14:30:46 +0200
+Message-Id: <20240827123052.9002-2-lhruska@suse.cz>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
@@ -14,7 +14,6 @@ Signed-off-by: Josh Poimboeuf <jpoimboe@redhat.com>
 Signed-off-by: Lukas Hruska <lhruska@suse.cz>
 Reviewed-by: Petr Mladek <pmladek@suse.com>
 Reviewed-by: Marcos Paulo de Souza <mpdesouza@suse.com>
-Signed-off-by: Marcos Paulo de Souza <mpdesouza@suse.com>
 ---
  MAINTAINERS                    |  1 +
  include/uapi/linux/livepatch.h | 15 +++++++++++++++
@@ -23,10 +22,10 @@ Signed-off-by: Marcos Paulo de Souza <mpdesouza@suse.com>
  create mode 100644 include/uapi/linux/livepatch.h
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 28e20975c26f..130b8b0bd4f7 100644
+index 878dcd23b331..31d809797241 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -12614,6 +12614,7 @@ F:	Documentation/ABI/testing/sysfs-kernel-livepatch
+@@ -13053,6 +13053,7 @@ F:	Documentation/ABI/testing/sysfs-kernel-livepatch
  F:	Documentation/livepatch/
  F:	arch/powerpc/include/asm/livepatch.h
  F:	include/linux/livepatch.h
@@ -56,7 +55,7 @@ index 000000000000..e19430918a07
 +
 +#endif /* _UAPI_LIVEPATCH_H */
 diff --git a/kernel/livepatch/core.c b/kernel/livepatch/core.c
-index ecbc9b6aba3a..8bde84d85263 100644
+index 3c21c31796db..81c248c577e3 100644
 --- a/kernel/livepatch/core.c
 +++ b/kernel/livepatch/core.c
 @@ -20,6 +20,7 @@
@@ -86,13 +85,13 @@ index ecbc9b6aba3a..8bde84d85263 100644
  	if (cnt != 1) {
  		pr_err("section %s has an incorrectly formatted name\n",
 -- 
-2.45.0
+2.46.0
 
 From git@z Thu Jan  1 00:00:00 1970
-Subject: [PATCH v2 2/6] livepatch: Add klp-convert tool
+Subject: [PATCH v3 2/6] livepatch: Add klp-convert tool
 From: Lukas Hruska <lhruska@suse.cz>
-Date: Thu, 16 May 2024 15:30:05 +0200
-Message-Id: <20240516133009.20224-3-lhruska@suse.cz>
+Date: Tue, 27 Aug 2024 14:30:47 +0200
+Message-Id: <20240827123052.9002-3-lhruska@suse.cz>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
@@ -128,7 +127,7 @@ KLP_RELOC_SYMBOL(). It will create symbol with all needed
 metadata. For example:
 
   extern char *saved_command_line \
-                 KLP_RELOC_SYMBOL(vmlinux, vmlinux, saved_command_line, 0);
+                 KLP_RELOC_SYMBOL(vmlinux, vmlinux, saved_command_line);
 
 would create symbol
 
@@ -167,19 +166,18 @@ Signed-off-by: Joe Lawrence <joe.lawrence@redhat.com>
 [lhruska@suse.cz: klp-convert code, minimal approach]
 Signed-off-by: Lukas Hruska <lhruska@suse.cz>
 Reviewed-by: Marcos Paulo de Souza <mpdesouza@suse.com>
-Signed-off-by: Marcos Paulo de Souza <mpdesouza@suse.com>
 ---
  MAINTAINERS                     |   1 +
  include/linux/livepatch.h       |  19 +
  scripts/Makefile                |   1 +
  scripts/livepatch/.gitignore    |   1 +
  scripts/livepatch/Makefile      |   5 +
- scripts/livepatch/elf.c         | 817 ++++++++++++++++++++++++++++++++
+ scripts/livepatch/elf.c         | 835 ++++++++++++++++++++++++++++++++
  scripts/livepatch/elf.h         |  73 +++
  scripts/livepatch/klp-convert.c | 284 +++++++++++
  scripts/livepatch/klp-convert.h |  23 +
  scripts/livepatch/list.h        | 391 +++++++++++++++
- 10 files changed, 1615 insertions(+)
+ 10 files changed, 1633 insertions(+)
  create mode 100644 scripts/livepatch/.gitignore
  create mode 100644 scripts/livepatch/Makefile
  create mode 100644 scripts/livepatch/elf.c
@@ -189,10 +187,10 @@ Signed-off-by: Marcos Paulo de Souza <mpdesouza@suse.com>
  create mode 100644 scripts/livepatch/list.h
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 130b8b0bd4f7..d2facc1f4e15 100644
+index 31d809797241..66916627a937 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -12618,6 +12618,7 @@ F:	include/uapi/linux/livepatch.h
+@@ -13057,6 +13057,7 @@ F:	include/uapi/linux/livepatch.h
  F:	kernel/livepatch/
  F:	kernel/module/livepatch.c
  F:	samples/livepatch/
@@ -201,7 +199,7 @@ index 130b8b0bd4f7..d2facc1f4e15 100644
  
  LLC (802.2)
 diff --git a/include/linux/livepatch.h b/include/linux/livepatch.h
-index 9b9b38e89563..83bbcd1c43fd 100644
+index 51a258c24ff5..43ed1f9567c3 100644
 --- a/include/linux/livepatch.h
 +++ b/include/linux/livepatch.h
 @@ -235,6 +235,25 @@ int klp_apply_section_relocs(struct module *pmod, Elf_Shdr *sechdrs,
@@ -222,7 +220,7 @@ index 9b9b38e89563..83bbcd1c43fd 100644
 + * Documentation/livepatch/module-elf-format.rst
 + */
 +#define KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, SYM_POS)	\
-+	asm("\".klp.sym.rela." #LP_OBJ_NAME "." #SYM_OBJ_NAME "." #SYM_NAME "," #SYM_POS "\"")
++	asm("\".klp.sym.rela." #LP_OBJ_NAME "." #SYM_OBJ_NAME "." #SYM_NAME "." #SYM_POS "\"")
 +
 +#define KLP_RELOC_SYMBOL(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME)	\
 +	KLP_RELOC_SYMBOL_POS(LP_OBJ_NAME, SYM_OBJ_NAME, SYM_NAME, 0)
@@ -231,7 +229,7 @@ index 9b9b38e89563..83bbcd1c43fd 100644
  
  static inline int klp_module_coming(struct module *mod) { return 0; }
 diff --git a/scripts/Makefile b/scripts/Makefile
-index bc90520a5426..dfb1870551a6 100644
+index dccef663ca82..4c9debc4132b 100644
 --- a/scripts/Makefile
 +++ b/scripts/Makefile
 @@ -55,6 +55,7 @@ targets += module.lds
@@ -262,10 +260,10 @@ index 000000000000..71dce0f3e893
 +HOSTLDLIBS_klp-convert		:= -lelf
 diff --git a/scripts/livepatch/elf.c b/scripts/livepatch/elf.c
 new file mode 100644
-index 000000000000..c649268a4a55
+index 000000000000..f0ac83973853
 --- /dev/null
 +++ b/scripts/livepatch/elf.c
-@@ -0,0 +1,817 @@
+@@ -0,0 +1,835 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * elf.c - ELF access library
@@ -858,8 +856,8 @@ index 000000000000..c649268a4a55
 +
 +static int write_file(struct elf *elf, const char *file)
 +{
-+	int fd;
-+	Elf *e;
++	int fd, ret = 0;
++	Elf *e = NULL;
 +	GElf_Ehdr eh, ehout;
 +	Elf_Scn *scn;
 +	Elf_Data *data;
@@ -869,28 +867,33 @@ index 000000000000..c649268a4a55
 +	fd = creat(file, 0664);
 +	if (fd == -1) {
 +		WARN("couldn't create %s", file);
-+		return -1;
++		ret = -1;
++		goto err;
 +	}
 +
 +	e = elf_begin(fd, ELF_C_WRITE, NULL);
 +	if (!e) {
 +		WARN("elf_begin failed");
-+		return -1;
++		ret = -1;
++		goto err;
 +	}
 +
 +	if (!gelf_newehdr(e, gelf_getclass(elf->elf))) {
 +		WARN("gelf_newehdr failed");
-+		return -1;
++		ret = -1;
++		goto err;
 +	}
 +
 +	if (!gelf_getehdr(e, &ehout)) {
 +		WARN("gelf_getehdr failed");
-+		return -1;
++		ret = -1;
++		goto err;
 +	}
 +
 +	if (!gelf_getehdr(elf->elf, &eh)) {
 +		WARN("gelf_getehdr failed");
-+		return -1;
++		ret = -1;
++		goto err;
 +	}
 +
 +	memset(&ehout, 0, sizeof(ehout));
@@ -907,18 +910,21 @@ index 000000000000..c649268a4a55
 +		scn = elf_newscn(e);
 +		if (!scn) {
 +			WARN("elf_newscn failed");
-+			return -1;
++			ret = -1;
++			goto err;
 +		}
 +
 +		data = elf_newdata(scn);
 +		if (!data) {
 +			WARN("elf_newdata failed");
-+			return -1;
++			ret = -1;
++			goto err;
 +		}
 +
 +		if (!elf_flagdata(data, ELF_C_SET, ELF_F_DIRTY)) {
 +			WARN("elf_flagdata failed");
-+			return -1;
++			ret = -1;
++			goto err;
 +		}
 +
 +		data->d_type = sec->elf_data->d_type;
@@ -927,31 +933,41 @@ index 000000000000..c649268a4a55
 +
 +		if (!gelf_getshdr(scn, &sh)) {
 +			WARN("gelf_getshdr failed");
-+			return -1;
++			ret = -1;
++			goto err;
 +		}
 +
 +		sh = sec->sh;
 +
 +		if (!gelf_update_shdr(scn, &sh)) {
 +			WARN("gelf_update_shdr failed");
-+			return -1;
++			ret = -1;
++			goto err;
 +		}
 +	}
 +
 +	if (!gelf_update_ehdr(e, &ehout)) {
 +		WARN("gelf_update_ehdr failed");
-+		return -1;
++		ret = -1;
++		goto err;
 +	}
 +
 +	if (elf_update(e, ELF_C_WRITE) < 0) {
 +		fprintf(stderr, "%s\n", elf_errmsg(-1));
 +		WARN("elf_update failed");
-+		return -1;
++		ret = -1;
++		goto err;
 +	}
 +
-+	elf_end(e);
++err:
++	if (e)
++		elf_end(e);
++	if (fd >= 0)
++		close(fd);
++	if (ret)
++		unlink(file);
 +
-+	return 0;
++	return ret;
 +}
 +
 +int elf_write_file(struct elf *elf, const char *file)
@@ -1077,7 +1093,7 @@ index 000000000000..c649268a4a55
 +		list_del(&sec->list);
 +		free(sec);
 +	}
-+	if (elf->fd > 0)
++	if (elf->fd >= 0)
 +		close(elf->fd);
 +	if (elf->elf)
 +		elf_end(elf->elf);
@@ -1164,7 +1180,7 @@ index 000000000000..784cf42b01bf
 +#endif /* _KLP_POST_ELF_H */
 diff --git a/scripts/livepatch/klp-convert.c b/scripts/livepatch/klp-convert.c
 new file mode 100644
-index 000000000000..203802be334b
+index 000000000000..a9e1e98d9b57
 --- /dev/null
 +++ b/scripts/livepatch/klp-convert.c
 @@ -0,0 +1,284 @@
@@ -1222,7 +1238,7 @@ index 000000000000..203802be334b
 +	err = safe_snprintf(klp_rela_name, length, KLP_RELA_PREFIX "%s%s",
 +			  lp_obj_name, oldsec->base->name);
 +	if (err) {
-+		WARN("Length error (%s)", klp_rela_name);
++		WARN("Length error (%s)\n", klp_rela_name);
 +		free(klp_rela_name);
 +		return NULL;
 +	}
@@ -1260,7 +1276,7 @@ index 000000000000..203802be334b
 +	static_assert(MODULE_NAME_LEN >= 56 && KSYM_NAME_LEN == 512,
 +			"Update limit in the below sscanf()");
 +
-+	if (sscanf(s->name, KLP_SYM_RELA_PREFIX "%55[^.].%55[^.].%511[^,],%lu",
++	if (sscanf(s->name, KLP_SYM_RELA_PREFIX "%55[^.].%55[^.].%511[^.].%lu",
 +			lp_obj_name, sym_obj_name, sym_name, &sym_pos) != 4) {
 +		WARN("Invalid format of symbol (%s)\n", s->name);
 +		return false;
@@ -1269,11 +1285,11 @@ index 000000000000..203802be334b
 +	poslen = calc_digits(sym_pos);
 +
 +	length = strlen(KLP_SYM_PREFIX) + strlen(sym_obj_name)
-+		 + strlen(sym_name) + sizeof(poslen) + 3;
++		 + strlen(sym_name) + poslen + 3;
 +
 +	klp_sym_name = calloc(1, length);
 +	if (!klp_sym_name) {
-+		WARN("Memory allocation failed (%s%s.%s,%lu)\n", KLP_SYM_PREFIX,
++		WARN("Memory allocation failed (%s%s.%s.%lu)\n", KLP_SYM_PREFIX,
 +				sym_obj_name, sym_name, sym_pos);
 +		return false;
 +	}
@@ -1281,7 +1297,7 @@ index 000000000000..203802be334b
 +	if (safe_snprintf(klp_sym_name, length, KLP_SYM_PREFIX "%s.%s,%lu",
 +			  sym_obj_name, sym_name, sym_pos)) {
 +
-+		WARN("Length error (%s%s.%s,%lu)", KLP_SYM_PREFIX,
++		WARN("Length error (%s%s.%s,%lu)\n", KLP_SYM_PREFIX,
 +				sym_obj_name, sym_name, sym_pos);
 +		free(klp_sym_name);
 +		return false;
@@ -1400,7 +1416,7 @@ index 000000000000..203802be334b
 +	struct symbol *sym;
 +
 +	if (argc != 3) {
-+		WARN("Usage: %s <input.ko> <output.ko>", argv[0]);
++		WARN("Usage: %s <input.ko> <output.ko>\n", argv[0]);
 +		return -1;
 +	}
 +
@@ -1424,7 +1440,7 @@ index 000000000000..203802be334b
 +
 +			rela_sec = get_or_create_klp_rela_section(sec, rela, klp_elf);
 +			if (!rela_sec) {
-+				WARN("Unable to convert relocation: %s",
++				WARN("Unable to convert relocation: %s\n",
 +						rela->sym->name);
 +				return -1;
 +			}
@@ -1454,7 +1470,7 @@ index 000000000000..203802be334b
 +}
 diff --git a/scripts/livepatch/klp-convert.h b/scripts/livepatch/klp-convert.h
 new file mode 100644
-index 000000000000..416b86e46598
+index 000000000000..72a387ce97c9
 --- /dev/null
 +++ b/scripts/livepatch/klp-convert.h
 @@ -0,0 +1,23 @@
@@ -1469,7 +1485,7 @@ index 000000000000..416b86e46598
 +#define SHF_RELA_LIVEPATCH	0x00100000
 +#define MODULE_NAME_LEN		(64 - sizeof(GElf_Addr))
 +#define WARN(format, ...) \
-+	fprintf(stderr, "klp-convert: " format "\n", ##__VA_ARGS__)
++	fprintf(stderr, "klp-convert: " format, ##__VA_ARGS__)
 +
 +/*
 + * klp-convert uses macros and structures defined in the linux sources
@@ -1879,13 +1895,13 @@ index 000000000000..4d429120fabf
 +
 +#endif
 -- 
-2.45.0
+2.46.0
 
 From git@z Thu Jan  1 00:00:00 1970
-Subject: [PATCH v2 3/6] kbuild/modpost: integrate klp-convert
+Subject: [PATCH v3 3/6] kbuild/modpost: integrate klp-convert
 From: Josh Poimboeuf <jpoimboe@redhat.com>
-Date: Thu, 16 May 2024 15:30:06 +0200
-Message-Id: <20240516133009.20224-4-lhruska@suse.cz>
+Date: Tue, 27 Aug 2024 14:30:48 +0200
+Message-Id: <20240827123052.9002-4-lhruska@suse.cz>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
@@ -1900,18 +1916,17 @@ Signed-off-by: Josh Poimboeuf <jpoimboe@redhat.com>
 Signed-off-by: Lukas Hruska <lhruska@suse.cz>
 Reviewed-by: Petr Mladek <pmladek@suse.com>
 Reviewed-by: Marcos Paulo de Souza <mpdesouza@suse.com>
-Signed-off-by: Marcos Paulo de Souza <mpdesouza@suse.com>
 ---
  .gitignore                |  1 +
- Makefile                  | 10 ++++++----
+ Makefile                  |  7 ++++---
  scripts/Makefile.modfinal | 15 +++++++++++++++
  scripts/Makefile.modpost  |  5 +++++
  scripts/mod/modpost.c     | 36 ++++++++++++++++++++++++++++++++++--
  scripts/mod/modpost.h     |  3 +++
- 6 files changed, 64 insertions(+), 6 deletions(-)
+ 6 files changed, 62 insertions(+), 5 deletions(-)
 
 diff --git a/.gitignore b/.gitignore
-index c59dc60ba62e..9b7d492cac99 100644
+index 7902adf4f7f1..2a66d0e66ad4 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -70,6 +70,7 @@ modules.order
@@ -1923,10 +1938,10 @@ index c59dc60ba62e..9b7d492cac99 100644
  
  #
 diff --git a/Makefile b/Makefile
-index 967e97878ecd..db06e5db21af 100644
+index 7b60eb103c5d..8cec35f3ef8c 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -1095,6 +1095,7 @@ PHONY += prepare0
+@@ -1091,6 +1091,7 @@ PHONY += prepare0
  export extmod_prefix = $(if $(KBUILD_EXTMOD),$(KBUILD_EXTMOD)/)
  export MODORDER := $(extmod_prefix)modules.order
  export MODULES_NSDEPS := $(extmod_prefix)modules.nsdeps
@@ -1934,7 +1949,7 @@ index 967e97878ecd..db06e5db21af 100644
  
  ifeq ($(KBUILD_EXTMOD),)
  
-@@ -1453,8 +1454,8 @@ endif
+@@ -1458,8 +1459,8 @@ endif
  #
  
  # *.ko are usually independent of vmlinux, but CONFIG_DEBUG_INFO_BTF_MODULES
@@ -1945,20 +1960,17 @@ index 967e97878ecd..db06e5db21af 100644
  KBUILD_BUILTIN := 1
  modules: vmlinux
  endif
-@@ -1477,8 +1478,9 @@ endif # CONFIG_MODULES
+@@ -1482,7 +1483,7 @@ endif # CONFIG_MODULES
  # Directories & files removed with 'make clean'
  CLEAN_FILES += vmlinux.symvers modules-only.symvers \
  	       modules.builtin modules.builtin.modinfo modules.nsdeps \
--	       compile_commands.json .thinlto-cache rust/test \
--	       rust-project.json .vmlinux.objs .vmlinux.export.c
-+           modules.livepatch compile_commands.json .thinlto-cache \
-+           rust/test rust-project.json .vmlinux.objs \
-+           .vmlinux.export.c
+-	       compile_commands.json rust/test \
++	       modules.livepatch compile_commands.json rust/test \
+ 	       rust-project.json .vmlinux.objs .vmlinux.export.c
  
  # Directories & files removed with 'make mrproper'
- MRPROPER_FILES += include/config include/generated          \
 diff --git a/scripts/Makefile.modfinal b/scripts/Makefile.modfinal
-index 79fcf2731686..a2a162d204f6 100644
+index 306a6bb86e4d..ace8e81c710d 100644
 --- a/scripts/Makefile.modfinal
 +++ b/scripts/Makefile.modfinal
 @@ -14,6 +14,7 @@ include $(srctree)/scripts/Makefile.lib
@@ -1969,7 +1981,7 @@ index 79fcf2731686..a2a162d204f6 100644
  
  __modfinal: $(modules:%.o=%.ko)
  	@:
-@@ -60,6 +61,20 @@ endif
+@@ -62,6 +63,20 @@ endif
  
  targets += $(modules:%.o=%.ko) $(modules:%.o=%.mod.o)
  
@@ -1987,11 +1999,11 @@ index 79fcf2731686..a2a162d204f6 100644
 +
 +targets += $(modules-klp:.ko=.tmp.ko)
 +
- # Add FORCE to the prequisites of a target to force it to be always rebuilt.
+ # Add FORCE to the prerequisites of a target to force it to be always rebuilt.
  # ---------------------------------------------------------------------------
  
 diff --git a/scripts/Makefile.modpost b/scripts/Makefile.modpost
-index 739402f45509..3c765c568e34 100644
+index 44936ebad161..b44a46aed274 100644
 --- a/scripts/Makefile.modpost
 +++ b/scripts/Makefile.modpost
 @@ -48,6 +48,7 @@ modpost-args =										\
@@ -2014,21 +2026,21 @@ index 739402f45509..3c765c568e34 100644
  FORCE:
  
 diff --git a/scripts/mod/modpost.c b/scripts/mod/modpost.c
-index 2f5b91da5afa..15d7d2de653e 100644
+index d16d0ace2775..ee2a51915bb1 100644
 --- a/scripts/mod/modpost.c
 +++ b/scripts/mod/modpost.c
-@@ -1654,6 +1654,10 @@ static void read_symbols(const char *modname)
- 		}
+@@ -1590,6 +1590,10 @@ static void read_symbols(const char *modname)
+ 			warn("missing MODULE_DESCRIPTION() in %s\n", modname);
  	}
  
 +	/* Livepatch modules have unresolved symbols resolved by klp-convert */
 +	if (get_modinfo(&info, "livepatch"))
 +		mod->is_livepatch = true;
 +
- 	if (extra_warn && !get_modinfo(&info, "description"))
- 		warn("missing MODULE_DESCRIPTION() in %s\n", modname);
  	for (sym = info.symtab_start; sym < info.symtab_stop; sym++) {
-@@ -1742,10 +1746,18 @@ static void check_exports(struct module *mod)
+ 		symname = remove_dot(info.strtab + sym->st_name);
+ 
+@@ -1676,10 +1680,18 @@ static void check_exports(struct module *mod)
  		const char *basename;
  		exp = find_symbol(s->name);
  		if (!exp) {
@@ -2048,7 +2060,7 @@ index 2f5b91da5afa..15d7d2de653e 100644
  			continue;
  		}
  		if (exp->module == mod) {
-@@ -2178,6 +2190,20 @@ static void write_namespace_deps_files(const char *fname)
+@@ -2112,6 +2124,20 @@ static void write_namespace_deps_files(const char *fname)
  	free(ns_deps_buf.p);
  }
  
@@ -2069,7 +2081,7 @@ index 2f5b91da5afa..15d7d2de653e 100644
  struct dump_list {
  	struct list_head list;
  	const char *file;
-@@ -2189,11 +2215,12 @@ int main(int argc, char **argv)
+@@ -2123,11 +2149,12 @@ int main(int argc, char **argv)
  	char *missing_namespace_deps = NULL;
  	char *unused_exports_white_list = NULL;
  	char *dump_write = NULL, *files_source = NULL;
@@ -2083,7 +2095,7 @@ index 2f5b91da5afa..15d7d2de653e 100644
  		switch (opt) {
  		case 'e':
  			external_module = true;
-@@ -2206,6 +2233,9 @@ int main(int argc, char **argv)
+@@ -2140,6 +2167,9 @@ int main(int argc, char **argv)
  		case 'M':
  			module_enabled = true;
  			break;
@@ -2093,7 +2105,7 @@ index 2f5b91da5afa..15d7d2de653e 100644
  		case 'm':
  			modversions = true;
  			break;
-@@ -2285,6 +2315,8 @@ int main(int argc, char **argv)
+@@ -2219,6 +2249,8 @@ int main(int argc, char **argv)
  
  	if (dump_write)
  		write_dump(dump_write);
@@ -2103,7 +2115,7 @@ index 2f5b91da5afa..15d7d2de653e 100644
  		error("Section mismatches detected.\n"
  		      "Set CONFIG_SECTION_MISMATCH_WARN_ONLY=y to allow them.\n");
 diff --git a/scripts/mod/modpost.h b/scripts/mod/modpost.h
-index ee43c7950636..7a82460cc4d6 100644
+index 58197b34a3c8..cb5bb2e76c53 100644
 --- a/scripts/mod/modpost.h
 +++ b/scripts/mod/modpost.h
 @@ -76,6 +76,8 @@
@@ -2124,13 +2136,13 @@ index ee43c7950636..7a82460cc4d6 100644
  	bool has_init;
  	bool has_cleanup;
 -- 
-2.45.0
+2.46.0
 
 From git@z Thu Jan  1 00:00:00 1970
-Subject: [PATCH v2 4/6] livepatch: Add sample livepatch module
+Subject: [PATCH v3 4/6] livepatch: Add sample livepatch module
 From: Josh Poimboeuf <jpoimboe@redhat.com>
-Date: Thu, 16 May 2024 15:30:07 +0200
-Message-Id: <20240516133009.20224-5-lhruska@suse.cz>
+Date: Tue, 27 Aug 2024 14:30:49 +0200
+Message-Id: <20240827123052.9002-5-lhruska@suse.cz>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
@@ -2147,7 +2159,6 @@ string "livepatch=1".
 Signed-off-by: Josh Poimboeuf <jpoimboe@redhat.com>
 Signed-off-by: Lukas Hruska <lhruska@suse.cz>
 Reviewed-by: Petr Mladek <pmladek@suse.com>
-Signed-off-by: Marcos Paulo de Souza <mpdesouza@suse.com>
 ---
  samples/livepatch/Makefile                  |  1 +
  samples/livepatch/livepatch-extern-symbol.c | 84 +++++++++++++++++++++
@@ -2155,14 +2166,14 @@ Signed-off-by: Marcos Paulo de Souza <mpdesouza@suse.com>
  create mode 100644 samples/livepatch/livepatch-extern-symbol.c
 
 diff --git a/samples/livepatch/Makefile b/samples/livepatch/Makefile
-index 9f853eeb6140..f2b41f4d6c16 100644
+index 9f853eeb6140..5cc81d5db17c 100644
 --- a/samples/livepatch/Makefile
 +++ b/samples/livepatch/Makefile
 @@ -6,3 +6,4 @@ obj-$(CONFIG_SAMPLE_LIVEPATCH) += livepatch-shadow-fix2.o
  obj-$(CONFIG_SAMPLE_LIVEPATCH) += livepatch-callbacks-demo.o
  obj-$(CONFIG_SAMPLE_LIVEPATCH) += livepatch-callbacks-mod.o
  obj-$(CONFIG_SAMPLE_LIVEPATCH) += livepatch-callbacks-busymod.o
-+obj-$(CONFIG_SAMPLE_LIVEPATCH) += livepatch-annotated-sample.o
++obj-$(CONFIG_SAMPLE_LIVEPATCH) += livepatch-extern-symbol.o
 diff --git a/samples/livepatch/livepatch-extern-symbol.c b/samples/livepatch/livepatch-extern-symbol.c
 new file mode 100644
 index 000000000000..276a43d157b4
@@ -2254,13 +2265,13 @@ index 000000000000..276a43d157b4
 +MODULE_LICENSE("GPL");
 +MODULE_INFO(livepatch, "Y");
 -- 
-2.45.0
+2.46.0
 
 From git@z Thu Jan  1 00:00:00 1970
-Subject: [PATCH v2 5/6] documentation: Update on livepatch elf format
+Subject: [PATCH v3 5/6] documentation: Update on livepatch elf format
 From: Lukas Hruska <lhruska@suse.cz>
-Date: Thu, 16 May 2024 15:30:08 +0200
-Message-Id: <20240516133009.20224-6-lhruska@suse.cz>
+Date: Tue, 27 Aug 2024 14:30:50 +0200
+Message-Id: <20240827123052.9002-6-lhruska@suse.cz>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
@@ -2271,7 +2282,6 @@ describing how klp-convert works for fixing relocations.
 Signed-off-by: Lukas Hruska <lhruska@suse.cz>
 Reviewed-by: Petr Mladek <pmladek@suse.com>
 Reviewed-by: Marcos Paulo de Souza <mpdesouza@suse.com>
-Signed-off-by: Marcos Paulo de Souza <mpdesouza@suse.com>
 ---
  Documentation/livepatch/module-elf-format.rst | 67 +++++++++++++++++++
  1 file changed, 67 insertions(+)
@@ -2352,14 +2362,14 @@ index a03ed02ec57e..2aa9b11cd806 100644
 +      Offset             Info             Type               Symbol's Value  Symbol's Name + Addend
 +      0000000000000068  0000003c00000002 R_X86_64_PC32          0000000000000000 .klp.sym.vmlinux.saved_command_line,0 - 4
 -- 
-2.45.0
+2.46.0
 
 From git@z Thu Jan  1 00:00:00 1970
-Subject: [PATCH v2 6/6] selftests: livepatch: Test livepatching function
+Subject: [PATCH v3 6/6] selftests: livepatch: Test livepatching function
  using an external symbol
 From: Lukas Hruska <lhruska@suse.cz>
-Date: Thu, 16 May 2024 15:30:09 +0200
-Message-Id: <20240516133009.20224-7-lhruska@suse.cz>
+Date: Tue, 27 Aug 2024 14:30:51 +0200
+Message-Id: <20240827123052.9002-7-lhruska@suse.cz>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
@@ -2370,20 +2380,34 @@ livepatch a function that use an external symbol.
 Signed-off-by: Lukas Hruska <lhruska@suse.cz>
 Reviewed-by: Petr Mladek <pmladek@suse.com>
 Tested-by: Petr Mladek <pmladek@suse.com>
-Signed-off-by: Marcos Paulo de Souza <mpdesouza@suse.com>
 ---
- .../testing/selftests/livepatch/functions.sh  | 16 +++++-
+ tools/testing/selftests/livepatch/Makefile    |  3 +-
+ .../testing/selftests/livepatch/functions.sh  | 14 +++++
  .../selftests/livepatch/test-extern.sh        | 57 +++++++++++++++++++
  .../selftests/livepatch/test_modules/Makefile |  2 +
  .../livepatch/test_modules/test_klp_extern.c  | 51 +++++++++++++++++
  .../test_modules/test_klp_extern_hello.c      | 36 ++++++++++++
- 5 files changed, 161 insertions(+), 1 deletion(-)
+ 6 files changed, 162 insertions(+), 1 deletion(-)
  create mode 100755 tools/testing/selftests/livepatch/test-extern.sh
  create mode 100644 tools/testing/selftests/livepatch/test_modules/test_klp_extern.c
  create mode 100644 tools/testing/selftests/livepatch/test_modules/test_klp_extern_hello.c
 
+diff --git a/tools/testing/selftests/livepatch/Makefile b/tools/testing/selftests/livepatch/Makefile
+index 35418a4790be..611ee16bef56 100644
+--- a/tools/testing/selftests/livepatch/Makefile
++++ b/tools/testing/selftests/livepatch/Makefile
+@@ -10,7 +10,8 @@ TEST_PROGS := \
+ 	test-state.sh \
+ 	test-ftrace.sh \
+ 	test-sysfs.sh \
+-	test-syscall.sh
++	test-syscall.sh \
++	test-extern.sh
+ 
+ TEST_FILES := settings
+ 
 diff --git a/tools/testing/selftests/livepatch/functions.sh b/tools/testing/selftests/livepatch/functions.sh
-index fc4c6a016d38..801d55dc06ac 100644
+index fc4c6a016d38..9b6a19eee3a2 100644
 --- a/tools/testing/selftests/livepatch/functions.sh
 +++ b/tools/testing/selftests/livepatch/functions.sh
 @@ -7,6 +7,7 @@
@@ -2394,15 +2418,6 @@ index fc4c6a016d38..801d55dc06ac 100644
  
  # Kselftest framework requirement - SKIP code is 4
  ksft_skip=4
-@@ -299,7 +300,7 @@ function check_result {
- 	result=$(dmesg | awk -v last_dmesg="$LAST_DMESG" 'p; $0 == last_dmesg { p=1 }' | \
- 		 grep -e 'livepatch:' -e 'test_klp' | \
- 		 grep -v '\(tainting\|taints\) kernel' | \
--		 sed 's/^\[[ 0-9.]*\] //')
-+		 sed 's/^\[[ 0-9.]*\] //' | sed 's/^test_klp_log: //')
- 
- 	if [[ "$expect" == "$result" ]] ; then
- 		echo "ok"
 @@ -344,3 +345,16 @@ function check_sysfs_value() {
  		die "Unexpected value in $path: $expected_value vs. $value"
  	fi
@@ -2555,7 +2570,7 @@ index 000000000000..2a88ae289668
 +MODULE_DESCRIPTION("Livepatch test: external symbol relocation");
 diff --git a/tools/testing/selftests/livepatch/test_modules/test_klp_extern_hello.c b/tools/testing/selftests/livepatch/test_modules/test_klp_extern_hello.c
 new file mode 100644
-index 000000000000..58ce4e655eee
+index 000000000000..431c55b5849a
 --- /dev/null
 +++ b/tools/testing/selftests/livepatch/test_modules/test_klp_extern_hello.c
 @@ -0,0 +1,36 @@
@@ -2575,7 +2590,7 @@ index 000000000000..58ce4e655eee
 +}
 +
 +static const struct kernel_param_ops hello_ops = {
-+	.get	= hello_get
++	.get	= hello_get,
 +};
 +
 +module_param_cb(hello, &hello_ops, NULL, 0400);
@@ -2596,5 +2611,214 @@ index 000000000000..58ce4e655eee
 +MODULE_AUTHOR("Lukas Hruska <lhruska@suse.cz>");
 +MODULE_DESCRIPTION("Livepatch test: external symbol relocation - test module");
 -- 
-2.45.0
+2.46.0
+
+From git@z Thu Jan  1 00:00:00 1970
+Subject: [PATCH v3 7/6] selftests: livepatch: Test failing IBT checks
+ crashing the module
+From: Lukas Hruska <lhruska@suse.cz>
+Date: Tue, 27 Aug 2024 14:30:52 +0200
+Message-Id: <20240827123052.9002-8-lhruska@suse.cz>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+This patch is only an example of how to generate #GP by IBT.
+It serves only as an example for those wondering how the Linux behaves
+in this case.
+Don't merge this patch, because it causes a refcount underflow of the test
+module, so it's not possible to unload it.
+
+Signed-off-by: Lukas Hruska <lhruska@suse.cz>
+---
+ tools/testing/selftests/livepatch/Makefile    |  4 ++
+ tools/testing/selftests/livepatch/test-ibt.sh | 57 +++++++++++++++++++
+ .../selftests/livepatch/test_modules/Makefile |  2 +
+ .../test_modules/test_klp_extern_hello.c      | 20 +++++++
+ .../livepatch/test_modules/test_klp_ibt.c     | 51 +++++++++++++++++
+ 5 files changed, 134 insertions(+)
+ create mode 100644 tools/testing/selftests/livepatch/test-ibt.sh
+ create mode 100644 tools/testing/selftests/livepatch/test_modules/test_klp_ibt.c
+
+diff --git a/tools/testing/selftests/livepatch/Makefile b/tools/testing/selftests/livepatch/Makefile
+index 611ee16bef56..3ef2040e4c50 100644
+--- a/tools/testing/selftests/livepatch/Makefile
++++ b/tools/testing/selftests/livepatch/Makefile
+@@ -13,6 +13,10 @@ TEST_PROGS := \
+ 	test-syscall.sh \
+ 	test-extern.sh
+ 
++ifdef CONFIG_X86_KERNEL_IBT
++	TEST_PROGS += test-ibt.sh
++endif
++
+ TEST_FILES := settings
+ 
+ include ../lib.mk
+diff --git a/tools/testing/selftests/livepatch/test-ibt.sh b/tools/testing/selftests/livepatch/test-ibt.sh
+new file mode 100644
+index 000000000000..c5f49fb7af4d
+--- /dev/null
++++ b/tools/testing/selftests/livepatch/test-ibt.sh
+@@ -0,0 +1,57 @@
++#!/bin/bash
++# SPDX-License-Identifier: GPL-2.0
++# Copyright (C) 2024 Lukas Hruska <lhruska@suse.cz>
++
++. $(dirname $0)/functions.sh
++
++MOD_LIVEPATCH=test_klp_ibt
++MOD_HELLO=test_klp_extern_hello
++PARAM_HELLO=hello
++
++setup_config
++
++# - load a module to be livepatched
++# - load a livepatch that calls the unused function which does not have endbr64
++#   as its first instruction
++# - unload the livepatch and make sure the patch was removed
++# - unload the module that was livepatched
++
++start_test "livepatch with external symbol"
++
++load_mod $MOD_HELLO
++
++read_module_param $MOD_HELLO $PARAM_HELLO
++
++load_lp $MOD_LIVEPATCH
++
++read_module_param $MOD_HELLO $PARAM_HELLO
++
++disable_lp $MOD_LIVEPATCH
++unload_lp $MOD_LIVEPATCH
++
++read_module_param $MOD_HELLO $PARAM_HELLO
++
++unload_mod $MOD_HELLO
++
++check_result "% insmod test_modules/$MOD_HELLO.ko
++% echo \"$MOD_HELLO/parameters/$PARAM_HELLO: \$(cat /sys/module/$MOD_HELLO/parameters/$PARAM_HELLO)\"
++$MOD_HELLO/parameters/$PARAM_HELLO: Hello from kernel module.
++% insmod test_modules/$MOD_LIVEPATCH.ko
++livepatch: enabling patch '$MOD_LIVEPATCH'
++livepatch: '$MOD_LIVEPATCH': initializing patching transition
++livepatch: '$MOD_LIVEPATCH': starting patching transition
++livepatch: '$MOD_LIVEPATCH': completing patching transition
++livepatch: '$MOD_LIVEPATCH': patching complete
++% echo \"$MOD_HELLO/parameters/$PARAM_HELLO: \$(cat /sys/module/$MOD_HELLO/parameters/$PARAM_HELLO)\"
++$MOD_HELLO/parameters/$PARAM_HELLO: Hello from livepatched module.
++% echo 0 > /sys/kernel/livepatch/$MOD_LIVEPATCH/enabled
++livepatch: '$MOD_LIVEPATCH': initializing unpatching transition
++livepatch: '$MOD_LIVEPATCH': starting unpatching transition
++livepatch: '$MOD_LIVEPATCH': completing unpatching transition
++livepatch: '$MOD_LIVEPATCH': unpatching complete
++% rmmod $MOD_LIVEPATCH
++% echo \"$MOD_HELLO/parameters/$PARAM_HELLO: \$(cat /sys/module/$MOD_HELLO/parameters/$PARAM_HELLO)\"
++$MOD_HELLO/parameters/$PARAM_HELLO: Hello from kernel module.
++% rmmod $MOD_HELLO"
++
++exit 0
+diff --git a/tools/testing/selftests/livepatch/test_modules/Makefile b/tools/testing/selftests/livepatch/test_modules/Makefile
+index 0d6df14787da..49a22ea90f3a 100644
+--- a/tools/testing/selftests/livepatch/test_modules/Makefile
++++ b/tools/testing/selftests/livepatch/test_modules/Makefile
+@@ -15,6 +15,8 @@ obj-m += test_klp_atomic_replace.o \
+ 	test_klp_shadow_vars.o \
+ 	test_klp_syscall.o
+ 
++obj-$(CONFIG_X86_KERNEL_IBT) += test_klp_ibt.o
++
+ # Ensure that KDIR exists, otherwise skip the compilation
+ modules:
+ ifneq ("$(wildcard $(KDIR))", "")
+diff --git a/tools/testing/selftests/livepatch/test_modules/test_klp_extern_hello.c b/tools/testing/selftests/livepatch/test_modules/test_klp_extern_hello.c
+index 431c55b5849a..37e1cd2cecdb 100644
+--- a/tools/testing/selftests/livepatch/test_modules/test_klp_extern_hello.c
++++ b/tools/testing/selftests/livepatch/test_modules/test_klp_extern_hello.c
+@@ -13,6 +13,26 @@ static int hello_get(char *buffer, const struct kernel_param *kp)
+ 	return sysfs_emit(buffer, "%s kernel module.\n", hello_msg);
+ }
+ 
++#ifdef CONFIG_X86_KERNEL_IBT
++static __attribute__((nocf_check)) int hello_get_alt(char *buffer, const struct kernel_param *kp)
++{
++	return sysfs_emit(buffer, "%s unused function.\n", hello_msg);
++}
++
++static int fail_get(char *buffer, const struct kernel_param *kp)
++{
++	int __attribute__((nocf_check)) (* volatile klpe_hello_get_alt)(char *, const struct kernel_param *) = hello_get_alt;
++	return (*klpe_hello_get_alt)(buffer, kp);
++}
++
++static const struct kernel_param_ops fail_ops = {
++	.get	= fail_get,
++};
++
++module_param_cb(fail, &fail_ops, NULL, 0400);
++MODULE_PARM_DESC(fail, "Read only parameter failing the reader.");
++#endif
++
+ static const struct kernel_param_ops hello_ops = {
+ 	.get	= hello_get,
+ };
+diff --git a/tools/testing/selftests/livepatch/test_modules/test_klp_ibt.c b/tools/testing/selftests/livepatch/test_modules/test_klp_ibt.c
+new file mode 100644
+index 000000000000..3b76d175d398
+--- /dev/null
++++ b/tools/testing/selftests/livepatch/test_modules/test_klp_ibt.c
+@@ -0,0 +1,51 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (C) 2024 Lukas Hruska <lhruska@suse.cz>
++
++#define pr_fmt(fmt) "test_klp_extern_hello: " fmt
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/livepatch.h>
++
++extern int hello_get_alt(char *buffer, const struct kernel_param *kp)
++			KLP_RELOC_SYMBOL(test_klp_extern_hello, test_klp_extern_hello, hello_get_alt);
++
++static int hello_get(char *buffer, const struct kernel_param *kp)
++{
++	return hello_get_alt(buffer, kp);
++}
++
++static struct klp_func funcs[] = {
++	{
++		.old_name = "hello_get",
++		.new_func = hello_get,
++	}, { }
++};
++
++static struct klp_object objs[] = {
++	{
++		.name = "test_klp_extern_hello",
++		.funcs = funcs,
++	}, { }
++};
++
++static struct klp_patch patch = {
++	.mod = THIS_MODULE,
++	.objs = objs,
++};
++
++static int test_klp_extern_init(void)
++{
++	return klp_enable_patch(&patch);
++}
++
++static void test_klp_extern_exit(void)
++{
++}
++
++module_init(test_klp_extern_init);
++module_exit(test_klp_extern_exit);
++MODULE_LICENSE("GPL");
++MODULE_INFO(livepatch, "Y");
++MODULE_AUTHOR("Lukas Hruska <lhruska@suse.cz>");
++MODULE_DESCRIPTION("Livepatch test: external function call with IBT enabled");
+-- 
+2.46.0
 
