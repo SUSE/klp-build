@@ -161,7 +161,7 @@ class Setup(Config):
         repo = f"{repo}_Update"
 
         # On 15.5 the RT kernels and in the main codestreams
-        if not rt or (sle >= 15 and sp >= 5):
+        if not rt or (sle == 15 and sp == 5):
             return repo
 
         return f"{repo}_Products_SLERT_Update"
