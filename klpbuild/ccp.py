@@ -38,6 +38,7 @@ class CCP(Config):
             "__read_overflow",
             "__read_overflow2",
             "__real_strnlen",
+            "__real_strlcpy",
             "twaddle",
             "set_geometry",
             "valid_floppy_drive_params",
