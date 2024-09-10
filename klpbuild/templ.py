@@ -111,7 +111,7 @@ TEMPL_KLP_LONE_FILE = """\
 #include <linux/livepatch.h>
 
 % for obj, funcs in klp_objs.items():
-static struct klp_func ${ obj }_funcs[] = {
+static struct klp_func _${ obj }_funcs[] = {
 % for func in funcs:
     {
         .old_name = "${ func }",
@@ -128,7 +128,7 @@ static struct klp_object objs[] = {
 %if obj != "vmlinux":
         .name = "${ obj }",
 %endif
-        .funcs = ${ obj }_funcs
+        .funcs = _${ obj }_funcs
     },
 % endfor
     {}
