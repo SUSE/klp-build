@@ -310,6 +310,8 @@ class IBS(Config):
         test_src = self.get_tests_path()
         run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
 
+        logging.info(f"Validating the downloaded RPMs...")
+
         for arch in ARCHS:
             tests_path = Path(self.lp_path, "tests", arch)
             test_arch_path = Path(tests_path, self.lp_name)
@@ -324,6 +326,7 @@ class IBS(Config):
             for d in ["built", "repro", "tests.out"]:
                 Path(test_arch_path, d).mkdir(exist_ok=True)
 
+            logging.info(f"Checking {arch} symbols...")
             build_cs = []
             for cs, data in self.filter_cs(verbose=False).items():
                 if arch not in data["archs"]:
@@ -350,6 +353,8 @@ class IBS(Config):
 
                 build_cs.append(self.get_full_cs(cs))
 
+            logging.info("Done.")
+
             # Prepare the config and test files used by kgr-test
             test_dst = Path(test_arch_path, f"repro/{self.lp_name}")
             if test_src.is_file():
@@ -364,6 +369,7 @@ class IBS(Config):
             with open(config, "w") as f:
                 f.write("\n".join(natsorted(build_cs)))
 
+            logging.info(f"Creating {arch} tar file...")
             subprocess.run(
                 ["tar", "-cJf", f"{self.lp_name}.tar.xz", f"{self.lp_name}"],
                 cwd=tests_path,
@@ -371,6 +377,8 @@ class IBS(Config):
                 stderr=subprocess.PIPE,
                 check=True,
             )
+
+            logging.info("Done.")
 
     # We can try delete a project that was removed, so don't bother with errors
     def delete_rpms(self, cs):
@@ -408,9 +416,11 @@ class IBS(Config):
                     rpms.append((i, prj, prj, "devbuild", arch, "klp", rpm, dest))
                     i += 1
 
-        logging.info(f"Downloading {len(rpms)} packages")
+        logging.info(f"Downloading {len(rpms)} packages...")
         self.total = len(rpms)
         self.do_work(self.download_binary_rpms, rpms)
+
+        logging.info(f"Download finished.")
 
     def status(self, wait=False):
         finished_prj = []
