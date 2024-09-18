@@ -356,7 +356,55 @@ class GitHelper(Config):
 
         return commits
 
-    def get_patched_kernels(self, commits):
+    def get_patched_tags(self, suse_commits):
+        tag_commits = {}
+        patched = []
+        total_commits = len(suse_commits)
+
+        # Grab only the first commit, since they would be put together
+        # in a release either way. The order of the array is backards, the
+        # first entry will be the last patch found.
+        for su in suse_commits:
+            tag_commits[su] = []
+
+            tags = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src,
+                                            "tag", f"--contains={su}",
+                                            "rpm-*"])
+
+            for tag in tags.decode().splitlines():
+                # Remove noise around the kernel version, like
+                # rpm-5.3.18-150200.24.112--sle15-sp2-ltss-updates
+                if "--" in tag:
+                    continue
+
+                tag = tag.replace("rpm-", "")
+                tag_commits.setdefault(tag, [])
+                tag_commits[tag].append(su)
+
+            # "patched branches" are those who contain all commits
+            for tag, b in tag_commits.items():
+                if len(b) == total_commits:
+                    patched.append(tag)
+
+        # remove duplicates
+        return natsorted(list(set(patched)))
+
+    def is_kernel_patched(self, kernel, suse_commits, cve):
+        commits = []
+
+        ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "log",
+                                       f"--grep=CVE-{cve}",
+                                       f"--tags=*rpm-{kernel}",
+                                       "--pretty=format:\"%H\""]);
+
+        for c in ret.decode().splitlines():
+            # Remove quotes for each commit hash
+            commits.append(c.replace("\"", ""))
+
+        # "patched kernels" are those who contain all commits.
+        return len(suse_commits) == len(commits), commits
+
+    def get_patched_kernels(self, codestreams, commits, cve):
         if not commits:
             return []
 
@@ -364,41 +412,46 @@ class GitHelper(Config):
             logging.info("kernel_src_dir not found, skip getting SUSE commits")
             return []
 
+        if not cve:
+            logging.info("No CVE informed, skipping the processing of getting the patched kernels.")
+            return []
+
         print("Searching for already patched codestreams...")
 
-        patched = []
+        kernels = []
+
         for bc, _ in self.kernel_branches.items():
             suse_commits = commits[bc]["commits"]
             if not suse_commits:
                 continue
 
-            tag_commits = {}
+            # Get all the kernels/tags containing the commits in the main SLE
+            # branch. This information alone is not reliable enough to decide
+            # if a kernel is patched.
+            suse_tags = self.get_patched_tags(suse_commits)
 
-            # Grab only the first commit, since they would be put together
-            # in a release either way. The order of the array is backards, the
-            # first entry will be the last patch found.
-            for su in suse_commits:
-                tag_commits[su] = []
+            # Proceed to analyse each codestream's kernel
+            for cs, data in codestreams.items():
+                if bc+'u' not in cs:
+                    continue
 
-                tags = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "tag",
-                                                f"--contains={su}",
-                                                "rpm-*"])
+                kernel = data["kernel"]
 
-                for tag in tags.decode().splitlines():
-                    # Remove noise around the kernel version, like
-                    # rpm-5.3.18-150200.24.112--sle15-sp2-ltss-updates
-                    if "--" in tag:
-                        continue
+                patched, kern_commits = self.is_kernel_patched(kernel, suse_commits, cve)
+                if not patched and kernel not in suse_tags:
+                    continue
 
-                    tag = tag.replace("rpm-", "")
-                    tag_commits.setdefault(tag, [])
-                    tag_commits[tag].append(su)
+                print(f"\n{cs} ({kernel}):")
 
-            # "patched branches" are those who contain all commits
-            total_commits = len(suse_commits)
-            for tag, b in tag_commits.items():
-                if len(b) == total_commits:
-                    patched.append(tag)
+                # If no patches/commits were found for this kernel, fallback to
+                # the commits in the main SLE branch. In either case, we can
+                # assume that this kernel is already patched.
+                for c in kern_commits if patched else suse_commits:
+                    print(f"{c}")
+
+                kernels.append(kernel)
+
+        print("")
 
         # remove duplicates
-        return natsorted(list(set(patched)))
+        return natsorted(list(set(kernels)))

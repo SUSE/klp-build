@@ -190,7 +190,9 @@ class Setup(Config):
         # Called at this point because codestreams is populated
         self.conf["commits"] = ksrc.get_commits(self.conf.get("cve", ""))
 
-        patched_kernels = ksrc.get_patched_kernels(self.conf["commits"])
+        patched_kernels = ksrc.get_patched_kernels(all_codestreams,
+                                                   self.conf["commits"],
+                                                   self.conf.get("cve", ""))
 
         self.conf["patched_kernels"] = patched_kernels
 
