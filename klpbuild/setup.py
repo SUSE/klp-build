@@ -237,6 +237,9 @@ class Setup(Config):
             if self.missing_codestream(cs):
                 cs_data_missing[cs] = data
 
+        logging.info(f"Affected architectures:")
+        logging.info(f"\t{' '.join(self.conf['archs'])}")
+
         if patched_cs:
             cs_list = utils.classify_codestreams(patched_cs)
             logging.info("Skipping already patched codestreams:")
