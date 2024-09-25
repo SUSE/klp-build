@@ -209,6 +209,12 @@ class IBS(Config):
             mod_path.unlink()
             os.symlink(self.get_odir(cs), mod_path)
 
+        # Create symlink from lib to usr/lib so we can use virtme on the
+        # extracted kernels
+        usr_lib = Path(self.data, ARCH, "usr", "lib")
+        if not usr_lib.exists():
+            usr_lib.symlink_to(Path(self.data, ARCH, "lib"))
+
         logging.info("Finished extract vmlinux and modules...")
 
     def download_binary_rpms(self, args):
