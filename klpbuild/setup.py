@@ -223,9 +223,6 @@ class Setup(Config):
                     unaffected_cs.append(cs)
                     continue
 
-            data["files"] = copy.deepcopy(self.file_funcs)
-            data["repo"] = self.cs_repo(cs)
-
             # Set supported archs for the codestream
             # RT is supported only on x86_64 at the moment
             archs = ["x86_64"]
@@ -238,9 +235,6 @@ class Setup(Config):
 
             if self.missing_codestream(cs):
                 cs_data_missing[cs] = data
-
-        logging.info(f"Affected architectures:")
-        logging.info(f"\t{' '.join(self.conf['archs'])}")
 
         if patched_cs:
             cs_list = utils.classify_codestreams(patched_cs)
@@ -298,9 +292,15 @@ class Setup(Config):
         else:
             self.setup_codestreams()
 
+        logging.info(f"Affected architectures:")
+        logging.info(f"\t{' '.join(self.conf['archs'])}")
+
         logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed
         for cs, data in self.working_cs.items():
+            data["files"] = copy.deepcopy(self.file_funcs)
+            data["repo"] = self.cs_repo(cs)
+
             # Check if the files exist in the respective codestream directories
             mod_syms = {}
             kernel = self.get_cs_kernel(cs)
