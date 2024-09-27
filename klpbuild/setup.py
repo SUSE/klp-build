@@ -84,7 +84,8 @@ class Setup(Config):
             self.file_funcs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
 
     # Parse SLE15-SP2_Update_25 to 15.2u25
-    def parse_cs_line(self, cs):
+    @staticmethod
+    def parse_cs_line(cs):
         rt = "rt" if "-RT" in cs else ""
 
         sle, _, u = cs.replace("SLE", "").replace("-RT", "").split("_")
@@ -95,7 +96,8 @@ class Setup(Config):
 
         return int(sle), int(sp), int(u), rt
 
-    def download_supported_file(self):
+    @staticmethod
+    def download_supported_file():
         logging.info("Downloading codestreams file")
         cs_url = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
         suse_cert = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
@@ -126,7 +128,7 @@ class Setup(Config):
             kernel = re.sub(r"\.\d+$", "", kernel_full)
 
             # Fill the majority of possible fields here
-            sle, sp, u, rt = self.parse_cs_line(full_cs)
+            sle, sp, u, rt = Setup.parse_cs_line(full_cs)
             if rt:
                 cs_key = f"{sle}.{sp}{rt}u{u}"
             else:
@@ -183,7 +185,7 @@ class Setup(Config):
     def setup_codestreams(self):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
-        all_codestreams = self.download_supported_file()
+        all_codestreams = Setup.download_supported_file()
 
         ksrc = GitHelper(self.lp_name, self.filter, self.data)
 
