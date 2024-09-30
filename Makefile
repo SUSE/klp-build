@@ -9,8 +9,8 @@ test:
 setup:
 	python3 -m unittest -v tests.test_lp_setup.LpSetupTest
 
-ccp:
-	python3 -m unittest -v tests.test_ccp.CcpTesting
+extract:
+	pytest tests/test_extract.py
 
 templ:
 	python3 -m unittest -v tests.test_templ.TemplTesting
