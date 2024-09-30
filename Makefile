@@ -14,3 +14,6 @@ ccp:
 
 templ:
 	python3 -m unittest -v tests.test_templ.TemplTesting
+
+ksrc:
+	pytest tests/test_ksrc.py
