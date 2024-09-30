@@ -182,6 +182,23 @@ class Setup(Config):
 
         return len(self.conf["commits"][to_check]["commits"]) > 0
 
+    # Needs to be called after setup_codestreams since the workincs_cs is set
+    # there
+    def download_missing_cs_data(self):
+        data_missing = {}
+
+        for cs, data in self.working_cs.items():
+            if self.missing_codestream(cs):
+                data_missing[cs] = data
+
+        # Found missing cs data, downloading and extract
+        if data_missing:
+            logging.info("Download the necessary data from the following codestreams:")
+            logging.info(f'\t{" ".join(data_missing.keys())}\n')
+            ibs = IBS(self.lp_name, self.filter, self.working_cs)
+            ibs.download_cs_data(data_missing)
+            logging.info("Done.")
+
     def setup_codestreams(self):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
@@ -197,8 +214,6 @@ class Setup(Config):
                                                    self.conf.get("cve", ""))
 
         self.conf["patched_kernels"] = patched_kernels
-
-        cs_data_missing = {}
 
         # list of codestreams that matches the file-funcs argument
         self.working_cs = OrderedDict()
@@ -230,11 +245,9 @@ class Setup(Config):
                 archs.extend(["ppc64le", "s390x"])
 
             data["archs"] = archs
+            data["repo"] = self.cs_repo(cs)
 
             self.working_cs[cs] = data
-
-            if self.missing_codestream(cs):
-                cs_data_missing[cs] = data
 
         if patched_cs:
             cs_list = utils.classify_codestreams(patched_cs)
@@ -261,22 +274,6 @@ class Setup(Config):
         # by the user, avoid downloading missing codestreams that are not affected
         self.working_cs = self.filter_cs(self.working_cs, verbose=True)
 
-        # Remove filtered codestreams from missing data codestreams, as we don't
-        # need to download data from codestreams that we don't need to build
-        # livepatched
-        data_missing = cs_data_missing.copy()
-        for cs in cs_data_missing.keys():
-            if cs not in self.working_cs.keys():
-                data_missing.pop(cs)
-
-        # Found missing cs data, downloading and extract
-        if data_missing:
-            logging.info("Download the necessary data from the following codestreams:")
-            logging.info(f'\t{" ".join(data_missing.keys())}\n')
-            ibs = IBS(self.lp_name, self.filter, self.working_cs)
-            ibs.download_cs_data(data_missing)
-            logging.info("Done.")
-
     def setup_project_files(self):
         self.lp_path.mkdir(exist_ok=True)
 
@@ -295,11 +292,12 @@ class Setup(Config):
         logging.info(f"Affected architectures:")
         logging.info(f"\t{' '.join(self.conf['archs'])}")
 
+        self.download_missing_cs_data()
+
         logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed
         for cs, data in self.working_cs.items():
             data["files"] = copy.deepcopy(self.file_funcs)
-            data["repo"] = self.cs_repo(cs)
 
             # Check if the files exist in the respective codestream directories
             mod_syms = {}
