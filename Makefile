@@ -17,3 +17,6 @@ templ:
 
 ksrc:
 	pytest tests/test_ksrc.py
+
+utils:
+	pytest tests/test_utils.py
