@@ -259,6 +259,13 @@ class Setup(Config):
             logging.info("Skipping unaffected codestreams (missing backports):")
             logging.info(f'\t{" ".join(cs_list)}')
 
+        # Add new codestreams to the already existing list, skipping duplicates
+        self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs", []) + patched_cs)))
+
+        # working_cs will contain the final dict of codestreams that wast set
+        # by the user, avoid downloading missing codestreams that are not affected
+        self.working_cs = self.filter_cs(self.working_cs, verbose=True)
+
         if not self.working_cs.keys():
             logging.info("All supported codestreams are already patched. Exiting klp-build")
             sys.exit(0)
@@ -267,12 +274,6 @@ class Setup(Config):
         cs_list = utils.classify_codestreams(self.working_cs.keys())
         logging.info(f'\t{" ".join(cs_list)}')
 
-        # Add new codestreams to the already existing list, skipping duplicates
-        self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs", []) + patched_cs)))
-
-        # working_cs will contain the final dict of codestreams that wast set
-        # by the user, avoid downloading missing codestreams that are not affected
-        self.working_cs = self.filter_cs(self.working_cs, verbose=True)
 
     def setup_project_files(self):
         self.lp_path.mkdir(exist_ok=True)
