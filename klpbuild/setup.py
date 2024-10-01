@@ -304,6 +304,9 @@ class Setup(Config):
             mod_syms = {}
             kernel = self.get_cs_kernel(cs)
             for f, fdata in data["files"].items():
+
+                self.validate_config(cs, fdata["conf"], fdata["module"])
+
                 sdir = self.get_sdir(cs)
                 if not Path(sdir, f).is_file():
                     raise RuntimeError(f"{cs} ({kernel}): File {f} not found on {str(sdir)}")
@@ -315,8 +318,6 @@ class Setup(Config):
                         msg += " Creating an empty file."
                         ipa_f.touch()
                     logging.warning(msg)
-
-                self.validate_config(cs, fdata["conf"], fdata["module"])
 
                 # If the config was enabled on all supported architectures,
                 # there is no point in leaving the conf being set, since the
