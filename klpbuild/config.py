@@ -159,9 +159,6 @@ class Config:
         if not patches_dir.exists():
             return
 
-        if not fil:
-            fil = subprocess.DEVNULL
-
         fil.write(f"\nRemoving patches from {cs}({kernel})\n")
         fil.flush()
         err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=fil, stdout=fil)
@@ -172,7 +169,7 @@ class Config:
         shutil.rmtree(patches_dir, ignore_errors=True)
         shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
 
-    def apply_all_patches(self, cs, fil=subprocess.STDOUT):
+    def apply_all_patches(self, cs, fil):
         if self.kdir:
             patch_dirs = [self.get_patches_dir()]
         else:

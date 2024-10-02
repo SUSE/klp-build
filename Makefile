@@ -3,6 +3,8 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+all: ksrc extract utils
+
 test:
 	python3 -m unittest -v
 

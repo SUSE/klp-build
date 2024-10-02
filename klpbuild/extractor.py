@@ -46,10 +46,11 @@ class Extractor(Config):
         if self.apply_patches and not patches.exists():
             raise ValueError("--apply-patches specified without patches. Run get-patches!")
 
-        self.quilt_log = None
         if patches.exists():
             self.quilt_log = open(Path(patches, "quilt.log"), "w")
             self.quilt_log.truncate()
+        else:
+            self.quilt_log = open("/dev/null", "w")
 
         self.total = 0
         self.make_lock = Lock()
