@@ -11,12 +11,13 @@ from klpbuild.utils import ARCH
 
 
 class CE(Config):
-    def __init__(self, lp_name, lp_filter, avoid_ext):
+    def __init__(self, lp_name, lp_filter, avoid_ext, ignore_errors):
         super().__init__(lp_name, lp_filter)
 
         self.app = "ce"
 
         self.avoid_externalize = avoid_ext
+        self.ignore_errors = ignore_errors
 
         self.ce_path = shutil.which("clang-extract")
         if not self.ce_path:
@@ -86,5 +87,8 @@ class CE(Config):
 
         # For debug purposes. Uncomment for dumping clang-extract passes
         # ce_args.extend(['-DCE_DUMP_PASSES'])
+
+        if self.ignore_errors:
+            ce_args.extend(["-DCE_IGNORE_CLANG_ERRORS"])
 
         return ce_args, None

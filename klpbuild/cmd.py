@@ -129,6 +129,10 @@ def create_parser() -> argparse.ArgumentParser:
         "--apply-patches", action="store_true", help="Apply patches found by get-patches subcommand, if they exist"
     )
     extract_opts.add_argument(
+        "--ignore-errors", action="store_true", help="Don't exit clang-extract if an error is detected when "
+        "extracting the code. Should be used on cases like extracting tracepoints or other code that are "
+        "usually problematic.")
+    extract_opts.add_argument(
         "--type", type=str, choices=["ccp", "ce"], default="ccp", help="Choose between ccp and ce"
     )
     extract_opts.add_argument("--workers", type=int, default=4, help="Number of processes for ccp and ce. Default is 4")
@@ -194,10 +198,11 @@ def main_func(main_args):
         setup.setup_project_files()
 
     elif args.cmd == "extract":
-        Extractor(args.name, args.filter, args.apply_patches, args.type, args.avoid_ext, args.workers).run()
+        Extractor(args.name, args.filter, args.apply_patches, args.type,
+                  args.avoid_ext, args.ignore_errors, args.workers).run()
 
     elif args.cmd == "cs-diff":
-        Extractor(args.name, "", False, args.type, []).diff_cs(args.codestreams)
+        Extractor(args.name, "", False, args.type, [], False).diff_cs(args.codestreams)
 
     elif args.cmd == "check-inline":
         Inliner(args.name).check_inline(args.codestream, args.file, args.symbol)

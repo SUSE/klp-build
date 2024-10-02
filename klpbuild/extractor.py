@@ -28,7 +28,7 @@ from klpbuild.templ import TemplateGen
 
 
 class Extractor(Config):
-    def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, workers=4):
+    def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, ignore_errors, workers=4):
         super().__init__(lp_name, lp_filter)
 
         if not self.kdir and not self.host:
@@ -63,7 +63,7 @@ class Extractor(Config):
         if app == "ccp":
             self.runner = CCP(lp_name, lp_filter, avoid_ext)
         else:
-            self.runner = CE(lp_name, lp_filter, avoid_ext)
+            self.runner = CE(lp_name, lp_filter, avoid_ext, ignore_errors)
 
         self.app = app
         self.tem = TemplateGen(self.lp_name, self.filter, self.app)
