@@ -185,7 +185,9 @@ class Extractor(Config):
 
     def get_cmd_from_json(self, cs, fname):
         cc_file = Path(self.get_odir(cs), "compile_commands.json")
-        if not cc_file.exists():
+        # FIXME: compile_commands.json that is packaged with SLE/openSUSE
+        # doesn't quite work yet, so don't use it yet.
+        if not cc_file.exists() or not self.kdir:
             return None
 
         with open(cc_file) as f:
