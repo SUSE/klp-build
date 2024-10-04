@@ -26,9 +26,11 @@ Show command's help message and exit.
 .TP
 .BI "-n, --name" " NAME"
 The livepatch name. This will be the directory name of the resulting
-livepatches. If
+livepatches.
+.TP
 .BI --filter " FILTER"
-Filter out codestreams using a regex. Example: "15\.3u[0-9]+"
+SLE specific. List of accepted codestreams. Must be specified in regex format.
+Example: "15\.3u[0-9]+|15\.6u0"
 .TP
 .B --experimental
 Enables functions that may not work as expected yet.
@@ -61,20 +63,20 @@ SLE specific. Codestreams affected by the CVE. Can be used as a regex, like,
 .TP
 .BI --file-funcs " [FILE_FUNCS ...]"
 File and functions to be livepatched. Can be set multiple times. The format is:
-.BI --file-funcs " file/path.c func1 func2"
-.BI --file-func " file/patch2 func1..."
+.BI --file-funcs " file/path.c func1 func2..."
+.BI --file-funcs " file/patch2.c func1 func2..."
 .TP
 .BI --mod-file-funcs " [MOD_FILE_FUNCS ...]"
 Module, file and functions to be livepatched. Can be set multiple times. The
 format is:
-.BI --file-funcs " module1 file/path.c func1 func2"
-.BI --file-funcs " module2 file/patch2 func1..."
+.BI --mod-file-funcs " module1 file/path.c func1 func2..."
+.BI --mod-file-funcs " module2 file/patch2.c func1 func2..."
 .TP
 .BI --conf-mod-file-funcs " [CONF_MOD_FILE_FUNCS ...]"
 Conf, module, file and functions to be livepatched. Can be set multiple times.
 The format is:
-.BI --file-funcs " conf1 module1 file/path.c func1 func2"
-.BI --file-func " conf2 module2 file/patch2 func1..."
+.BI --conf-mod-file-funcs " conf1 module1 file/path.c func1 func2..."
+.BI --conf-mod-file-funcs " conf2 module2 file/patch2.c func1 func2..."
 .TP
 .BI --module " MODULE"
 The module that will be livepatched for all files. If empty,
@@ -85,7 +87,8 @@ will be livepatched instead.
 SLE specific. Supported architectures for this livepatch.
 .TP
 .BI --skips " SKIPS"
-List of codestreams to filter out.
+SLE specific. List of excluded codestreams. Must be specified in regex format.
+Example: "15\.3u[0-9]+|15\.6u0"
 .RE
 .B check-inline
 .RS 7
@@ -134,6 +137,13 @@ and
 .BR clang-extract "(1)."
 Default:
 .BR 4 "."
+.TP
+.B --ignore-errors
+Don't exit
+.BR clang-extract "(1)"
+if an error is detected when extracting the code.
+Should be used on cases like extracting tracepoints
+or other code that is usually problematic.
 .RE
 .B cs-diff
 .RS 7
