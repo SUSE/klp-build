@@ -21,6 +21,9 @@ def classify_codestreams(cs_list):
     # later
     cs_group = {}
     for cs in cs_list:
+        if not isinstance(cs, str):
+            cs = cs.name()
+
         prefix, up = cs.split("u")
         if not cs_group.get(prefix, ""):
             cs_group[prefix] = [int(up)]
