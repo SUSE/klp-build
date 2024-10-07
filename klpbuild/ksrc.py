@@ -431,11 +431,11 @@ class GitHelper(Config):
             suse_tags = self.get_patched_tags(suse_commits)
 
             # Proceed to analyse each codestream's kernel
-            for cs, data in codestreams.items():
-                if bc+'u' not in cs:
+            for cs in codestreams:
+                if bc+'u' not in cs.name():
                     continue
 
-                kernel = data["kernel"]
+                kernel = cs.kernel()
 
                 patched, kern_commits = self.is_kernel_patched(kernel, suse_commits, cve)
                 if not patched and kernel not in suse_tags:

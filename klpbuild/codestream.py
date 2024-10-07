@@ -43,6 +43,10 @@ class Codestream:
         self.archs = archs
 
 
+    def set_files(self, files):
+        self.files = files
+
+
     def name(self):
         if self.rt:
             return f"{self.sle}.{self.sp}rtu{self.update}"
