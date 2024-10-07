@@ -3,7 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-all: ksrc extract utils
+all: ksrc extract utils templ
 
 test:
 	python3 -m unittest -v
@@ -15,7 +15,7 @@ extract:
 	pytest tests/test_extract.py
 
 templ:
-	python3 -m unittest -v tests.test_templ.TemplTesting
+	pytest tests/test_templ.py
 
 ksrc:
 	pytest tests/test_ksrc.py

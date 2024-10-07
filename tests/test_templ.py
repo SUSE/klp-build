@@ -3,77 +3,79 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
-import logging
-import os
-import unittest
+from klpbuild.extractor import Extractor
+from klpbuild.setup import Setup
+import klpbuild.utils as utils
+from tests.utils import get_file_content
 
-from klpbuild.ccp import CCP
-from tests import utils
+def test_templ_with_externalized_vars():
+    lp = "bsc9999999"
+    cs = "15.5u19"
 
+    Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None, cs_arg="",
+          file_funcs=[["fs/proc/cmdline.c", "cmdline_proc_show"]],
+          mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
+          conf="CONFIG_PROC_FS",
+          archs=utils.ARCHS, skips=None, no_check=False).setup_project_files()
 
-class TemplTesting(utils.TestUtils):
-    def setUp(self):
-        logging.disable(logging.INFO)
-        logging.disable(logging.WARNING)
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ccp",
+                     avoid_ext=[], ignore_errors=False, workers=4).run()
 
-    def test_templ_with_externalized_vars(self):
-        v = self.sargs()
-        cs = "15.3u32"
-        v["filter"] = cs
-        v["file_funcs"] = [["lib/seq_buf.c", "seq_buf_putmem_hex"]]
+    # As we passed vmlinux as module, we don't have the module notifier and
+    # LP_MODULE, linux/module.h is not included
+    # As the code is using the default archs, which is all of them, the
+    # IS_ENABLED macro shouldn't exist
+    content = get_file_content(lp, cs)
+    for check in ["LP_MODULE", "module_notify", "linux/module.h", "#if IS_ENABLED"]:
+        assert check not in content
 
-        self.setup(v, True)
-        ccp = CCP(v["bsc"], cs, [])
-        ccp.run_ccp()
+    # For this file and symbol, there is one symbol to be looked up, so
+    # klp_funcs should be present
+    assert "klp_funcs" in content
 
-        # As we passed vmlinux as module, we don't have the module notifier and
-        # LP_MODULE, linux/module.h is not included
-        # As the code is using the default archs, which is all of them, the
-        # IS_ENABLED macro shouldn't exist
-        self.output_contains_not(v, cs, ["LP_MODULE", "module_notify", "linux/module.h", "#if IS_ENABLED"])
+def test_templ_without_externalized_vars():
+    lp = "bsc9999999"
+    cs = "15.5u19"
 
-        # For this file and symbol, there is one symbol to be looked up, so
-        # klp_funcs should be present
-        self.output_contains(v, cs, ["klp_funcs"])
+    Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None, cs_arg="",
+          file_funcs=[["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]],
+          mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
+          conf="CONFIG_IPV6",
+          archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
-    def test_templ_without_externalized_vars(self):
-        v = self.sargs()
-        cs = "15.5u0"
-        v["filter"] = cs
-        v["file_funcs"] = [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]]
-        v["conf"] = "CONFIG_IPV6"
-        v["archs"] = ["x86_64"]
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ccp",
+                     avoid_ext=[], ignore_errors=False, workers=4).run()
 
-        self.setup(v, True)
-        ccp = CCP(v["bsc"], cs, [])
-        ccp.run_ccp()
+    # As we passed vmlinux as module, we don't have the module notifier and
+    # LP_MODULE, linux/module.h is not included
+    # For this file and symbol, no externalized symbols are used, so
+    # klp_funcs shouldn't be preset.
+    content = get_file_content(lp, cs)
+    for check in ["LP_MODULE", "module_notify", "linux/module.h", "klp_funcs"]:
+        assert check not in content
 
-        # As we passed vmlinux as module, we don't have the module notifier and
-        # LP_MODULE, linux/module.h is not included
-        # For this file and symbol, no externalized symbols are used, so
-        # klp_funcs shouldn't be preset.
-        self.output_contains_not(v, cs, ["LP_MODULE", "module_notify", "linux/module.h", "klp_funcs"])
+    # As the config only targets x86_64, IS_ENABLED should be set
+    assert "#if IS_ENABLED" in content
 
-        # As the config only targets x86_64, IS_ENABLED should be set
-        self.output_contains(v, cs, ["#if IS_ENABLED"])
+# For multifile patches, a third file will be generated and called
+# livepatch_XXX, and alongside this file the other files will have the prefix
+# bscXXXXXXX.
+def test_check_header_file_included():
+    lp = "bsc9999999"
+    cs = "15.5u17"
 
-    def test_check_header_file_included(self):
-        v = self.sargs()
-        cs = "15.5u0"
-        v["filter"] = cs
-        v["file_funcs"] = [["fs/exec.c", "begin_new_exec"], ["kernel/events/core.c", "perf_event_exec"]]
-        v["conf"] = "CONFIG_IPV6"
-        v["archs"] = ["x86_64"]
+    Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None, cs_arg="",
+          file_funcs=[["fs/exec.c", "begin_new_exec"], ["kernel/events/core.c", "perf_event_exec"]],
+          mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
+          conf="CONFIG_IPV6",
+          archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
-        self.setup(v, True)
-        ccp = CCP(v["bsc"], cs, [])
-        ccp.run_ccp()
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ccp",
+                     avoid_ext=[], ignore_errors=False, workers=4).run()
 
-        # Check if the livepatch general file contains the header
-        self.output_contains(v, cs, ["Upstream commit:"])
-        self.output_contains_not(v, cs, ["Upstream commit:"], f'bsc{v["bsc"]}_kernel_events_core.c')
-        self.output_contains_not(v, cs, ["Upstream commit:"], f'bsc{v["bsc"]}_fs_exec.c')
+    # test the livepatch_ prefix file
+    assert "Upstream commit:" in get_file_content(lp, cs)
 
-
-if __name__ == "__main__":
-    unittest.main()
+    # Check the other two files
+    assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_kernel_events_core.c")
+    assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_fs_exec.c")

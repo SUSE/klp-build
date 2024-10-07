@@ -8,8 +8,20 @@ import shutil
 import unittest
 from pathlib import Path
 
-from klpbuild.setup import Setup
+from klpbuild.config import Config
 
+def get_workdir(lp_name, lp_filter):
+    return Config(lp_name, lp_filter).lp_path
+
+def get_file_content(lp_name, filter, fname=None):
+    # Check the generated LP files
+    path = Path(get_workdir(lp_name, filter), "ccp", filter, "lp")
+
+    if not fname:
+        fname = f'livepatch_{lp_name}.c'
+
+    with open(Path(path, fname)) as f:
+        return f.read()
 
 class TestUtils(unittest.TestCase):
     # default setup args
