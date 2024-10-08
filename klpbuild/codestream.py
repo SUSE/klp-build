@@ -4,18 +4,17 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 class Codestream:
-    __slots__ = ("sle", "sp", "update", "rt", "project", "kernel", "branch",
-                 "archs", "files", "modules", "repo")
+    __slots__ = ("sle", "sp", "update", "rt", "project", "kernel", "archs",
+                 "files", "modules", "repo")
 
     def __init__(self, sle, sp, update, rt, project="", kernel="",
-                 branch="", archs=[], files={}, modules={}):
+                 archs=[], files={}, modules={}):
         self.sle = sle
         self.sp = sp
         self.update = update
         self.rt = rt
         self.project = project
         self.kernel = kernel
-        self.branch = branch
         self.archs = archs
         self.files = files
         self.modules = modules
@@ -34,6 +33,14 @@ class Codestream:
             sle, sp = sle, "0"
 
         return cls(int(sle), int(sp), int(u), rt, proj, kernel)
+
+
+    @classmethod
+    def from_data(cls, data):
+        return cls(data["sle"], data["sp"], data["update"], data["rt"],
+                 data["project"], data["kernel"], data["archs"], data["files"],
+                 data["modules"])
+
 
     def get_repo(self):
         if self.update == 0:
@@ -71,6 +78,19 @@ class Codestream:
         if self.rt:
             return f"{self.sle}.{self.sp}rt"
         return f"{self.sle}.{self.sp}"
+
+
+    # Parse 15.2u25 to SLE15-SP2_Update_25
+    def name_full(self):
+        buf = f"SLE{self.sle}"
+
+        if int(self.sp) > 0:
+            buf = f"{buf}-SP{self.sp}"
+
+        if self.rt:
+            buf = f"{buf}-RT"
+
+        return f"{buf}_Update_{self.update}"
 
 
     def data(self):

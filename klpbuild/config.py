@@ -21,6 +21,7 @@ from pathlib import PurePath
 from natsort import natsorted
 
 from klpbuild.utils import ARCH
+from klpbuild.codestream import Codestream
 from klpbuild.utils import classify_codestreams
 
 from elftools.common.utils import bytes2str
@@ -56,10 +57,13 @@ class Config:
 
         self.working_cs = OrderedDict(working_cs)
         self.codestreams = OrderedDict()
+        self.new_codestreams = []
         self.cs_file = Path(self.lp_path, "codestreams.json")
         if self.cs_file.is_file():
             with open(self.cs_file) as f:
                 self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
+                for _, data in self.codestreams.items():
+                    self.new_codestreams.append(Codestream.from_data(data))
 
         self.conf = OrderedDict(
             {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data":

@@ -232,17 +232,17 @@ class IBS(Config):
     def convert_prj_to_cs(self, prj):
         return prj.replace(f"{self.prj_prefix}-", "").replace("_", ".")
 
-    def apply_filter(self, item_list):
+    def apply_filter(self, cs_list):
         if not self.filter:
             return item_list
 
         filtered = []
-        for item in item_list:
-            cmp_item = self.convert_prj_to_cs(item)
+        for cs in cs_list:
+            cmp_item = self.convert_prj_to_cs(cs.name())
             if not re.match(self.filter, cmp_item):
                 continue
 
-            filtered.append(item)
+            filtered.append(cs)
 
         return filtered
 
@@ -491,24 +491,22 @@ class IBS(Config):
         self.delete_projects(prjs, True)
 
     def cs_to_project(self, cs):
-        return self.prj_prefix + "-" + cs.replace(".", "_")
+        return self.prj_prefix + "-" + cs.name().replace(".", "_")
 
     def create_prj_meta(self, cs):
-        data = self.get_cs_data(cs)
-
         prj = fromstring(
             "<project name=''><title></title><description></description>"
             "<build><enable/></build><publish><disable/></publish>"
             "<debuginfo><disable/></debuginfo>"
             '<repository name="devbuild">'
-            f"<path project=\"{data['project']}\" repository=\"{data['repo']}\"/>"
+            f"<path project=\"{cs.project}\" repository=\"{cs.repo}\"/>"
             "</repository>"
             "</project>"
         )
 
         repo = prj.find("repository")
 
-        for arch in self.get_cs_archs(cs):
+        for arch in cs.archs:
             ar = SubElement(repo, "arch")
             ar._setText(arch)
 
@@ -521,14 +519,14 @@ class IBS(Config):
             logging.info(f"Could not find git branch for {cs}. Skipping.")
             return
 
-        logging.info(f"({i}/{self.total}) pushing {cs} using branch {branch}...")
+        logging.info(f"({i}/{self.total}) pushing {cs.name()} using branch {branch}...")
 
         # If the project exists, drop it first
         prj = self.cs_to_project(cs)
         self.delete_project(i, prj, verbose=False)
 
         meta = self.create_prj_meta(cs)
-        prj_desc = f"Development of livepatches for {cs}"
+        prj_desc = f"Development of livepatches for {cs.name()}"
 
         try:
             self.osc.projects.set_meta(
@@ -541,7 +539,7 @@ class IBS(Config):
             logging.error(e, e.response.content)
             raise RuntimeError("")
 
-        base_path = Path(self.lp_path, "ccp", cs)
+        base_path = Path(self.lp_path, "ccp", cs.name())
 
         # Remove previously created directories
         prj_path = Path(base_path, "checkout")
@@ -571,7 +569,7 @@ class IBS(Config):
 
         # Fix RELEASE version
         with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
-            ver = self.get_full_cs(cs).replace("EMBARGO", "")
+            ver = cs.name_full().replace("EMBARGO", "")
             f.write(f"RELEASE={ver}")
 
         subprocess.check_output(
@@ -586,13 +584,13 @@ class IBS(Config):
         self.osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
         shutil.rmtree(prj_path)
 
-        logging.info(f"({i}/{self.total}) {cs} done")
+        logging.info(f"({i}/{self.total}) {cs.name()} done")
 
     def log(self, cs, arch):
         logging.info(self.osc.build.get_log(self.cs_to_project(cs), "devbuild", arch, "klp"))
 
     def push(self, wait=False):
-        cs_list = self.apply_filter(self.codestreams.keys())
+        cs_list = self.apply_filter(self.new_codestreams)
 
         if not cs_list:
             logging.error(f"push: No codestreams found for {self.lp_name}")

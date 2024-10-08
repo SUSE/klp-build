@@ -55,7 +55,7 @@ class GitHelper(Config):
                     self.branches.append(r.name)
 
     def get_cs_branch(self, cs):
-        cs_sle, sp, cs_up, rt = self.get_cs_tuple(cs)
+        cs_sle, sp, cs_up, rt = cs.sle, cs.sp, cs.update, cs.rt
 
         if not self.kgr_patches:
             logging.warning("kgr_patches_dir not found")
