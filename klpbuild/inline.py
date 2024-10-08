@@ -12,8 +12,8 @@ from klpbuild.utils import ARCH
 
 
 class Inliner(Config):
-    def __init__(self, lp_name):
-        super().__init__(lp_name, [])
+    def __init__(self, lp_name, lp_filter):
+        super().__init__(lp_name, lp_filter)
 
         if not self.lp_path.exists():
             raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
@@ -22,15 +22,18 @@ class Inliner(Config):
         if not self.ce_inline_path:
             raise RuntimeError("ce-inline not found. Aborting.")
 
-    def check_inline(self, cs, fname, func):
+    def check_inline(self, fname, func):
         ce_args = [ str(self.ce_inline_path), "-where-is-inlined" ]
 
-        if not self.codestreams.get(cs, None):
-            raise RuntimeError(f"Codestram {cs} not found. Aborting.")
+        filtered = self.filter_cs(verbose=False)
+        if not filtered:
+            raise RuntimeError(f"Codestream {self.lp_filter} not found. Aborting.")
 
-        fdata = self.codestreams[cs]["files"]
+        assert len(filtered) == 1
 
-        mod = fdata.get(fname, {}).get("module", None)
+        cs = filtered[0]
+
+        mod = cs.files.get(fname, {}).get("module", None)
         if not mod:
             raise RuntimeError(f"File {fname} not in setup phase. Aborting.")
 

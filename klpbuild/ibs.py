@@ -232,20 +232,6 @@ class IBS(Config):
     def convert_prj_to_cs(self, prj):
         return prj.replace(f"{self.prj_prefix}-", "").replace("_", ".")
 
-    def apply_filter(self, cs_list):
-        if not self.filter:
-            return item_list
-
-        filtered = []
-        for cs in cs_list:
-            cmp_item = self.convert_prj_to_cs(cs.name())
-            if not re.match(self.filter, cmp_item):
-                continue
-
-            filtered.append(cs)
-
-        return filtered
-
     def find_missing_symbols(self, cs, arch, lp_mod_path):
         vmlinux_path = self.get_cs_boot_file(cs, "vmlinux", arch)
         vmlinux_syms = self.get_all_symbols_from_object(vmlinux_path, True)
@@ -576,7 +562,7 @@ class IBS(Config):
         logging.info(self.osc.build.get_log(self.cs_to_project(cs), "devbuild", arch, "klp"))
 
     def push(self, wait=False):
-        cs_list = self.apply_filter(self.new_codestreams)
+        cs_list = self.filter_cs(verbose=False)
 
         if not cs_list:
             logging.error(f"push: No codestreams found for {self.lp_name}")

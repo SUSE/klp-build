@@ -139,7 +139,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     diff_opts = sub.add_parser("cs-diff", parents=[parentparser])
     diff_opts.add_argument(
-        "--codestreams", nargs=2, type=str, required=True, help="SLE specific. Apply diff on two different codestreams"
+        "--cs", nargs=2, type=str, required=True, help="SLE specific. Apply diff on two different codestreams"
     )
     diff_opts.add_argument("--type", type=str, choices=["ccp", "ce"], default="ccp", help="Choose between ccp and ce")
 
@@ -202,10 +202,11 @@ def main_func(main_args):
                   args.avoid_ext, args.ignore_errors, args.workers).run()
 
     elif args.cmd == "cs-diff":
-        Extractor(args.name, "", False, args.type, [], False).diff_cs(args.codestreams)
+        lp_filter = args.cs[0] + "|" + args.cs[1]
+        Extractor(args.name, lp_filter, False, args.type, [], False).diff_cs()
 
     elif args.cmd == "check-inline":
-        Inliner(args.name).check_inline(args.codestream, args.file, args.symbol)
+        Inliner(args.name, args.codestream).check_inline(args.file, args.symbol)
 
     elif args.cmd == "get-patches":
         GitHelper(args.name, args.filter).get_commits(args.cve)

@@ -315,7 +315,7 @@ class Extractor(Config):
                 sys.exit(1)
 
         # Save the ext_symbols set by execute
-        self.flush_cs_file()
+        self.flush_cs_file(working_cs)
 
         # TODO: change the templates so we generate a similar code than we
         # already do for SUSE livepatches
@@ -413,17 +413,21 @@ class Extractor(Config):
         return cs_files
 
     # cs_list should be only two entries
-    def diff_cs(self, cs_list):
+    def diff_cs(self):
         args = []
-        f1 = {}
-        f2 = {}
-        for cs in cs_list:
-            for fname, _ in self.get_cs_files(cs).items():
+
+        cs_cmp = []
+
+        for cs in self.filter_cs(verbose=False):
+            cs_cmp.append(cs.name())
+            for fname, _ in cs.files.items():
                 args.append((_, fname, cs, _))
 
+        assert len(args) == 2
+
         cs_code = self.get_cs_code(args)
-        f1 = cs_code.get(cs_list[0])
-        f2 = cs_code.get(cs_list[1])
+        f1 = cs_code.get(cs_cmp[0])
+        f2 = cs_code.get(cs_cmp[1])
 
         assert len(f1) == len(f2)
 

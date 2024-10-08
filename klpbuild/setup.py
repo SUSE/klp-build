@@ -128,7 +128,6 @@ class Setup(Config):
                 "files": self.file_funcs,
                 "archs": [utils.ARCH],
             }
-            self.working_cs = [Codestreams()]
         else:
             self.setup_codestreams()
 
@@ -189,11 +188,7 @@ class Setup(Config):
                         cs_ = f"{cs.name()}-{arch} ({cs.kernel})"
                         logging.warning(f"{cs_}: Symbols {m_syms} not found on {mod} object")
 
-        # Update and save codestreams data
-        for cs in self.working_cs:
-            self.codestreams[cs.name()] = cs.data()
-
-        self.flush_cs_file()
+        self.flush_cs_file(self.working_cs)
 
         # cpp will use this data in the next step
         with open(self.conf_file, "w") as f:

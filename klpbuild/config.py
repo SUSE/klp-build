@@ -235,15 +235,6 @@ class Config:
         fpath = f'work_{str(fname).replace("/", "_")}'
         return Path(self.get_cs_dir(cs, app), fpath)
 
-    def get_cs_data(self, cs):
-        if self.working_cs.get(cs, ""):
-            return self.working_cs[cs]
-
-        return self.codestreams[cs]
-
-    def get_cs_files(self, cs):
-        return self.get_cs_data(cs)["files"]
-
     def validate_config(self, cs, conf, mod):
         """
         Check if the CONFIG is enabled on the codestream. If the configuration
@@ -385,9 +376,15 @@ class Config:
 
         return test_src
 
-    def flush_cs_file(self):
+
+    # Update and save codestreams data
+    def flush_cs_file(self, working_cs):
+        for cs in working_cs:
+            self.codestreams[cs.name()] = cs.data()
+
         with open(self.cs_file, "w") as f:
             f.write(json.dumps(self.codestreams, indent=4))
+
 
     def is_mod(self, mod):
         return mod != "vmlinux"
