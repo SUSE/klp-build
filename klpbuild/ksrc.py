@@ -519,7 +519,7 @@ class GitHelper(Config):
             patched_kernels = self.get_patched_kernels(all_codestreams, commits, cve)
 
         # list of codestreams that matches the file-funcs argument
-        working_cs = OrderedDict()
+        working_cs = []
         patched_cs = []
         unaffected_cs = []
 
@@ -544,7 +544,7 @@ class GitHelper(Config):
                 archs.extend(["ppc64le", "s390x"])
 
             cs.set_archs(archs)
-            working_cs[cs.name()] = cs.data()
+            working_cs.append(cs)
 
         if patched_cs:
             cs_list = utils.classify_codestreams(patched_cs)
@@ -560,12 +560,12 @@ class GitHelper(Config):
         # by the user, avoid downloading missing codestreams that are not affected
         working_cs = self.filter_cs(working_cs, verbose=True)
 
-        if not working_cs.keys():
+        if not working_cs:
             logging.info("All supported codestreams are already patched. Exiting klp-build")
             sys.exit(0)
 
         logging.info("All affected codestreams:")
-        cs_list = utils.classify_codestreams(working_cs.keys())
+        cs_list = utils.classify_codestreams(working_cs)
         logging.info(f'\t{" ".join(cs_list)}')
 
         return commits, patched_cs, patched_kernels, working_cs

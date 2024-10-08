@@ -114,7 +114,7 @@ class IBS(Config):
         cmd = f"rpm2cpio {rpm_file} | cpio --quiet -uidm"
         subprocess.check_output(cmd, shell=True, cwd=path_dest)
 
-        logging.info(f"({i}/{self.total}) extracted {cs} {rpm}: ok")
+        logging.info(f"({i}/{self.total}) extracted {cs.name()} {rpm}: ok")
 
     def download_and_extract(self, args):
         i, cs, prj, repo, arch, pkg, rpm, dest = args
@@ -135,17 +135,17 @@ class IBS(Config):
         }
 
         logging.info("Getting list of files...")
-        for cs, data in cs_list.items():
-            prj = data["project"]
-            repo = data["repo"]
+        for cs in cs_list:
+            prj = cs.project
+            repo = cs.repo
 
             path_dest = Path(self.data, "kernel-rpms")
             path_dest.mkdir(exist_ok=True, parents=True)
 
-            for arch in self.get_cs_archs(cs):
+            for arch in cs.archs:
                 for pkg, regex in cs_data.items():
                     # RT kernels have different package names
-                    if self.cs_is_rt(cs):
+                    if cs.rt:
                         if pkg == "kernel-default":
                             pkg = "kernel-rt"
                         elif pkg == "kernel-source":
@@ -183,11 +183,11 @@ class IBS(Config):
 
         # Create a list of paths pointing to lib/modules for each downloaded
         # codestream
-        for cs, data in cs_list.items():
-            for arch in self.get_cs_archs(cs):
-                kname = data["kernel"] + "-default"
-                if data.get("rt", ""):
-                    kname = data['kernel'] + "-rt"
+        for cs in cs_list:
+            for arch in cs.archs:
+                kname = cs.kernel + "-default"
+                if cs.rt:
+                    kname = cs.kernel + "-rt"
 
                 # Extract modules and vmlinux files that are compressed
                 mod_path = Path(self.get_data_dir(arch), "lib", "modules", kname)
@@ -222,10 +222,10 @@ class IBS(Config):
 
         try:
             self.osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
-            logging.info(f"({i}/{self.total}) {cs} {rpm}: ok")
+            logging.info(f"({i}/{self.total}) {cs.name()} {rpm}: ok")
         except OSError as e:
             if e.errno == errno.EEXIST:
-                logging.info(f"({i}/{self.total}) {cs} {rpm}: already downloaded. skipping.")
+                logging.info(f"({i}/{self.total}) {cs.name()} {rpm}: already downloaded. skipping.")
             else:
                 raise RuntimeError(f"download error on {prj}: {rpm}")
 
@@ -283,31 +283,17 @@ class IBS(Config):
         # Check depends field
         # At this point we found that our livepatch module depends on
         # exported functions from other modules. List the modules here.
-        lp_mod_path = Path(rpm_dir, "lib", "modules", f"{self.get_cs_kernel(cs)}-{ktype}", dir_path, lp_file)
+        lp_mod_path = Path(rpm_dir, "lib", "modules", f"{cs.kernel}-{ktype}", dir_path, lp_file)
         elffile = self.get_elf_object(lp_mod_path)
         deps = self.get_elf_modinfo_entry(elffile, "depends")
         if len(deps):
-            logging.warning(f"{cs}:{arch} has dependencies: {deps}.")
+            logging.warning(f"{cs.name()}:{arch} has dependencies: {deps}.")
 
         funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
         if funcs:
-            logging.warning(f'{cs}:{arch} Undefined functions: {" ".join(funcs)}')
+            logging.warning(f'{cs.name()}:{arch} Undefined functions: {" ".join(funcs)}')
 
         shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
-
-    # Parse 15.2u25 to SLE15-SP2_Update_25
-    def get_full_cs(self, cs):
-        sle, sp, up, rt = self.get_cs_tuple(cs)
-
-        buf = f"SLE{sle}"
-
-        if int(sp) > 0:
-            buf = f"{buf}-SP{sp}"
-
-        if rt:
-            buf = f"{buf}-RT"
-
-        return f"{buf}_Update_{up}"
 
     def prepare_tests(self):
         # Download all built rpms
@@ -334,30 +320,30 @@ class IBS(Config):
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs, data in self.filter_cs(verbose=False).items():
-                if arch not in data["archs"]:
+            for cs in self.filter_cs(verbose=False).items():
+                if arch not in cs.archs:
                     continue
 
-                rpm_dir = Path(self.lp_path, "ccp", cs, arch, "rpm")
+                rpm_dir = Path(self.lp_path, "ccp", cs.name(), arch, "rpm")
                 if not rpm_dir.exists():
-                    logging.info(f"{cs}/{arch}: rpm dir not found. Skipping.")
+                    logging.info(f"{cs.name()}/{arch}: rpm dir not found. Skipping.")
                     continue
 
                 # TODO: there will be only one rpm, format it directly
                 rpm = os.listdir(rpm_dir)
                 if len(rpm) > 1:
-                    raise RuntimeError(f"ERROR: {cs}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
+                    raise RuntimeError(f"ERROR: {cs.name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
 
                 for rpm in os.listdir(rpm_dir):
                     # Check for dependencies
-                    self.validate_livepatch_module(cs, arch, rpm_dir, rpm)
+                    self.validate_livepatch_module(cs.name(), arch, rpm_dir, rpm)
 
                     shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, "built"))
 
-                if "rt" in cs and arch != "x86_64":
+                if cs.rt and arch != "x86_64":
                     continue
 
-                build_cs.append(self.get_full_cs(cs))
+                build_cs.append(cs.name_full())
 
             logging.info("Done.")
 
@@ -389,8 +375,8 @@ class IBS(Config):
     # We can try delete a project that was removed, so don't bother with errors
     def delete_rpms(self, cs):
         try:
-            for arch in self.get_cs_archs(cs):
-                shutil.rmtree(Path(self.lp_path, "ccp", cs, arch, "rpm"), ignore_errors=True)
+            for arch in cs.archs:
+                shutil.rmtree(Path(self.lp_path, "ccp", cs.name(), arch, "rpm"), ignore_errors=True)
         except KeyError:
             pass
 

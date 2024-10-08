@@ -121,7 +121,7 @@ class Extractor(Config):
                 "make",
                 "-sn",
                 f"CC={cc}",
-                f"KLP_CS={cs}",
+                f"KLP_CS={cs.name()}",
                 f"HOSTCC={cc}",
                 "WERROR=0",
                 "CFLAGS_REMOVE_objtool=-Werror",
@@ -161,7 +161,7 @@ class Extractor(Config):
                 f.flush()
 
             if not result:
-                logging.error(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs}. "
+                logging.error(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs.name()}. "
                               f"Check file {str(log_path)} for more details.")
                 return None
 
@@ -177,7 +177,7 @@ class Extractor(Config):
             f.write(ret)
 
             if not " -pg " in ret:
-                logging.warning(f"{cs}:{file_} is not compiled with livepatch support (-pg flag)")
+                logging.warning(f"{cs.name()}:{file_} is not compiled with livepatch support (-pg flag)")
 
             return ret
 
@@ -208,7 +208,7 @@ class Extractor(Config):
         odir = self.get_odir(cs)
 
         # The header text has two tabs
-        cs_info = cs.ljust(15, " ")
+        cs_info = cs.name().ljust(15, " ")
         idx = f"({i}/{self.total})".rjust(15, " ")
 
         logging.info(f"{idx} {cs_info} {fname}")
@@ -232,14 +232,13 @@ class Extractor(Config):
 
         # SLE15-SP6 doesn't enabled CET, but we would like to start using
         # klp-convert either way.
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        needs_ibt = sle > 15 or (sle == 15 and sp >= 6)
+        needs_ibt = cs.sle > 15 or (cs.sle == 15 and cs.sp >= 6)
 
         args, lenv = self.runner.cmd_args(needs_ibt, cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
 
         # Detect and set ibt information. It will be used in the TemplateGen
         if '-fcf-protection' in cmd or needs_ibt:
-            self.codestreams[cs]["files"][fname]["ibt"] = True
+            cs.files[fname]["ibt"] = True
 
         out_log = Path(out_dir, f"{self.app}.out.txt")
         with open(out_log, "w") as f:
@@ -250,10 +249,10 @@ class Extractor(Config):
             try:
                 subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
             except:
-                logging.error(f"Error when processing {cs}:{fname}. Check file {out_log} for details.")
+                logging.error(f"Error when processing {cs.name()}:{fname}. Check file {out_log} for details.")
                 raise
 
-        self.codestreams[cs]["files"][fname]["ext_symbols"] = self.runner.get_symbol_list(out_dir)
+        cs.files[fname]["ext_symbols"] = self.runner.get_symbol_list(out_dir)
 
         lp_out = Path(out_dir, self.lp_out_file(fname))
 
@@ -282,7 +281,7 @@ class Extractor(Config):
         # cs/file/funcs tuple, instead of spawning a thread per codestream
         args = []
         i = 1
-        for cs, data in working_cs.items():
+        for cs in working_cs:
             # remove any previously generated files and leftover patches
             shutil.rmtree(self.get_cs_dir(cs, self.app), ignore_errors=True)
             self.remove_patches(cs, self.quilt_log)
@@ -291,7 +290,7 @@ class Extractor(Config):
             if self.apply_patches:
                 self.apply_all_patches(cs, self.quilt_log)
 
-            for fname, fdata in data["files"].items():
+            for fname, fdata in cs.files.items():
                 args.append((i, fname, cs, fdata))
                 i += 1
 
@@ -318,12 +317,10 @@ class Extractor(Config):
         # Save the ext_symbols set by execute
         self.flush_cs_file()
 
-        self.tem.refresh_codestreams(self.codestreams)
-
         # TODO: change the templates so we generate a similar code than we
         # already do for SUSE livepatches
         # Create the livepatches per codestream
-        for cs, _ in working_cs.items():
+        for cs in working_cs:
             self.tem.GenerateLivePatches(cs)
 
         # For kdir setup, do not execute additional checks
@@ -342,7 +339,7 @@ class Extractor(Config):
 
         # Iterate over each codestream, getting each file processed, and all
         # externalized symbols of this file
-        for cs, _ in working_cs.items():
+        for cs in working_cs:
             # Cleanup patches after the LPs were created if they were applied
             if self.apply_patches:
                 self.remove_patches(cs, self.quilt_log)
@@ -350,7 +347,7 @@ class Extractor(Config):
             # Map all symbols related to each obj, to make it check the symbols
             # only once per object
             obj_syms = {}
-            for f, fdata in self.get_cs_files(cs).items():
+            for f, fdata in cs.files.items():
                 for obj, syms in fdata["ext_symbols"].items():
                     obj_syms.setdefault(obj, [])
                     obj_syms[obj].extend(syms)
@@ -361,8 +358,8 @@ class Extractor(Config):
                     for arch, arch_syms in missing.items():
                         missing_syms.setdefault(arch, {})
                         missing_syms[arch].setdefault(obj, {})
-                        missing_syms[arch][obj].setdefault(cs, [])
-                        missing_syms[arch][obj][cs].extend(arch_syms)
+                        missing_syms[arch][obj].setdefault(cs.name(), [])
+                        missing_syms[arch][obj][cs.name()].extend(arch_syms)
 
             self.tem.CreateKbuildFile(cs)
 
@@ -382,7 +379,7 @@ class Extractor(Config):
         # Mount the cs_files dict
         for arg in args:
             _, file, cs, _ = arg
-            cs_files.setdefault(cs, [])
+            cs_files.setdefault(cs.name(), [])
 
             fpath = self.get_work_lp_file(cs, file)
             with open(fpath, "r+") as fi:
@@ -411,7 +408,7 @@ class Extractor(Config):
                 # Reduce the noise from klp-ccp when expanding macros
                 src = re.sub(r"__compiletime_assert_\d+", "__compiletime_assert", src)
 
-                cs_files[cs].append((file, src))
+                cs_files[cs.name()].append((file, src))
 
         return cs_files
 

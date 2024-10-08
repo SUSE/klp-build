@@ -6,6 +6,9 @@
 all:
 	pytest tests
 
+config:
+	pytest tests/test_config.py
+
 setup:
 	pytest tests/test_setup.py
 

@@ -85,17 +85,19 @@ class Setup(Config):
     # Needs to be called after setup_codestreams since the workincs_cs is set
     # there
     def download_missing_cs_data(self):
-        data_missing = {}
+        data_missing = []
+        cs_missing = []
 
-        for cs, data in self.working_cs.items():
+        for cs in self.working_cs:
             if self.missing_codestream(cs):
-                data_missing[cs] = data
+                data_missing.append(cs)
+                cs_missing.append(cs.name())
 
         # Found missing cs data, downloading and extract
         if data_missing:
             logging.info("Download the necessary data from the following codestreams:")
-            logging.info(f'\t{" ".join(data_missing.keys())}\n')
-            ibs = IBS(self.lp_name, self.filter, self.working_cs)
+            logging.info(f'\t{" ".join(cs_missing)}\n')
+            ibs = IBS(self.lp_name, self.filter, {})
             ibs.download_cs_data(data_missing)
             logging.info("Done.")
 
@@ -126,6 +128,7 @@ class Setup(Config):
                 "files": self.file_funcs,
                 "archs": [utils.ARCH],
             }
+            self.working_cs = [Codestreams()]
         else:
             self.setup_codestreams()
 
@@ -136,23 +139,23 @@ class Setup(Config):
 
         logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed
-        for cs, data in self.working_cs.items():
-            data["files"] = copy.deepcopy(self.file_funcs)
+        for cs in self.working_cs:
+            cs.set_files(copy.deepcopy(self.file_funcs))
 
             # Check if the files exist in the respective codestream directories
             mod_syms = {}
-            kernel = self.get_cs_kernel(cs)
-            for f, fdata in data["files"].items():
+            kernel = cs.kernel
+            for f, fdata in cs.files.items():
 
                 self.validate_config(cs, fdata["conf"], fdata["module"])
 
                 sdir = self.get_sdir(cs)
                 if not Path(sdir, f).is_file():
-                    raise RuntimeError(f"{cs} ({kernel}): File {f} not found on {str(sdir)}")
+                    raise RuntimeError(f"{cs.name()} ({kernel}): File {f} not found on {str(sdir)}")
 
                 ipa_f = self.get_ipa_file(cs, f)
                 if not ipa_f.is_file():
-                    msg = f"{cs} ({kernel}): File {ipa_f} not found."
+                    msg = f"{cs.name()} ({kernel}): File {ipa_f} not found."
                     if not self.kdir and not self.host:
                         msg += " Creating an empty file."
                         ipa_f.touch()
@@ -165,14 +168,14 @@ class Setup(Config):
                     fdata["conf"] = ""
 
                 mod = fdata["module"]
-                if not data["modules"].get(mod, ""):
+                if not cs.modules.get(mod, ""):
                     if self.is_mod(mod):
                         mod_path = str(self.find_module_obj(utils.ARCH, cs, mod,
                                                             check_support=True))
                     else:
                         mod_path = str(self.get_kernel_path(utils.ARCH, cs))
 
-                    data["modules"][mod] = mod_path
+                    cs.modules[mod] = mod_path
 
                 mod_syms.setdefault(mod, [])
                 mod_syms[mod].extend(fdata["symbols"])
@@ -183,12 +186,12 @@ class Setup(Config):
                 if arch_syms:
                     for arch, syms in arch_syms.items():
                         m_syms = ",".join(syms)
-                        cs_ = f"{cs}-{arch} ({self.get_cs_kernel(cs)})"
+                        cs_ = f"{cs.name()}-{arch} ({cs.kernel})"
                         logging.warning(f"{cs_}: Symbols {m_syms} not found on {mod} object")
 
         # Update and save codestreams data
-        for cs, data in self.working_cs.items():
-            self.codestreams[cs] = data
+        for cs in self.working_cs:
+            self.codestreams[cs.name()] = cs.data()
 
         self.flush_cs_file()
 

@@ -484,11 +484,6 @@ class TemplateGen(Config):
                 self.user = "Change me"
                 self.email = "change@me"
 
-    # Things might have changed since TemplateGen was instantiated, so reassign
-    # it
-    def refresh_codestreams(self, cs_list):
-        self.codestreams = cs_list
-
     def preproc_slashes(text):
         txt = r"<%! BS='\\' %>" + text.replace("\\", "${BS}")
         return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
@@ -503,11 +498,13 @@ class TemplateGen(Config):
         with open(Path(lp_path, "patched_funcs.csv"), "w") as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
+    def get_work_dirname(self, fname):
+        return f'work_{str(fname).replace("/", "_")}'
+
     # 15.4 onwards we don't have module_mutex, so template generates
     # different code
     def is_mod_mutex(self, cs):
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        return sle < 15 or (sle == 15 and sp < 4)
+        return cs.sle < 15 or (cs.sle == 15 and cs.sp < 4)
 
     def __GenerateHeaderFile(self, lp_path, cs):
         out_name = f"livepatch_{self.lp_name}.h"
@@ -518,7 +515,7 @@ class TemplateGen(Config):
         config = ""
         mod = ""
 
-        for f, data in self.get_cs_files(cs).items():
+        for f, data in cs.files.items():
             configs.add(data["conf"])
             # At this point we only care to know if we are livepatching a module
             # or not, so we can overwrite the module.
@@ -552,7 +549,7 @@ class TemplateGen(Config):
     def __BuildKlpObjs(self, cs, src):
         objs = {}
 
-        for src_file, fdata in self.get_cs_files(cs).items():
+        for src_file, fdata in cs.files.items():
             if src and src != src_file:
                 continue
             mod = fdata["module"].replace("-", "_")
@@ -565,7 +562,7 @@ class TemplateGen(Config):
         if src_file:
             lp_inc_dir = str(self.get_work_dir(cs, src_file, self.app))
             lp_file = self.lp_out_file(src_file)
-            fdata = self.get_cs_files(cs)[str(src_file)]
+            fdata = cs.files[str(src_file)]
             mod = self.fix_mod_string(fdata["module"])
             if not self.is_mod(mod):
                 mod = ""
@@ -673,7 +670,7 @@ class TemplateGen(Config):
         lp_path = self.get_cs_lp_dir(cs)
         lp_path.mkdir(exist_ok=True)
 
-        files = self.get_cs_files(cs)
+        files = cs.files
         is_multi_files = len(files.keys()) > 1
 
         # This file is only consumed by the SLE kernels

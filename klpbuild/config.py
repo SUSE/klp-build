@@ -157,18 +157,17 @@ class Config:
 
     def remove_patches(self, cs, fil):
         sdir = self.get_sdir(cs)
-        kernel = self.get_cs_kernel(cs)
         # Check if there were patches applied previously
         patches_dir = Path(sdir, "patches")
         if not patches_dir.exists():
             return
 
-        fil.write(f"\nRemoving patches from {cs}({kernel})\n")
+        fil.write(f"\nRemoving patches from {cs.name()}({cs.kernel})\n")
         fil.flush()
         err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=fil, stdout=fil)
 
         if err.returncode not in [0, 2]:
-            raise RuntimeError(f"{cs}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
+            raise RuntimeError(f"{cs.name()}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
 
         shutil.rmtree(patches_dir, ignore_errors=True)
         shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
@@ -177,18 +176,16 @@ class Config:
         if self.kdir:
             patch_dirs = [self.get_patches_dir()]
         else:
-            sle, sp, u, rt = self.get_cs_tuple(cs)
-
             dirs = []
 
-            if rt:
-                dirs.extend([f"{sle}.{sp}rtu{u}", f"{sle}.{sp}{rt}"])
+            if cs.rt:
+                dirs.extend([f"{cs.sle}.{cs.sp}rtu{cs.update}", f"{cle.sle}.{cs.sp}rt"])
 
-            dirs.extend([f"{sle}.{sp}u{u}", f"{sle}.{sp}"])
+            dirs.extend([f"{cs.sle}.{cs.sp}u{cs.update}", f"{cs.sle}.{cs.sp}"])
 
-            if sle == 15 and sp < 4:
+            if cs.sle == 15 and cs.sp < 4:
                 dirs.append("cve-5.3")
-            elif sle == 15 and sp <= 5:
+            elif cs.sle == 15 and cs.sp <= 5:
                 dirs.append("cve-5.14")
 
             patch_dirs = []
@@ -198,13 +195,12 @@ class Config:
 
         patched = False
         sdir = self.get_sdir(cs)
-        kernel = self.get_cs_kernel(cs)
         for pdir in patch_dirs:
             if not pdir.exists():
                 fil.write(f"\nPatches dir {pdir} doesnt exists\n")
                 continue
 
-            fil.write(f"\nApplying patches on {cs}({kernel}) from {pdir}\n")
+            fil.write(f"\nApplying patches on {cs}({cs.kernel}) from {pdir}\n")
             fil.flush()
 
             for patch in sorted(pdir.iterdir(), reverse=True):
@@ -230,17 +226,10 @@ class Config:
             break
 
         if not patched:
-            raise RuntimeError(f"{cs}({kernel}): Failed to apply patches. Aborting")
-
-    # All architectures supported by the codestream
-    def get_cs_archs(self, cs):
-        return self.get_cs_data(cs)["archs"]
+            raise RuntimeError(f"{cs}({cs.kernel}): Failed to apply patches. Aborting")
 
     def get_cs_dir(self, cs, app):
-        return Path(self.lp_path, app, cs)
-
-    def get_work_dirname(self, fname):
-        return f'work_{str(fname).replace("/", "_")}'
+        return Path(self.lp_path, app, cs.name())
 
     def get_work_dir(self, cs, fname, app):
         fpath = f'work_{str(fname).replace("/", "_")}'
@@ -252,23 +241,8 @@ class Config:
 
         return self.codestreams[cs]
 
-    def get_cs_modules(self, cs):
-        return self.get_cs_data(cs)["modules"]
-
-    def get_cs_kernel(self, cs):
-        return self.get_cs_data(cs)["kernel"]
-
     def get_cs_files(self, cs):
         return self.get_cs_data(cs)["files"]
-
-    def get_cs_tuple(self, cs):
-        # There aren't codestreams with kdir
-        if self.kdir or self.host:
-            return (99, 99, 0, 99)
-
-        match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
-
-        return (int(match.group(1)), int(match.group(2)), int(match.group(4)), match.group(3))
 
     def validate_config(self, cs, conf, mod):
         """
@@ -285,29 +259,30 @@ class Config:
             return
 
         configs = {}
-        kernel = self.get_cs_kernel(cs)
+        kernel = cs.kernel
+        name = cs.name()
 
         # Validate only the specified architectures, but check if the codestream
         # is supported on that arch (like RT that is currently supported only on
         # x86_64)
         for arch in self.conf.get("archs"):
-            if arch not in self.get_cs_archs(cs):
+            if arch not in cs.archs:
                 continue
 
             kconf = self.get_cs_boot_file(cs, ".config", arch)
             with open(kconf) as f:
                 match = re.search(rf"{conf}=([ym])", f.read())
                 if not match:
-                    raise RuntimeError(f"{cs}:{arch} ({kernel}): Config {conf} not enabled")
+                    raise RuntimeError(f"{name}:{arch} ({kernel}): Config {conf} not enabled")
 
             conf_entry = match.group(1)
             if conf_entry == "m" and mod == "vmlinux":
-                raise RuntimeError(f"{cs}:{arch} ({kernel}): Config {conf} is set as module, but no module was specified")
+                raise RuntimeError(f"{name}:{arch} ({kernel}): Config {conf} is set as module, but no module was specified")
             elif conf_entry == "y" and mod != "vmlinux":
-                raise RuntimeError(f"{cs}:{arch} ({kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
+                raise RuntimeError(f"{name}:{arch} ({kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
 
             configs.setdefault(conf_entry, [])
-            configs[conf_entry].append(f"{cs}:{arch}")
+            configs[conf_entry].append(f"{name}:{arch}")
 
         if len(configs.keys()) > 1:
             print(configs["y"])
@@ -319,35 +294,32 @@ class Config:
         # for all of them when a codestream is missing.
         return not self.get_cs_boot_file(cs, ".config", ARCH).exists()
 
-    def cs_is_rt(self, cs):
-        return self.get_cs_data(cs).get("rt", False)
-
     def get_ktype(self, cs):
         if self.host:
             ktype = platform.uname()[2]
 
             return "default" if "-default" in ktype else "rt"
 
-        return "rt" if self.cs_is_rt(cs) else "default"
+        return "rt" if cs.rt else "default"
 
     # The config file is copied from boot/config-<version> to linux-obj when we
     # extract the code, and after that we always check for the config on the
     # -obj dir. Return the original path here so we can use this function on the
     # extraction code.
     def get_cs_kernel_config(self, cs, arch):
-        return Path(self.get_data_dir(arch), "boot", f"config-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
+        return Path(self.get_data_dir(arch), "boot", f"config-{cs.kernel}-{self.get_ktype(cs)}")
 
     def get_cs_boot_file(self, cs, file, arch=""):
         if file == "vmlinux":
             if self.kdir:
                 return Path(self.get_data_dir(arch), file)
-            return Path(self.get_data_dir(arch), "boot", f"{file}-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
+            return Path(self.get_data_dir(arch), "boot", f"{file}-{cs.kernel}-{self.get_ktype(cs)}")
 
         # we currently download kernel-source only or the curent arch (ARCH), so
         # whether we have to check for the config of a different arch try to
         # check the config file on boot dir:
         if file == ".config" and arch != ARCH:
-            return Path(self.get_data_dir(arch), "boot", f"config-{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
+            return Path(self.get_data_dir(arch), "boot", f"config-{cs.kernel}-{self.get_ktype(cs)}")
 
         return Path(self.get_odir(cs, arch), file)
 
@@ -374,7 +346,7 @@ class Config:
         if ktype == "-default":
             ktype = ""
 
-        return Path(init_path, "usr", "src", f"linux-{self.get_cs_kernel(cs)}{ktype}")
+        return Path(init_path, "usr", "src", f"linux-{cs.kernel}{ktype}")
 
     def get_odir(self, cs, arch=""):
         if self.kdir:
@@ -392,7 +364,7 @@ class Config:
             return self.data
 
         if not mod or self.is_mod(mod):
-            return Path(self.get_data_dir(arch), "lib", "modules", f"{self.get_cs_kernel(cs)}-{self.get_ktype(cs)}")
+            return Path(self.get_data_dir(arch), "lib", "modules", f"{cs.kernel}-{self.get_ktype(cs)}")
         return self.get_data_dir(arch)
 
     def get_tests_path(self):
@@ -427,7 +399,7 @@ class Config:
         if self.kdir:
             return Path(prefix, "vmlinux")
 
-        kver = self.get_cs_kernel(cs)
+        kver = cs.kernel
         # Search for vmlinux on /boot, lib/modules
         if self.host:
             kpath = Path(f"{kver}-{self.get_ktype(cs)}")
@@ -461,7 +433,7 @@ class Config:
         if not self.is_mod(module):
             return self.get_kernel_path(arch, cs)
 
-        obj = self.get_cs_modules(cs).get(module, "")
+        obj = cs.modules.get(module, "")
         if not obj:
             obj = self.find_module_obj(arch, cs, module)
 
@@ -471,7 +443,8 @@ class Config:
     def find_module_obj(self, arch, cs, mod, check_support=False):
         assert mod != "vmlinux"
 
-        kernel = self.get_cs_kernel(cs)
+        kernel = cs.kernel
+        name = cs.name()
 
         # Module name use underscores, but the final module object uses hyphens.
         mod = mod.replace("_", "[-_]")
@@ -480,7 +453,7 @@ class Config:
         with open(Path(mod_path, "modules.order")) as f:
             obj_match = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
             if not obj_match:
-                raise RuntimeError(f"{cs}-{arch} ({kernel}): Module not found: {mod}")
+                raise RuntimeError(f"{name}-{arch} ({kernel}): Module not found: {mod}")
 
         # if kdir if set, modules.order will show the module with suffix .o, so
         # make sure the extension. Also check for multiple extensions since we
@@ -494,16 +467,15 @@ class Config:
             # Validate if the module being livepatches is supported or not
             elffile = self.get_elf_object(Path(mod_path, obj))
             if "no" == self.get_elf_modinfo_entry(elffile, "supported"):
-                print(f"WARN: {cs}-{arch} ({kernel}): Module {mod} is not supported by SLE")
+                print(f"WARN: {name}-{arch} ({kernel}): Module {mod} is not supported by SLE")
 
         return obj
 
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
     def filter_cs(self, cs_list=None, verbose=True):
-        cs_del_list = []
         if not cs_list:
-            cs_list = self.codestreams
+            cs_list = self.new_codestreams
         full_cs = copy.deepcopy(cs_list)
 
         if self.kdir:
@@ -511,25 +483,27 @@ class Config:
 
         if verbose:
             logging.info("Checking filter and skips...")
+
+        result = []
         filtered = []
-        for cs in full_cs.keys():
-            if self.filter and not re.match(self.filter, cs):
-                filtered.append(cs)
-            elif self.skips and re.match(self.skips, cs):
-                filtered.append(cs)
+        for cs in full_cs:
+            name = cs.name()
+
+            if self.filter and not re.match(self.filter, name):
+                filtered.append(name)
+                continue
+            elif self.skips and re.match(self.skips, name):
+                filtered.append(name)
+                continue
+
+            result.append(cs)
 
         if verbose:
             if filtered:
                 logging.info("Skipping codestreams:")
                 logging.info(f'\t{" ".join(classify_codestreams(filtered))}')
 
-        cs_del_list.extend(filtered)
-
-        for cs in cs_del_list:
-            full_cs.pop(cs, "")
-
-        keys = natsorted(full_cs.keys())
-        return OrderedDict((k, full_cs[k]) for k in keys)
+        return result
 
     def get_elf_modinfo_entry(self, elffile, conf):
         sec = elffile.get_section_by_name(".modinfo")
@@ -588,23 +562,24 @@ class Config:
     # codestream and architecture
     # Return all the symbols not found per arch/obj
     def check_symbol(self, arch, cs, mod, symbols):
-        self.obj_symbols.setdefault(arch, {})
-        self.obj_symbols[arch].setdefault(cs, {})
+        name = cs.name()
 
-        if not self.obj_symbols[arch][cs].get(mod, ""):
+        self.obj_symbols.setdefault(arch, {})
+        self.obj_symbols[arch].setdefault(name, {})
+
+        if not self.obj_symbols[arch][name].get(mod, ""):
             obj = self.get_module_obj(arch, cs, mod)
-            self.obj_symbols[arch][cs][mod] = self.get_all_symbols_from_object(obj, True)
+            self.obj_symbols[arch][name][mod] = self.get_all_symbols_from_object(obj, True)
 
         ret = []
 
         for symbol in symbols:
-            nsyms = self.obj_symbols[arch][cs][mod].count(symbol)
+            nsyms = self.obj_symbols[arch][name][mod].count(symbol)
             if nsyms == 0:
                 ret.append(symbol)
 
             elif nsyms > 1:
-                kernel = self.get_cs_kernel(cs)
-                print(f"WARNING: {cs}-{arch} ({kernel}): symbol {symbol} duplicated on {mod}")
+                print(f"WARNING: {cs}-{arch} ({cs.kernel}): symbol {symbol} duplicated on {mod}")
 
             # If len(syms) == 1 means that we found a unique symbol, which is
             # what we expect, and nothing need to be done.
@@ -620,10 +595,9 @@ class Config:
     # architecture exists in the other supported ones. In this case skip_on_host
     # will be True, since we trust the decisions made by the extractor tool.
     def check_symbol_archs(self, cs, mod, symbols, skip_on_host):
-        data = self.get_cs_data(cs)
         arch_sym = {}
         # Validate only architectures supported by the codestream
-        for arch in data["archs"]:
+        for arch in cs.archs:
             if arch == ARCH and skip_on_host:
                 continue
 

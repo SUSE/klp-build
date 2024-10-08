@@ -150,8 +150,7 @@ class CCP(Config):
         ]:
             cmd = cmd.replace(opt, "")
 
-        sle, sp, _, _ = self.get_cs_tuple(cs)
-        if sle >= 15 and sp >= 4:
+        if cs.sle >= 15 and cs.sp >= 4:
             cmd += " -D__has_attribute(x)=0"
 
         ccp_args.extend(cmd.split(" "))

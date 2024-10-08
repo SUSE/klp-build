@@ -3,9 +3,6 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
-import os
-import shutil
-import unittest
 from pathlib import Path
 
 from klpbuild.config import Config

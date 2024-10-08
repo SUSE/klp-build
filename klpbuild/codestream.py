@@ -3,6 +3,8 @@
 # Copyright (C) 2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import re
+
 class Codestream:
     __slots__ = ("sle", "sp", "update", "rt", "project", "kernel", "archs",
                  "files", "modules", "repo")
@@ -36,10 +38,22 @@ class Codestream:
 
 
     @classmethod
+    def from_cs(cls, cs):
+        match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
+        return cls(int(match.group(1)), int(match.group(2)), int(match.group(4)), match.group(3))
+
+
+    @classmethod
     def from_data(cls, data):
         return cls(data["sle"], data["sp"], data["update"], data["rt"],
                  data["project"], data["kernel"], data["archs"], data["files"],
                  data["modules"])
+
+    def __eq__(self, cs):
+        return self.sle == cs.sle and \
+                self.sp == cs.sp and \
+                self.update == cs.update and \
+                self.rt == cs.rt
 
 
     def get_repo(self):
@@ -102,6 +116,7 @@ class Codestream:
                 "project" : self.project,
                 "kernel" : self.kernel,
                 "archs" : self.archs,
+                "files" : self.files,
                 "modules" : self.modules,
                 "repo" : self.repo,
                 }
