@@ -22,6 +22,19 @@ class Codestream:
         self.repo = self.get_repo()
 
 
+    @classmethod
+    def from_codestream(cls, cs, proj, kernel):
+        # Parse SLE15-SP2_Update_25 to 15.2u25
+        rt = "rt" if "-RT" in cs else ""
+
+        sle, _, u = cs.replace("SLE", "").replace("-RT", "").split("_")
+        if "-SP" in sle:
+            sle, sp = sle.split("-SP")
+        else:
+            sle, sp = sle, "0"
+
+        return cls(int(sle), int(sp), int(u), rt, proj, kernel)
+
     def get_repo(self):
         if self.update == 0:
             return "standard"
@@ -70,4 +83,5 @@ class Codestream:
                 "kernel" : self.kernel,
                 "archs" : self.archs,
                 "modules" : self.modules,
+                "repo" : self.repo,
                 }

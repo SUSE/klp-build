@@ -208,10 +208,10 @@ def main_func(main_args):
         Inliner(args.name).check_inline(args.codestream, args.file, args.symbol)
 
     elif args.cmd == "get-patches":
-        GitHelper(args.name, args.filter, None).get_commits(args.cve)
+        GitHelper(args.name, args.filter).get_commits(args.cve)
 
     elif args.cmd == "format-patches":
-        GitHelper(args.name, args.filter, None).format_patches(args.version)
+        GitHelper(args.name, args.filter).format_patches(args.version)
 
     elif args.cmd == "status":
         IBS(args.name, args.filter).status(args.wait)

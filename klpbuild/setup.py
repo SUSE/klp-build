@@ -18,7 +18,6 @@ from klpbuild import utils
 from klpbuild.config import Config
 from klpbuild.ibs import IBS
 from klpbuild.ksrc import GitHelper
-from klpbuild.codestream import Codestream
 
 
 class Setup(Config):
@@ -83,56 +82,6 @@ class Setup(Config):
 
             self.file_funcs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
 
-    # Parse SLE15-SP2_Update_25 to 15.2u25
-    @staticmethod
-    def parse_cs_line(cs):
-        rt = "rt" if "-RT" in cs else ""
-
-        sle, _, u = cs.replace("SLE", "").replace("-RT", "").split("_")
-        if "-SP" in sle:
-            sle, sp = sle.split("-SP")
-        else:
-            sle, sp = sle, "0"
-
-        return int(sle), int(sp), int(u), rt
-
-    @staticmethod
-    def download_supported_file():
-        logging.info("Downloading codestreams file")
-        cs_url = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
-        suse_cert = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
-        if suse_cert.exists():
-            req = requests.get(cs_url, verify=suse_cert)
-        else:
-            req = requests.get(cs_url)
-
-        # exit on error
-        req.raise_for_status()
-
-        first_line = True
-        codestreams = []
-        for line in req.iter_lines():
-            # skip empty lines
-            if not line:
-                continue
-
-            # skip file header
-            if first_line:
-                first_line = False
-                continue
-
-            # remove the last two columns, which are dates of the line
-            # and add a fifth field with the forth one + rpm- prefix, and
-            # remove the build counter number
-            full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
-            kernel = re.sub(r"\.\d+$", "", kernel_full)
-
-            # Fill the majority of possible fields here
-            sle, sp, u, rt = Setup.parse_cs_line(full_cs)
-            codestreams.append(Codestream(sle, sp, u, rt, proj, kernel))
-
-        return codestreams
-
     # Needs to be called after setup_codestreams since the workincs_cs is set
     # there
     def download_missing_cs_data(self):
@@ -152,14 +101,10 @@ class Setup(Config):
 
 
     def setup_codestreams(self):
-        # Always get the latest supported.csv file and check the content
-        # against the codestreams informed by the user
-        all_codestreams = Setup.download_supported_file()
-
-        ksrc = GitHelper(self.lp_name, self.filter, None)
+        ksrc = GitHelper(self.lp_name, self.filter, skips=self.skips)
 
         # Called at this point because codestreams is populated
-        commits, patched_cs, patched_kernels, self.working_cs = ksrc.scan(all_codestreams,
+        commits, patched_cs, patched_kernels, self.working_cs = ksrc.scan(
                                                      self.conf.get("cve", ""),
                                                      self.no_check)
         self.conf["commits"] = commits

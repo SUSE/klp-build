@@ -24,8 +24,8 @@ from klpbuild import utils
 
 
 class GitHelper(Config):
-    def __init__(self, lp_name, lp_filter, data_dir):
-        super().__init__(lp_name, lp_filter, data_dir)
+    def __init__(self, lp_name, lp_filter, data_dir=None, skips=""):
+        super().__init__(lp_name, lp_filter, data_dir, skips)
 
         self.kern_src = self.get_user_path('kernel_src_dir', isopt=True)
 
@@ -438,13 +438,12 @@ class GitHelper(Config):
                 if bc+'u' not in cs.name():
                     continue
 
-                kernel = cs.kernel()
-
+                kernel = cs.kernel
                 patched, kern_commits = self.is_kernel_patched(kernel, suse_commits, cve)
                 if not patched and kernel not in suse_tags:
                     continue
 
-                print(f"\n{cs} ({kernel}):")
+                print(f"\n{cs.name()} ({kernel}):")
 
                 # If no patches/commits were found for this kernel, fallback to
                 # the commits in the main SLE branch. In either case, we can
@@ -471,7 +470,47 @@ class GitHelper(Config):
         return len(commits[cs.name_cs()]["commits"]) > 0
 
 
-    def scan(self, all_codestreams, cve, no_check):
+    @staticmethod
+    def download_supported_file():
+        logging.info("Downloading codestreams file")
+        cs_url = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
+        suse_cert = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
+        if suse_cert.exists():
+            req = requests.get(cs_url, verify=suse_cert)
+        else:
+            req = requests.get(cs_url)
+
+        # exit on error
+        req.raise_for_status()
+
+        first_line = True
+        codestreams = []
+        for line in req.iter_lines():
+            # skip empty lines
+            if not line:
+                continue
+
+            # skip file header
+            if first_line:
+                first_line = False
+                continue
+
+            # remove the last two columns, which are dates of the line
+            # and add a fifth field with the forth one + rpm- prefix, and
+            # remove the build counter number
+            full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
+            kernel = re.sub(r"\.\d+$", "", kernel_full)
+
+            codestreams.append(Codestream.from_codestream(full_cs, proj, kernel))
+
+        return codestreams
+
+
+    def scan(self, cve, no_check):
+        # Always get the latest supported.csv file and check the content
+        # against the codestreams informed by the user
+        all_codestreams = GitHelper.download_supported_file()
+
         if not cve:
             commits = {}
             patched_kernels = []
@@ -491,7 +530,7 @@ class GitHelper(Config):
             # Skip patched codestreams
             if not no_check:
                 if cs.kernel in patched_kernels:
-                    patched_cs.append(cs)
+                    patched_cs.append(cs.name())
                     continue
 
                 if not GitHelper.cs_is_affected(cs, cve, commits):
