@@ -25,7 +25,7 @@ class Inliner(Config):
     def check_inline(self, fname, func):
         ce_args = [ str(self.ce_inline_path), "-where-is-inlined" ]
 
-        filtered = self.filter_cs(verbose=False)
+        filtered = self.filter_cs()
         if not filtered:
             raise RuntimeError(f"Codestream {self.lp_filter} not found. Aborting.")
 

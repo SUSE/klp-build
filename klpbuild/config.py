@@ -470,7 +470,7 @@ class Config:
 
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
-    def filter_cs(self, cs_list=None, verbose=True):
+    def filter_cs(self, cs_list=None, verbose=False):
         if not cs_list:
             cs_list = self.new_codestreams
         full_cs = copy.deepcopy(cs_list)

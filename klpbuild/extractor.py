@@ -418,7 +418,7 @@ class Extractor(Config):
 
         cs_cmp = []
 
-        for cs in self.filter_cs(verbose=False):
+        for cs in self.filter_cs():
             cs_cmp.append(cs.name())
             for fname, _ in cs.files.items():
                 args.append((_, fname, cs, _))
