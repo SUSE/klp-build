@@ -8,7 +8,6 @@ import json
 import logging
 import platform
 import re
-from collections import OrderedDict
 from pathlib import Path
 import sys
 
@@ -134,21 +133,6 @@ class Setup(Config):
 
         return codestreams
 
-    def cs_is_affected(self, cs):
-        # We can only check if the cs is affected or not if the CVE was informed
-        # (so we can get all commits related to that specific CVE). Otherwise we
-        # consider all codestreams as affected.
-        if not self.conf.get("cve", ""):
-            return True
-
-        sle, sp, up, rt = self.get_cs_tuple(cs)
-
-        to_check = f"{sle}.{sp}"
-        if rt:
-            to_check = f"{sle}.{sp}rt"
-
-        return len(self.conf["commits"][to_check]["commits"]) > 0
-
     # Needs to be called after setup_codestreams since the workincs_cs is set
     # there
     def download_missing_cs_data(self):
@@ -166,78 +150,23 @@ class Setup(Config):
             ibs.download_cs_data(data_missing)
             logging.info("Done.")
 
+
     def setup_codestreams(self):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
         all_codestreams = Setup.download_supported_file()
 
-        ksrc = GitHelper(self.lp_name, self.filter, self.data)
+        ksrc = GitHelper(self.lp_name, self.filter, None)
 
         # Called at this point because codestreams is populated
-        self.conf["commits"] = ksrc.get_commits(self.conf.get("cve", ""))
-
-        patched_kernels = ksrc.get_patched_kernels(all_codestreams,
-                                                   self.conf["commits"],
-                                                   self.conf.get("cve", ""))
-
+        commits, patched_cs, patched_kernels, self.working_cs = ksrc.scan(all_codestreams,
+                                                     self.conf.get("cve", ""),
+                                                     self.no_check)
+        self.conf["commits"] = commits
         self.conf["patched_kernels"] = patched_kernels
-
-        # list of codestreams that matches the file-funcs argument
-        self.working_cs = OrderedDict()
-        patched_cs = []
-        unaffected_cs = []
-
-        if self.no_check:
-            logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
-
-        for cs in all_codestreams:
-            # Only process codestreams that are related to the argument
-            if not re.match(self.codestream, cs.name()):
-                continue
-
-            # Skip patched codestreams
-            if not self.no_check:
-                if cs.kernel in patched_kernels:
-                    patched_cs.append(cs)
-                    continue
-
-                if not self.cs_is_affected(cs):
-                    unaffected_cs.append(cs)
-                    continue
-
-            # Set supported archs for the codestream
-            # RT is supported only on x86_64 at the moment
-            archs = ["x86_64"]
-            if not cs.rt:
-                archs.extend(["ppc64le", "s390x"])
-
-            cs.set_archs(archs)
-            self.working_cs[cs.name()] = cs.data()
-
-        if patched_cs:
-            cs_list = utils.classify_codestreams(patched_cs)
-            logging.info("Skipping already patched codestreams:")
-            logging.info(f'\t{" ".join(cs_list)}')
-
-        if unaffected_cs:
-            cs_list = utils.classify_codestreams(unaffected_cs)
-            logging.info("Skipping unaffected codestreams (missing backports):")
-            logging.info(f'\t{" ".join(cs_list)}')
-
         # Add new codestreams to the already existing list, skipping duplicates
-        self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs", []) + patched_cs)))
-
-        # working_cs will contain the final dict of codestreams that wast set
-        # by the user, avoid downloading missing codestreams that are not affected
-        self.working_cs = self.filter_cs(self.working_cs, verbose=True)
-
-        if not self.working_cs.keys():
-            logging.info("All supported codestreams are already patched. Exiting klp-build")
-            sys.exit(0)
-
-        logging.info("All affected codestreams:")
-        cs_list = utils.classify_codestreams(self.working_cs.keys())
-        logging.info(f'\t{" ".join(cs_list)}')
+        self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs",
+                                                                   []) + patched_cs)))
 
 
     def setup_project_files(self):

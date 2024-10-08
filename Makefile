@@ -7,7 +7,7 @@ all:
 	pytest tests
 
 setup:
-	pytest tests/test_lp_setup.py
+	pytest tests/test_setup.py
 
 extract:
 	pytest tests/test_extract.py

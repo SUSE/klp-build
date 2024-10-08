@@ -54,6 +54,12 @@ class Codestream:
         return f"{self.sle}.{self.sp}u{self.update}"
 
 
+    def name_cs(self):
+        if self.rt:
+            return f"{self.sle}.{self.sp}rt"
+        return f"{self.sle}.{self.sp}"
+
+
     def data(self):
         return {
                 "sle" : self.sle,

@@ -3,6 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
+from collections import OrderedDict
 import logging
 import os
 import re
@@ -17,7 +18,9 @@ import git
 import requests
 from natsort import natsorted
 
+from klpbuild.codestream import Codestream
 from klpbuild.config import Config
+from klpbuild import utils
 
 
 class GitHelper(Config):
@@ -455,3 +458,75 @@ class GitHelper(Config):
 
         # remove duplicates
         return natsorted(list(set(kernels)))
+
+
+    @staticmethod
+    def cs_is_affected(cs, cve, commits):
+        # We can only check if the cs is affected or not if the CVE was informed
+        # (so we can get all commits related to that specific CVE). Otherwise we
+        # consider all codestreams as affected.
+        if not cve:
+            return True
+
+        return len(commits[cs.name_cs()]["commits"]) > 0
+
+
+    def scan(self, all_codestreams, cve, no_check):
+        if not cve:
+            commits = {}
+            patched_kernels = []
+        else:
+            commits = self.get_commits(cve)
+            patched_kernels = self.get_patched_kernels(all_codestreams, commits, cve)
+
+        # list of codestreams that matches the file-funcs argument
+        working_cs = OrderedDict()
+        patched_cs = []
+        unaffected_cs = []
+
+        if no_check:
+            logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
+
+        for cs in all_codestreams:
+            # Skip patched codestreams
+            if not no_check:
+                if cs.kernel in patched_kernels:
+                    patched_cs.append(cs)
+                    continue
+
+                if not GitHelper.cs_is_affected(cs, cve, commits):
+                    unaffected_cs.append(cs)
+                    continue
+
+            # Set supported archs for the codestream
+            # RT is supported only on x86_64 at the moment
+            archs = ["x86_64"]
+            if not cs.rt:
+                archs.extend(["ppc64le", "s390x"])
+
+            cs.set_archs(archs)
+            working_cs[cs.name()] = cs.data()
+
+        if patched_cs:
+            cs_list = utils.classify_codestreams(patched_cs)
+            logging.info("Skipping already patched codestreams:")
+            logging.info(f'\t{" ".join(cs_list)}')
+
+        if unaffected_cs:
+            cs_list = utils.classify_codestreams(unaffected_cs)
+            logging.info("Skipping unaffected codestreams (missing backports):")
+            logging.info(f'\t{" ".join(cs_list)}')
+
+        # working_cs will contain the final dict of codestreams that wast set
+        # by the user, avoid downloading missing codestreams that are not affected
+        working_cs = self.filter_cs(working_cs, verbose=True)
+
+        if not working_cs.keys():
+            logging.info("All supported codestreams are already patched. Exiting klp-build")
+            sys.exit(0)
+
+        logging.info("All affected codestreams:")
+        cs_list = utils.classify_codestreams(working_cs.keys())
+        logging.info(f'\t{" ".join(cs_list)}')
+
+        return commits, patched_cs, patched_kernels, working_cs
