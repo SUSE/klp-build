@@ -24,9 +24,6 @@ def create_parser() -> argparse.ArgumentParser:
         "resulting livepatches.",
     )
     parentparser.add_argument("--filter", type=str, help=r"Filter out codestreams using a regex. Example: 15\.3u[0-9]+")
-    parentparser.add_argument(
-        "--experimental", action="store_true", help="Enables functions that may not work as expected yet."
-    )
 
     parser = argparse.ArgumentParser(add_help=False)
     sub = parser.add_subparsers(dest="cmd")
