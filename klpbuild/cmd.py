@@ -150,6 +150,11 @@ def create_parser() -> argparse.ArgumentParser:
         "--cve", required=True, help="SLE specific. CVE number to search for related backported patches"
     )
 
+    patches = sub.add_parser("scan")
+    patches.add_argument(
+        "--cve", required=True, help="SLE specific. Shows which codestreams are vulnerable to the CVE"
+    )
+
     sub.add_parser("cleanup", parents=[parentparser], help="SLE specific. Remove livepatch packages from IBS")
 
     sub.add_parser(
@@ -207,6 +212,9 @@ def main_func(main_args):
 
     elif args.cmd == "get-patches":
         GitHelper(args.name, args.filter).get_commits(args.cve)
+
+    elif args.cmd == "scan":
+        GitHelper("bsc_check", "").scan(args.cve, False)
 
     elif args.cmd == "format-patches":
         GitHelper(args.name, args.filter).format_patches(args.version)
