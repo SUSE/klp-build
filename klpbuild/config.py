@@ -57,13 +57,13 @@ class Config:
 
         self.working_cs = OrderedDict(working_cs)
         self.codestreams = OrderedDict()
-        self.new_codestreams = []
+        self.codestreams_list = []
         self.cs_file = Path(self.lp_path, "codestreams.json")
         if self.cs_file.is_file():
             with open(self.cs_file) as f:
                 self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
                 for _, data in self.codestreams.items():
-                    self.new_codestreams.append(Codestream.from_data(data))
+                    self.codestreams_list.append(Codestream.from_data(data))
 
         self.conf = OrderedDict(
             {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data":
@@ -472,7 +472,7 @@ class Config:
     # codestreams without file-funcs and not matching the filter
     def filter_cs(self, cs_list=None, verbose=False):
         if not cs_list:
-            cs_list = self.new_codestreams
+            cs_list = self.codestreams_list
         full_cs = copy.deepcopy(cs_list)
 
         if self.kdir:
