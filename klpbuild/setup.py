@@ -41,7 +41,7 @@ class Setup(Config):
 
         archs.sort()
 
-        if not self.kdir and not self.host and not lp_name.startswith("bsc"):
+        if not lp_name.startswith("bsc"):
             raise ValueError("Please use prefix 'bsc' when creating a livepatch for codestreams")
 
         if conf and not conf.startswith("CONFIG_"):
@@ -119,17 +119,7 @@ class Setup(Config):
     def setup_project_files(self):
         self.lp_path.mkdir(exist_ok=True)
 
-        # When kdir is used, the only supported architecture is the HOST
-        # architecture.
-        if self.kdir or self.host:
-            self.working_cs["linux"] = {
-                "kernel": platform.uname()[2].replace("-default", ""),
-                "modules": {},
-                "files": self.file_funcs,
-                "archs": [utils.ARCH],
-            }
-        else:
-            self.setup_codestreams()
+        self.setup_codestreams()
 
         logging.info(f"Affected architectures:")
         logging.info(f"\t{' '.join(self.conf['archs'])}")
@@ -154,10 +144,8 @@ class Setup(Config):
 
                 ipa_f = self.get_ipa_file(cs, f)
                 if not ipa_f.is_file():
-                    msg = f"{cs.name()} ({kernel}): File {ipa_f} not found."
-                    if not self.kdir and not self.host:
-                        msg += " Creating an empty file."
-                        ipa_f.touch()
+                    msg = f"{cs.name()} ({kernel}): File {ipa_f} not found. Creating an empty file."
+                    ipa_f.touch()
                     logging.warning(msg)
 
                 # If the config was enabled on all supported architectures,

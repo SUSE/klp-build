@@ -468,21 +468,16 @@ class TemplateGen(Config):
         self.check_enabled = self.conf["archs"] != ARCHS
         self.app = app
 
-        # We dont need author info when creating a LP using kdir
-        if self.kdir:
-            self.user = ""
-            self.email = ""
-        else:
-            try:
-                import git
+        try:
+            import git
 
-                git_data = git.GitConfigParser()
-                self.user = git_data.get_value("user", "name")
-                self.email = git_data.get_value("user", "email")
-            except:
-                # it couldn't find the default user and email
-                self.user = "Change me"
-                self.email = "change@me"
+            git_data = git.GitConfigParser()
+            self.user = git_data.get_value("user", "name")
+            self.email = git_data.get_value("user", "email")
+        except:
+            # it couldn't find the default user and email
+            self.user = "Change me"
+            self.email = "change@me"
 
     def preproc_slashes(text):
         txt = r"<%! BS='\\' %>" + text.replace("\\", "${BS}")
@@ -606,22 +601,13 @@ class TemplateGen(Config):
             "app": self.app,
         }
 
-        if not self.kdir:
-            render_vars['commits'] = self.conf["commits"]
+        render_vars['commits'] = self.conf["commits"]
 
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
-            if not self.kdir:
-                # For C files, first add the LICENSE header template to the file
-                f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
 
-            # For IBT we don't need fancy kallsyms, and we can really only on klp-convert, so
-            # the generated templates is much simpler. Use this only if kdir is
-            # specified
-            if ibt and self.kdir:
-                render_vars["klp_objs"] = self.__BuildKlpObjs(cs, src_file)
-                # FIXME: handle multiple livepatch files
-                temp_str = TEMPL_KLP_LONE_FILE
+            # For C files, first add the LICENSE header template to the file
+            f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
 
             # If we have multiple source files for the same livepatch,
             # create one hollow file to wire-up the multiple _init and
@@ -631,7 +617,7 @@ class TemplateGen(Config):
             # module_notifier armed to signal whenever the module comes on
             # in order to do the symbol lookups. Otherwise only _init is
             # needed, and only if there are externalized symbols being used.
-            elif not lp_file:
+            if not lp_file:
                 temp_str = TEMPL_HOLLOW
             elif mod:
                 temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_MODULE
@@ -658,8 +644,7 @@ class TemplateGen(Config):
             obj = f"livepatch_{self.lp_name}.o"
 
         modpath = self.get_mod_path(cs, ARCH)
-        if not self.kdir:
-            modpath = Path(modpath, "build")
+        modpath = Path(modpath, "build")
 
         render_vars = {"kdir": modpath, "pwd": work_dir, "obj": obj}
 
@@ -673,9 +658,7 @@ class TemplateGen(Config):
         files = cs.files
         is_multi_files = len(files.keys()) > 1
 
-        # This file is only consumed by the SLE kernels
-        if not self.kdir:
-            self.GeneratePatchedFuncs(lp_path, files)
+        self.GeneratePatchedFuncs(lp_path, files)
 
         # If there are more then one source file, we cannot fully infer what are
         # the correct configs and mods to be livepatched, so leave the mod and
@@ -690,10 +673,6 @@ class TemplateGen(Config):
         # of the other source files
         if is_multi_files:
             self.__GenerateLivepatchFile(lp_path, cs, None, False)
-        else:
-            # FIXME: Create Makefiles for multifile livepatches for kdir as well
-            if self.kdir:
-                self.CreateMakefile(cs, "", True)
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):

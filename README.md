@@ -34,9 +34,6 @@ Option ``--data-dir``, if set, will overwrite the path specified here.
 
 # Creating a livepatch for upstream kernels - Not production ready yet
 
-__IMPORTANT__: There are some still out-of-tree patches needed to make it to
-work (klp-convert) tool. Check the patches directory for what is needed.
-
 The current approach to create for upstream kernels needs a directory with the
 source code, and the compiled sources in the same location.
 

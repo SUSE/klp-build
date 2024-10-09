@@ -31,9 +31,8 @@ class Extractor(Config):
     def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, ignore_errors, workers=4):
         super().__init__(lp_name, lp_filter)
 
-        if not self.kdir and not self.host:
-            self.sdir_lock = FileLock(Path(self.get_data_dir(utils.ARCH), "sdir.lock"))
-            self.sdir_lock.acquire()
+        self.sdir_lock = FileLock(Path(self.get_data_dir(utils.ARCH), "sdir.lock"))
+        self.sdir_lock.acquire()
 
         if not self.lp_path.exists():
             raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
@@ -55,11 +54,6 @@ class Extractor(Config):
         self.total = 0
         self.make_lock = Lock()
 
-        if self.kdir:
-            if app == "ccp":
-                logging.info("Forcing the use of ce since --kdir was set.")
-            app = "ce"
-
         if app == "ccp":
             self.runner = CCP(lp_name, lp_filter, avoid_ext)
         else:
@@ -69,7 +63,7 @@ class Extractor(Config):
         self.tem = TemplateGen(self.lp_name, self.filter, self.app)
 
     def __del__(self):
-        if not self.kdir and not self.host and self.sdir_lock:
+        if self.sdir_lock:
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
 
@@ -187,8 +181,7 @@ class Extractor(Config):
         cc_file = Path(self.get_odir(cs), "compile_commands.json")
         # FIXME: compile_commands.json that is packaged with SLE/openSUSE
         # doesn't quite work yet, so don't use it yet.
-        if not cc_file.exists() or not self.kdir:
-            return None
+        return None
 
         with open(cc_file) as f:
             buf = f.read()
@@ -294,11 +287,6 @@ class Extractor(Config):
                 args.append((i, fname, cs, fdata))
                 i += 1
 
-        if self.kdir and not self.host:
-            logging.info("Refreshing compile_commands.json...")
-            subprocess.check_output('./scripts/clang-tools/gen_compile_commands.py',
-                                    cwd=self.data)
-
         logging.info(f"Extracting code using {self.app}")
         self.total = len(args)
         logging.info(f"\nGenerating livepatches for {len(args)} file(s) using {self.workers} workers...")
@@ -322,12 +310,6 @@ class Extractor(Config):
         # Create the livepatches per codestream
         for cs in working_cs:
             self.tem.GenerateLivePatches(cs)
-
-        # For kdir setup, do not execute additional checks
-        if self.kdir or self.host:
-            if self.apply_patches:
-                self.remove_patches(cs, self.quilt_log)
-            return
 
         self.group_equal_files(args)
 

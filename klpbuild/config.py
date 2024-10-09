@@ -67,7 +67,7 @@ class Config:
 
         self.conf = OrderedDict(
             {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data":
-             str(data_dir), "kdir": False, "host": False,}
+             str(data_dir), }
         )
 
         self.conf_file = Path(self.lp_path, "conf.json")
@@ -78,19 +78,6 @@ class Config:
         self.data = Path(self.conf.get("data", "non-existent"))
         if not self.data.exists():
             self.data = self.get_user_path('data_dir')
-
-        if self.data == Path("/"):
-            self.conf["host"] = True
-            self.host = True
-            self.kdir = False
-        else:
-            # kdir happens when the vmlinux is in on data-dir, meaning that we
-            # are extracting code from a kernel-source directory
-            self.kdir = Path(self.data, "vmlinux").exists()
-            # assign kdir back to conf file so it's stored for later use of
-            # different klp-build subcommands
-            self.conf["kdir"] = self.kdir
-            self.host = False
 
         # will contain the symbols from the to be livepatched object
         # cached by the codestream : object
@@ -151,8 +138,6 @@ class Config:
         return f"{self.lp_name}_{fpath}"
 
     def get_patches_dir(self):
-        if self.kdir:
-            return Path(self.data, "fixes")
         return Path(self.lp_path, "fixes")
 
     def remove_patches(self, cs, fil):
@@ -173,25 +158,22 @@ class Config:
         shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
 
     def apply_all_patches(self, cs, fil):
-        if self.kdir:
-            patch_dirs = [self.get_patches_dir()]
-        else:
-            dirs = []
+        dirs = []
 
-            if cs.rt:
-                dirs.extend([f"{cs.sle}.{cs.sp}rtu{cs.update}", f"{cle.sle}.{cs.sp}rt"])
+        if cs.rt:
+            dirs.extend([f"{cs.sle}.{cs.sp}rtu{cs.update}", f"{cle.sle}.{cs.sp}rt"])
 
-            dirs.extend([f"{cs.sle}.{cs.sp}u{cs.update}", f"{cs.sle}.{cs.sp}"])
+        dirs.extend([f"{cs.sle}.{cs.sp}u{cs.update}", f"{cs.sle}.{cs.sp}"])
 
-            if cs.sle == 15 and cs.sp < 4:
-                dirs.append("cve-5.3")
-            elif cs.sle == 15 and cs.sp <= 5:
-                dirs.append("cve-5.14")
+        if cs.sle == 15 and cs.sp < 4:
+            dirs.append("cve-5.3")
+        elif cs.sle == 15 and cs.sp <= 5:
+            dirs.append("cve-5.14")
 
-            patch_dirs = []
+        patch_dirs = []
 
-            for d in dirs:
-                patch_dirs.append(Path(self.get_patches_dir(), d))
+        for d in dirs:
+            patch_dirs.append(Path(self.get_patches_dir(), d))
 
         patched = False
         sdir = self.get_sdir(cs)
@@ -241,14 +223,6 @@ class Config:
         entry is set as M, check if a module was specified (different from
         vmlinux).
         """
-        if self.kdir:
-            kconf = Path(self.data, ".config")
-            with open(kconf) as f:
-                match = re.search(rf"{conf}=[ym]", f.read())
-                if not match:
-                    raise RuntimeError(f"Config {conf} not enabled")
-            return
-
         configs = {}
         kernel = cs.kernel
         name = cs.name()
@@ -286,11 +260,6 @@ class Config:
         return not self.get_cs_boot_file(cs, ".config", ARCH).exists()
 
     def get_ktype(self, cs):
-        if self.host:
-            ktype = platform.uname()[2]
-
-            return "default" if "-default" in ktype else "rt"
-
         return "rt" if cs.rt else "default"
 
     # The config file is copied from boot/config-<version> to linux-obj when we
@@ -302,8 +271,6 @@ class Config:
 
     def get_cs_boot_file(self, cs, file, arch=""):
         if file == "vmlinux":
-            if self.kdir:
-                return Path(self.get_data_dir(arch), file)
             return Path(self.get_data_dir(arch), "boot", f"{file}-{cs.kernel}-{self.get_ktype(cs)}")
 
         # we currently download kernel-source only or the curent arch (ARCH), so
@@ -315,11 +282,6 @@ class Config:
         return Path(self.get_odir(cs, arch), file)
 
     def get_data_dir(self, arch):
-        # kdir will have self.data pointing to a kernel-source directory
-        # for host, it should be /
-        if self.kdir or self.host:
-            return self.data
-
         # For the SLE usage, it should point to the place where the codestreams
         # are downloaded
         return Path(self.data, arch)
@@ -329,8 +291,6 @@ class Config:
             arch = ARCH
 
         init_path = self.get_data_dir(arch)
-        if self.kdir:
-            return init_path
 
         # Only -rt codestreams have a suffix for source directory
         ktype = f"-{self.get_ktype(cs)}"
@@ -340,20 +300,12 @@ class Config:
         return Path(init_path, "usr", "src", f"linux-{cs.kernel}{ktype}")
 
     def get_odir(self, cs, arch=""):
-        if self.kdir:
-            return self.data
         return Path(f"{self.get_sdir(cs, arch)}-obj", ARCH, self.get_ktype(cs))
 
     def get_ipa_file(self, cs, fname):
-        if self.kdir:
-            return Path(self.data, f"{fname}.000i.ipa-clones")
-
         return Path(self.get_odir(cs), f"{fname}.000i.ipa-clones")
 
     def get_mod_path(self, cs, arch, mod=""):
-        if self.kdir:
-            return self.data
-
         if not mod or self.is_mod(mod):
             return Path(self.get_data_dir(arch), "lib", "modules", f"{cs.kernel}-{self.get_ktype(cs)}")
         return self.get_data_dir(arch)
@@ -391,38 +343,8 @@ class Config:
 
     def get_kernel_path(self, arch, cs):
         prefix = self.get_data_dir(arch)
-        # For compiled kernel directories it creates vmlinux, so we can grab it
-        # directly from there
-        if self.kdir:
-            return Path(prefix, "vmlinux")
-
-        kver = cs.kernel
-        # Search for vmlinux on /boot, lib/modules
-        if self.host:
-            kpath = Path(f"{kver}-{self.get_ktype(cs)}")
-            kernel_paths = [
-                    "boot",
-                    f"lib/modules/{kpath}",
-                    f"usr/lib/modules/{kpath}"
-                    ]
-
-            for p in kernel_paths:
-                vmpath = list(Path(prefix, p).glob("vmlinux*"))
-                if len(vmpath) == 0:
-                    continue
-
-                if len(vmpath) == 1:
-                    return vmpath[0]
-
-                # When the glob reaches a directory where it contains vmlinux of
-                # different kernels, so filter by the same kernel version that
-                # we are running
-                return list(Path(prefix, p).glob(f"vmlinux-{kver}*"))[0]
-
-            raise RuntimeError("Couldn't find the hosts kernel")
-
         # Got get SLE kernel, decompressed
-        return Path(prefix, f"boot/vmlinux-{kver}-{self.get_ktype(cs)}")
+        return Path(prefix, f"boot/vmlinux-{cs.kernel}-{self.get_ktype(cs)}")
 
     # This function can be called to get the path to a module that has symbols
     # that were externalized, so we need to find the path to the module as well.
@@ -452,7 +374,7 @@ class Config:
             if not obj_match:
                 raise RuntimeError(f"{name}-{arch} ({kernel}): Module not found: {mod}")
 
-        # if kdir if set, modules.order will show the module with suffix .o, so
+        # modules.order will show the module with suffix .o, so
         # make sure the extension. Also check for multiple extensions since we
         # can have modules being compressed using different algorithms.
         for ext in [".ko", ".ko.zst", ".ko.gz"]:
@@ -474,9 +396,6 @@ class Config:
         if not cs_list:
             cs_list = self.codestreams_list
         full_cs = copy.deepcopy(cs_list)
-
-        if self.kdir:
-            return full_cs
 
         if verbose:
             logging.info("Checking filter and skips...")
