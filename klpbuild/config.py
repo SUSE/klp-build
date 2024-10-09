@@ -233,7 +233,7 @@ class Config:
             if arch not in cs.archs:
                 continue
 
-            kconf = self.get_cs_boot_file(cs, ".config", arch)
+            kconf = self.get_boot_file(cs, "config", arch)
             with open(kconf) as f:
                 match = re.search(rf"{conf}=([ym])", f.read())
                 if not match:
@@ -258,24 +258,8 @@ class Config:
         # for all of them when a codestream is missing.
         return not Path(self.get_odir(cs, ARCH), ".config").exists()
 
-    # The config file is copied from boot/config-<version> to linux-obj when we
-    # extract the code, and after that we always check for the config on the
-    # -obj dir. Return the original path here so we can use this function on the
-    # extraction code.
-    def get_cs_kernel_config(self, cs, arch):
-        return Path(self.get_data_dir(arch), "boot", f"config-{cs.kname()}")
-
-    def get_cs_boot_file(self, cs, file, arch=""):
-        if file == "vmlinux":
-            return Path(self.get_data_dir(arch), "boot", f"{file}-{cs.kname()}")
-
-        # we currently download kernel-source only or the curent arch (ARCH), so
-        # whether we have to check for the config of a different arch try to
-        # check the config file on boot dir:
-        if file == ".config" and arch != ARCH:
-            return Path(self.get_data_dir(arch), "boot", f"config-{cs.kname()}")
-
-        return Path(self.get_odir(cs, arch), file)
+    def get_boot_file(self, cs, file, arch=ARCH):
+        return Path(self.get_data_dir(arch), "boot", f"{file}-{cs.kname()}")
 
     def get_data_dir(self, arch):
         # For the SLE usage, it should point to the place where the codestreams
@@ -336,7 +320,7 @@ class Config:
     # that were externalized, so we need to find the path to the module as well.
     def get_module_obj(self, arch, cs, module):
         if not self.is_mod(module):
-            return self.get_cs_boot_file(cs, "vmlinux", arch)
+            return self.get_boot_file(cs, "vmlinux", arch)
 
         obj = cs.modules.get(module, "")
         if not obj:

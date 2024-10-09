@@ -191,14 +191,16 @@ class IBS(Config):
                     cmd = rf'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
-                # Extract gzipped vmlinux per arch
-                vmlinux_path = Path(self.get_data_dir(arch), "boot", f"vmlinux-{cs.kname()}.gz")
-                # ppc64le doesn't gzips vmlinux
-                if vmlinux_path.exists():
-                    subprocess.check_output(rf'gzip -k -d -f {vmlinux_path}', shell=True)
+                # Extract gzipped files per arch
+                files = ["vmlinux", "symvers"]
+                for f in files:
+                    f_path = Path(self.get_data_dir(arch), "boot", f"{f}-{cs.kname()}.gz")
+                    # ppc64le doesn't gzips vmlinux
+                    if f_path.exists():
+                        subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
 
             # Use the SLE .config
-            shutil.copy(self.get_cs_kernel_config(cs, ARCH), Path(self.get_odir(cs), ".config"))
+            shutil.copy(self.get_boot_file(cs, "config", ARCH), Path(self.get_odir(cs), ".config"))
 
             # Recreate the build link to enable us to test the generated LP
             mod_path = Path(self.get_mod_path(cs, ARCH), "build")
@@ -229,7 +231,7 @@ class IBS(Config):
         return prj.replace(f"{self.prj_prefix}-", "").replace("_", ".")
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):
-        vmlinux_path = self.get_cs_boot_file(cs, "vmlinux", arch)
+        vmlinux_path = self.get_boot_file(cs, "vmlinux", arch)
         vmlinux_syms = self.get_all_symbols_from_object(vmlinux_path, True)
 
         # Get list of UNDEFINED symbols from the livepatch module
