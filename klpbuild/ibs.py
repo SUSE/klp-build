@@ -185,18 +185,14 @@ class IBS(Config):
         # codestream
         for cs in cs_list:
             for arch in cs.archs:
-                kname = cs.kernel + "-default"
-                if cs.rt:
-                    kname = cs.kernel + "-rt"
-
                 # Extract modules and vmlinux files that are compressed
-                mod_path = Path(self.get_data_dir(arch), "lib", "modules", kname)
+                mod_path = Path(self.get_data_dir(arch), "lib", "modules", cs.kname())
                 for fext, ecmd in [("zst", "unzstd -f -d"), ("xz", "xz --quiet -d -k")]:
                     cmd = rf'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
                 # Extract gzipped vmlinux per arch
-                vmlinux_path = Path(self.get_data_dir(arch), "boot", f"vmlinux-{kname}.gz")
+                vmlinux_path = Path(self.get_data_dir(arch), "boot", f"vmlinux-{cs.kname()}.gz")
                 # ppc64le doesn't gzips vmlinux
                 if vmlinux_path.exists():
                     subprocess.check_output(rf'gzip -k -d -f {vmlinux_path}', shell=True)

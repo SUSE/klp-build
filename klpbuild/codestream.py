@@ -6,7 +6,7 @@
 import re
 
 class Codestream:
-    __slots__ = ("sle", "sp", "update", "rt", "project", "kernel", "archs",
+    __slots__ = ("sle", "sp", "update", "rt", "ktype", "project", "kernel", "archs",
                  "files", "modules", "repo")
 
     def __init__(self, sle, sp, update, rt, project="", kernel="",
@@ -15,6 +15,7 @@ class Codestream:
         self.sp = sp
         self.update = update
         self.rt = rt
+        self.ktype = "-rt" if rt else "-default"
         self.project = project
         self.kernel = kernel
         self.archs = archs
@@ -49,6 +50,7 @@ class Codestream:
                  data["project"], data["kernel"], data["archs"], data["files"],
                  data["modules"])
 
+
     def __eq__(self, cs):
         return self.sle == cs.sle and \
                 self.sp == cs.sp and \
@@ -79,6 +81,10 @@ class Codestream:
 
     def set_files(self, files):
         self.files = files
+
+
+    def kname(self):
+        return self.kernel + self.ktype
 
 
     def name(self):

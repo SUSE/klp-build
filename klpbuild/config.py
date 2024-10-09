@@ -182,7 +182,7 @@ class Config:
                 fil.write(f"\nPatches dir {pdir} doesnt exists\n")
                 continue
 
-            fil.write(f"\nApplying patches on {cs}({cs.kernel}) from {pdir}\n")
+            fil.write(f"\nApplying patches on {cs.name()}({cs.kernel}) from {pdir}\n")
             fil.flush()
 
             for patch in sorted(pdir.iterdir(), reverse=True):
@@ -208,7 +208,7 @@ class Config:
             break
 
         if not patched:
-            raise RuntimeError(f"{cs}({cs.kernel}): Failed to apply patches. Aborting")
+            raise RuntimeError(f"{cs.name()}({cs.kernel}): Failed to apply patches. Aborting")
 
     def get_cs_dir(self, cs, app):
         return Path(self.lp_path, app, cs.name())
@@ -224,7 +224,6 @@ class Config:
         vmlinux).
         """
         configs = {}
-        kernel = cs.kernel
         name = cs.name()
 
         # Validate only the specified architectures, but check if the codestream
@@ -238,13 +237,13 @@ class Config:
             with open(kconf) as f:
                 match = re.search(rf"{conf}=([ym])", f.read())
                 if not match:
-                    raise RuntimeError(f"{name}:{arch} ({kernel}): Config {conf} not enabled")
+                    raise RuntimeError(f"{name}:{arch} ({cs.kernel}): Config {conf} not enabled")
 
             conf_entry = match.group(1)
             if conf_entry == "m" and mod == "vmlinux":
-                raise RuntimeError(f"{name}:{arch} ({kernel}): Config {conf} is set as module, but no module was specified")
+                raise RuntimeError(f"{name}:{arch} ({cs.kernel}): Config {conf} is set as module, but no module was specified")
             elif conf_entry == "y" and mod != "vmlinux":
-                raise RuntimeError(f"{name}:{arch} ({kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
+                raise RuntimeError(f"{name}:{arch} ({cs.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
 
             configs.setdefault(conf_entry, [])
             configs[conf_entry].append(f"{name}:{arch}")
@@ -257,27 +256,24 @@ class Config:
     def missing_codestream(self, cs):
         # Check if the config exists for the current ARCH since we extract code
         # for all of them when a codestream is missing.
-        return not self.get_cs_boot_file(cs, ".config", ARCH).exists()
-
-    def get_ktype(self, cs):
-        return "rt" if cs.rt else "default"
+        return not Path(self.get_odir(cs, ARCH), ".config").exists()
 
     # The config file is copied from boot/config-<version> to linux-obj when we
     # extract the code, and after that we always check for the config on the
     # -obj dir. Return the original path here so we can use this function on the
     # extraction code.
     def get_cs_kernel_config(self, cs, arch):
-        return Path(self.get_data_dir(arch), "boot", f"config-{cs.kernel}-{self.get_ktype(cs)}")
+        return Path(self.get_data_dir(arch), "boot", f"config-{cs.kname()}")
 
     def get_cs_boot_file(self, cs, file, arch=""):
         if file == "vmlinux":
-            return Path(self.get_data_dir(arch), "boot", f"{file}-{cs.kernel}-{self.get_ktype(cs)}")
+            return Path(self.get_data_dir(arch), "boot", f"{file}-{cs.kname()}")
 
         # we currently download kernel-source only or the curent arch (ARCH), so
         # whether we have to check for the config of a different arch try to
         # check the config file on boot dir:
         if file == ".config" and arch != ARCH:
-            return Path(self.get_data_dir(arch), "boot", f"config-{cs.kernel}-{self.get_ktype(cs)}")
+            return Path(self.get_data_dir(arch), "boot", f"config-{cs.kname()}")
 
         return Path(self.get_odir(cs, arch), file)
 
@@ -290,24 +286,19 @@ class Config:
         if not arch:
             arch = ARCH
 
-        init_path = self.get_data_dir(arch)
-
         # Only -rt codestreams have a suffix for source directory
-        ktype = f"-{self.get_ktype(cs)}"
-        if ktype == "-default":
-            ktype = ""
-
-        return Path(init_path, "usr", "src", f"linux-{cs.kernel}{ktype}")
+        ktype = cs.ktype.replace("-default", "")
+        return Path(self.get_data_dir(arch), "usr", "src", f"linux-{cs.kernel}{ktype}")
 
     def get_odir(self, cs, arch=""):
-        return Path(f"{self.get_sdir(cs, arch)}-obj", ARCH, self.get_ktype(cs))
+        return Path(f"{self.get_sdir(cs, arch)}-obj", ARCH, cs.ktype.replace("-", ""))
 
     def get_ipa_file(self, cs, fname):
         return Path(self.get_odir(cs), f"{fname}.000i.ipa-clones")
 
     def get_mod_path(self, cs, arch, mod=""):
         if not mod or self.is_mod(mod):
-            return Path(self.get_data_dir(arch), "lib", "modules", f"{cs.kernel}-{self.get_ktype(cs)}")
+            return Path(self.get_data_dir(arch), "lib", "modules", f"{cs.kname()}")
         return self.get_data_dir(arch)
 
     def get_tests_path(self):
@@ -341,16 +332,11 @@ class Config:
     def is_mod(self, mod):
         return mod != "vmlinux"
 
-    def get_kernel_path(self, arch, cs):
-        prefix = self.get_data_dir(arch)
-        # Got get SLE kernel, decompressed
-        return Path(prefix, f"boot/vmlinux-{cs.kernel}-{self.get_ktype(cs)}")
-
     # This function can be called to get the path to a module that has symbols
     # that were externalized, so we need to find the path to the module as well.
     def get_module_obj(self, arch, cs, module):
         if not self.is_mod(module):
-            return self.get_kernel_path(arch, cs)
+            return self.get_cs_boot_file(cs, "vmlinux", arch)
 
         obj = cs.modules.get(module, "")
         if not obj:
@@ -362,9 +348,6 @@ class Config:
     def find_module_obj(self, arch, cs, mod, check_support=False):
         assert mod != "vmlinux"
 
-        kernel = cs.kernel
-        name = cs.name()
-
         # Module name use underscores, but the final module object uses hyphens.
         mod = mod.replace("_", "[-_]")
 
@@ -372,7 +355,7 @@ class Config:
         with open(Path(mod_path, "modules.order")) as f:
             obj_match = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
             if not obj_match:
-                raise RuntimeError(f"{name}-{arch} ({kernel}): Module not found: {mod}")
+                raise RuntimeError(f"{cs.name()}-{arch} ({cs.kernel}): Module not found: {mod}")
 
         # modules.order will show the module with suffix .o, so
         # make sure the extension. Also check for multiple extensions since we
@@ -386,7 +369,7 @@ class Config:
             # Validate if the module being livepatches is supported or not
             elffile = self.get_elf_object(Path(mod_path, obj))
             if "no" == self.get_elf_modinfo_entry(elffile, "supported"):
-                print(f"WARN: {name}-{arch} ({kernel}): Module {mod} is not supported by SLE")
+                print(f"WARN: {cs.name()}-{arch} ({cs.kernel}): Module {mod} is not supported by SLE")
 
         return obj
 
@@ -495,7 +478,7 @@ class Config:
                 ret.append(symbol)
 
             elif nsyms > 1:
-                print(f"WARNING: {cs}-{arch} ({cs.kernel}): symbol {symbol} duplicated on {mod}")
+                print(f"WARNING: {cs.name()}-{arch} ({cs.kernel}): symbol {symbol} duplicated on {mod}")
 
             # If len(syms) == 1 means that we found a unique symbol, which is
             # what we expect, and nothing need to be done.

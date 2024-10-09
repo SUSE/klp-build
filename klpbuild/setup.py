@@ -160,7 +160,7 @@ class Setup(Config):
                         mod_path = str(self.find_module_obj(utils.ARCH, cs, mod,
                                                             check_support=True))
                     else:
-                        mod_path = str(self.get_kernel_path(utils.ARCH, cs))
+                        mod_path = str(self.get_cs_boot_file(cs, "vmlinux", utils.ARCH))
 
                     cs.modules[mod] = mod_path
 
