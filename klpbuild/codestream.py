@@ -3,14 +3,18 @@
 # Copyright (C) 2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+from pathlib import Path
 import re
 
-class Codestream:
-    __slots__ = ("sle", "sp", "update", "rt", "ktype", "project", "kernel", "archs",
-                 "files", "modules", "repo")
+from klpbuild.utils import ARCH
 
-    def __init__(self, sle, sp, update, rt, project="", kernel="",
+class Codestream:
+    __slots__ = ("data_path", "sle", "sp", "update", "rt", "ktype", "project",
+                 "kernel", "archs", "files", "modules", "repo")
+
+    def __init__(self, data_path, sle, sp, update, rt, project="", kernel="",
                  archs=[], files={}, modules={}):
+        self.data_path = data_path
         self.sle = sle
         self.sp = sp
         self.update = update
@@ -25,7 +29,7 @@ class Codestream:
 
 
     @classmethod
-    def from_codestream(cls, cs, proj, kernel):
+    def from_codestream(cls, data_path, cs, proj, kernel):
         # Parse SLE15-SP2_Update_25 to 15.2u25
         rt = "rt" if "-RT" in cs else ""
 
@@ -35,18 +39,18 @@ class Codestream:
         else:
             sle, sp = sle, "0"
 
-        return cls(int(sle), int(sp), int(u), rt, proj, kernel)
+        return cls(data_path, int(sle), int(sp), int(u), rt, proj, kernel)
 
 
     @classmethod
-    def from_cs(cls, cs):
+    def from_cs(cls, data_path, cs):
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
-        return cls(int(match.group(1)), int(match.group(2)), int(match.group(4)), match.group(3))
+        return cls(data_path, int(match.group(1)), int(match.group(2)), int(match.group(4)), match.group(3))
 
 
     @classmethod
-    def from_data(cls, data):
-        return cls(data["sle"], data["sp"], data["update"], data["rt"],
+    def from_data(cls, data_path, data):
+        return cls(data_path, data["sle"], data["sp"], data["update"], data["rt"],
                  data["project"], data["kernel"], data["archs"], data["files"],
                  data["modules"])
 
@@ -56,6 +60,17 @@ class Codestream:
                 self.sp == cs.sp and \
                 self.update == cs.update and \
                 self.rt == cs.rt
+
+
+    def get_data_dir(self, arch):
+        # For the SLE usage, it should point to the place where the codestreams
+        # are downloaded
+        return Path(self.data_path, arch)
+
+
+    def get_boot_file(self, file, arch=ARCH):
+        assert file in ["vmlinux", "config", "symvers"]
+        return Path(self.get_data_dir(arch), "boot", f"{file}-{self.kname()}")
 
 
     def get_repo(self):
@@ -125,4 +140,5 @@ class Codestream:
                 "files" : self.files,
                 "modules" : self.modules,
                 "repo" : self.repo,
+                "data_path" : str(self.data_path),
                 }

@@ -44,7 +44,7 @@ class Inliner(Config):
         if ipa_f.exists():
             ce_args.extend(["-ipa-files", str(ipa_f)])
 
-        ce_args.extend(["-symvers", str(self.get_boot_file(cs, "symvers"))])
+        ce_args.extend(["-symvers", str(cs.get_boot_file("symvers"))])
 
         ce_args.extend([func])
 

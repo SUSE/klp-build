@@ -89,7 +89,7 @@ class Setup(Config):
         cs_missing = []
 
         for cs in self.working_cs:
-            if self.missing_codestream(cs):
+            if not cs.get_boot_file("config").exists():
                 data_missing.append(cs)
                 cs_missing.append(cs.name())
 
@@ -160,7 +160,7 @@ class Setup(Config):
                         mod_path = str(self.find_module_obj(utils.ARCH, cs, mod,
                                                             check_support=True))
                     else:
-                        mod_path = str(self.get_boot_file(cs, "vmlinux", utils.ARCH))
+                        mod_path = str(cs.get_boot_file("vmlinux"))
 
                     cs.modules[mod] = mod_path
 

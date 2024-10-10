@@ -58,13 +58,6 @@ class Config:
         self.working_cs = OrderedDict(working_cs)
         self.codestreams = OrderedDict()
         self.codestreams_list = []
-        self.cs_file = Path(self.lp_path, "codestreams.json")
-        if self.cs_file.is_file():
-            with open(self.cs_file) as f:
-                self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
-                for _, data in self.codestreams.items():
-                    self.codestreams_list.append(Codestream.from_data(data))
-
         self.conf = OrderedDict(
             {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data":
              str(data_dir), }
@@ -78,6 +71,13 @@ class Config:
         self.data = Path(self.conf.get("data", "non-existent"))
         if not self.data.exists():
             self.data = self.get_user_path('data_dir')
+
+        self.cs_file = Path(self.lp_path, "codestreams.json")
+        if self.cs_file.is_file():
+            with open(self.cs_file) as f:
+                self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
+                for _, data in self.codestreams.items():
+                    self.codestreams_list.append(Codestream.from_data(self.data, data))
 
         # will contain the symbols from the to be livepatched object
         # cached by the codestream : object
@@ -233,7 +233,7 @@ class Config:
             if arch not in cs.archs:
                 continue
 
-            kconf = self.get_boot_file(cs, "config", arch)
+            kconf = cs.get_boot_file("config", arch)
             with open(kconf) as f:
                 match = re.search(rf"{conf}=([ym])", f.read())
                 if not match:
@@ -256,10 +256,7 @@ class Config:
     def missing_codestream(self, cs):
         # Check if the config exists for the current ARCH since we extract code
         # for all of them when a codestream is missing.
-        return not Path(self.get_odir(cs, ARCH), ".config").exists()
-
-    def get_boot_file(self, cs, file, arch=ARCH):
-        return Path(self.get_data_dir(arch), "boot", f"{file}-{cs.kname()}")
+        return not Path(self.get_odir(cs), ".config").exists()
 
     def get_data_dir(self, arch):
         # For the SLE usage, it should point to the place where the codestreams
@@ -320,7 +317,7 @@ class Config:
     # that were externalized, so we need to find the path to the module as well.
     def get_module_obj(self, arch, cs, module):
         if not self.is_mod(module):
-            return self.get_boot_file(cs, "vmlinux", arch)
+            return cs.get_boot_file("vmlinux", arch)
 
         obj = cs.modules.get(module, "")
         if not obj:

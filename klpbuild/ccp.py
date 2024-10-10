@@ -161,7 +161,7 @@ class CCP(Config):
         env = self.env.copy()
 
         env["KCP_KLP_CONVERT_EXTS"] = "1" if needs_ibt else "0"
-        env["KCP_MOD_SYMVERS"] = str(self.get_boot_file(cs, "symvers"))
+        env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
         env["KCP_KBUILD_ODIR"] = str(odir)
         env["KCP_PATCHED_OBJ"] = self.get_module_obj(ARCH, cs, fdata["module"])
         env["KCP_KBUILD_SDIR"] = str(sdir)

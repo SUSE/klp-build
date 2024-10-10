@@ -32,7 +32,8 @@ def test_templ_with_externalized_vars():
     # For this file and symbol, there is one symbol to be looked up, so
     # klp_funcs should be present
     assert "klp_funcs" in content
-'''
+
+
 def test_templ_without_externalized_vars():
     lp = "bsc9999999"
     cs = "15.5u19"
@@ -57,6 +58,7 @@ def test_templ_without_externalized_vars():
     # As the config only targets x86_64, IS_ENABLED should be set
     assert "#if IS_ENABLED" in content
 
+
 # For multifile patches, a third file will be generated and called
 # livepatch_XXX, and alongside this file the other files will have the prefix
 # bscXXXXXXX.
@@ -65,7 +67,7 @@ def test_check_header_file_included():
     cs = "15.5u17"
 
     Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None, cs_arg="",
-          file_funcs=[["fs/exec.c", "begin_new_exec"], ["kernel/events/core.c", "perf_event_exec"]],
+          file_funcs=[["net/ipv6/rpl.c", "ipv6_rpl_srh_size"], ["kernel/events/core.c", "perf_event_exec"]],
           mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
           conf="CONFIG_IPV6",
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
@@ -78,5 +80,4 @@ def test_check_header_file_included():
 
     # Check the other two files
     assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_kernel_events_core.c")
-    assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_fs_exec.c")
-'''
+    assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_net_ipv6_rpl.c")
