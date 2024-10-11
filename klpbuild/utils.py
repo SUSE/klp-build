@@ -64,3 +64,7 @@ def classify_codestreams(cs_list):
             ret_list.append(f"{cs}u{sim[0]}-{last_item}")
 
     return ret_list
+
+
+def is_mod(mod):
+    return mod != "vmlinux"

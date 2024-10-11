@@ -8,7 +8,7 @@ from pathlib import Path
 import shutil
 
 from klpbuild.config import Config
-from klpbuild.utils import ARCH
+from klpbuild.utils import ARCH, is_mod
 
 
 class CCP(Config):
@@ -91,7 +91,7 @@ class CCP(Config):
                         continue
 
                     _, sym, var, mod = l.split(" ")
-                    if not self.is_mod(mod):
+                    if not is_mod(mod):
                         mod = "vmlinux"
 
                     exts.append((sym, var, mod))

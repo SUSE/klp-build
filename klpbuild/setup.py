@@ -156,7 +156,7 @@ class Setup(Config):
 
                 mod = fdata["module"]
                 if not cs.modules.get(mod, ""):
-                    if self.is_mod(mod):
+                    if utils.is_mod(mod):
                         mod_path = str(self.find_module_obj(utils.ARCH, cs, mod,
                                                             check_support=True))
                     else:

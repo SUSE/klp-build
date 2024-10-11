@@ -142,6 +142,12 @@ class Codestream:
         return f"{buf}_Update_{self.update}"
 
 
+    # 15.4 onwards we don't have module_mutex, so template generates
+    # different code
+    def is_mod_mutex(self):
+        return self.sle < 15 or (self.sle == 15 and self.sp < 4)
+
+
     def data(self):
         return {
                 "sle" : self.sle,

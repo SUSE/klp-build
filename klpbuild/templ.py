@@ -11,8 +11,7 @@ from mako.lookup import TemplateLookup
 from mako.template import Template
 
 from klpbuild.config import Config
-from klpbuild.utils import ARCH
-from klpbuild.utils import ARCHS
+from klpbuild.utils import ARCH, ARCHS, is_mod
 
 TEMPL_H = """\
 #ifndef _${ fname.upper() }_H
@@ -496,11 +495,6 @@ class TemplateGen(Config):
     def get_work_dirname(self, fname):
         return f'work_{str(fname).replace("/", "_")}'
 
-    # 15.4 onwards we don't have module_mutex, so template generates
-    # different code
-    def is_mod_mutex(self, cs):
-        return cs.sle < 15 or (cs.sle == 15 and cs.sp < 4)
-
     def __GenerateHeaderFile(self, lp_path, cs):
         out_name = f"livepatch_{self.lp_name}.h"
 
@@ -559,7 +553,7 @@ class TemplateGen(Config):
             lp_file = self.lp_out_file(src_file)
             fdata = cs.files[str(src_file)]
             mod = self.fix_mod_string(fdata["module"])
-            if not self.is_mod(mod):
+            if not is_mod(mod):
                 mod = ""
             fconf = fdata["conf"]
             exts = fdata["ext_symbols"]
@@ -593,7 +587,7 @@ class TemplateGen(Config):
             "email": self.email,
             "config": fconf,
             "mod": mod,
-            "mod_mutex": self.is_mod_mutex(cs),
+            "mod_mutex": cs.is_mod_mutex(),
             "check_enabled": self.check_enabled,
             "ext_vars": exts,
             "inc_src_file": lp_file,

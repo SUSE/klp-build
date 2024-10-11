@@ -15,9 +15,8 @@ from collections import OrderedDict
 from pathlib import Path
 from pathlib import PurePath
 
-from klpbuild.utils import ARCH
 from klpbuild.codestream import Codestream
-from klpbuild.utils import classify_codestreams
+from klpbuild.utils import ARCH, classify_codestreams, is_mod
 
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
@@ -176,7 +175,7 @@ class Config:
             raise RuntimeError(f"Configuration mismtach between codestreams. Aborting.")
 
     def get_mod_path(self, cs, arch, mod=""):
-        if not mod or self.is_mod(mod):
+        if not mod or is_mod(mod):
             return Path(cs.get_data_dir(arch), "lib", "modules", f"{cs.kname()}")
         return cs.get_data_dir(arch)
 
@@ -208,13 +207,10 @@ class Config:
             f.write(json.dumps(self.codestreams, indent=4))
 
 
-    def is_mod(self, mod):
-        return mod != "vmlinux"
-
     # This function can be called to get the path to a module that has symbols
     # that were externalized, so we need to find the path to the module as well.
     def get_module_obj(self, arch, cs, module):
-        if not self.is_mod(module):
+        if not is_mod(module):
             return cs.get_boot_file("vmlinux", arch)
 
         obj = cs.modules.get(module, "")
