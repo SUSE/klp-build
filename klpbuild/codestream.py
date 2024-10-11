@@ -68,6 +68,20 @@ class Codestream:
         return Path(self.data_path, arch)
 
 
+    def get_sdir(self, arch=ARCH):
+        # Only -rt codestreams have a suffix for source directory
+        ktype = self.ktype.replace("-default", "")
+        return Path(self.get_data_dir(arch), "usr", "src", f"linux-{self.kernel}{ktype}")
+
+
+    def get_odir(self):
+        return Path(f"{self.get_sdir(ARCH)}-obj", ARCH, self.ktype.replace("-", ""))
+
+
+    def get_ipa_file(self, fname):
+        return Path(self.get_odir(), f"{fname}.000i.ipa-clones")
+
+
     def get_boot_file(self, file, arch=ARCH):
         assert file in ["vmlinux", "config", "symvers"]
         return Path(self.get_data_dir(arch), "boot", f"{file}-{self.kname()}")

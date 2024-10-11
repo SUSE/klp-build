@@ -31,7 +31,7 @@ class Extractor(Config):
     def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, ignore_errors, workers=4):
         super().__init__(lp_name, lp_filter)
 
-        self.sdir_lock = FileLock(Path(self.get_data_dir(utils.ARCH), "sdir.lock"))
+        self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
         self.sdir_lock.acquire()
 
         if not self.lp_path.exists():
@@ -177,8 +177,84 @@ class Extractor(Config):
 
         return None
 
+
+    def get_patches_dir(self):
+        return Path(self.lp_path, "fixes")
+
+    def remove_patches(self, cs, fil):
+        sdir = cs.get_sdir()
+        # Check if there were patches applied previously
+        patches_dir = Path(sdir, "patches")
+        if not patches_dir.exists():
+            return
+
+        fil.write(f"\nRemoving patches from {cs.name()}({cs.kernel})\n")
+        fil.flush()
+        err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=fil, stdout=fil)
+
+        if err.returncode not in [0, 2]:
+            raise RuntimeError(f"{cs.name()}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
+
+        shutil.rmtree(patches_dir, ignore_errors=True)
+        shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
+
+    def apply_all_patches(self, cs, fil):
+        dirs = []
+
+        if cs.rt:
+            dirs.extend([f"{cs.sle}.{cs.sp}rtu{cs.update}", f"{cs.sle}.{cs.sp}rt"])
+
+        dirs.extend([f"{cs.sle}.{cs.sp}u{cs.update}", f"{cs.sle}.{cs.sp}"])
+
+        if cs.sle == 15 and cs.sp < 4:
+            dirs.append("cve-5.3")
+        elif cs.sle == 15 and cs.sp <= 5:
+            dirs.append("cve-5.14")
+
+        patch_dirs = []
+
+        for d in dirs:
+            patch_dirs.append(Path(self.get_patches_dir(), d))
+
+        patched = False
+        sdir = cs.get_sdir()
+        for pdir in patch_dirs:
+            if not pdir.exists():
+                fil.write(f"\nPatches dir {pdir} doesnt exists\n")
+                continue
+
+            fil.write(f"\nApplying patches on {cs.name()}({cs.kernel}) from {pdir}\n")
+            fil.flush()
+
+            for patch in sorted(pdir.iterdir(), reverse=True):
+                if not str(patch).endswith(".patch"):
+                    continue
+
+                err = subprocess.run(["quilt", "import", str(patch)], cwd=sdir, stderr=fil, stdout=fil)
+                if err.returncode != 0:
+                    fil.write("\nFailed to import patches, remove applied and try again\n")
+                    self.remove_patches(cs, fil)
+
+            err = subprocess.run(["quilt", "push", "-a"], cwd=sdir, stderr=fil, stdout=fil)
+
+            if err.returncode != 0:
+                fil.write("\nFailed to apply patches, remove applied and try again\n")
+                self.remove_patches(cs, fil)
+
+                continue
+
+            patched = True
+            fil.flush()
+            # Stop the loop in the first dir that we find patches.
+            break
+
+        if not patched:
+            raise RuntimeError(f"{cs.name()}({cs.kernel}): Failed to apply patches. Aborting")
+
+
+
     def get_cmd_from_json(self, cs, fname):
-        cc_file = Path(self.get_odir(cs), "compile_commands.json")
+        cc_file = Path(cs.get_odir(), "compile_commands.json")
         # FIXME: compile_commands.json that is packaged with SLE/openSUSE
         # doesn't quite work yet, so don't use it yet.
         return None
@@ -197,8 +273,8 @@ class Extractor(Config):
     def process(self, args):
         i, fname, cs, fdata = args
 
-        sdir = self.get_sdir(cs)
-        odir = self.get_odir(cs)
+        sdir = cs.get_sdir()
+        odir = cs.get_odir()
 
         # The header text has two tabs
         cs_info = cs.name().ljust(15, " ")
@@ -375,7 +451,7 @@ class Extractor(Config):
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f"{self.get_data_dir(utils.ARCH)}.+{file}", "", src)
+                src = re.sub(f"{cs.get_data_dir(utils.ARCH)}.+{file}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(rf"\.lineno = \d+,", "", src)

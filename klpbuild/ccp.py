@@ -108,9 +108,6 @@ class CCP(Config):
         return symbols
 
     def cmd_args(self, needs_ibt, cs, fname, funcs, out_dir, fdata, cmd):
-        sdir = self.get_sdir(cs)
-        odir = self.get_odir(cs)
-
         lp_name = self.lp_out_file(fname)
         lp_out = Path(out_dir, lp_name)
         ppath = self.pol_path
@@ -162,10 +159,10 @@ class CCP(Config):
 
         env["KCP_KLP_CONVERT_EXTS"] = "1" if needs_ibt else "0"
         env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
-        env["KCP_KBUILD_ODIR"] = str(odir)
+        env["KCP_KBUILD_ODIR"] = str(cs.get_odir())
         env["KCP_PATCHED_OBJ"] = self.get_module_obj(ARCH, cs, fdata["module"])
-        env["KCP_KBUILD_SDIR"] = str(sdir)
-        env["KCP_IPA_CLONES_DUMP"] = str(self.get_ipa_file(cs, fname))
+        env["KCP_KBUILD_SDIR"] = str(cs.get_sdir())
+        env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
         env["KCP_WORK_DIR"] = str(out_dir)
 
         return ccp_args, env

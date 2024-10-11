@@ -9,16 +9,11 @@ import gzip
 import io
 import json
 import logging
-import platform
 import os
 import re
-import shutil
-import subprocess
 from collections import OrderedDict
 from pathlib import Path
 from pathlib import PurePath
-
-from natsort import natsorted
 
 from klpbuild.utils import ARCH
 from klpbuild.codestream import Codestream
@@ -137,79 +132,6 @@ class Config:
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f"{self.lp_name}_{fpath}"
 
-    def get_patches_dir(self):
-        return Path(self.lp_path, "fixes")
-
-    def remove_patches(self, cs, fil):
-        sdir = self.get_sdir(cs)
-        # Check if there were patches applied previously
-        patches_dir = Path(sdir, "patches")
-        if not patches_dir.exists():
-            return
-
-        fil.write(f"\nRemoving patches from {cs.name()}({cs.kernel})\n")
-        fil.flush()
-        err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=fil, stdout=fil)
-
-        if err.returncode not in [0, 2]:
-            raise RuntimeError(f"{cs.name()}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
-
-        shutil.rmtree(patches_dir, ignore_errors=True)
-        shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
-
-    def apply_all_patches(self, cs, fil):
-        dirs = []
-
-        if cs.rt:
-            dirs.extend([f"{cs.sle}.{cs.sp}rtu{cs.update}", f"{cle.sle}.{cs.sp}rt"])
-
-        dirs.extend([f"{cs.sle}.{cs.sp}u{cs.update}", f"{cs.sle}.{cs.sp}"])
-
-        if cs.sle == 15 and cs.sp < 4:
-            dirs.append("cve-5.3")
-        elif cs.sle == 15 and cs.sp <= 5:
-            dirs.append("cve-5.14")
-
-        patch_dirs = []
-
-        for d in dirs:
-            patch_dirs.append(Path(self.get_patches_dir(), d))
-
-        patched = False
-        sdir = self.get_sdir(cs)
-        for pdir in patch_dirs:
-            if not pdir.exists():
-                fil.write(f"\nPatches dir {pdir} doesnt exists\n")
-                continue
-
-            fil.write(f"\nApplying patches on {cs.name()}({cs.kernel}) from {pdir}\n")
-            fil.flush()
-
-            for patch in sorted(pdir.iterdir(), reverse=True):
-                if not str(patch).endswith(".patch"):
-                    continue
-
-                err = subprocess.run(["quilt", "import", str(patch)], cwd=sdir, stderr=fil, stdout=fil)
-                if err.returncode != 0:
-                    fil.write("\nFailed to import patches, remove applied and try again\n")
-                    self.remove_patches(cs, fil)
-
-            err = subprocess.run(["quilt", "push", "-a"], cwd=sdir, stderr=fil, stdout=fil)
-
-            if err.returncode != 0:
-                fil.write("\nFailed to apply patches, remove applied and try again\n")
-                self.remove_patches(cs, fil)
-
-                continue
-
-            patched = True
-            fil.flush()
-            # Stop the loop in the first dir that we find patches.
-            break
-
-        if not patched:
-            raise RuntimeError(f"{cs.name()}({cs.kernel}): Failed to apply patches. Aborting")
-
     def get_cs_dir(self, cs, app):
         return Path(self.lp_path, app, cs.name())
 
@@ -253,34 +175,10 @@ class Config:
             print(configs["m"])
             raise RuntimeError(f"Configuration mismtach between codestreams. Aborting.")
 
-    def missing_codestream(self, cs):
-        # Check if the config exists for the current ARCH since we extract code
-        # for all of them when a codestream is missing.
-        return not Path(self.get_odir(cs), ".config").exists()
-
-    def get_data_dir(self, arch):
-        # For the SLE usage, it should point to the place where the codestreams
-        # are downloaded
-        return Path(self.data, arch)
-
-    def get_sdir(self, cs, arch=""):
-        if not arch:
-            arch = ARCH
-
-        # Only -rt codestreams have a suffix for source directory
-        ktype = cs.ktype.replace("-default", "")
-        return Path(self.get_data_dir(arch), "usr", "src", f"linux-{cs.kernel}{ktype}")
-
-    def get_odir(self, cs, arch=""):
-        return Path(f"{self.get_sdir(cs, arch)}-obj", ARCH, cs.ktype.replace("-", ""))
-
-    def get_ipa_file(self, cs, fname):
-        return Path(self.get_odir(cs), f"{fname}.000i.ipa-clones")
-
     def get_mod_path(self, cs, arch, mod=""):
         if not mod or self.is_mod(mod):
-            return Path(self.get_data_dir(arch), "lib", "modules", f"{cs.kname()}")
-        return self.get_data_dir(arch)
+            return Path(cs.get_data_dir(arch), "lib", "modules", f"{cs.kname()}")
+        return cs.get_data_dir(arch)
 
     def get_tests_path(self):
         self.kgraft_tests_path = self.get_user_path('kgr_patches_tests_dir')

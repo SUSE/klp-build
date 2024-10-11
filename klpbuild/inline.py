@@ -40,7 +40,7 @@ class Inliner(Config):
         ce_args.extend(["-debuginfo", str(self.get_module_obj(ARCH, cs, mod))])
 
         # clang-extract works without ipa-clones, so don't hard require it
-        ipa_f = self.get_ipa_file(cs, fname)
+        ipa_f = cs.get_ipa_file(fname)
         if ipa_f.exists():
             ce_args.extend(["-ipa-files", str(ipa_f)])
 

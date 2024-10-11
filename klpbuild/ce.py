@@ -76,7 +76,7 @@ class CE(Config):
             ce_args.extend(["-D__USE_IBT__"])
 
         # clang-extract works without ipa-clones, so don't hard require it
-        ipa_f = self.get_ipa_file(cs, fname)
+        ipa_f = cs.get_ipa_file(fname)
         if ipa_f.exists():
             ce_args.extend([f"-DCE_IPACLONES_PATH={ipa_f}"])
 

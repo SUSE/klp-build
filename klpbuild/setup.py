@@ -138,11 +138,11 @@ class Setup(Config):
 
                 self.validate_config(cs, fdata["conf"], fdata["module"])
 
-                sdir = self.get_sdir(cs)
+                sdir = cs.get_sdir()
                 if not Path(sdir, f).is_file():
                     raise RuntimeError(f"{cs.name()} ({kernel}): File {f} not found on {str(sdir)}")
 
-                ipa_f = self.get_ipa_file(cs, f)
+                ipa_f = cs.get_ipa_file(f)
                 if not ipa_f.is_file():
                     msg = f"{cs.name()} ({kernel}): File {ipa_f} not found. Creating an empty file."
                     ipa_f.touch()

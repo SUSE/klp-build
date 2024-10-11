@@ -107,7 +107,7 @@ class IBS(Config):
         if arch != "x86_64" and "-extra" in rpm:
             return
 
-        path_dest = self.get_data_dir(arch)
+        path_dest = cs.get_data_dir(arch)
         path_dest.mkdir(exist_ok=True, parents=True)
 
         rpm_file = Path(dest, rpm)
@@ -186,7 +186,7 @@ class IBS(Config):
         for cs in cs_list:
             for arch in cs.archs:
                 # Extract modules and vmlinux files that are compressed
-                mod_path = Path(self.get_data_dir(arch), "lib", "modules", cs.kname())
+                mod_path = Path(cs.get_data_dir(arch), "lib", "modules", cs.kname())
                 for fext, ecmd in [("zst", "unzstd -f -d"), ("xz", "xz --quiet -d -k")]:
                     cmd = rf'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
@@ -194,18 +194,18 @@ class IBS(Config):
                 # Extract gzipped files per arch
                 files = ["vmlinux", "symvers"]
                 for f in files:
-                    f_path = Path(self.get_data_dir(arch), "boot", f"{f}-{cs.kname()}.gz")
+                    f_path = Path(cs.get_data_dir(arch), "boot", f"{f}-{cs.kname()}.gz")
                     # ppc64le doesn't gzips vmlinux
                     if f_path.exists():
                         subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
 
             # Use the SLE .config
-            shutil.copy(cs.get_boot_file("config"), Path(self.get_odir(cs), ".config"))
+            shutil.copy(cs.get_boot_file("config"), Path(cs.get_odir(), ".config"))
 
             # Recreate the build link to enable us to test the generated LP
             mod_path = Path(self.get_mod_path(cs, ARCH), "build")
             mod_path.unlink()
-            os.symlink(self.get_odir(cs), mod_path)
+            os.symlink(cs.get_odir(), mod_path)
 
         # Create symlink from lib to usr/lib so we can use virtme on the
         # extracted kernels
