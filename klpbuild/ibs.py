@@ -25,8 +25,7 @@ from osctiny import Osc
 
 from klpbuild.config import Config
 from klpbuild.ksrc import GitHelper
-from klpbuild.utils import ARCH
-from klpbuild.utils import ARCHS
+from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry
 
 
 class IBS(Config):
@@ -203,7 +202,7 @@ class IBS(Config):
             shutil.copy(cs.get_boot_file("config"), Path(cs.get_odir(), ".config"))
 
             # Recreate the build link to enable us to test the generated LP
-            mod_path = Path(self.get_mod_path(cs, ARCH), "build")
+            mod_path = cs.get_kernel_build_path(ARCH)
             mod_path.unlink()
             os.symlink(cs.get_odir(), mod_path)
 
@@ -232,10 +231,10 @@ class IBS(Config):
 
     def find_missing_symbols(self, cs, arch, lp_mod_path):
         vmlinux_path = cs.get_boot_file("vmlinux", arch)
-        vmlinux_syms = self.get_all_symbols_from_object(vmlinux_path, True)
+        vmlinux_syms = get_all_symbols_from_object(vmlinux_path, True)
 
         # Get list of UNDEFINED symbols from the livepatch module
-        lp_und_symbols = self.get_all_symbols_from_object(lp_mod_path, False)
+        lp_und_symbols = get_all_symbols_from_object(lp_mod_path, False)
 
         missing_syms = []
         # Find all UNDEFINED symbols that exists in the livepatch module that
@@ -268,8 +267,8 @@ class IBS(Config):
         # At this point we found that our livepatch module depends on
         # exported functions from other modules. List the modules here.
         lp_mod_path = Path(rpm_dir, "lib", "modules", f"{cs.kernel}-{ktype}", dir_path, lp_file)
-        elffile = self.get_elf_object(lp_mod_path)
-        deps = self.get_elf_modinfo_entry(elffile, "depends")
+        elffile = get_elf_object(lp_mod_path)
+        deps = get_elf_modinfo_entry(elffile, "depends")
         if len(deps):
             logging.warning(f"{cs.name()}:{arch} has dependencies: {deps}.")
 

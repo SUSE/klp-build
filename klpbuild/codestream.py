@@ -148,6 +148,16 @@ class Codestream:
         return self.sle < 15 or (self.sle == 15 and self.sp < 4)
 
 
+    def get_mod_path(self, arch):
+        return Path(self.get_data_dir(arch), "lib", "modules", f"{self.kname()}")
+
+
+    # Returns the path to the kernel-obj's build dir, used when build testing
+    # the generated module
+    def get_kernel_build_path(self, arch):
+        return Path(self.get_mod_path(arch), "build")
+
+
     def data(self):
         return {
                 "sle" : self.sle,

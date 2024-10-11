@@ -637,10 +637,7 @@ class TemplateGen(Config):
             work_dir = self.get_cs_lp_dir(cs)
             obj = f"livepatch_{self.lp_name}.o"
 
-        modpath = self.get_mod_path(cs, ARCH)
-        modpath = Path(modpath, "build")
-
-        render_vars = {"kdir": modpath, "pwd": work_dir, "obj": obj}
+        render_vars = {"kdir": cs.get_kernel_build_path(ARCH), "pwd": work_dir, "obj": obj}
 
         with open(Path(work_dir, "Makefile"), "w") as f:
             f.write(Template(TEMPL_MAKEFILE).render(**render_vars))

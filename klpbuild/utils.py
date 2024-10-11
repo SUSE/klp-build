@@ -3,7 +3,17 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import gzip
+import io
 import platform
+
+from elftools.common.utils import bytes2str
+from elftools.elf.elffile import ELFFile
+from elftools.elf.sections import SymbolTableSection
+
+import lzma
+import zstandard
+
 
 ARCH = platform.processor()
 ARCHS = ["ppc64le", "s390x", "x86_64"]
@@ -68,3 +78,58 @@ def classify_codestreams(cs_list):
 
 def is_mod(mod):
     return mod != "vmlinux"
+
+
+def get_elf_modinfo_entry(elffile, conf):
+    sec = elffile.get_section_by_name(".modinfo")
+    if not sec:
+        return None
+
+    # Iterate over all info on modinfo section
+    for line in bytes2str(sec.data()).split("\0"):
+        if line.startswith(conf):
+            key, val = line.split("=")
+            return val.strip()
+
+    return ""
+
+
+def get_elf_object(obj):
+    with open(obj, "rb") as f:
+        data = f.read()
+
+    # FIXME: use magic lib instead of checking the file extension
+    if str(obj).endswith(".gz"):
+        io_bytes = io.BytesIO(gzip.decompress(data))
+    elif str(obj).endswith(".zst"):
+        dctx = zstandard.ZstdDecompressor()
+        io_bytes = io.BytesIO(dctx.decompress(data))
+    elif str(obj).endswith(".xz"):
+        io_bytes = io.BytesIO(lzma.decompress(data))
+    else:
+        io_bytes = io.BytesIO(data)
+
+    return ELFFile(io_bytes)
+
+
+# Load the ELF object and return all symbols
+def get_all_symbols_from_object(obj, defined):
+    syms = []
+
+    for sec in get_elf_object(obj).iter_sections():
+        if not isinstance(sec, SymbolTableSection):
+            continue
+
+        if sec['sh_entsize'] == 0:
+            continue
+
+        for symbol in sec.iter_symbols():
+            # Somehow we end up receiving an empty symbol
+            if not symbol.name:
+                continue
+            if str(symbol["st_shndx"]) == "SHN_UNDEF" and not defined:
+                syms.append(symbol.name)
+            elif str(symbol["st_shndx"]) != "SHN_UNDEF" and defined:
+                syms.append(symbol.name)
+
+    return syms

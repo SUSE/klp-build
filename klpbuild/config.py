@@ -5,25 +5,17 @@
 
 import configparser
 import copy
-import gzip
-import io
 import json
 import logging
 import os
 import re
 from collections import OrderedDict
-from pathlib import Path
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 from klpbuild.codestream import Codestream
 from klpbuild.utils import ARCH, classify_codestreams, is_mod
+from klpbuild.utils import get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry
 
-from elftools.common.utils import bytes2str
-from elftools.elf.elffile import ELFFile
-from elftools.elf.sections import SymbolTableSection
-
-import lzma
-import zstandard
 
 class Config:
     def __init__(self, lp_name, lp_filter, data_dir=None, skips="", working_cs={}):
@@ -174,11 +166,6 @@ class Config:
             print(configs["m"])
             raise RuntimeError(f"Configuration mismtach between codestreams. Aborting.")
 
-    def get_mod_path(self, cs, arch, mod=""):
-        if not mod or is_mod(mod):
-            return Path(cs.get_data_dir(arch), "lib", "modules", f"{cs.kname()}")
-        return cs.get_data_dir(arch)
-
     def get_tests_path(self):
         self.kgraft_tests_path = self.get_user_path('kgr_patches_tests_dir')
 
@@ -217,7 +204,7 @@ class Config:
         if not obj:
             obj = self.find_module_obj(arch, cs, module)
 
-        return Path(self.get_mod_path(cs, arch, module), obj)
+        return Path(cs.get_mod_path(arch), obj)
 
     # Return only the name of the module to be livepatched
     def find_module_obj(self, arch, cs, mod, check_support=False):
@@ -226,7 +213,7 @@ class Config:
         # Module name use underscores, but the final module object uses hyphens.
         mod = mod.replace("_", "[-_]")
 
-        mod_path = self.get_mod_path(cs, arch, mod)
+        mod_path = cs.get_mod_path(arch)
         with open(Path(mod_path, "modules.order")) as f:
             obj_match = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
             if not obj_match:
@@ -242,8 +229,8 @@ class Config:
 
         if check_support:
             # Validate if the module being livepatches is supported or not
-            elffile = self.get_elf_object(Path(mod_path, obj))
-            if "no" == self.get_elf_modinfo_entry(elffile, "supported"):
+            elffile = get_elf_object(Path(mod_path, obj))
+            if "no" == get_elf_modinfo_entry(elffile, "supported"):
                 print(f"WARN: {cs.name()}-{arch} ({cs.kernel}): Module {mod} is not supported by SLE")
 
         return obj
@@ -279,59 +266,6 @@ class Config:
 
         return result
 
-    def get_elf_modinfo_entry(self, elffile, conf):
-        sec = elffile.get_section_by_name(".modinfo")
-        if not sec:
-            return None
-
-        # Iterate over all info on modinfo section
-        for line in bytes2str(sec.data()).split("\0"):
-            if line.startswith(conf):
-                key, val = line.split("=")
-                return val.strip()
-
-        return ""
-
-    def get_elf_object(self, obj):
-        with open(obj, "rb") as f:
-            data = f.read()
-
-        # FIXME: use magic lib instead of checking the file extension
-        if str(obj).endswith(".gz"):
-            io_bytes = io.BytesIO(gzip.decompress(data))
-        elif str(obj).endswith(".zst"):
-            dctx = zstandard.ZstdDecompressor()
-            io_bytes = io.BytesIO(dctx.decompress(data))
-        elif str(obj).endswith(".xz"):
-            io_bytes = io.BytesIO(lzma.decompress(data))
-        else:
-            io_bytes = io.BytesIO(data)
-
-        return ELFFile(io_bytes)
-
-    # Load the ELF object and return all symbols
-    def get_all_symbols_from_object(self, obj, defined):
-        syms = []
-
-        elffile = self.get_elf_object(obj)
-        for sec in elffile.iter_sections():
-            if not isinstance(sec, SymbolTableSection):
-                continue
-
-            if sec['sh_entsize'] == 0:
-                continue
-
-            for symbol in sec.iter_symbols():
-                # Somehow we end up receiving an empty symbol
-                if not symbol.name:
-                    continue
-                if str(symbol["st_shndx"]) == "SHN_UNDEF" and not defined:
-                    syms.append(symbol.name)
-                elif str(symbol["st_shndx"]) != "SHN_UNDEF" and defined:
-                    syms.append(symbol.name)
-
-        return syms
-
     # Cache the symbols using the object path. It differs for each
     # codestream and architecture
     # Return all the symbols not found per arch/obj
@@ -343,7 +277,7 @@ class Config:
 
         if not self.obj_symbols[arch][name].get(mod, ""):
             obj = self.get_module_obj(arch, cs, mod)
-            self.obj_symbols[arch][name][mod] = self.get_all_symbols_from_object(obj, True)
+            self.obj_symbols[arch][name][mod] = get_all_symbols_from_object(obj, True)
 
         ret = []
 
