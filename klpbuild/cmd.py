@@ -5,6 +5,7 @@
 
 import argparse
 
+from klpbuild.codestream import Codestream
 from klpbuild.extractor import Extractor
 from klpbuild.ibs import IBS
 from klpbuild.inline import Inliner
@@ -226,7 +227,7 @@ def main_func(main_args):
         IBS(args.name, args.filter).push(args.wait)
 
     elif args.cmd == "log":
-        IBS(args.name, args.filter).log(args.cs, args.arch)
+        IBS(args.name, args.filter).log(Codestream.from_cs("", args.cs), args.arch)
 
     elif args.cmd == "cleanup":
         IBS(args.name, args.filter).cleanup()
