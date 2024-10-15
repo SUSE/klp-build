@@ -9,11 +9,11 @@
 klp-build \- the kernel livepatching creation tool
 .SH SYNOPSIS
 .B klp-build
-<command> [-h] [-n NAME] [--filter FILTER] [--experimental]
+<command> [-h] [-n NAME] [--filter FILTER]
 .SH DESCRIPTION
 .B klp-build
 is a tool meant for automating the whole process of creating and testing
-livepatches for the Linux kernel.
+livepatches for the Linux kernel (SLE edition).
 To reduce the burden of livepatch developement,
 .B klp-build
 is also capable of checking which codestreams are vulnerable, batching multiple
@@ -29,11 +29,8 @@ The livepatch name. This will be the directory name of the resulting
 livepatches.
 .TP
 .BI --filter " FILTER"
-SLE specific. List of accepted codestreams. Must be specified in regex format.
+List of accepted codestreams. Must be specified in regex format.
 Example: "15\.3u[0-9]+|15\.6u0"
-.TP
-.B --experimental
-Enables functions that may not work as expected yet.
 .SH COMMANDS
 .TP
 .B setup
@@ -45,20 +42,20 @@ data is generated and stored for future use.
 .RS 7
 .TP
 .BI --cve " CVE"
-SLE specific. The CVE assigned to this livepatch.
+The CVE assigned to this livepatch.
 .TP
 .BI --conf " CONF"
 The kernel CONFIG used to build the object to be livepatched.
 .TP
 .B --no-check
-SLE specific. Do not check for already patched codestreams, do the setup for
+Do not check for already patched codestreams, do the setup for
 all non filtered codestreams.
 .TP
 .BI --data-dir " DATA_DIR"
 The path where source files and modules will be found.
 .TP
 .BI --codestreams " CODESTREAMS"
-SLE specific. Codestreams affected by the CVE. Can be used as a regex, like,
+Codestreams affected by the CVE. Can be used as a regex, like,
 "15.u[34]".
 .TP
 .BI --file-funcs " [FILE_FUNCS ...]"
@@ -84,17 +81,17 @@ The module that will be livepatched for all files. If empty,
 will be livepatched instead.
 .TP
 .BI --archs " {ppc64le,s390x,x86_64} [{ppc64le,s390x,x86_64} ...]"
-SLE specific. Supported architectures for this livepatch.
+Supported architectures for this livepatch.
 .TP
 .BI --skips " SKIPS"
-SLE specific. List of excluded codestreams. Must be specified in regex format.
+List of excluded codestreams. Must be specified in regex format.
 Example: "15\.3u[0-9]+|15\.6u0"
 .RE
 .B check-inline
 .RS 7
 .TP
 .BI --codestreams " CODESTREAMS"
-SLE specific. Codestream to check the inlined symbol.
+Codestream to check the inlined symbol.
 .TP
 .BI --file " FILE"
 File to be checked.
@@ -149,7 +146,7 @@ or other code that is usually problematic.
 .RS 7
 .TP
 .BI --codestreams " CODESTREAMS CODESTREAMS"
-SLE specific. Apply diff on two different codestreams.
+Apply diff on two different codestreams.
 .TP
 .BI --type " {ccp,ce}"
 Choose between
@@ -159,7 +156,7 @@ and
 .RE
 .TP
 .B format-patches
-SLE specific. Extract patches from kgraft-patches (see the
+Extract patches from kgraft-patches (see the
 .BR "SEE ALSO" " section)."
 .RS 7
 .TP
@@ -172,18 +169,18 @@ Find and list the kernel versions with a backported fix to the indicated CVE.
 .RS 7
 .TP
 .BI --cve " CVE"
-SLE specific. CVE number to search for related backported patches.
+CVE number to search for related backported patches.
 .RE
 .TP
 .B cleanup
-SLE specific. Remove livepatch packages from SUSE's Build Service.
+Remove livepatch packages from SUSE's Build Service.
 .TP
 .B prepare-tests
 Generates a tar archive per supported architecture containing
 scripts and files that can later be used to run tests in the desired test benchs.
 .TP
 .B push
-SLE specific. Push the generated livetpatch packages to SUSE's Build Service.
+Push the generated livetpatch packages to SUSE's Build Service.
 By doing so,
 .B klp-build
 can automate the building phase for each codestream and architecture.
@@ -194,7 +191,7 @@ Wait until all codestreams builds are finished.
 .RE
 .TP
 .B status
-SLE specific. Check the status of the livepatch building phase initiated by the
+Check the status of the livepatch building phase initiated by the
 .B push
 command.
 .RS 7
@@ -204,7 +201,7 @@ Wait until all codestreams builds are finished.
 .RE
 .TP
 .B log
-SLE specific. Get build logs from SUSE'S Build Service.
+Get build logs from SUSE'S Build Service.
 .RS 7
 .TP
 .BI --cs " CS"

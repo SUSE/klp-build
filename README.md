@@ -16,6 +16,8 @@ To run tests use:
 
 `tox -e tests`
 
+# Creating a livepatch for multiple SUSE Linux Enterprise codestreams
+
 ## Configuration
 klp-build supports a per-user configuration file located in
 __~/.config/klp-build/config__, following the standard ``key=value`` format.
@@ -31,63 +33,6 @@ Path to directory where the dowloaded kernels source code will be placed. To cre
 livepatch for upstream kernel, it has to point to a kernel tree with the
 sources already built. By default set to: __~/klp/data__.
 Option ``--data-dir``, if set, will overwrite the path specified here.
-
-# Creating a livepatch for upstream kernels - Not production ready yet
-
-The current approach to create for upstream kernels needs a directory with the
-source code, and the compiled sources in the same location.
-
-
-## Setup
-
-```sh
-klp-build setup --data-dir /home/mpdesouza/git/linux \
-                --name sound_lp \
-                --mod snd-pcm \
-                --conf CONFIG_SND_PCM \
-                --file-funcs sound/core/pcm.c snd_pcm_attach_substream
-```
-
-This command creates a new directory ~/klp/livepatches/sound_lp. The setup phase
-checks if the configuration entry is set, and if the symbol being extracted is
-present in the module.
-
-Explaining some arguments:
---mod: The module to be livepatched. If empty, vmlinux will be livepatched
-       instead.
---file-funcs: Lists the symbols (hence funcs) from each file. These
-              symbols will be extracted into the livepatching.
-
-
-## Extraction
-
-For upstream kernels we only support using [clang-extract](https://github.com/SUSE/clang-extract)
-for code extraction:
-```sh
-klp-build extract --name sound_lp
-```
-
-The contents of the generated file are placed
-on ~/klp/livepatches/sound_lp/ce/__$codestream__/lp.
-
-
-__IMPORTANT__: Do not use it on production. klp-build is still only used to
-create livepatches on SLE kernels using klp-ccp. The tool needs more tests in
-order to rely on this process to create livepatches for upstream kernels. More
-work needs to be done before it happens, like:
-
-* Generate a template to include and generate a compilable livepatch
-* Simplify the setup/extraction in just one pass in order to make it even easier
-  for the livepatch developer.
-* Many other small adjustments
-
-
-# Creating a livepatch for multiple SUSE Linux Enterprise codestreams
-
-
-## Configuration
-
-Along with the variables mentioned earlier, we also need:
 
 #### kernel_src_dir
 Only used for SLE kernels. Should contain the path to the
@@ -106,7 +51,6 @@ klp-build will check if the configuration is enabled, if the symbol is present
 on the module being livepatched. The check will be done in all architectures
 informed as argument. If the argument is not informed, it will return an error
 if configuration is not available on any of them.
-
 
 ## Extraction
 
