@@ -28,7 +28,7 @@ from klpbuild.templ import TemplateGen
 
 
 class Extractor(Config):
-    def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, ignore_errors, workers=4):
+    def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, ignore_errors):
         super().__init__(lp_name, lp_filter)
 
         self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
@@ -37,10 +37,14 @@ class Extractor(Config):
         if not self.lp_path.exists():
             raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
 
-        self.workers = workers
-
         patches = self.get_patches_dir()
         self.apply_patches = apply_patches
+
+        workers = self.get_user_settings('workers', True)
+        if workers == "":
+            self.workers = 4
+        else:
+            self.workers = int(workers)
 
         if self.apply_patches and not patches.exists():
             raise ValueError("--apply-patches specified without patches. Run get-patches!")

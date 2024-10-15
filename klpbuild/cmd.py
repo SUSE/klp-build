@@ -133,8 +133,6 @@ def create_parser() -> argparse.ArgumentParser:
     extract_opts.add_argument(
         "--type", type=str, choices=["ccp", "ce"], default="ccp", help="Choose between ccp and ce"
     )
-    extract_opts.add_argument("--workers", type=int, default=4, help="Number of processes for ccp and ce. Default is 4")
-
     diff_opts = sub.add_parser("cs-diff", parents=[parentparser])
     diff_opts.add_argument(
         "--cs", nargs=2, type=str, required=True, help="SLE specific. Apply diff on two different codestreams"
@@ -202,7 +200,7 @@ def main_func(main_args):
 
     elif args.cmd == "extract":
         Extractor(args.name, args.filter, args.apply_patches, args.type,
-                  args.avoid_ext, args.ignore_errors, args.workers).run()
+                  args.avoid_ext, args.ignore_errors).run()
 
     elif args.cmd == "cs-diff":
         lp_filter = args.cs[0] + "|" + args.cs[1]

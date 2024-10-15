@@ -84,7 +84,7 @@ class Config:
                            '#kernel_src_dir': 'kernel-src/',
                            '#ccp_pol_dir': 'kgr-scripts/ccp-pol/'}
 
-        config['Settings'] = {}
+        config['Settings'] = {'workers': 4}
 
         logging.info(f"Creating default user configuration: '{self.user_conf_file}'")
         os.makedirs(os.path.dirname(self.user_conf_file), exist_ok=True)
