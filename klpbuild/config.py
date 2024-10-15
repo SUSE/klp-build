@@ -84,6 +84,8 @@ class Config:
                            '#kernel_src_dir': 'kernel-src/',
                            '#ccp_pol_dir': 'kgr-scripts/ccp-pol/'}
 
+        config['Settings'] = {}
+
         logging.info(f"Creating default user configuration: '{self.user_conf_file}'")
         os.makedirs(os.path.dirname(self.user_conf_file), exist_ok=True)
         with open(self.user_conf_file, 'w') as f:
@@ -98,8 +100,9 @@ class Config:
         config.read(self.user_conf_file)
 
         # Check mandatory fields
-        if 'Paths' not in config:
-            raise ValueError(f"config: 'Paths' section not found")
+        for s in {'Paths', 'Settings'}:
+            if s not in config:
+                raise ValueError(f"config: '{s}' section not found")
 
         self.user_conf = config
 
@@ -118,6 +121,14 @@ class Config:
                  raise ValueError("{p} should be a file")
 
         return p
+
+    def get_user_settings(self, entry, isopt=False):
+        if entry not in self.user_conf['Settings']:
+            if isopt:
+                return ""
+            raise ValueError(f"config: '{entry}' entry not found")
+
+        return self.user_conf['Settings'][entry]
 
     def lp_out_file(self, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
