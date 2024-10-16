@@ -303,7 +303,7 @@ class IBS(Config):
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs in self.filter_cs().items():
+            for cs in self.filter_cs():
                 if arch not in cs.archs:
                     continue
 
@@ -319,7 +319,7 @@ class IBS(Config):
 
                 for rpm in os.listdir(rpm_dir):
                     # Check for dependencies
-                    self.validate_livepatch_module(cs.name(), arch, rpm_dir, rpm)
+                    self.validate_livepatch_module(cs, arch, rpm_dir, rpm)
 
                     shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, "built"))
 
@@ -368,7 +368,9 @@ class IBS(Config):
         i = 1
         for result in self.get_projects():
             prj = result.get("name")
-            cs = self.convert_prj_to_cs(prj)
+            cs_name = self.convert_prj_to_cs(prj)
+
+            cs = self.get_cs(cs_name)
 
             # Remove previously downloaded rpms
             self.delete_rpms(cs)
@@ -385,10 +387,10 @@ class IBS(Config):
                         continue
 
                     # Create a directory for each arch supported
-                    dest = Path(self.lp_path, "ccp", cs, str(arch), "rpm")
+                    dest = Path(self.lp_path, "ccp", cs.name(), str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
-                    rpms.append((i, prj, prj, "devbuild", arch, "klp", rpm, dest))
+                    rpms.append((i, cs, prj, "devbuild", arch, "klp", rpm, dest))
                     i += 1
 
         logging.info(f"Downloading {len(rpms)} packages...")

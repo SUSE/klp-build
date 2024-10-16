@@ -141,6 +141,12 @@ class Config:
         fpath = f'work_{str(fname).replace("/", "_")}'
         return Path(self.get_cs_dir(cs, app), fpath)
 
+
+    # Return a Codestream object from the codestream name
+    def get_cs(self, cs):
+        return Codestream.from_data(self.data, self.codestreams[cs])
+
+
     def validate_config(self, cs, conf, mod):
         """
         Check if the CONFIG is enabled on the codestream. If the configuration
