@@ -487,7 +487,7 @@ class IBS(Config):
         # get the kgraft branch related to this codestream
         branch = self.ksrc.get_cs_branch(cs)
         if not branch:
-            logging.info(f"Could not find git branch for {cs}. Skipping.")
+            logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
 
         logging.info(f"({i}/{self.total}) pushing {cs.name()} using branch {branch}...")
