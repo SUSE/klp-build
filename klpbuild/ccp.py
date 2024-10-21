@@ -17,12 +17,6 @@ class CCP(Config):
 
         self.env = os.environ
 
-        ccp_path = shutil.which("klp-ccp")
-        if not ccp_path:
-            raise RuntimeError("klp-ccp not found. Aborting.")
-
-        self.ccp_path = str(ccp_path)
-
         self.pol_path = self.get_user_path('ccp_pol_dir')
 
         # List of symbols that are currently not resolvable for klp-ccp
@@ -112,20 +106,9 @@ class CCP(Config):
         lp_out = Path(out_dir, lp_name)
         ppath = self.pol_path
 
-        ccp_args = [self.ccp_path]
-        for arg in [
-            "may-include-header",
-            "can-externalize-fun",
-            "shall-externalize-fun",
-            "shall-externalize-obj",
-            "modify-externalized-sym",
-            "rename-rewritten-fun",
-        ]:
-            ccp_args.append(f"--pol-cmd-{arg}={ppath}/kgr-ccp-pol-{arg}.sh")
-
-        ccp_args.append(f"--pol-cmd-modify-patched-fun-sym={ppath}/kgr-ccp-pol-modify-patched-sym.sh")
-
-        ccp_args.extend(["--compiler=x86_64-gcc-9.1.0", "-i", f"{funcs}", "-o", f"{str(lp_out)}", "--"])
+        ccp_args = [str(shutil.which("klp-ccp")) , "-P", "suse.KlpPolicy",
+                    "--compiler=x86_64-gcc-9.1.0", "-i", f"{funcs}", "-o",
+                    f"{str(lp_out)}", "--"]
 
         # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
         # 15.4u0 options
