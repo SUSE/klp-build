@@ -20,6 +20,7 @@ from natsort import natsorted
 
 from klpbuild.codestream import Codestream
 from klpbuild.config import Config
+from klpbuild.ibs import IBS
 from klpbuild import utils
 
 
@@ -522,6 +523,8 @@ class GitHelper(Config):
         working_cs = []
         patched_cs = []
         unaffected_cs = []
+        data_missing = []
+        cs_missing = []
 
         if no_check:
             logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
@@ -543,8 +546,19 @@ class GitHelper(Config):
             if not cs.rt:
                 archs.extend(["ppc64le", "s390x"])
 
+            if not cs.get_boot_file("config").exists():
+                data_missing.append(cs)
+                cs_missing.append(cs.name())
+
             cs.set_archs(archs)
             working_cs.append(cs)
+
+        # Found missing cs data, downloading and extract
+        if data_missing:
+            logging.info("Download the necessary data from the following codestreams:")
+            logging.info(f'\t{" ".join(cs_missing)}\n')
+            IBS(self.lp_name, self.filter).download_cs_data(data_missing)
+            logging.info("Done.")
 
         if patched_cs:
             cs_list = utils.classify_codestreams(patched_cs)

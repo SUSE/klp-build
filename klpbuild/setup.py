@@ -16,7 +16,6 @@ from natsort import natsorted
 
 from klpbuild import utils
 from klpbuild.config import Config
-from klpbuild.ibs import IBS
 from klpbuild.ksrc import GitHelper
 
 
@@ -82,26 +81,6 @@ class Setup(Config):
 
             self.file_funcs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
 
-    # Needs to be called after setup_codestreams since the workincs_cs is set
-    # there
-    def download_missing_cs_data(self, codestreams):
-        data_missing = []
-        cs_missing = []
-
-        for cs in codestreams:
-            if not cs.get_boot_file("config").exists():
-                data_missing.append(cs)
-                cs_missing.append(cs.name())
-
-        # Found missing cs data, downloading and extract
-        if data_missing:
-            logging.info("Download the necessary data from the following codestreams:")
-            logging.info(f'\t{" ".join(cs_missing)}\n')
-            ibs = IBS(self.lp_name, self.filter)
-            ibs.download_cs_data(data_missing)
-            logging.info("Done.")
-
-
     def setup_codestreams(self):
         ksrc = GitHelper(self.lp_name, self.filter, skips=self.skips)
 
@@ -125,8 +104,6 @@ class Setup(Config):
 
         logging.info(f"Affected architectures:")
         logging.info(f"\t{' '.join(self.conf['archs'])}")
-
-        self.download_missing_cs_data(codestreams)
 
         logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed

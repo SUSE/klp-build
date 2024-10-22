@@ -24,7 +24,6 @@ from natsort import natsorted
 from osctiny import Osc
 
 from klpbuild.config import Config
-from klpbuild.ksrc import GitHelper
 from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry
 
 
@@ -35,8 +34,6 @@ class IBS(Config):
 
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
-
-        self.ksrc = GitHelper(self.lp_name, self.filter)
 
         # Total number of work items
         self.total = 0
@@ -485,7 +482,8 @@ class IBS(Config):
 
     def create_lp_package(self, i, cs):
         # get the kgraft branch related to this codestream
-        branch = self.ksrc.get_cs_branch(cs)
+        from klpbuild.ksrc import GitHelper
+        branch = GitHelper(self.lp_name, self.filter).get_cs_branch(cs)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
