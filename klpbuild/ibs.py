@@ -29,8 +29,8 @@ from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_obj
 
 
 class IBS(Config):
-    def __init__(self, lp_name, lp_filter, working_cs={}):
-        super().__init__(lp_name, lp_filter, working_cs=working_cs)
+    def __init__(self, lp_name, lp_filter):
+        super().__init__(lp_name, lp_filter)
         self.osc = Osc(url="https://api.suse.de")
 
         self.ibs_user = self.osc.username
