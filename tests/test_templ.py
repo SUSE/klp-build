@@ -19,7 +19,7 @@ def test_templ_with_externalized_vars():
           archs=utils.ARCHS, skips=None, no_check=False).setup_project_files()
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ce",
-                     avoid_ext=[], ignore_errors=False, workers=4).run()
+                     avoid_ext=[], ignore_errors=False).run()
 
     # As we passed vmlinux as module, we don't have the module notifier and
     # LP_MODULE, linux/module.h is not included
@@ -45,7 +45,7 @@ def test_templ_without_externalized_vars():
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ce",
-                     avoid_ext=[], ignore_errors=False, workers=4).run()
+                     avoid_ext=[], ignore_errors=False).run()
 
     # As we passed vmlinux as module, we don't have the module notifier and
     # LP_MODULE, linux/module.h is not included
@@ -73,7 +73,7 @@ def test_check_header_file_included():
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ce",
-                     avoid_ext=[], ignore_errors=False, workers=4).run()
+                     avoid_ext=[], ignore_errors=False).run()
 
     # test the livepatch_ prefix file
     assert "Upstream commit:" in get_file_content(lp, cs)
