@@ -87,6 +87,7 @@ class Setup(Config):
         # Called at this point because codestreams is populated
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(
                                                      self.conf.get("cve", ""),
+                                                     "",
                                                      self.no_check)
         self.conf["commits"] = commits
         self.conf["patched_kernels"] = patched_kernels

@@ -507,7 +507,7 @@ class GitHelper(Config):
         return codestreams
 
 
-    def scan(self, cve, no_check):
+    def scan(self, cve, conf, no_check):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
         all_codestreams = GitHelper.download_supported_file(self.data)
@@ -525,6 +525,7 @@ class GitHelper(Config):
         unaffected_cs = []
         data_missing = []
         cs_missing = []
+        conf_not_set = []
 
         if no_check:
             logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
@@ -546,11 +547,18 @@ class GitHelper(Config):
             if not cs.rt:
                 archs.extend(["ppc64le", "s390x"])
 
+            cs.set_archs(archs)
+
             if not cs.get_boot_file("config").exists():
                 data_missing.append(cs)
                 cs_missing.append(cs.name())
+                # recheck later if we can add the missing codestreams
+                continue
 
-            cs.set_archs(archs)
+            if conf and not cs.get_all_configs(conf):
+                conf_not_set.append(cs)
+                continue
+
             working_cs.append(cs)
 
         # Found missing cs data, downloading and extract
@@ -559,6 +567,19 @@ class GitHelper(Config):
             logging.info(f'\t{" ".join(cs_missing)}\n')
             IBS(self.lp_name, self.filter).download_cs_data(data_missing)
             logging.info("Done.")
+
+            for cs in data_missing:
+                # Ok, the downloaded codestream has the configuration set
+                if cs.get_all_configs(conf):
+                    working_cs.append(cs)
+                # Nope, the config is missing, so don't add it to working_cs
+                else:
+                    conf_not_set.append(cs)
+
+        if conf_not_set:
+            cs_list = utils.classify_codestreams(conf_not_set)
+            logging.info(f"Skipping codestreams without {conf} set:")
+            logging.info(f'\t{" ".join(cs_list)}')
 
         if patched_cs:
             cs_list = utils.classify_codestreams(patched_cs)

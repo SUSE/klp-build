@@ -158,6 +158,23 @@ class Codestream:
         return Path(self.get_mod_path(arch), "build")
 
 
+    def get_all_configs(self, conf):
+        """
+        Get the config value for all supported architectures of a codestream. If
+        the configuration is not set the return value will be an empty dict.
+        """
+        configs = {}
+
+        for arch in self.archs:
+            kconf = self.get_boot_file("config", arch)
+            with open(kconf) as f:
+                match = re.search(rf"{conf}=([ym])", f.read())
+                if match:
+                    configs[arch] = match.group(1)
+
+        return configs
+
+
     def data(self):
         return {
                 "sle" : self.sle,
