@@ -18,7 +18,7 @@ from klpbuild.utils import get_all_symbols_from_object, get_elf_object, get_elf_
 
 
 class Config:
-    def __init__(self, lp_name, lp_filter, data_dir=None, skips="", working_cs={}):
+    def __init__(self, lp_name, lp_filter, data_dir=None, skips=""):
         # FIXME: Config is instantiated multiple times, meaning that the
         # config file gets loaded and the logs are printed as many times.
 
@@ -41,7 +41,6 @@ class Config:
         self.filter = lp_filter
         self.skips = skips
 
-        self.working_cs = OrderedDict(working_cs)
         self.codestreams = OrderedDict()
         self.codestreams_list = []
         self.conf = OrderedDict(
@@ -159,17 +158,7 @@ class Config:
         # Validate only the specified architectures, but check if the codestream
         # is supported on that arch (like RT that is currently supported only on
         # x86_64)
-        for arch in self.conf.get("archs"):
-            if arch not in cs.archs:
-                continue
-
-            kconf = cs.get_boot_file("config", arch)
-            with open(kconf) as f:
-                match = re.search(rf"{conf}=([ym])", f.read())
-                if not match:
-                    raise RuntimeError(f"{name}:{arch} ({cs.kernel}): Config {conf} not enabled")
-
-            conf_entry = match.group(1)
+        for arch, conf_entry in cs.get_all_configs(conf).items():
             if conf_entry == "m" and mod == "vmlinux":
                 raise RuntimeError(f"{name}:{arch} ({cs.kernel}): Config {conf} is set as module, but no module was specified")
             elif conf_entry == "y" and mod != "vmlinux":

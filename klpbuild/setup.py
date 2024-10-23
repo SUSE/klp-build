@@ -16,7 +16,6 @@ from natsort import natsorted
 
 from klpbuild import utils
 from klpbuild.config import Config
-from klpbuild.ibs import IBS
 from klpbuild.ksrc import GitHelper
 
 
@@ -82,32 +81,13 @@ class Setup(Config):
 
             self.file_funcs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
 
-    # Needs to be called after setup_codestreams since the workincs_cs is set
-    # there
-    def download_missing_cs_data(self):
-        data_missing = []
-        cs_missing = []
-
-        for cs in self.working_cs:
-            if not cs.get_boot_file("config").exists():
-                data_missing.append(cs)
-                cs_missing.append(cs.name())
-
-        # Found missing cs data, downloading and extract
-        if data_missing:
-            logging.info("Download the necessary data from the following codestreams:")
-            logging.info(f'\t{" ".join(cs_missing)}\n')
-            ibs = IBS(self.lp_name, self.filter, {})
-            ibs.download_cs_data(data_missing)
-            logging.info("Done.")
-
-
     def setup_codestreams(self):
         ksrc = GitHelper(self.lp_name, self.filter, skips=self.skips)
 
         # Called at this point because codestreams is populated
-        commits, patched_cs, patched_kernels, self.working_cs = ksrc.scan(
+        commits, patched_cs, patched_kernels, codestreams = ksrc.scan(
                                                      self.conf.get("cve", ""),
+                                                     "",
                                                      self.no_check)
         self.conf["commits"] = commits
         self.conf["patched_kernels"] = patched_kernels
@@ -115,20 +95,20 @@ class Setup(Config):
         self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs",
                                                                    []) + patched_cs)))
 
+        return codestreams
+
 
     def setup_project_files(self):
         self.lp_path.mkdir(exist_ok=True)
 
-        self.setup_codestreams()
+        codestreams = self.setup_codestreams()
 
         logging.info(f"Affected architectures:")
         logging.info(f"\t{' '.join(self.conf['archs'])}")
 
-        self.download_missing_cs_data()
-
         logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed
-        for cs in self.working_cs:
+        for cs in codestreams:
             cs.set_files(copy.deepcopy(self.file_funcs))
 
             # Check if the files exist in the respective codestream directories
@@ -176,7 +156,7 @@ class Setup(Config):
                         cs_ = f"{cs.name()}-{arch} ({cs.kernel})"
                         logging.warning(f"{cs_}: Symbols {m_syms} not found on {mod} object")
 
-        self.flush_cs_file(self.working_cs)
+        self.flush_cs_file(codestreams)
 
         # cpp will use this data in the next step
         with open(self.conf_file, "w") as f:
