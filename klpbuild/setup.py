@@ -26,7 +26,6 @@ class Setup(Config):
         lp_filter,
         data_dir,
         cve,
-        cs_arg,
         file_funcs,
         mod_file_funcs,
         conf_mod_file_funcs,
@@ -57,7 +56,6 @@ class Setup(Config):
             self.conf["cve"] = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
         self.no_check = no_check
-        self.codestream = cs_arg
         self.file_funcs = {}
 
         for f in file_funcs:

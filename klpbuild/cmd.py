@@ -45,12 +45,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="The path where source files and modules will be found",
     )
     setup.add_argument(
-        "--codestreams",
-        type=str,
-        default="",
-        help="SLE specific. Codestreams affected by the CVE. Can be used a regex, like, 15.u[34]",
-    )
-    setup.add_argument(
         "--file-funcs",
         required=False,
         action="append",
@@ -189,7 +183,6 @@ def main_func(main_args):
             args.filter,
             args.data_dir,
             args.cve,
-            args.codestreams,
             args.file_funcs,
             args.mod_file_funcs,
             args.conf_mod_file_funcs,

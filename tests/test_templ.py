@@ -12,7 +12,7 @@ def test_templ_with_externalized_vars():
     lp = "bsc9999999"
     cs = "15.5u19"
 
-    Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None, cs_arg="",
+    Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None,
           file_funcs=[["fs/proc/cmdline.c", "cmdline_proc_show"]],
           mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
           conf="CONFIG_PROC_FS",
@@ -38,7 +38,7 @@ def test_templ_without_externalized_vars():
     lp = "bsc9999999"
     cs = "15.5u19"
 
-    Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None, cs_arg="",
+    Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None,
           file_funcs=[["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]],
           mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
           conf="CONFIG_IPV6",
@@ -66,7 +66,7 @@ def test_check_header_file_included():
     lp = "bsc9999999"
     cs = "15.5u17"
 
-    Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None, cs_arg="",
+    Setup(lp_name=lp, lp_filter=cs, data_dir=None, cve=None,
           file_funcs=[["net/ipv6/rpl.c", "ipv6_rpl_srh_size"], ["kernel/events/core.c", "perf_event_exec"]],
           mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
           conf="CONFIG_IPV6",
