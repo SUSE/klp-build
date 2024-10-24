@@ -37,7 +37,7 @@ class Codestream:
         if "-SP" in sle:
             sle, sp = sle.split("-SP")
         else:
-            sle, sp = sle, "0"
+            sp = "0"
 
         return cls(data_path, int(sle), int(sp), int(u), rt, proj, kernel)
 

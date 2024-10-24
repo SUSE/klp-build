@@ -3,7 +3,6 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-import os
 import sys
 
 from klpbuild.cmd import main_func

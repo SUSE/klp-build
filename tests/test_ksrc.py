@@ -3,7 +3,6 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
-import logging
 from klpbuild.ksrc import GitHelper
 import pytest
 

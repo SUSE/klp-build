@@ -115,7 +115,7 @@ class IBS(Config):
         logging.info(f"({i}/{self.total}) extracted {cs.name()} {rpm}: ok")
 
     def download_and_extract(self, args):
-        i, cs, prj, repo, arch, pkg, rpm, dest = args
+        i, cs, _, _, arch, _, rpm, dest = args
 
         self.download_binary_rpms(args)
 
