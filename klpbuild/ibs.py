@@ -35,6 +35,8 @@ class IBS(Config):
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
+        self.workers = int(self.get_user_settings("workers"))
+
         # Total number of work items
         self.total = 0
 
@@ -45,7 +47,7 @@ class IBS(Config):
         if len(args) == 0:
             return
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as executor:
             results = executor.map(func, args)
             for result in results:
                 if result:
