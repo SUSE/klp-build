@@ -6,12 +6,9 @@
 import copy
 import json
 import logging
-import platform
 import re
 from pathlib import Path
-import sys
 
-import requests
 from natsort import natsorted
 
 from klpbuild import utils

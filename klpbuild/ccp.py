@@ -17,8 +17,6 @@ class CCP(Config):
 
         self.env = os.environ
 
-        self.pol_path = self.get_user_path('ccp_pol_dir')
-
         # List of symbols that are currently not resolvable for klp-ccp
         avoid_syms = [
             "__xadd_wrong_size",
@@ -104,7 +102,6 @@ class CCP(Config):
     def cmd_args(self, needs_ibt, cs, fname, funcs, out_dir, fdata, cmd):
         lp_name = self.lp_out_file(fname)
         lp_out = Path(out_dir, lp_name)
-        ppath = self.pol_path
 
         ccp_args = [str(shutil.which("klp-ccp")) , "-P", "suse.KlpPolicy",
                     "--compiler=x86_64-gcc-9.1.0", "-i", f"{funcs}", "-o",

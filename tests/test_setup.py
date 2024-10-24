@@ -10,7 +10,7 @@ import pytest
 
 from klpbuild.setup import Setup
 import klpbuild.utils as utils
-from tests.utils import get_file_content, get_workdir
+from tests.utils import get_workdir
 
 lp = "bsc9999999"
 cs = "15.5u19"

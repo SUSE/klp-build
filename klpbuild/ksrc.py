@@ -3,9 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
-from collections import OrderedDict
 import logging
-import os
 import re
 import shutil
 import subprocess
