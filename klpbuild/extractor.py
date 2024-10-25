@@ -485,7 +485,7 @@ class Extractor(Config):
             for fname, _ in cs.files.items():
                 args.append((_, fname, cs, _))
 
-        assert len(args) == 2
+        assert len(cs_cmp) == 2
 
         cs_code = self.get_cs_code(args)
         f1 = cs_code.get(cs_cmp[0])
