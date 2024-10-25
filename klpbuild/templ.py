@@ -459,7 +459,7 @@ class TemplateGen(Config):
         # Only add the inc_dir if CE is used, since it's the only backend that
         # produces the proto.h headers
         if len(proto_files) > 0:
-            lp_inc_dir = self.get_cs_dir(cs)
+            lp_inc_dir = cs.dir()
 
         # Only populate the config check in the header if the livepatch is
         # patching code under only one config. Otherwise let the developer to
@@ -493,7 +493,7 @@ class TemplateGen(Config):
 
     def __GenerateLivepatchFile(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
-            lp_inc_dir = str(self.get_work_dir(cs, src_file))
+            lp_inc_dir = str(cs.work_dir(src_file))
             lp_file = self.lp_out_file(src_file)
             fdata = cs.files[str(src_file)]
             mod = self.fix_mod_string(fdata["module"])
@@ -564,11 +564,11 @@ class TemplateGen(Config):
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
 
     def get_cs_lp_dir(self, cs):
-        return Path(self.get_cs_dir(cs), "lp")
+        return Path(cs.dir(), "lp")
 
     def CreateMakefile(self, cs, fname, final):
         if not final:
-            work_dir = self.get_work_dir(cs, fname)
+            work_dir = cs.work_dir(fname)
             obj = "livepatch.o"
             lp_path = Path(work_dir, "livepatch.c")
 

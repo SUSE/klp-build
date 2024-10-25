@@ -280,7 +280,7 @@ class Extractor(Config):
 
         logging.info(f"{idx} {cs_info} {fname}")
 
-        out_dir = self.get_work_dir(cs, fname)
+        out_dir = cs.work_dir(fname)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # create symlink to the respective codestream file
@@ -351,7 +351,7 @@ class Extractor(Config):
         i = 1
         for cs in working_cs:
             # remove any previously generated files and leftover patches
-            shutil.rmtree(self.get_cs_dir(cs), ignore_errors=True)
+            shutil.rmtree(cs.dir(), ignore_errors=True)
             self.remove_patches(cs, self.quilt_log)
 
             # Apply patches before the LPs were created
@@ -428,7 +428,7 @@ class Extractor(Config):
             logging.warn(json.dumps(missing_syms, indent=4))
 
     def get_work_lp_file(self, cs, fname):
-        return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
+        return Path(cs.work_dir(fname), self.lp_out_file(fname))
 
     def get_cs_code(self, args):
         cs_files = {}

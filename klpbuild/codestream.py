@@ -9,12 +9,13 @@ import re
 from klpbuild.utils import ARCH
 
 class Codestream:
-    __slots__ = ("data_path", "sle", "sp", "update", "rt", "ktype", "project",
-                 "kernel", "archs", "files", "modules", "repo")
+    __slots__ = ("data_path", "lp_path", "sle", "sp", "update", "rt", "ktype",
+                 "project", "kernel", "archs", "files", "modules", "repo")
 
-    def __init__(self, data_path, sle, sp, update, rt, project="", kernel="",
-                 archs=[], files={}, modules={}):
+    def __init__(self, data_path, lp_path, sle, sp, update, rt, project="",
+                 kernel="", archs=[], files={}, modules={}):
         self.data_path = data_path
+        self.lp_path = lp_path
         self.sle = sle
         self.sp = sp
         self.update = update
@@ -29,7 +30,7 @@ class Codestream:
 
 
     @classmethod
-    def from_codestream(cls, data_path, cs, proj, kernel):
+    def from_codestream(cls, data_path, lp_path, cs, proj, kernel):
         # Parse SLE15-SP2_Update_25 to 15.2u25
         rt = "rt" if "-RT" in cs else ""
 
@@ -39,20 +40,21 @@ class Codestream:
         else:
             sp = "0"
 
-        return cls(data_path, int(sle), int(sp), int(u), rt, proj, kernel)
+        return cls(data_path, lp_path, int(sle), int(sp), int(u), rt, proj, kernel)
 
 
     @classmethod
-    def from_cs(cls, data_path, cs):
+    def from_cs(cls, cs):
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
-        return cls(data_path, int(match.group(1)), int(match.group(2)), int(match.group(4)), match.group(3))
+        return cls("", "", int(match.group(1)), int(match.group(2)),
+                   int(match.group(4)), match.group(3))
 
 
     @classmethod
-    def from_data(cls, data_path, data):
-        return cls(data_path, data["sle"], data["sp"], data["update"], data["rt"],
-                 data["project"], data["kernel"], data["archs"], data["files"],
-                 data["modules"])
+    def from_data(cls, data_path, lp_path, data):
+        return cls(data_path, lp_path, data["sle"], data["sp"], data["update"],
+                   data["rt"], data["project"], data["kernel"], data["archs"],
+                   data["files"], data["modules"])
 
 
     def __eq__(self, cs):
@@ -123,6 +125,15 @@ class Codestream:
         return f"{self.sle}.{self.sp}u{self.update}"
 
 
+    def dir(self):
+        return Path(self.lp_path, "ccp", self.name())
+
+
+    def work_dir(self, fname):
+        fpath = f'work_{str(fname).replace("/", "_")}'
+        return Path(self.dir(), fpath)
+
+
     def name_cs(self):
         if self.rt:
             return f"{self.sle}.{self.sp}rt"
@@ -188,4 +199,5 @@ class Codestream:
                 "modules" : self.modules,
                 "repo" : self.repo,
                 "data_path" : str(self.data_path),
+                "lp_path" : str(self.lp_path),
                 }

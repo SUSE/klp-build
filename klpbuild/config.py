@@ -62,7 +62,9 @@ class Config:
             with open(self.cs_file) as f:
                 self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
                 for _, data in self.codestreams.items():
-                    self.codestreams_list.append(Codestream.from_data(self.data, data))
+                    self.codestreams_list.append(Codestream.from_data(self.data,
+                                                                      self.lp_path,
+                                                                      data))
 
         # will contain the symbols from the to be livepatched object
         # cached by the codestream : object
@@ -132,17 +134,10 @@ class Config:
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f"{self.lp_name}_{fpath}"
 
-    def get_cs_dir(self, cs):
-        return Path(self.lp_path, "ccp", cs.name())
-
-    def get_work_dir(self, cs, fname):
-        fpath = f'work_{str(fname).replace("/", "_")}'
-        return Path(self.get_cs_dir(cs), fpath)
-
 
     # Return a Codestream object from the codestream name
     def get_cs(self, cs):
-        return Codestream.from_data(self.data, self.codestreams[cs])
+        return Codestream.from_data(self.data, self.lp_path, self.codestreams[cs])
 
 
     def validate_config(self, cs, conf, mod):
