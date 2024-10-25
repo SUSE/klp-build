@@ -38,7 +38,7 @@ class Config:
 
         self.lp_name = lp_name
         self.lp_path = Path(work, self.lp_name)
-        self.filter = lp_filter
+        self.lp_filter = lp_filter
         self.skips = skips
 
         self.codestreams = OrderedDict()
@@ -80,8 +80,7 @@ class Config:
                            '## SUSE internal use only ##': None,
                            '#kgr_patches_dir': 'kgraft-patches/',
                            '#kgr_patches_tests_dir': 'kgraft-patches_testscripts/',
-                           '#kernel_src_dir': 'kernel-src/',
-                           '#ccp_pol_dir': 'kgr-scripts/ccp-pol/'}
+                           '#kernel_src_dir': 'kernel-src/'}
 
         config['Settings'] = {'workers': 4}
 
@@ -133,12 +132,12 @@ class Config:
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f"{self.lp_name}_{fpath}"
 
-    def get_cs_dir(self, cs, app):
-        return Path(self.lp_path, app, cs.name())
+    def get_cs_dir(self, cs):
+        return Path(self.lp_path, "ccp", cs.name())
 
-    def get_work_dir(self, cs, fname, app):
+    def get_work_dir(self, cs, fname):
         fpath = f'work_{str(fname).replace("/", "_")}'
-        return Path(self.get_cs_dir(cs, app), fpath)
+        return Path(self.get_cs_dir(cs), fpath)
 
 
     # Return a Codestream object from the codestream name
@@ -256,7 +255,7 @@ class Config:
         for cs in full_cs:
             name = cs.name()
 
-            if self.filter and not re.match(self.filter, name):
+            if self.lp_filter and not re.match(self.lp_filter, name):
                 filtered.append(name)
                 continue
             elif self.skips and re.match(self.skips, name):

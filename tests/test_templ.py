@@ -18,8 +18,7 @@ def test_templ_with_externalized_vars():
           conf="CONFIG_PROC_FS",
           archs=utils.ARCHS, skips=None, no_check=False).setup_project_files()
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ce",
-                     avoid_ext=[], ignore_errors=False).run()
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
     # As we passed vmlinux as module, we don't have the module notifier and
     # LP_MODULE, linux/module.h is not included
@@ -44,8 +43,7 @@ def test_templ_without_externalized_vars():
           conf="CONFIG_IPV6",
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ce",
-                     avoid_ext=[], ignore_errors=False).run()
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
     # As we passed vmlinux as module, we don't have the module notifier and
     # LP_MODULE, linux/module.h is not included
@@ -72,8 +70,7 @@ def test_check_header_file_included():
           conf="CONFIG_IPV6",
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ce",
-                     avoid_ext=[], ignore_errors=False).run()
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
     # test the livepatch_ prefix file
     assert "Upstream commit:" in get_file_content(lp, cs)

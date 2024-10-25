@@ -54,17 +54,14 @@ if configuration is not available on any of them.
 
 ## Extraction
 
-At this point we support two different backends to perform the code extraction:
-[klp-ccp](https://github.com/SUSE/klp-ccp) and
-[clang-extract](https://github.com/SUSE/clang-extract), but only klp-ccp is
-being used in production. To extract the livepatches, run the command below:
+[klp-ccp](https://github.com/SUSE/klp-ccp) is used to extract the defective functions.
+To extract the livepatches, run the command below:
 
 ```sh
-klp-build extract --name bsc1197597 --type ccp
+klp-build extract --name bsc1197597
 ```
 
-Depending of the __type__ chosen, it will use klp-ccp or clang-extract to
-extract the livepatch from the sources. The resulting livepatched will be placed
+The resulting livepatched will be placed
 on __~/klp/livepatches/bsc1197597/ccp/$codestream__/lp, for example:
 
 ``/home/john/klp/livepatches/bsc1197597/ccp/15.5u40/lp``

@@ -22,13 +22,12 @@ from natsort import natsorted
 
 from klpbuild import utils
 from klpbuild.ccp import CCP
-from klpbuild.ce import CE
 from klpbuild.config import Config
 from klpbuild.templ import TemplateGen
 
 
 class Extractor(Config):
-    def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, ignore_errors):
+    def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
         super().__init__(lp_name, lp_filter)
 
         self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
@@ -39,6 +38,7 @@ class Extractor(Config):
 
         patches = self.get_patches_dir()
         self.apply_patches = apply_patches
+        self.avoid_ext = avoid_ext
 
         workers = self.get_user_settings('workers', True)
         if workers == "":
@@ -58,13 +58,7 @@ class Extractor(Config):
         self.total = 0
         self.make_lock = Lock()
 
-        if app == "ccp":
-            self.runner = CCP(lp_name, lp_filter, avoid_ext)
-        else:
-            self.runner = CE(lp_name, lp_filter, avoid_ext, ignore_errors)
-
-        self.app = app
-        self.tem = TemplateGen(self.lp_name, self.filter, self.app)
+        self.tem = TemplateGen(self.lp_name, self.lp_filter)
 
     def __del__(self):
         if self.sdir_lock:
@@ -286,7 +280,7 @@ class Extractor(Config):
 
         logging.info(f"{idx} {cs_info} {fname}")
 
-        out_dir = self.get_work_dir(cs, fname, self.app)
+        out_dir = self.get_work_dir(cs, fname)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # create symlink to the respective codestream file
@@ -307,16 +301,17 @@ class Extractor(Config):
         # klp-convert either way.
         needs_ibt = cs.sle > 15 or (cs.sle == 15 and cs.sp >= 6)
 
-        args, lenv = self.runner.cmd_args(needs_ibt, cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
+        ccp = CCP(self.lp_name, self.lp_filter, self.avoid_ext)
+        args, lenv = ccp.cmd_args(needs_ibt, cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
 
         # Detect and set ibt information. It will be used in the TemplateGen
         if '-fcf-protection' in cmd or needs_ibt:
             cs.files[fname]["ibt"] = True
 
-        out_log = Path(out_dir, f"{self.app}.out.txt")
+        out_log = Path(out_dir, f"ccp.out.txt")
         with open(out_log, "w") as f:
             # Write the command line used
-            f.write(f"Executing {self.app} on {odir}\n")
+            f.write(f"Executing ccp on {odir}\n")
             f.write("\n".join(args) + "\n")
             f.flush()
             try:
@@ -325,7 +320,7 @@ class Extractor(Config):
                 logging.error(f"Error when processing {cs.name()}:{fname}. Check file {out_log} for details.")
                 raise
 
-        cs.files[fname]["ext_symbols"] = self.runner.get_symbol_list(out_dir)
+        cs.files[fname]["ext_symbols"] = ccp.get_symbol_list(out_dir)
 
         lp_out = Path(out_dir, self.lp_out_file(fname))
 
@@ -356,7 +351,7 @@ class Extractor(Config):
         i = 1
         for cs in working_cs:
             # remove any previously generated files and leftover patches
-            shutil.rmtree(self.get_cs_dir(cs, self.app), ignore_errors=True)
+            shutil.rmtree(self.get_cs_dir(cs), ignore_errors=True)
             self.remove_patches(cs, self.quilt_log)
 
             # Apply patches before the LPs were created
@@ -367,7 +362,7 @@ class Extractor(Config):
                 args.append((i, fname, cs, fdata))
                 i += 1
 
-        logging.info(f"Extracting code using {self.app}")
+        logging.info("Extracting code using ccp")
         self.total = len(args)
         logging.info(f"\nGenerating livepatches for {len(args)} file(s) using {self.workers} workers...")
         logging.info("\t\tCodestream\tFile")
@@ -433,7 +428,7 @@ class Extractor(Config):
             logging.warn(json.dumps(missing_syms, indent=4))
 
     def get_work_lp_file(self, cs, fname):
-        return Path(self.get_work_dir(cs, fname, self.app), self.lp_out_file(fname))
+        return Path(self.get_work_dir(cs, fname), self.lp_out_file(fname))
 
     def get_cs_code(self, args):
         cs_files = {}
@@ -463,9 +458,6 @@ class Extractor(Config):
                 # Remove any mentions to klpr_trace, since it's currently
                 # buggy in klp-ccp
                 src = re.sub(r".+klpr_trace.+", "", src)
-
-                # Remove clang-extract comments
-                src = re.sub(r"clang-extract: .+", "", src)
 
                 # Reduce the noise from klp-ccp when expanding macros
                 src = re.sub(r"__compiletime_assert_\d+", "__compiletime_assert", src)
@@ -561,7 +553,7 @@ class Extractor(Config):
         for cs_list in cs_equal:
             groups.append(" ".join(utils.classify_codestreams(cs_list)))
 
-        with open(Path(self.lp_path, self.app, "groups"), "w") as f:
+        with open(Path(self.lp_path, "ccp", "groups"), "w") as f:
             f.write("\n".join(groups))
 
         logging.info("\nGrouping codestreams that share the same content and files:")

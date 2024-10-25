@@ -120,18 +120,10 @@ def create_parser() -> argparse.ArgumentParser:
     extract_opts.add_argument(
         "--apply-patches", action="store_true", help="Apply patches found by get-patches subcommand, if they exist"
     )
-    extract_opts.add_argument(
-        "--ignore-errors", action="store_true", help="Don't exit clang-extract if an error is detected when "
-        "extracting the code. Should be used on cases like extracting tracepoints or other code that are "
-        "usually problematic.")
-    extract_opts.add_argument(
-        "--type", type=str, choices=["ccp", "ce"], default="ccp", help="Choose between ccp and ce"
-    )
     diff_opts = sub.add_parser("cs-diff", parents=[parentparser])
     diff_opts.add_argument(
         "--cs", nargs=2, type=str, required=True, help="SLE specific. Apply diff on two different codestreams"
     )
-    diff_opts.add_argument("--type", type=str, choices=["ccp", "ce"], default="ccp", help="Choose between ccp and ce")
 
     fmt = sub.add_parser(
         "format-patches", parents=[parentparser], help="SLE specific. Extract patches from kgraft-patches"
@@ -195,12 +187,11 @@ def main_func(main_args):
         setup.setup_project_files()
 
     elif args.cmd == "extract":
-        Extractor(args.name, args.filter, args.apply_patches, args.type,
-                  args.avoid_ext, args.ignore_errors).run()
+        Extractor(args.name, args.filter, args.apply_patches, args.avoid_ext).run()
 
     elif args.cmd == "cs-diff":
         lp_filter = args.cs[0] + "|" + args.cs[1]
-        Extractor(args.name, lp_filter, False, args.type, [], False).diff_cs()
+        Extractor(args.name, lp_filter, False, []).diff_cs()
 
     elif args.cmd == "check-inline":
         Inliner(args.name, args.codestream).check_inline(args.file, args.symbol)

@@ -62,7 +62,7 @@ class IBS(Config):
             prj_name = prj.get("name")
             cs = self.convert_prj_to_cs(prj_name)
 
-            if self.filter and not re.match(self.filter, cs):
+            if self.lp_filter and not re.match(self.lp_filter, cs):
                 continue
 
             prjs.append(prj)
@@ -485,7 +485,7 @@ class IBS(Config):
     def create_lp_package(self, i, cs):
         # get the kgraft branch related to this codestream
         from klpbuild.ksrc import GitHelper
-        branch = GitHelper(self.lp_name, self.filter).get_cs_branch(cs)
+        branch = GitHelper(self.lp_name, self.lp_filter).get_cs_branch(cs)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return

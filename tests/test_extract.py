@@ -20,7 +20,6 @@ def test_detect_file_without_ftrace_support(caplog):
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
     with caplog.at_level(logging.WARNING):
-        Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, app="ce",
-                         avoid_ext=[], ignore_errors=False).run()
+        Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
     assert "lib/seq_buf.o is not compiled with livepatch support (-pg flag)" in caplog.text

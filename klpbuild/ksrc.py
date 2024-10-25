@@ -563,7 +563,7 @@ class GitHelper(Config):
         if data_missing:
             logging.info("Download the necessary data from the following codestreams:")
             logging.info(f'\t{" ".join(cs_missing)}\n')
-            IBS(self.lp_name, self.filter).download_cs_data(data_missing)
+            IBS(self.lp_name, self.lp_filter).download_cs_data(data_missing)
             logging.info("Done.")
 
             for cs in data_missing:

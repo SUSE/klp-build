@@ -77,7 +77,7 @@ class Setup(Config):
             self.file_funcs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
 
     def setup_codestreams(self):
-        ksrc = GitHelper(self.lp_name, self.filter, skips=self.skips)
+        ksrc = GitHelper(self.lp_name, self.lp_filter, skips=self.skips)
 
         # Called at this point because codestreams is populated
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(

@@ -120,31 +120,8 @@ Apply patches found by
 .B get-patches
 command, if they exist.
 .TP
-.BI --type " {ccp,ce}"
-Choose between
-.BR klp-ccp (1)
-and
-.BR clang-extract (1)
-back-ends.
-.TP
-.B --ignore-errors
-Don't exit
-.BR clang-extract "(1)"
-if an error is detected when extracting the code.
-Should be used on cases like extracting tracepoints
-or other code that is usually problematic.
-.RE
-.B cs-diff
-.RS 7
-.TP
 .BI --codestreams " CODESTREAMS CODESTREAMS"
 Apply diff on two different codestreams.
-.TP
-.BI --type " {ccp,ce}"
-Choose between
-.BR klp-ccp (1)
-and
-.BR clang-extract "(1)."
 .RE
 .TP
 .B format-patches
@@ -238,7 +215,6 @@ SUSE's kernel-source public repository:
 .I https://github.com/SUSE/kernel-source
 .PP
 .BR klp-ccp "(1) "
-.BR clang-extract (1)
 .SH AUTHOR
 Contributors to the
 .B klp-build
