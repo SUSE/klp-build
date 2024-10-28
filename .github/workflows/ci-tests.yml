@@ -1,0 +1,38 @@
+# @file ci-tests.yml
+---
+name: klp-build tests
+
+on: [push, pull_request]
+
+jobs:
+  distribution-check:
+    runs-on: ubuntu-latest
+    container:
+      image: opensuse/tumbleweed:latest
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Install dependencies
+      run: zypper in -y awk python3-devel git make automake clang-devel clang bison autoconf-archive autoconf python3-pytest tox gcc
+
+    - name: Download klp-ccp
+      run: git clone https://github.com/SUSE/klp-ccp
+
+    - name: Install klp-ccp
+      run: |
+        cd klp-ccp && mkdir config
+        aclocal
+        autoheader
+        automake --add-missing --foreign
+        autoconf
+        mkdir -p build && cd build
+        CXX=clang++ CXXFLAGS='-O0' ../configure
+        make && make install
+
+    - name: Run klp-build tests
+      run: |
+        cd tests/ci-env/ && sh setup.sh &
+        tox -e tests
+      env:
+        KLP_CCP_PYTHONPOLICY_PATH: klp-ccp/examples/policies:klp-ccp/lp-creation-python-policy
+
