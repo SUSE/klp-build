@@ -438,9 +438,6 @@ class TemplateGen(Config):
         with open(Path(lp_path, "patched_funcs.csv"), "w") as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
-    def get_work_dirname(self, fname):
-        return f'work_{str(fname).replace("/", "_")}'
-
     def __GenerateHeaderFile(self, lp_path, cs):
         out_name = f"livepatch_{self.lp_name}.h"
 
@@ -478,18 +475,6 @@ class TemplateGen(Config):
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
             f.write(Template(TEMPL_H, lookup=lpdir).render(**render_vars))
-
-    def __BuildKlpObjs(self, cs, src):
-        objs = {}
-
-        for src_file, fdata in cs.files.items():
-            if src and src != src_file:
-                continue
-            mod = fdata["module"].replace("-", "_")
-            objs.setdefault(mod, [])
-            objs[mod].extend(fdata["symbols"])
-
-        return objs
 
     def __GenerateLivepatchFile(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
