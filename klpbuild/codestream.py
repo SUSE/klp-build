@@ -10,7 +10,8 @@ from klpbuild.utils import ARCH
 
 class Codestream:
     __slots__ = ("data_path", "lp_path", "sle", "sp", "update", "rt", "ktype",
-                 "project", "kernel", "archs", "files", "modules", "repo")
+                 "needs_ibt", "project", "kernel", "archs", "files", "modules",
+                 "repo")
 
     def __init__(self, data_path, lp_path, sle, sp, update, rt, project="",
                  kernel="", archs=[], files={}, modules={}):
@@ -21,6 +22,7 @@ class Codestream:
         self.update = update
         self.rt = rt
         self.ktype = "-rt" if rt else "-default"
+        self.needs_ibt = sle > 15 or (sle == 15 and sp >= 6)
         self.project = project
         self.kernel = kernel
         self.archs = archs
