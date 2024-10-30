@@ -104,62 +104,9 @@ ${get_commits(commits, '15.6')}
  */
 """
 
-TEMPL_KLP_LONE_FILE = """\
-<%include file="${ inc_src_file }"/>
-
-#include <linux/livepatch.h>
-
-% for obj, funcs in klp_objs.items():
-static struct klp_func _${ obj }_funcs[] = {
-% for func in funcs:
-    {
-        .old_name = "${ func }",
-        .new_func = klpp_${ func },
-    },
-% endfor
-% endfor
-    {}
-};
-
-static struct klp_object objs[] = {
-% for obj, _ in klp_objs.items():
-    {
-%if obj != "vmlinux":
-        .name = "${ obj }",
-%endif
-        .funcs = _${ obj }_funcs
-    },
-% endfor
-    {}
-};
-
-static struct klp_patch patch = {
-    .mod = THIS_MODULE,
-    .objs = objs,
-};
-
-static int ${ fname }_init(void)
-{
-    return klp_enable_patch(&patch);
-}
-
-static void ${ fname }_cleanup(void)
-{
-}
-
-module_init(${ fname }_init);
-module_exit(${ fname }_cleanup);
-MODULE_LICENSE("GPL");
-MODULE_INFO(livepatch, "Y");
-"""
-
 TEMPL_GET_EXTS = """\
 <%
-def get_exts(app, ibt_mod, ext_vars):
-        # CE doesn't need any additional externalization
-        if ibt_mod and app == 'ce':
-            return ''
-
+def get_exts(ibt_mod, ext_vars):
         ext_list = []
         for obj, syms in ext_vars.items():
             if obj == 'vmlinux':
@@ -232,13 +179,13 @@ TEMPL_PATCH_VMLINUX = """\
 
 % if ext_vars:
 % if ibt:
-${get_exts(app, "vmlinux", ext_vars)}
+${get_exts("vmlinux", ext_vars)}
 % else: # ibt
 #include <linux/kernel.h>
 #include "../kallsyms_relocs.h"
 
 static struct klp_kallsyms_reloc klp_funcs[] = {
-${get_exts(app, "", ext_vars)}
+${get_exts("", ext_vars)}
 };
 
 int ${ fname }_init(void)
@@ -273,7 +220,7 @@ TEMPL_PATCH_MODULE = """\
 
 % if ext_vars:
 % if ibt:
-${get_exts(app, mod, ext_vars)}
+${get_exts(mod, ext_vars)}
 % else: # ibt
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -282,7 +229,7 @@ ${get_exts(app, mod, ext_vars)}
 #define LP_MODULE "${ mod }"
 
 static struct klp_kallsyms_reloc klp_funcs[] = {
-${get_exts(app, "", ext_vars)}
+${get_exts("", ext_vars)}
 };
 
 static int module_notify(struct notifier_block *nb,
@@ -459,13 +406,12 @@ clean:
 
 
 class TemplateGen(Config):
-    def __init__(self, lp_name, lp_filter, app="ccp"):
+    def __init__(self, lp_name, lp_filter):
         super().__init__(lp_name, lp_filter)
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
         self.check_enabled = self.conf["archs"] != ARCHS
-        self.app = app
 
         try:
             import git
@@ -509,13 +455,11 @@ class TemplateGen(Config):
             # At this point we only care to know if we are livepatching a module
             # or not, so we can overwrite the module.
             mod = data["module"]
-            if self.app == "ce":
-                proto_files.append(str(Path(self.get_work_dirname(f), "proto.h")))
 
         # Only add the inc_dir if CE is used, since it's the only backend that
         # produces the proto.h headers
         if len(proto_files) > 0:
-            lp_inc_dir = self.get_cs_dir(cs, self.app)
+            lp_inc_dir = cs.dir()
 
         # Only populate the config check in the header if the livepatch is
         # patching code under only one config. Otherwise let the developer to
@@ -549,7 +493,7 @@ class TemplateGen(Config):
 
     def __GenerateLivepatchFile(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
-            lp_inc_dir = str(self.get_work_dir(cs, src_file, self.app))
+            lp_inc_dir = str(cs.work_dir(src_file))
             lp_file = self.lp_out_file(src_file)
             fdata = cs.files[str(src_file)]
             mod = self.fix_mod_string(fdata["module"])
@@ -592,7 +536,6 @@ class TemplateGen(Config):
             "ext_vars": exts,
             "inc_src_file": lp_file,
             "ibt": ibt,
-            "app": self.app,
         }
 
         render_vars['commits'] = self.conf["commits"]
@@ -621,11 +564,11 @@ class TemplateGen(Config):
             f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
 
     def get_cs_lp_dir(self, cs):
-        return Path(self.get_cs_dir(cs, self.app), "lp")
+        return Path(cs.dir(), "lp")
 
     def CreateMakefile(self, cs, fname, final):
         if not final:
-            work_dir = self.get_work_dir(cs, fname, self.app)
+            work_dir = cs.work_dir(fname)
             obj = "livepatch.o"
             lp_path = Path(work_dir, "livepatch.c")
 

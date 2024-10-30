@@ -21,14 +21,12 @@ from filelock import FileLock
 from natsort import natsorted
 
 from klpbuild import utils
-from klpbuild.ccp import CCP
-from klpbuild.ce import CE
 from klpbuild.config import Config
 from klpbuild.templ import TemplateGen
 
 
 class Extractor(Config):
-    def __init__(self, lp_name, lp_filter, apply_patches, app, avoid_ext, ignore_errors):
+    def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
         super().__init__(lp_name, lp_filter)
 
         self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
@@ -39,6 +37,7 @@ class Extractor(Config):
 
         patches = self.get_patches_dir()
         self.apply_patches = apply_patches
+        self.avoid_ext = avoid_ext
 
         workers = self.get_user_settings('workers', True)
         if workers == "":
@@ -58,13 +57,60 @@ class Extractor(Config):
         self.total = 0
         self.make_lock = Lock()
 
-        if app == "ccp":
-            self.runner = CCP(lp_name, lp_filter, avoid_ext)
-        else:
-            self.runner = CE(lp_name, lp_filter, avoid_ext, ignore_errors)
+        self.tem = TemplateGen(self.lp_name, self.lp_filter)
 
-        self.app = app
-        self.tem = TemplateGen(self.lp_name, self.filter, self.app)
+        self.env = os.environ
+
+        # List of symbols that are currently not resolvable for klp-ccp
+        avoid_syms = [
+            "__xadd_wrong_size",
+            "__bad_copy_from",
+            "__bad_copy_to",
+            "rcu_irq_enter_disabled",
+            "rcu_irq_enter_irqson",
+            "rcu_irq_exit_irqson",
+            "verbose",
+            "__write_overflow",
+            "__read_overflow",
+            "__read_overflow2",
+            "__real_strnlen",
+            "__real_strlcpy",
+            "twaddle",
+            "set_geometry",
+            "valid_floppy_drive_params",
+            "__real_memchr_inv",
+            "__real_kmemdup",
+            "lockdep_rtnl_is_held",
+            "lockdep_rht_mutex_is_held",
+            "debug_lockdep_rcu_enabled",
+            "lockdep_rcu_suspicious",
+            "rcu_read_lock_bh_held",
+            "lock_acquire",
+            "preempt_count_add",
+            "rcu_read_lock_any_held",
+            "preempt_count_sub",
+            "lock_release",
+            "trace_hardirqs_off",
+            "trace_hardirqs_on",
+            "debug_smp_processor_id",
+            "lock_is_held_type",
+            "mutex_lock_nested",
+            "rcu_read_lock_held",
+            "__bad_unaligned_access_size",
+            "__builtin_alloca",
+            "tls_validate_xmit_skb_sw",
+        ]
+        # The backlist tells the klp-ccp to always copy the symbol code,
+        # instead of externalizing. This helps in cases where different archs
+        # have different inline decisions, optimizing and sometimes removing the
+        # symbols.
+        if avoid_ext:
+            avoid_syms.extend(avoid_ext)
+
+        self.env["KCP_EXT_BLACKLIST"] = ",".join(avoid_syms)
+        self.env["KCP_READELF"] = "readelf"
+        self.env["KCP_RENAME_PREFIX"] = "klp"
+
 
     def __del__(self):
         if self.sdir_lock:
@@ -182,6 +228,39 @@ class Extractor(Config):
         return None
 
 
+    # Generate the list of exported symbols
+    def get_symbol_list(self, out_dir):
+        exts = []
+
+        for ext_file in ["fun_exts", "obj_exts"]:
+            ext_path = Path(out_dir, ext_file)
+            if not ext_path.exists():
+                continue
+
+            with open(ext_path) as f:
+                for l in f:
+                    l = l.strip()
+                    if not l.startswith("KALLSYMS") and not l.startswith("KLP_CONVERT"):
+                        continue
+
+                    _, sym, var, mod = l.split(" ")
+                    if not utils.is_mod(mod):
+                        mod = "vmlinux"
+
+                    exts.append((sym, var, mod))
+
+        exts.sort(key=lambda tup: tup[0])
+
+        # store the externalized symbols and module used in this codestream file
+        symbols = {}
+        for ext in exts:
+            sym, mod = ext[0], ext[2]
+            symbols.setdefault(mod, [])
+            symbols[mod].append(sym)
+
+        return symbols
+
+
     def get_patches_dir(self):
         return Path(self.lp_path, "fixes")
 
@@ -274,6 +353,55 @@ class Extractor(Config):
         logging.error(f"Couldn't find cmdline for {fname}. Aborting")
         return None
 
+    def cmd_args(self, cs, fname, out_dir, fdata, cmd):
+        lp_out = Path(out_dir, self.lp_out_file(fname))
+
+        funcs = ",".join(fdata["symbols"])
+
+        ccp_args = [str(shutil.which("klp-ccp")) , "-P", "suse.KlpPolicy",
+                    "--compiler=x86_64-gcc-9.1.0", "-i", f"{funcs}", "-o",
+                    f"{str(lp_out)}", "--"]
+
+        # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
+        # 15.4u0 options
+        # -fno-allow-store-data-races and -Wno-zero-length-bounds
+        # 15.4u1 options
+        # -mindirect-branch-cs-prefix appear in 15.4u1
+        # more options to be removed
+        # -mharden-sls=all
+        # 15.6 options
+        # -fmin-function-alignment=16
+        for opt in [
+            "-flive-patching=inline-clone",
+            "-fdump-ipa-clones",
+            "-fno-allow-store-data-races",
+            "-Wno-zero-length-bounds",
+            "-mindirect-branch-cs-prefix",
+            "-mharden-sls=all",
+            "-fmin-function-alignment=16",
+        ]:
+            cmd = cmd.replace(opt, "")
+
+        if cs.sle >= 15 and cs.sp >= 4:
+            cmd += " -D__has_attribute(x)=0"
+
+        ccp_args.extend(cmd.split(" "))
+
+        ccp_args = list(filter(None, ccp_args))
+
+        # Needed, otherwise threads would interfere with each other
+        env = self.env.copy()
+
+        env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt else "0"
+        env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
+        env["KCP_KBUILD_ODIR"] = str(cs.get_odir())
+        env["KCP_PATCHED_OBJ"] = self.get_module_obj(utils.ARCH, cs, fdata["module"])
+        env["KCP_KBUILD_SDIR"] = str(cs.get_sdir())
+        env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
+        env["KCP_WORK_DIR"] = str(out_dir)
+
+        return ccp_args, env
+
     def process(self, args):
         i, fname, cs, fdata = args
 
@@ -286,7 +414,7 @@ class Extractor(Config):
 
         logging.info(f"{idx} {cs_info} {fname}")
 
-        out_dir = self.get_work_dir(cs, fname, self.app)
+        out_dir = cs.work_dir(fname)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # create symlink to the respective codestream file
@@ -303,20 +431,16 @@ class Extractor(Config):
         if not cmd:
             raise
 
-        # SLE15-SP6 doesn't enabled CET, but we would like to start using
-        # klp-convert either way.
-        needs_ibt = cs.sle > 15 or (cs.sle == 15 and cs.sp >= 6)
-
-        args, lenv = self.runner.cmd_args(needs_ibt, cs, fname, ",".join(fdata["symbols"]), out_dir, fdata, cmd)
+        args, lenv = self.cmd_args(cs, fname, out_dir, fdata, cmd)
 
         # Detect and set ibt information. It will be used in the TemplateGen
-        if '-fcf-protection' in cmd or needs_ibt:
+        if '-fcf-protection' in cmd or cs.needs_ibt:
             cs.files[fname]["ibt"] = True
 
-        out_log = Path(out_dir, f"{self.app}.out.txt")
+        out_log = Path(out_dir, f"ccp.out.txt")
         with open(out_log, "w") as f:
             # Write the command line used
-            f.write(f"Executing {self.app} on {odir}\n")
+            f.write(f"Executing ccp on {odir}\n")
             f.write("\n".join(args) + "\n")
             f.flush()
             try:
@@ -325,7 +449,7 @@ class Extractor(Config):
                 logging.error(f"Error when processing {cs.name()}:{fname}. Check file {out_log} for details.")
                 raise
 
-        cs.files[fname]["ext_symbols"] = self.runner.get_symbol_list(out_dir)
+        cs.files[fname]["ext_symbols"] = self.get_symbol_list(out_dir)
 
         lp_out = Path(out_dir, self.lp_out_file(fname))
 
@@ -356,7 +480,7 @@ class Extractor(Config):
         i = 1
         for cs in working_cs:
             # remove any previously generated files and leftover patches
-            shutil.rmtree(self.get_cs_dir(cs, self.app), ignore_errors=True)
+            shutil.rmtree(cs.dir(), ignore_errors=True)
             self.remove_patches(cs, self.quilt_log)
 
             # Apply patches before the LPs were created
@@ -367,7 +491,7 @@ class Extractor(Config):
                 args.append((i, fname, cs, fdata))
                 i += 1
 
-        logging.info(f"Extracting code using {self.app}")
+        logging.info("Extracting code using ccp")
         self.total = len(args)
         logging.info(f"\nGenerating livepatches for {len(args)} file(s) using {self.workers} workers...")
         logging.info("\t\tCodestream\tFile")
@@ -433,7 +557,7 @@ class Extractor(Config):
             logging.warn(json.dumps(missing_syms, indent=4))
 
     def get_work_lp_file(self, cs, fname):
-        return Path(self.get_work_dir(cs, fname, self.app), self.lp_out_file(fname))
+        return Path(cs.work_dir(fname), self.lp_out_file(fname))
 
     def get_cs_code(self, args):
         cs_files = {}
@@ -463,9 +587,6 @@ class Extractor(Config):
                 # Remove any mentions to klpr_trace, since it's currently
                 # buggy in klp-ccp
                 src = re.sub(r".+klpr_trace.+", "", src)
-
-                # Remove clang-extract comments
-                src = re.sub(r"clang-extract: .+", "", src)
 
                 # Reduce the noise from klp-ccp when expanding macros
                 src = re.sub(r"__compiletime_assert_\d+", "__compiletime_assert", src)
@@ -561,7 +682,7 @@ class Extractor(Config):
         for cs_list in cs_equal:
             groups.append(" ".join(utils.classify_codestreams(cs_list)))
 
-        with open(Path(self.lp_path, self.app, "groups"), "w") as f:
+        with open(Path(self.lp_path, "ccp", "groups"), "w") as f:
             f.write("\n".join(groups))
 
         logging.info("\nGrouping codestreams that share the same content and files:")
