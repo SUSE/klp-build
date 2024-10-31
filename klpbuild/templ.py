@@ -164,7 +164,7 @@ def get_exts(ibt_mod, ext_vars):
                             ext_list.append(f"\\t {lsym}")
                             ext_list.append(f"\\t {end}")
 
-        return '\\n#include <linux/livepatch.h>\\n\\n' + '\\n'.join(ext_list)
+        return '\\n'.join(ext_list)
 %>
 """
 
