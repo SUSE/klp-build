@@ -528,9 +528,6 @@ class TemplateGen(Config):
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
 
-            # For C files, first add the LICENSE header template to the file
-            f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
-
             # If we have multiple source files for the same livepatch,
             # create one hollow file to wire-up the multiple _init and
             # _clean functions
@@ -546,7 +543,7 @@ class TemplateGen(Config):
             else:
                 temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
 
-            f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
+            f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**render_vars))
 
     def get_cs_lp_dir(self, cs):
         return Path(cs.dir(), "lp")
