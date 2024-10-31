@@ -545,9 +545,6 @@ class TemplateGen(Config):
 
             f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**render_vars))
 
-    def get_cs_lp_dir(self, cs):
-        return Path(cs.dir(), "lp")
-
     def CreateMakefile(self, cs, fname, final):
         if not final:
             work_dir = cs.work_dir(fname)
@@ -559,7 +556,7 @@ class TemplateGen(Config):
             with open(lp_path, "a") as f:
                 f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
         else:
-            work_dir = self.get_cs_lp_dir(cs)
+            work_dir = cs.lpdir()
             obj = f"livepatch_{self.lp_name}.o"
 
         render_vars = {"kdir": cs.get_kernel_build_path(ARCH), "pwd": work_dir, "obj": obj}
@@ -568,7 +565,7 @@ class TemplateGen(Config):
             f.write(Template(TEMPL_MAKEFILE).render(**render_vars))
 
     def GenerateLivePatches(self, cs):
-        lp_path = self.get_cs_lp_dir(cs)
+        lp_path = cs.lpdir()
         lp_path.mkdir(exist_ok=True)
 
         files = cs.files
@@ -592,9 +589,8 @@ class TemplateGen(Config):
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
-        lpdir = self.get_cs_lp_dir(cs)
-        render_vars = {"bsc": self.lp_name, "cs": cs, "lpdir": lpdir}
-        with open(Path(lpdir, "Kbuild.inc"), "w") as f:
+        render_vars = {"bsc": self.lp_name, "cs": cs, "lpdir": cs.lpdir()}
+        with open(Path(cs.lpdir(), "Kbuild.inc"), "w") as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
     def generate_commit_msg_file(self):

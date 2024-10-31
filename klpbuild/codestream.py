@@ -131,6 +131,10 @@ class Codestream:
         return Path(self.lp_path, "ccp", self.name())
 
 
+    def lpdir(self):
+        return Path(self.lp_path, "ccp", self.name(), "lp")
+
+
     def work_dir(self, fname):
         fpath = f'work_{str(fname).replace("/", "_")}'
         return Path(self.dir(), fpath)
