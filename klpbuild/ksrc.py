@@ -41,75 +41,13 @@ class GitHelper(Config):
             "cve-5.14": "cve/linux-5.14-LTSS",
         }
 
-        self.branches = []
-
-        self.kgr_patches = self.get_user_path('kgr_patches_dir', isopt=True)
-        if not self.kgr_patches:
-            logging.warning("kgr_patches_dir not found")
-        else:
-            # Filter only the branches related to this BSC
-            repo = git.Repo(self.kgr_patches).branches
-            for r in repo:
-                if r.name.startswith(self.lp_name):
-                    self.branches.append(r.name)
-
-    def get_cs_branch(self, cs):
-        branch_name = ""
-
-        for branch in self.branches:
-            # Check if the codestream is a rt one, and if yes, apply the correct
-            # separator later on
-            if cs.rt and "rt" not in branch:
-                continue
-
-            separator = "u"
-            if cs.rt:
-                separator = "rtu"
-
-            # First check if the branch has more than code stream sharing
-            # the same code
-            for b in branch.replace(self.lp_name + "_", "").split("_"):
-                # Only check the branches that are the same type of the branch
-                # being searched. Only check RT branches if the codestream is a
-                # RT one.
-                if cs.rt and "rtu" not in b:
-                    continue
-
-                if not cs.rt and "rtu" in b:
-                    continue
-
-                sle, u = b.split(separator)
-                if f"{cs.sle}.{cs.sp}" != f"{sle}":
-                    continue
-
-                # Get codestreams interval
-                up = u
-                down = u
-                if "-" in u:
-                    down, up = u.split("-")
-
-                # Codestream between the branch codestream interval
-                if cs.update >= int(down) and cs.update <= int(up):
-                    branch_name = branch
-                    break
-
-                # At this point we found a match for our codestream in
-                # codestreams.json, but we may have a more specialized git
-                # branch later one, like:
-                # bsc1197597_12.4u21-25_15.0u25-28
-                # bsc1197597_15.0u25-28
-                # Since 15.0 SLE uses a different kgraft-patches branch to
-                # be built on. In this case, we continue to loop over the
-                # other branches.
-
-        return branch_name
-
     def format_patches(self, version):
         ver = f"v{version}"
         # index 1 will be the test file
         index = 2
 
-        if not self.kgr_patches:
+        kgr_patches = self.get_user_path('kgr_patches_dir')
+        if not kgr_patches:
             logging.warning("kgr_patches_dir not found, patches will be incomplete")
 
         # Remove dir to avoid leftover patches with different names
@@ -136,7 +74,7 @@ class GitHelper(Config):
         )
 
         # Filter only the branches related to this BSC
-        for branch in self.branches:
+        for branch in utils.get_lp_branches(self.lp_name, kgr_patches):
             print(branch)
             bname = branch.replace(self.lp_name + "_", "")
             bs = " ".join(bname.split("_"))
@@ -148,7 +86,7 @@ class GitHelper(Config):
                 [
                     "/usr/bin/git",
                     "-C",
-                    str(self.kgr_patches),
+                    str(kgr_patches),
                     "format-patch",
                     "-1",
                     branch,

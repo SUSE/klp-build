@@ -3,6 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import git
 import gzip
 import io
 import platform
@@ -133,3 +134,66 @@ def get_all_symbols_from_object(obj, defined):
                 syms.append(symbol.name)
 
     return syms
+
+
+def get_lp_branches(lp_name, git_dir):
+    branches = []
+
+    # Filter only the branches related to this BSC
+    for r in git.Repo(git_dir).branches:
+        if r.name.startswith(lp_name):
+            branches.append(r.name)
+
+    return branches
+
+
+def get_cs_branch(cs, lp_name, git_dir):
+    branch_name = ""
+
+    for branch in get_lp_branches(lp_name, git_dir):
+        # Check if the codestream is a rt one, and if yes, apply the correct
+        # separator later on
+        if cs.rt and "rt" not in branch:
+            continue
+
+        separator = "u"
+        if cs.rt:
+            separator = "rtu"
+
+        # First check if the branch has more than code stream sharing
+        # the same code
+        for b in branch.replace(lp_name + "_", "").split("_"):
+            # Only check the branches that are the same type of the branch
+            # being searched. Only check RT branches if the codestream is a
+            # RT one.
+            if cs.rt and "rtu" not in b:
+                continue
+
+            if not cs.rt and "rtu" in b:
+                continue
+
+            sle, u = b.split(separator)
+            if f"{cs.sle}.{cs.sp}" != f"{sle}":
+                continue
+
+            # Get codestreams interval
+            up = u
+            down = u
+            if "-" in u:
+                down, up = u.split("-")
+
+            # Codestream between the branch codestream interval
+            if cs.update >= int(down) and cs.update <= int(up):
+                branch_name = branch
+                break
+
+            # At this point we found a match for our codestream in
+            # codestreams.json, but we may have a more specialized git
+            # branch later one, like:
+            # bsc1197597_12.4u21-25_15.0u25-28
+            # bsc1197597_15.0u25-28
+            # Since 15.0 SLE uses a different kgraft-patches branch to
+            # be built on. In this case, we continue to loop over the
+            # other branches.
+
+    return branch_name
