@@ -54,22 +54,16 @@ class GitHelper(Config):
                     self.branches.append(r.name)
 
     def get_cs_branch(self, cs):
-        cs_sle, sp, cs_up, rt = cs.sle, cs.sp, cs.update, cs.rt
-
-        if not self.kgr_patches:
-            logging.warning("kgr_patches_dir not found")
-            return ""
-
         branch_name = ""
 
         for branch in self.branches:
             # Check if the codestream is a rt one, and if yes, apply the correct
             # separator later on
-            if rt and "rt" not in branch:
+            if cs.rt and "rt" not in branch:
                 continue
 
             separator = "u"
-            if rt:
+            if cs.rt:
                 separator = "rtu"
 
             # First check if the branch has more than code stream sharing
@@ -78,14 +72,14 @@ class GitHelper(Config):
                 # Only check the branches that are the same type of the branch
                 # being searched. Only check RT branches if the codestream is a
                 # RT one.
-                if rt and "rtu" not in b:
+                if cs.rt and "rtu" not in b:
                     continue
 
-                if not rt and "rtu" in b:
+                if not cs.rt and "rtu" in b:
                     continue
 
                 sle, u = b.split(separator)
-                if f"{cs_sle}.{sp}" != f"{sle}":
+                if f"{cs.sle}.{cs.sp}" != f"{sle}":
                     continue
 
                 # Get codestreams interval
@@ -95,7 +89,7 @@ class GitHelper(Config):
                     down, up = u.split("-")
 
                 # Codestream between the branch codestream interval
-                if cs_up >= int(down) and cs_up <= int(up):
+                if cs.update >= int(down) and cs.update <= int(up):
                     branch_name = branch
                     break
 
