@@ -140,32 +140,6 @@ class Config:
         return Codestream.from_data(self.data, self.lp_path, self.codestreams[cs])
 
 
-    def validate_config(self, cs, conf, mod):
-        """
-        Check if the CONFIG is enabled on the codestream. If the configuration
-        entry is set as M, check if a module was specified (different from
-        vmlinux).
-        """
-        configs = {}
-        name = cs.name()
-
-        # Validate only the specified architectures, but check if the codestream
-        # is supported on that arch (like RT that is currently supported only on
-        # x86_64)
-        for arch, conf_entry in cs.get_all_configs(conf).items():
-            if conf_entry == "m" and mod == "vmlinux":
-                raise RuntimeError(f"{name}:{arch} ({cs.kernel}): Config {conf} is set as module, but no module was specified")
-            elif conf_entry == "y" and mod != "vmlinux":
-                raise RuntimeError(f"{name}:{arch} ({cs.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
-
-            configs.setdefault(conf_entry, [])
-            configs[conf_entry].append(f"{name}:{arch}")
-
-        if len(configs.keys()) > 1:
-            print(configs["y"])
-            print(configs["m"])
-            raise RuntimeError(f"Configuration mismtach between codestreams. Aborting.")
-
     def get_tests_path(self):
         self.kgraft_tests_path = self.get_user_path('kgr_patches_tests_dir')
 

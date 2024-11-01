@@ -192,6 +192,30 @@ class Codestream:
         return configs
 
 
+    def validate_config(self, conf, mod):
+        configs = {}
+
+        # Validate only the specified architectures, but check if the codestream
+        # is supported on that arch (like RT that is currently supported only on
+        # x86_64)
+        for arch, conf_entry in self.get_all_configs(conf).items():
+            if conf_entry == "m" and mod == "vmlinux":
+                raise RuntimeError(f"{self.name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
+            if conf_entry == "y" and mod != "vmlinux":
+                raise RuntimeError(f"{self.name()}:{arch} ({self.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
+
+            configs.setdefault(conf_entry, [])
+            configs[conf_entry].append(f"{self.name()}:{arch}")
+
+        # Validate if we have different settings for the same config on
+        # different architecures, like having it as builtin on one and as a
+        # module on a different arch.
+        if len(configs.keys()) > 1:
+            print(configs["y"])
+            print(configs["m"])
+            raise RuntimeError(f"{self.name()}: Configuration mismatach between codestreams. Aborting.")
+
+
     def data(self):
         return {
                 "sle" : self.sle,

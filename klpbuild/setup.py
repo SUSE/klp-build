@@ -111,7 +111,8 @@ class Setup(Config):
             kernel = cs.kernel
             for f, fdata in cs.files.items():
 
-                self.validate_config(cs, fdata["conf"], fdata["module"])
+                mod = fdata["module"]
+                cs.validate_config(fdata["conf"], mod)
 
                 sdir = cs.get_sdir()
                 if not Path(sdir, f).is_file():
@@ -129,7 +130,6 @@ class Setup(Config):
                 if self.conf["archs"] == utils.ARCHS:
                     fdata["conf"] = ""
 
-                mod = fdata["module"]
                 if not cs.modules.get(mod, ""):
                     if utils.is_mod(mod):
                         mod_path = str(self.find_module_obj(utils.ARCH, cs, mod,
