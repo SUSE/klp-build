@@ -395,7 +395,7 @@ class Extractor(Config):
         env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt else "0"
         env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
         env["KCP_KBUILD_ODIR"] = str(cs.get_odir())
-        env["KCP_PATCHED_OBJ"] = self.get_module_obj(utils.ARCH, cs, fdata["module"])
+        env["KCP_PATCHED_OBJ"] = str(cs.get_mod(fdata["module"]))
         env["KCP_KBUILD_SDIR"] = str(cs.get_sdir())
         env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
         env["KCP_WORK_DIR"] = str(out_dir)

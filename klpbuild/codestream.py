@@ -169,6 +169,12 @@ class Codestream:
         return Path(self.get_data_dir(arch), "lib", "modules", f"{self.kname()}")
 
 
+    # A codestream can be patching multiple objects, so get the path related to
+    # the module that we are interested
+    def get_mod(self, mod):
+        return self.modules[mod]
+
+
     # Returns the path to the kernel-obj's build dir, used when build testing
     # the generated module
     def get_kernel_build_path(self, arch):

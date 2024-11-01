@@ -37,7 +37,7 @@ class Inliner(Config):
         if not mod:
             raise RuntimeError(f"File {fname} not in setup phase. Aborting.")
 
-        ce_args.extend(["-debuginfo", str(self.get_module_obj(ARCH, cs, mod))])
+        ce_args.extend(["-debuginfo", str(cs.get_mod(mod))])
 
         # clang-extract works without ipa-clones, so don't hard require it
         ipa_f = cs.get_ipa_file(fname)
