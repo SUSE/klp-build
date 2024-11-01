@@ -10,11 +10,10 @@ import logging
 import os
 import re
 from collections import OrderedDict
-from pathlib import Path, PurePath
+from pathlib import Path
 
 from klpbuild.codestream import Codestream
-from klpbuild.utils import ARCH, classify_codestreams, is_mod
-from klpbuild.utils import get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry
+from klpbuild.utils import ARCH, classify_codestreams, get_all_symbols_from_object
 
 
 class Config:
@@ -168,47 +167,6 @@ class Config:
             f.write(json.dumps(self.codestreams, indent=4))
 
 
-    # This function can be called to get the path to a module that has symbols
-    # that were externalized, so we need to find the path to the module as well.
-    def get_module_obj(self, arch, cs, module):
-        if not is_mod(module):
-            return cs.get_boot_file("vmlinux", arch)
-
-        obj = cs.modules.get(module, "")
-        if not obj:
-            obj = self.find_module_obj(arch, cs, module)
-
-        return Path(cs.get_mod_path(arch), obj)
-
-    # Return only the name of the module to be livepatched
-    def find_module_obj(self, arch, cs, mod, check_support=False):
-        assert mod != "vmlinux"
-
-        # Module name use underscores, but the final module object uses hyphens.
-        mod = mod.replace("_", "[-_]")
-
-        mod_path = cs.get_mod_path(arch)
-        with open(Path(mod_path, "modules.order")) as f:
-            obj_match = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
-            if not obj_match:
-                raise RuntimeError(f"{cs.name()}-{arch} ({cs.kernel}): Module not found: {mod}")
-
-        # modules.order will show the module with suffix .o, so
-        # make sure the extension. Also check for multiple extensions since we
-        # can have modules being compressed using different algorithms.
-        for ext in [".ko", ".ko.zst", ".ko.gz"]:
-            obj = str(PurePath(obj_match.group(1)).with_suffix(ext))
-            if Path(mod_path, obj).exists():
-                break
-
-        if check_support:
-            # Validate if the module being livepatches is supported or not
-            elffile = get_elf_object(Path(mod_path, obj))
-            if "no" == get_elf_modinfo_entry(elffile, "supported"):
-                print(f"WARN: {cs.name()}-{arch} ({cs.kernel}): Module {mod} is not supported by SLE")
-
-        return obj
-
     # Return the codestreams list but removing already patched codestreams,
     # codestreams without file-funcs and not matching the filter
     def filter_cs(self, cs_list=None, verbose=False):
@@ -249,8 +207,9 @@ class Config:
         self.obj_symbols.setdefault(arch, {})
         self.obj_symbols[arch].setdefault(name, {})
 
+        # Checking if we already cached the results for this codestream
         if not self.obj_symbols[arch][name].get(mod, ""):
-            obj = self.get_module_obj(arch, cs, mod)
+            obj = cs.find_obj_path(arch, mod)
             self.obj_symbols[arch][name][mod] = get_all_symbols_from_object(obj, True)
 
         ret = []

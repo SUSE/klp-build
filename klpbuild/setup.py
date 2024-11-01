@@ -130,15 +130,13 @@ class Setup(Config):
                 if self.conf["archs"] == utils.ARCHS:
                     fdata["conf"] = ""
 
-                if not cs.modules.get(mod, ""):
-                    if utils.is_mod(mod):
-                        mod_path = str(self.find_module_obj(utils.ARCH, cs, mod,
-                                                            check_support=True))
-                    else:
-                        mod_path = str(cs.get_boot_file("vmlinux"))
+                mod_path = cs.find_obj_path(utils.ARCH, mod)
 
-                    cs.modules[mod] = mod_path
+                # Validate if the module being livepatches is supported or not
+                if utils.check_module_unsupported(mod_path):
+                    logging.warning(f"{cs.name()} ({cs.kernel}): Module {mod} is not supported by SLE")
 
+                cs.modules[mod] = str(mod_path)
                 mod_syms.setdefault(mod, [])
                 mod_syms[mod].extend(fdata["symbols"])
 
