@@ -89,7 +89,7 @@ def test_check_conf_mod_file_funcs():
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
     with open(Path(get_workdir(lp, cs), "codestreams.json")) as f:
-        data = json.loads(f.read())[cs]["files"]
+        data = json.loads(f.read())["codestreams"][cs]["files"]
 
     sch = data["net/sched/sch_qfq.c"]
     bts = data["drivers/bluetooth/btsdio.c"]
@@ -106,7 +106,7 @@ def test_check_conf_mod_file_funcs():
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
     with open(Path(get_workdir(lp, cs), "codestreams.json")) as f:
-        data = json.loads(f.read())[cs]["files"]
+        data = json.loads(f.read())["codestreams"][cs]["files"]
 
     sch = data["net/sched/sch_qfq.c"]
     bts = data["drivers/bluetooth/btsdio.c"]

@@ -47,7 +47,7 @@ class Setup(Config):
         if not file_funcs and not mod_file_funcs and not conf_mod_file_funcs:
             raise ValueError("You need to specify at least one of the file-funcs variants!")
 
-        self.conf["archs"] = archs
+        self.archs = archs
         if cve:
             self.conf["cve"] = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
@@ -98,7 +98,7 @@ class Setup(Config):
         codestreams = self.setup_codestreams()
 
         logging.info(f"Affected architectures:")
-        logging.info(f"\t{' '.join(self.conf['archs'])}")
+        logging.info(f"\t{' '.join(self.archs)}")
 
         logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed
@@ -126,7 +126,7 @@ class Setup(Config):
                 # If the config was enabled on all supported architectures,
                 # there is no point in leaving the conf being set, since the
                 # feature will be available everywhere.
-                if self.conf["archs"] == utils.ARCHS:
+                if self.archs == utils.ARCHS:
                     fdata["conf"] = ""
 
                 mod_path = cs.find_obj_path(utils.ARCH, mod)
