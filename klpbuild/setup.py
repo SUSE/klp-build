@@ -49,7 +49,7 @@ class Setup(Config):
 
         self.archs = archs
         if cve:
-            self.conf["cve"] = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
+            self.cve = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
         self.no_check = no_check
         self.file_funcs = {}
@@ -80,7 +80,7 @@ class Setup(Config):
 
         # Called at this point because codestreams is populated
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(
-                                                     self.conf.get("cve", ""),
+                                                     self.cve,
                                                      "",
                                                      self.no_check)
         self.conf["commits"] = commits

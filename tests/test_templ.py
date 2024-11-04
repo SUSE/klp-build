@@ -8,8 +8,10 @@ from klpbuild.setup import Setup
 import klpbuild.utils as utils
 from tests.utils import get_file_content
 
+import inspect
+
 def test_templ_with_externalized_vars():
-    lp = "bsc9999999"
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u19"
 
     Setup(lp_name=lp, lp_filter=cs, cve=None,
@@ -34,7 +36,7 @@ def test_templ_with_externalized_vars():
 
 
 def test_templ_without_externalized_vars():
-    lp = "bsc9999999"
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u19"
 
     Setup(lp_name=lp, lp_filter=cs, cve=None,
@@ -56,12 +58,15 @@ def test_templ_without_externalized_vars():
     # As the config only targets x86_64, IS_ENABLED should be set
     assert "#if IS_ENABLED" in content
 
+    # Without CVE speficied, we should have XXXX-XXXX
+    assert "CVE-XXXX-XXXX" in content
+
 
 # For multifile patches, a third file will be generated and called
 # livepatch_XXX, and alongside this file the other files will have the prefix
 # bscXXXXXXX.
 def test_check_header_file_included():
-    lp = "bsc9999999"
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u17"
 
     Setup(lp_name=lp, lp_filter=cs, cve=None,
@@ -78,3 +83,19 @@ def test_check_header_file_included():
     # Check the other two files
     assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_kernel_events_core.c")
     assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_net_ipv6_rpl.c")
+
+
+def test_templ_cve_specified():
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "15.5u19"
+
+    Setup(lp_name=lp, lp_filter=cs, cve="1234-5678",
+          file_funcs=[["fs/proc/cmdline.c", "cmdline_proc_show"]],
+          mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
+          conf="CONFIG_PROC_FS",
+          archs=utils.ARCHS, skips=None, no_check=True).setup_project_files()
+
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+
+    # With CVE speficied, we should have it in the final file
+    assert "CVE-1234-5678" in get_file_content(lp, cs)

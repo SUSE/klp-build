@@ -40,6 +40,7 @@ class Config:
         self.lp_filter = lp_filter
         self.skips = skips
         self.archs = []
+        self.cve = ""
 
         self.codestreams = OrderedDict()
         self.codestreams_list = []
@@ -57,6 +58,7 @@ class Config:
             with open(self.cs_file) as f:
                 jfile = json.loads(f.read(), object_pairs_hook=OrderedDict)
                 self.archs = jfile["archs"]
+                self.cve = jfile["cve"]
                 self.codestreams = jfile["codestreams"]
                 for _, data in self.codestreams.items():
                     self.codestreams_list.append(Codestream.from_data(self.data,
@@ -161,7 +163,9 @@ class Config:
         for cs in working_cs:
             self.codestreams[cs.name()] = cs.data()
 
-        data = { "archs" : self.archs, "codestreams" : self.codestreams }
+        data = { "archs" : self.archs,
+                "cve" : self.cve,
+                "codestreams" : self.codestreams }
 
         with open(self.cs_file, "w") as f:
             f.write(json.dumps(data, indent=4))
