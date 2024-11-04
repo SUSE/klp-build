@@ -164,7 +164,7 @@ def get_exts(ibt_mod, ext_vars):
                             ext_list.append(f"\\t {lsym}")
                             ext_list.append(f"\\t {end}")
 
-        return '\\n#include <linux/livepatch.h>\\n\\n' + '\\n'.join(ext_list)
+        return '\\n'.join(ext_list)
 %>
 """
 
@@ -438,9 +438,6 @@ class TemplateGen(Config):
         with open(Path(lp_path, "patched_funcs.csv"), "w") as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
-    def get_work_dirname(self, fname):
-        return f'work_{str(fname).replace("/", "_")}'
-
     def __GenerateHeaderFile(self, lp_path, cs):
         out_name = f"livepatch_{self.lp_name}.h"
 
@@ -478,18 +475,6 @@ class TemplateGen(Config):
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
             f.write(Template(TEMPL_H, lookup=lpdir).render(**render_vars))
-
-    def __BuildKlpObjs(self, cs, src):
-        objs = {}
-
-        for src_file, fdata in cs.files.items():
-            if src and src != src_file:
-                continue
-            mod = fdata["module"].replace("-", "_")
-            objs.setdefault(mod, [])
-            objs[mod].extend(fdata["symbols"])
-
-        return objs
 
     def __GenerateLivepatchFile(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
@@ -543,9 +528,6 @@ class TemplateGen(Config):
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
 
-            # For C files, first add the LICENSE header template to the file
-            f.write(Template(TEMPL_SUSE_HEADER, lookup=lpdir).render(**render_vars))
-
             # If we have multiple source files for the same livepatch,
             # create one hollow file to wire-up the multiple _init and
             # _clean functions
@@ -561,10 +543,7 @@ class TemplateGen(Config):
             else:
                 temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
 
-            f.write(Template(temp_str, lookup=lpdir).render(**render_vars))
-
-    def get_cs_lp_dir(self, cs):
-        return Path(cs.dir(), "lp")
+            f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**render_vars))
 
     def CreateMakefile(self, cs, fname, final):
         if not final:
@@ -577,7 +556,7 @@ class TemplateGen(Config):
             with open(lp_path, "a") as f:
                 f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
         else:
-            work_dir = self.get_cs_lp_dir(cs)
+            work_dir = cs.lpdir()
             obj = f"livepatch_{self.lp_name}.o"
 
         render_vars = {"kdir": cs.get_kernel_build_path(ARCH), "pwd": work_dir, "obj": obj}
@@ -586,7 +565,7 @@ class TemplateGen(Config):
             f.write(Template(TEMPL_MAKEFILE).render(**render_vars))
 
     def GenerateLivePatches(self, cs):
-        lp_path = self.get_cs_lp_dir(cs)
+        lp_path = cs.lpdir()
         lp_path.mkdir(exist_ok=True)
 
         files = cs.files
@@ -610,9 +589,8 @@ class TemplateGen(Config):
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
-        lpdir = self.get_cs_lp_dir(cs)
-        render_vars = {"bsc": self.lp_name, "cs": cs, "lpdir": lpdir}
-        with open(Path(lpdir, "Kbuild.inc"), "w") as f:
+        render_vars = {"bsc": self.lp_name, "cs": cs, "lpdir": cs.lpdir()}
+        with open(Path(cs.lpdir(), "Kbuild.inc"), "w") as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
     def generate_commit_msg_file(self):

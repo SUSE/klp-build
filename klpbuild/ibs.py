@@ -24,8 +24,7 @@ from natsort import natsorted
 from osctiny import Osc
 
 from klpbuild.config import Config
-from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry
-
+from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch
 
 class IBS(Config):
     def __init__(self, lp_name, lp_filter):
@@ -483,9 +482,8 @@ class IBS(Config):
         return prj
 
     def create_lp_package(self, i, cs):
-        # get the kgraft branch related to this codestream
-        from klpbuild.ksrc import GitHelper
-        branch = GitHelper(self.lp_name, self.lp_filter).get_cs_branch(cs)
+        kgr_path = self.get_user_path('kgr_patches_dir')
+        branch = get_cs_branch(cs, self.lp_name, kgr_path)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
@@ -521,11 +519,10 @@ class IBS(Config):
 
         self.osc.packages.checkout(prj, "klp", prj_path)
 
-        kgraft_path = self.get_user_path('kgr_patches_dir')
 
         # Get the code from codestream
         subprocess.check_output(
-            ["/usr/bin/git", "clone", "--single-branch", "-b", branch, str(kgraft_path), str(code_path)],
+            ["/usr/bin/git", "clone", "--single-branch", "-b", branch, str(kgr_path), str(code_path)],
             stderr=subprocess.STDOUT,
         )
 
