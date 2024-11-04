@@ -128,10 +128,6 @@ class Config:
 
         return self.user_conf['Settings'][entry]
 
-    def lp_out_file(self, fname):
-        fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
-        return f"{self.lp_name}_{fpath}"
-
 
     # Return a Codestream object from the codestream name
     def get_cs(self, cs):

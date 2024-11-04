@@ -483,7 +483,7 @@ class IBS(Config):
 
     def create_lp_package(self, i, cs):
         kgr_path = self.get_user_path('kgr_patches_dir')
-        branch = get_cs_branch(cs, self.lp_name, kgr_path)
+        branch = get_cs_branch(cs, cs.lp_name, kgr_path)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
@@ -530,8 +530,8 @@ class IBS(Config):
         # Otherwise only warn the caller about this fact.
         # This scenario can occur in case of LPing function that is already
         # part of different LP in which case we modify the existing one.
-        if self.lp_name not in os.listdir(code_path):
-            logging.warning(f"Warning: Directory {self.lp_name} not found on branch {branch}")
+        if cs.lp_name not in os.listdir(code_path):
+            logging.warning(f"Warning: Directory {cs.lp_name} not found on branch {branch}")
 
         # Fix RELEASE version
         with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:

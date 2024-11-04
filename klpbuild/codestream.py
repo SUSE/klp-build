@@ -9,14 +9,15 @@ import re
 from klpbuild.utils import ARCH, is_mod
 
 class Codestream:
-    __slots__ = ("data_path", "lp_path", "sle", "sp", "update", "rt", "ktype",
-                 "needs_ibt", "project", "kernel", "archs", "files", "modules",
-                 "repo")
+    __slots__ = ("data_path", "lp_path", "lp_name", "sle", "sp", "update", "rt",
+                 "ktype", "needs_ibt", "project", "kernel", "archs", "files",
+                 "modules", "repo")
 
     def __init__(self, data_path, lp_path, sle, sp, update, rt, project="",
                  kernel="", archs=[], files={}, modules={}):
         self.data_path = data_path
         self.lp_path = lp_path
+        self.lp_name = PurePath(lp_path).name
         self.sle = sle
         self.sp = sp
         self.update = update
@@ -253,6 +254,11 @@ class Codestream:
         return Path(mod_path, obj)
 
 
+    def lp_out_file(self, fname):
+        fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
+        return f"{self.lp_name}_{fpath}"
+
+
     def data(self):
         return {
                 "sle" : self.sle,
@@ -267,4 +273,5 @@ class Codestream:
                 "repo" : self.repo,
                 "data_path" : str(self.data_path),
                 "lp_path" : str(self.lp_path),
+                "lp_name" : str(self.lp_name),
                 }

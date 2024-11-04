@@ -439,7 +439,7 @@ class TemplateGen(Config):
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
     def __GenerateHeaderFile(self, lp_path, cs):
-        out_name = f"livepatch_{self.lp_name}.h"
+        out_name = f"livepatch_{cs.lp_name}.h"
 
         lp_inc_dir = Path()
         proto_files = []
@@ -479,7 +479,7 @@ class TemplateGen(Config):
     def __GenerateLivepatchFile(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
             lp_inc_dir = str(cs.work_dir(src_file))
-            lp_file = self.lp_out_file(src_file)
+            lp_file = cs.lp_out_file(src_file)
             fdata = cs.files[str(src_file)]
             mod = self.fix_mod_string(fdata["module"])
             if not is_mod(mod):
@@ -503,13 +503,13 @@ class TemplateGen(Config):
         if use_src_name:
             out_name = lp_file
         else:
-            out_name = f"livepatch_{self.lp_name}.c"
+            out_name = f"livepatch_{cs.lp_name}.c"
 
         render_vars = {
             "include_header": "livepatch_" in out_name,
             "cve": self.cve if self.cve else "XXXX-XXXX",
-            "lp_name": self.lp_name,
-            "lp_num": self.lp_name.replace("bsc", ""),
+            "lp_name": cs.lp_name,
+            "lp_num": cs.lp_name.replace("bsc", ""),
             "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
             "year": datetime.today().year,
             "user": self.user,
@@ -551,12 +551,12 @@ class TemplateGen(Config):
             lp_path = Path(work_dir, "livepatch.c")
 
             # Add more data to make it compile correctly
-            shutil.copy(Path(work_dir, self.lp_out_file(fname)), lp_path)
+            shutil.copy(Path(work_dir, cs.lp_out_file(fname)), lp_path)
             with open(lp_path, "a") as f:
                 f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
         else:
             work_dir = cs.lpdir()
-            obj = f"livepatch_{self.lp_name}.o"
+            obj = f"livepatch_{cs.lp_name}.o"
 
         render_vars = {"kdir": cs.get_kernel_build_path(ARCH), "pwd": work_dir, "obj": obj}
 
@@ -588,7 +588,7 @@ class TemplateGen(Config):
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def CreateKbuildFile(self, cs):
-        render_vars = {"bsc": self.lp_name, "cs": cs, "lpdir": cs.lpdir()}
+        render_vars = {"bsc": cs.lp_name, "cs": cs, "lpdir": cs.lpdir()}
         with open(Path(cs.lpdir(), "Kbuild.inc"), "w") as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
