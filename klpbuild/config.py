@@ -42,10 +42,7 @@ class Config:
 
         self.codestreams = OrderedDict()
         self.codestreams_list = []
-        self.conf = OrderedDict(
-            {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data":
-             str(data_dir), }
-        )
+        self.conf = OrderedDict()
 
         self.conf_file = Path(self.lp_path, "conf.json")
         if self.conf_file.is_file():
