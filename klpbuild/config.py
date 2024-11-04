@@ -54,7 +54,8 @@ class Config:
         self.cs_file = Path(self.lp_path, "codestreams.json")
         if self.cs_file.is_file():
             with open(self.cs_file) as f:
-                self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
+                jfile = json.loads(f.read(), object_pairs_hook=OrderedDict)
+                self.codestreams = jfile["codestreams"]
                 for _, data in self.codestreams.items():
                     self.codestreams_list.append(Codestream.from_data(self.data,
                                                                       self.lp_path,
@@ -159,7 +160,7 @@ class Config:
             self.codestreams[cs.name()] = cs.data()
 
         with open(self.cs_file, "w") as f:
-            f.write(json.dumps(self.codestreams, indent=4))
+            f.write(json.dumps({ "codestreams" : self.codestreams}, indent=4))
 
 
     # Return the codestreams list but removing already patched codestreams,
