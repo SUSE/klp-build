@@ -84,10 +84,9 @@ class Setup(Config):
                                                      "",
                                                      self.no_check)
         self.commits = commits
-        self.conf["patched_kernels"] = patched_kernels
+        self.patched_kernels = patched_kernels
         # Add new codestreams to the already existing list, skipping duplicates
-        self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs",
-                                                                   []) + patched_cs)))
+        self.patched_cs = natsorted(list(set(self.patched_cs + patched_cs)))
 
         return codestreams
 
@@ -149,9 +148,4 @@ class Setup(Config):
                         logging.warning(f"{cs_}: Symbols {m_syms} not found on {mod} object")
 
         self.flush_cs_file(codestreams)
-
-        # cpp will use this data in the next step
-        with open(self.conf_file, "w") as f:
-            f.write(json.dumps(self.conf, indent=4))
-
         logging.info("Done. Setup finished.")

@@ -42,16 +42,11 @@ class Config:
         self.archs = []
         self.cve = ""
         self.commits = {}
+        self.patched_kernels = []
+        self.patched_cs = []
 
         self.codestreams = OrderedDict()
         self.codestreams_list = []
-        self.conf = OrderedDict()
-
-        self.conf_file = Path(self.lp_path, "conf.json")
-        if self.conf_file.is_file():
-            with open(self.conf_file) as f:
-                self.conf = json.loads(f.read(), object_pairs_hook=OrderedDict)
-
         self.data = self.get_user_path('data_dir')
 
         self.cs_file = Path(self.lp_path, "codestreams.json")
@@ -61,6 +56,8 @@ class Config:
                 self.archs = jfile["archs"]
                 self.commits = jfile["commits"]
                 self.cve = jfile["cve"]
+                self.patched_kernels = jfile["patched_kernels"]
+                self.patched_cs = jfile["patched_cs"]
                 self.codestreams = jfile["codestreams"]
                 for _, data in self.codestreams.items():
                     self.codestreams_list.append(Codestream.from_data(self.data,
@@ -168,6 +165,8 @@ class Config:
         data = { "archs" : self.archs,
                 "commits" : self.commits,
                 "cve" : self.cve,
+                "patched_cs" : self.patched_cs,
+                "patched_kernels" : self.patched_kernels,
                 "codestreams" : self.codestreams }
 
         with open(self.cs_file, "w") as f:
