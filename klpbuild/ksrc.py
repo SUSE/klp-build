@@ -59,7 +59,7 @@ class GitHelper(Config):
             [
                 "/usr/bin/git",
                 "-C",
-                str(self.kgraft_tests_path),
+                str(self.get_user_path('kgr_patches_tests_dir')),
                 "format-patch",
                 "-1",
                 f"{test_src}",

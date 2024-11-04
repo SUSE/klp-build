@@ -139,22 +139,20 @@ class Config:
 
 
     def get_tests_path(self):
-        self.kgraft_tests_path = self.get_user_path('kgr_patches_tests_dir')
+        kgr_path = self.get_user_path('kgr_patches_tests_dir')
 
-        test_sh = Path(self.kgraft_tests_path, f"{self.lp_name}_test_script.sh")
-        test_dir_sh = Path(self.kgraft_tests_path, f"{self.lp_name}/test_script.sh")
-
+        test_sh = Path(kgr_path, f"{self.lp_name}_test_script.sh")
         if test_sh.is_file():
-            test_src = test_sh
-        elif test_dir_sh.is_file():
+            return test_sh
+
+        test_dir_sh = Path(kgr_path, f"{self.lp_name}/test_script.sh")
+        if test_dir_sh.is_file():
             # For more complex tests we support using a directory containing
             # as much files as needed. A `test_script.sh` is still required
             # as an entry point.
-            test_src = Path(os.path.dirname(test_dir_sh))
-        else:
-            raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
+            return PurePath(test_dir_sh).parent
 
-        return test_src
+        raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
 
 
     # Update and save codestreams data
