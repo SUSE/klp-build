@@ -521,9 +521,8 @@ class TemplateGen(Config):
             "ext_vars": exts,
             "inc_src_file": lp_file,
             "ibt": ibt,
+            "commits": self.commits
         }
-
-        render_vars['commits'] = self.conf["commits"]
 
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
@@ -594,7 +593,7 @@ class TemplateGen(Config):
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
     def generate_commit_msg_file(self):
-        cmts = self.conf["commits"].get("upstream", {})
+        cmts = self.commits.get("upstream", {})
         if cmts:
             cmts = cmts["commits"]
         render_vars = {

@@ -83,7 +83,7 @@ class Setup(Config):
                                                      self.cve,
                                                      "",
                                                      self.no_check)
-        self.conf["commits"] = commits
+        self.commits = commits
         self.conf["patched_kernels"] = patched_kernels
         # Add new codestreams to the already existing list, skipping duplicates
         self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs",

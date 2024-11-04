@@ -41,6 +41,7 @@ class Config:
         self.skips = skips
         self.archs = []
         self.cve = ""
+        self.commits = {}
 
         self.codestreams = OrderedDict()
         self.codestreams_list = []
@@ -58,6 +59,7 @@ class Config:
             with open(self.cs_file) as f:
                 jfile = json.loads(f.read(), object_pairs_hook=OrderedDict)
                 self.archs = jfile["archs"]
+                self.commits = jfile["commits"]
                 self.cve = jfile["cve"]
                 self.codestreams = jfile["codestreams"]
                 for _, data in self.codestreams.items():
@@ -164,6 +166,7 @@ class Config:
             self.codestreams[cs.name()] = cs.data()
 
         data = { "archs" : self.archs,
+                "commits" : self.commits,
                 "cve" : self.cve,
                 "codestreams" : self.codestreams }
 
