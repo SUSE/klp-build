@@ -35,8 +35,7 @@ class Config:
 
         work = self.get_user_path('work_dir')
 
-        self.lp_name = lp_name
-        self.lp_path = Path(work, self.lp_name)
+        self.lp_path = Path(work, lp_name)
         self.lp_filter = lp_filter
         self.skips = skips
         self.archs = []
@@ -134,14 +133,14 @@ class Config:
         return Codestream.from_data(self.data, self.lp_path, self.codestreams[cs])
 
 
-    def get_tests_path(self):
+    def get_tests_path(self, lp_name):
         kgr_path = self.get_user_path('kgr_patches_tests_dir')
 
-        test_sh = Path(kgr_path, f"{self.lp_name}_test_script.sh")
+        test_sh = Path(kgr_path, f"{lp_name}_test_script.sh")
         if test_sh.is_file():
             return test_sh
 
-        test_dir_sh = Path(kgr_path, f"{self.lp_name}/test_script.sh")
+        test_dir_sh = Path(kgr_path, f"{lp_name}/test_script.sh")
         if test_dir_sh.is_file():
             # For more complex tests we support using a directory containing
             # as much files as needed. A `test_script.sh` is still required

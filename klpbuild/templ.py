@@ -412,6 +412,7 @@ class TemplateGen(Config):
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
         self.check_enabled = self.archs != ARCHS
+        self.lp_name = lp_name
 
         try:
             import git

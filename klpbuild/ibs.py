@@ -31,6 +31,8 @@ class IBS(Config):
         super().__init__(lp_name, lp_filter)
         self.osc = Osc(url="https://api.suse.de")
 
+        self.lp_name = lp_name
+
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
@@ -280,7 +282,7 @@ class IBS(Config):
         # Download all built rpms
         self.download()
 
-        test_src = self.get_tests_path()
+        test_src = self.get_tests_path(self.lp_name)
         run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
 
         logging.info(f"Validating the downloaded RPMs...")

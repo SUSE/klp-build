@@ -51,6 +51,7 @@ class Setup(Config):
         if cve:
             self.cve = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
+        self.lp_name = lp_name
         self.no_check = no_check
         self.file_funcs = {}
 
