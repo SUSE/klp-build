@@ -21,7 +21,6 @@ class Setup(Config):
         self,
         lp_name,
         lp_filter,
-        data_dir,
         cve,
         file_funcs,
         mod_file_funcs,
@@ -32,7 +31,7 @@ class Setup(Config):
         skips,
         no_check,
     ):
-        super().__init__(lp_name, lp_filter, data_dir, skips=skips)
+        super().__init__(lp_name, lp_filter, skips=skips)
 
         archs.sort()
 

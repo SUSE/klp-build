@@ -17,7 +17,7 @@ from klpbuild.utils import ARCH, classify_codestreams, get_all_symbols_from_obje
 
 
 class Config:
-    def __init__(self, lp_name, lp_filter, data_dir=None, skips=""):
+    def __init__(self, lp_name, lp_filter, skips=""):
         # FIXME: Config is instantiated multiple times, meaning that the
         # config file gets loaded and the logs are printed as many times.
 
@@ -49,9 +49,7 @@ class Config:
             with open(self.conf_file) as f:
                 self.conf = json.loads(f.read(), object_pairs_hook=OrderedDict)
 
-        self.data = Path(self.conf.get("data", "non-existent"))
-        if not self.data.exists():
-            self.data = self.get_user_path('data_dir')
+        self.data = self.get_user_path('data_dir')
 
         self.cs_file = Path(self.lp_path, "codestreams.json")
         if self.cs_file.is_file():
