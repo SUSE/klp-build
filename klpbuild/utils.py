@@ -197,3 +197,8 @@ def get_cs_branch(cs, lp_name, git_dir):
             # other branches.
 
     return branch_name
+
+
+def check_module_unsupported(mod_path):
+    elffile = get_elf_object(mod_path)
+    return "no" == get_elf_modinfo_entry(elffile, "supported")

@@ -3,10 +3,10 @@
 # Copyright (C) 2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-from pathlib import Path
+from pathlib import Path, PurePath
 import re
 
-from klpbuild.utils import ARCH
+from klpbuild.utils import ARCH, is_mod
 
 class Codestream:
     __slots__ = ("data_path", "lp_path", "sle", "sp", "update", "rt", "ktype",
@@ -169,6 +169,12 @@ class Codestream:
         return Path(self.get_data_dir(arch), "lib", "modules", f"{self.kname()}")
 
 
+    # A codestream can be patching multiple objects, so get the path related to
+    # the module that we are interested
+    def get_mod(self, mod):
+        return self.modules[mod]
+
+
     # Returns the path to the kernel-obj's build dir, used when build testing
     # the generated module
     def get_kernel_build_path(self, arch):
@@ -190,6 +196,61 @@ class Codestream:
                     configs[arch] = match.group(1)
 
         return configs
+
+
+    def validate_config(self, conf, mod):
+        configs = {}
+
+        # Validate only the specified architectures, but check if the codestream
+        # is supported on that arch (like RT that is currently supported only on
+        # x86_64)
+        for arch, conf_entry in self.get_all_configs(conf).items():
+            if conf_entry == "m" and mod == "vmlinux":
+                raise RuntimeError(f"{self.name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
+            if conf_entry == "y" and mod != "vmlinux":
+                raise RuntimeError(f"{self.name()}:{arch} ({self.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
+
+            configs.setdefault(conf_entry, [])
+            configs[conf_entry].append(f"{self.name()}:{arch}")
+
+        # Validate if we have different settings for the same config on
+        # different architecures, like having it as builtin on one and as a
+        # module on a different arch.
+        if len(configs.keys()) > 1:
+            print(configs["y"])
+            print(configs["m"])
+            raise RuntimeError(f"{self.name()}: Configuration mismatach between codestreams. Aborting.")
+
+
+    # Return only the name of the module to be livepatched
+    def find_obj_path(self, arch, mod):
+        # Return the path is the modules was previously found
+        obj = self.modules.get(mod, "")
+        if obj:
+            return obj
+
+        # We already know the path to vmlinux, so return it
+        if not is_mod(mod):
+            return self.get_boot_file("vmlinux", arch)
+
+        # Module name use underscores, but the final module object uses hyphens.
+        mod = mod.replace("_", "[-_]")
+
+        mod_path = self.get_mod_path(arch)
+        with open(Path(mod_path, "modules.order")) as f:
+            obj_match = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
+            if not obj_match:
+                raise RuntimeError(f"{self.name()}-{arch} ({self.kernel}): Module not found: {mod}")
+
+        # modules.order will show the module with suffix .o, so
+        # make sure the extension. Also check for multiple extensions since we
+        # can have modules being compressed using different algorithms.
+        for ext in [".ko", ".ko.zst", ".ko.gz"]:
+            obj = str(PurePath(obj_match.group(1)).with_suffix(ext))
+            if Path(mod_path, obj).exists():
+                break
+
+        return Path(mod_path, obj)
 
 
     def data(self):
