@@ -3,17 +3,19 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-import git
+import copy
 import gzip
 import io
+import logging
+import lzma
 import platform
+import re
+import zstandard
 
+import git
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
-
-import lzma
-import zstandard
 
 
 ARCH = platform.processor()
@@ -202,3 +204,36 @@ def get_cs_branch(cs, lp_name, git_dir):
 def check_module_unsupported(mod_path):
     elffile = get_elf_object(mod_path)
     return "no" == get_elf_modinfo_entry(elffile, "supported")
+
+
+def filter_cs(lp_filter, lp_skip, cs_list, verbose=False):
+    if isinstance(cs_list, dict):
+        full_cs = copy.deepcopy(list(cs_list.values()))
+    else:
+        full_cs = copy.deepcopy(cs_list)
+
+    if verbose:
+        logging.info("Checking filter and skips...")
+
+    result = []
+    filtered = []
+    for cs in full_cs:
+        name = cs.name()
+
+        if lp_filter and not re.match(lp_filter, name):
+            filtered.append(name)
+            continue
+
+        if lp_skip and re.match(lp_skip, name):
+            filtered.append(name)
+            continue
+
+        result.append(cs)
+
+    if verbose:
+        if filtered:
+            logging.info("Skipping codestreams:")
+            clist = " ".join(classify_codestreams(filtered))
+            logging.info("\t%s", clist)
+
+    return result

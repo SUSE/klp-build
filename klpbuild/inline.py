@@ -4,20 +4,20 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import shutil
-from pathlib import Path
 import subprocess
 
 from klpbuild.config import Config
-from klpbuild.utils import ARCH
+from klpbuild.utils import filter_cs
 
 
 class Inliner(Config):
     def __init__(self, lp_name, lp_filter):
-        super().__init__(lp_name, lp_filter)
+        super().__init__(lp_name)
 
         if not self.lp_path.exists():
             raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
 
+        self.lp_filter = lp_filter
         self.ce_inline_path = shutil.which("ce-inline")
         if not self.ce_inline_path:
             raise RuntimeError("ce-inline not found. Aborting.")
@@ -25,7 +25,7 @@ class Inliner(Config):
     def check_inline(self, fname, func):
         ce_args = [ str(self.ce_inline_path), "-where-is-inlined" ]
 
-        filtered = self.filter_cs()
+        filtered = filter_cs(self.lp_filter, "", self.codestreams)
         if not filtered:
             raise RuntimeError(f"Codestream {self.lp_filter} not found. Aborting.")
 

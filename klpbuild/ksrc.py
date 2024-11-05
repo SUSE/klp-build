@@ -12,7 +12,6 @@ from datetime import datetime
 from pathlib import Path
 from pathlib import PurePath
 
-import git
 import requests
 from natsort import natsorted
 
@@ -23,8 +22,8 @@ from klpbuild import utils
 
 
 class GitHelper(Config):
-    def __init__(self, lp_name, lp_filter, skips=""):
-        super().__init__(lp_name, lp_filter, skips)
+    def __init__(self, lp_name, lp_filter, skips):
+        super().__init__(lp_name)
 
         self.kern_src = self.get_user_path('kernel_src_dir', isopt=True)
 
@@ -42,6 +41,8 @@ class GitHelper(Config):
         }
 
         self.lp_name = lp_name
+        self.lp_filter = lp_filter
+        self.lp_skip = skips
 
     def format_patches(self, version):
         ver = f"v{version}"
@@ -498,7 +499,7 @@ class GitHelper(Config):
         if data_missing:
             logging.info("Download the necessary data from the following codestreams:")
             logging.info(f'\t{" ".join(cs_missing)}\n')
-            IBS(self.lp_name, self.lp_filter).download_cs_data(data_missing)
+            IBS(self.lp_name, self.lp_filter, self.skip).download_cs_data(data_missing)
             logging.info("Done.")
 
             for cs in data_missing:
@@ -526,7 +527,8 @@ class GitHelper(Config):
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
-        working_cs = self.filter_cs(working_cs, verbose=True)
+        working_cs = utils.filter_cs(self.lp_filter, self.lp_skip,
+                                    working_cs, verbose=True)
 
         if not working_cs:
             logging.info("All supported codestreams are already patched. Exiting klp-build")

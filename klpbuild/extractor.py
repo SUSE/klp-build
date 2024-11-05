@@ -27,7 +27,7 @@ from klpbuild.templ import TemplateGen
 
 class Extractor(Config):
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
-        super().__init__(lp_name, lp_filter)
+        super().__init__(lp_name)
 
         self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
         self.sdir_lock.acquire()
@@ -36,6 +36,7 @@ class Extractor(Config):
             raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
 
         patches = self.get_patches_dir()
+        self.lp_filter = lp_filter
         self.apply_patches = apply_patches
         self.avoid_ext = avoid_ext
 
@@ -57,7 +58,7 @@ class Extractor(Config):
         self.total = 0
         self.make_lock = Lock()
 
-        self.tem = TemplateGen(lp_name, lp_filter)
+        self.tem = TemplateGen(lp_name)
 
         self.env = os.environ
 
@@ -468,7 +469,8 @@ class Extractor(Config):
     def run(self):
         logging.info(f"Work directory: {self.lp_path}")
 
-        working_cs = self.filter_cs(verbose=True)
+        working_cs = utils.filter_cs(self.lp_filter, "",
+                                    self.codestreams, verbose=True)
 
         if len(working_cs) == 0:
             logging.error(f"No codestreams found")
@@ -601,7 +603,9 @@ class Extractor(Config):
 
         cs_cmp = []
 
-        for cs in self.filter_cs():
+        for cs in utils.filter_cs(self.lp_filter, "",
+                                 self.codestreams, verbose=True):
+
             cs_cmp.append(cs.name())
             for fname, _ in cs.files.items():
                 args.append((_, fname, cs, _))

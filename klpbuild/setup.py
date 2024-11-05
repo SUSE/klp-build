@@ -4,7 +4,6 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import copy
-import json
 import logging
 import re
 from pathlib import Path
@@ -31,7 +30,7 @@ class Setup(Config):
         skips,
         no_check,
     ):
-        super().__init__(lp_name, lp_filter, skips=skips)
+        super().__init__(lp_name)
 
         archs.sort()
 
@@ -52,6 +51,8 @@ class Setup(Config):
             self.cve = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
         self.lp_name = lp_name
+        self.lp_filter = lp_filter
+        self.lp_skips = skips
         self.no_check = no_check
         self.file_funcs = {}
 
@@ -77,7 +78,7 @@ class Setup(Config):
             self.file_funcs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
 
     def setup_codestreams(self):
-        ksrc = GitHelper(self.lp_name, self.lp_filter, skips=self.skips)
+        ksrc = GitHelper(self.lp_name, self.lp_filter, self.lp_skips)
 
         # Called at this point because codestreams is populated
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(

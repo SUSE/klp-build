@@ -4,20 +4,18 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import configparser
-import copy
 import json
 import logging
 import os
-import re
 from collections import OrderedDict
 from pathlib import Path, PurePath
 
 from klpbuild.codestream import Codestream
-from klpbuild.utils import ARCH, classify_codestreams, get_all_symbols_from_object
+from klpbuild.utils import ARCH, get_all_symbols_from_object
 
 
 class Config:
-    def __init__(self, lp_name, lp_filter, skips=""):
+    def __init__(self, lp_name):
         # FIXME: Config is instantiated multiple times, meaning that the
         # config file gets loaded and the logs are printed as many times.
 
@@ -33,8 +31,6 @@ class Config:
 
         self.load_user_conf()
 
-        self.lp_filter = lp_filter
-        self.skips = skips
         self.archs = []
         self.cve = ""
         self.commits = {}
@@ -154,38 +150,6 @@ class Config:
         with open(self.cs_file, "w") as f:
             f.write(json.dumps(data, indent=4))
 
-
-    # Return the codestreams list but removing already patched codestreams,
-    # codestreams without file-funcs and not matching the filter
-    def filter_cs(self, cs_list=None, verbose=False):
-        if not cs_list:
-            cs_list = list(self.codestreams.values())
-        full_cs = copy.deepcopy(cs_list)
-
-        if verbose:
-            logging.info("Checking filter and skips...")
-
-        result = []
-        filtered = []
-        for cs in full_cs:
-            name = cs.name()
-
-            if self.lp_filter and not re.match(self.lp_filter, name):
-                filtered.append(name)
-                continue
-
-            if self.skips and re.match(self.skips, name):
-                filtered.append(name)
-                continue
-
-            result.append(cs)
-
-        if verbose:
-            if filtered:
-                logging.info("Skipping codestreams:")
-                logging.info(f'\t{" ".join(classify_codestreams(filtered))}')
-
-        return result
 
     # Cache the symbols using the object path. It differs for each
     # codestream and architecture
