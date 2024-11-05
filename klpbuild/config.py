@@ -33,9 +33,6 @@ class Config:
 
         self.load_user_conf()
 
-        work = self.get_user_path('work_dir')
-
-        self.lp_path = Path(work, lp_name)
         self.lp_filter = lp_filter
         self.skips = skips
         self.archs = []
@@ -45,8 +42,8 @@ class Config:
         self.patched_cs = []
 
         self.codestreams = OrderedDict()
-        self.codestreams_list = []
         self.data = self.get_user_path('data_dir')
+        self.lp_path = Path(self.get_user_path('work_dir'), lp_name)
 
         self.cs_file = Path(self.lp_path, "codestreams.json")
         if self.cs_file.is_file():
@@ -57,11 +54,10 @@ class Config:
                 self.cve = jfile["cve"]
                 self.patched_kernels = jfile["patched_kernels"]
                 self.patched_cs = jfile["patched_cs"]
-                self.codestreams = jfile["codestreams"]
-                for _, data in self.codestreams.items():
-                    self.codestreams_list.append(Codestream.from_data(self.data,
+                for cs, data in jfile["codestreams"].items():
+                    self.codestreams[cs] = Codestream.from_data(self.data,
                                                                       self.lp_path,
-                                                                      data))
+                                                                      data)
 
         # will contain the symbols from the to be livepatched object
         # cached by the codestream : object
@@ -130,7 +126,7 @@ class Config:
 
     # Return a Codestream object from the codestream name
     def get_cs(self, cs):
-        return Codestream.from_data(self.data, self.lp_path, self.codestreams[cs])
+        return self.codestreams[cs]
 
 
     def get_tests_path(self, lp_name):
@@ -170,7 +166,7 @@ class Config:
     # codestreams without file-funcs and not matching the filter
     def filter_cs(self, cs_list=None, verbose=False):
         if not cs_list:
-            cs_list = self.codestreams_list
+            cs_list = list(self.codestreams.values())
         full_cs = copy.deepcopy(cs_list)
 
         if verbose:
