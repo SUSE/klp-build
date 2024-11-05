@@ -370,7 +370,8 @@ class IBS(Config):
             prj = result.get("name")
             cs_name = self.convert_prj_to_cs(prj)
 
-            cs = self.get_cs(cs_name)
+            # Get the codestream from the dict
+            cs = self.codestreams[cs_name]
 
             # Remove previously downloaded rpms
             self.delete_rpms(cs)

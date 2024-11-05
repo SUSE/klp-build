@@ -10,7 +10,7 @@ import logging
 import os
 import re
 from collections import OrderedDict
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from klpbuild.codestream import Codestream
 from klpbuild.utils import ARCH, classify_codestreams, get_all_symbols_from_object
@@ -26,7 +26,7 @@ class Config:
         home = Path.home()
         self.user_conf_file = Path(home, ".config/klp-build/config")
         if not self.user_conf_file.is_file():
-            logging.warning(f"Warning: user configuration file not found")
+            logging.warning("Warning: user configuration file not found")
             # If there's no configuration file assume fresh install.
             # Prepare the system with a default environment and conf.
             self.setup_user_env(Path(home, "klp"))
@@ -55,9 +55,7 @@ class Config:
                 self.patched_kernels = jfile["patched_kernels"]
                 self.patched_cs = jfile["patched_cs"]
                 for cs, data in jfile["codestreams"].items():
-                    self.codestreams[cs] = Codestream.from_data(self.data,
-                                                                      self.lp_path,
-                                                                      data)
+                    self.codestreams[cs] = Codestream.from_data(data)
 
         # will contain the symbols from the to be livepatched object
         # cached by the codestream : object
@@ -93,7 +91,7 @@ class Config:
         config.read(self.user_conf_file)
 
         # Check mandatory fields
-        for s in {'Paths', 'Settings'}:
+        for s in ['Paths', 'Settings']:
             if s not in config:
                 raise ValueError(f"config: '{s}' section not found")
 
@@ -122,11 +120,6 @@ class Config:
             raise ValueError(f"config: '{entry}' entry not found")
 
         return self.user_conf['Settings'][entry]
-
-
-    # Return a Codestream object from the codestream name
-    def get_cs(self, cs):
-        return self.codestreams[cs]
 
 
     def get_tests_path(self, lp_name):
@@ -180,7 +173,8 @@ class Config:
             if self.lp_filter and not re.match(self.lp_filter, name):
                 filtered.append(name)
                 continue
-            elif self.skips and re.match(self.skips, name):
+
+            if self.skips and re.match(self.skips, name):
                 filtered.append(name)
                 continue
 

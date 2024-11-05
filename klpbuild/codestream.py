@@ -54,10 +54,10 @@ class Codestream:
 
 
     @classmethod
-    def from_data(cls, data_path, lp_path, data):
-        return cls(data_path, lp_path, data["sle"], data["sp"], data["update"],
-                   data["rt"], data["project"], data["kernel"], data["archs"],
-                   data["files"], data["modules"])
+    def from_data(cls, data):
+        return cls(data["data_path"], data["lp_path"], data["sle"], data["sp"],
+                   data["update"], data["rt"], data["project"], data["kernel"],
+                   data["archs"], data["files"], data["modules"])
 
 
     def __eq__(self, cs):
