@@ -686,6 +686,9 @@ class Extractor(Config):
         for cs_list in cs_equal:
             groups.append(" ".join(utils.classify_codestreams(cs_list)))
 
+        # Sort between all groups of codestreams
+        groups = natsorted(groups)
+
         with open(Path(self.lp_path, "ccp", "groups"), "w") as f:
             f.write("\n".join(groups))
 

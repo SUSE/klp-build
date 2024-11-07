@@ -17,6 +17,7 @@ from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
+from natsort import natsorted
 
 ARCH = platform.processor()
 ARCHS = ["ppc64le", "s390x", "x86_64"]
@@ -76,7 +77,7 @@ def classify_codestreams(cs_list):
             last_item = sim[len(sim) - 1]
             ret_list.append(f"{cs}u{sim[0]}-{last_item}")
 
-    return ret_list
+    return natsorted(ret_list)
 
 
 def is_mod(mod):
