@@ -11,7 +11,6 @@ from collections import OrderedDict
 from pathlib import Path, PurePath
 
 from klpbuild.codestream import Codestream
-from klpbuild.utils import ARCH, get_all_symbols_from_object
 
 
 class Config:
@@ -52,10 +51,6 @@ class Config:
                 self.patched_cs = jfile["patched_cs"]
                 for cs, data in jfile["codestreams"].items():
                     self.codestreams[cs] = Codestream.from_data(data)
-
-        # will contain the symbols from the to be livepatched object
-        # cached by the codestream : object
-        self.obj_symbols = {}
 
 
     def setup_user_env(self, basedir):
@@ -149,59 +144,3 @@ class Config:
 
         with open(self.cs_file, "w") as f:
             f.write(json.dumps(data, indent=4))
-
-
-    # Cache the symbols using the object path. It differs for each
-    # codestream and architecture
-    # Return all the symbols not found per arch/obj
-    def check_symbol(self, arch, cs, mod, symbols):
-        name = cs.name()
-
-        self.obj_symbols.setdefault(arch, {})
-        self.obj_symbols[arch].setdefault(name, {})
-
-        # Checking if we already cached the results for this codestream
-        if not self.obj_symbols[arch][name].get(mod, ""):
-            obj = cs.find_obj_path(arch, mod)
-            self.obj_symbols[arch][name][mod] = get_all_symbols_from_object(obj, True)
-
-        ret = []
-
-        for symbol in symbols:
-            nsyms = self.obj_symbols[arch][name][mod].count(symbol)
-            if nsyms == 0:
-                ret.append(symbol)
-
-            elif nsyms > 1:
-                print(f"WARNING: {cs.name()}-{arch} ({cs.kernel}): symbol {symbol} duplicated on {mod}")
-
-            # If len(syms) == 1 means that we found a unique symbol, which is
-            # what we expect, and nothing need to be done.
-
-        return ret
-
-    # This functions is used to check if the symbols exist in the module they
-    # we will livepatch. In this case skip_on_host argument will be false,
-    # meaning that we want the symbol to checked against all supported
-    # architectures before creating the livepatches.
-    #
-    # It is also used when we want to check if a symbol externalized in one
-    # architecture exists in the other supported ones. In this case skip_on_host
-    # will be True, since we trust the decisions made by the extractor tool.
-    def check_symbol_archs(self, cs, mod, symbols, skip_on_host):
-        arch_sym = {}
-        # Validate only architectures supported by the codestream
-        for arch in cs.archs:
-            if arch == ARCH and skip_on_host:
-                continue
-
-            # Skip if the arch is not supported by the livepatch code
-            if not arch in self.archs:
-                continue
-
-            # Assign the not found symbols on arch
-            syms = self.check_symbol(arch, cs, mod, symbols)
-            if syms:
-                arch_sym[arch] = syms
-
-        return arch_sym

@@ -6,7 +6,7 @@
 from pathlib import Path, PurePath
 import re
 
-from klpbuild.utils import ARCH, is_mod
+from klpbuild.utils import ARCH, is_mod, get_all_symbols_from_object
 
 class Codestream:
     __slots__ = ("data_path", "lp_path", "lp_name", "sle", "sp", "update", "rt",
@@ -257,6 +257,64 @@ class Codestream:
     def lp_out_file(self, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f"{self.lp_name}_{fpath}"
+
+
+    # Cache the symbols using the object path. It differs for each
+    # codestream and architecture
+    # Return all the symbols not found per arch/obj
+    def __check_symbol(self, arch, mod, symbols, cache):
+        name = self.name()
+
+        cache.setdefault(arch, {})
+        cache[arch].setdefault(name, {})
+
+        if not cache[arch][name].get(mod, ""):
+            obj = self.find_obj_path(arch, mod)
+            cache[arch][name][mod] = get_all_symbols_from_object(obj, True)
+
+        ret = []
+
+        for symbol in symbols:
+            nsyms = cache[arch][name][mod].count(symbol)
+            if nsyms == 0:
+                ret.append(symbol)
+
+            elif nsyms > 1:
+                print(f"WARNING: {self.name()}-{arch} ({self.kernel}): symbol {symbol} duplicated on {mod}")
+
+            # If len(syms) == 1 means that we found a unique symbol, which is
+            # what we expect, and nothing need to be done.
+
+        return ret
+
+
+    # This functions is used to check if the symbols exist in the module that
+    # will be livepatched. In this case skip_on_host argument will be false,
+    # meaning that we want the symbol to checked against all supported
+    # architectures before creating the livepatches.
+    #
+    # It is also used when we want to check if a symbol externalized in one
+    # architecture exists in the other supported ones. In this case skip_on_host
+    # will be True, since we trust the decisions made by the extractor tool.
+    def check_symbol_archs(self, lp_archs, mod, symbols, skip_on_host):
+        cache = {}
+
+        arch_sym = {}
+        # Validate only architectures supported by the codestream
+        for arch in self.archs:
+            if arch == ARCH and skip_on_host:
+                continue
+
+            # Skip if the arch is not supported by the livepatch code
+            if arch not in lp_archs:
+                continue
+
+            # Assign the not found symbols on arch
+            syms = self.__check_symbol(arch, mod, symbols, cache)
+            if syms:
+                arch_sym[arch] = syms
+
+        return arch_sym
 
 
     def data(self):
