@@ -130,17 +130,23 @@ class Config:
         raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
 
 
-    # Update and save codestreams data
+    # Update and save codestreams data, working_cs is always a list
     def flush_cs_file(self, working_cs):
+        # Update the latest state of the codestreams
         for cs in working_cs:
-            self.codestreams[cs.name()] = cs.data()
+            self.codestreams[cs.name()] = cs
+
+        # Format each codestream for the json
+        cs_data = {}
+        for key, cs in self.codestreams.items():
+            cs_data[key] = cs.data()
 
         data = { "archs" : self.archs,
                 "commits" : self.commits,
                 "cve" : self.cve,
                 "patched_cs" : self.patched_cs,
                 "patched_kernels" : self.patched_kernels,
-                "codestreams" : self.codestreams }
+                "codestreams" : cs_data }
 
         with open(self.cs_file, "w") as f:
             f.write(json.dumps(data, indent=4))
