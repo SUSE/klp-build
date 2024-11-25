@@ -32,7 +32,6 @@ By default set to: __~/klp/livepatches__.
 Path to directory where the dowloaded kernels source code will be placed. To create a
 livepatch for upstream kernel, it has to point to a kernel tree with the
 sources already built. By default set to: __~/klp/data__.
-Option ``--data-dir``, if set, will overwrite the path specified here.
 
 #### kernel_src_dir
 Only used for SLE kernels. Should contain the path to the

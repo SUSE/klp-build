@@ -21,7 +21,6 @@ class Setup(Config):
         self,
         lp_name,
         lp_filter,
-        data_dir,
         cve,
         file_funcs,
         mod_file_funcs,
@@ -32,7 +31,7 @@ class Setup(Config):
         skips,
         no_check,
     ):
-        super().__init__(lp_name, lp_filter, data_dir, skips=skips)
+        super().__init__(lp_name, lp_filter, skips=skips)
 
         archs.sort()
 
@@ -48,10 +47,11 @@ class Setup(Config):
         if not file_funcs and not mod_file_funcs and not conf_mod_file_funcs:
             raise ValueError("You need to specify at least one of the file-funcs variants!")
 
-        self.conf["archs"] = archs
+        self.archs = archs
         if cve:
-            self.conf["cve"] = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
+            self.cve = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
+        self.lp_name = lp_name
         self.no_check = no_check
         self.file_funcs = {}
 
@@ -81,14 +81,13 @@ class Setup(Config):
 
         # Called at this point because codestreams is populated
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(
-                                                     self.conf.get("cve", ""),
+                                                     self.cve,
                                                      "",
                                                      self.no_check)
-        self.conf["commits"] = commits
-        self.conf["patched_kernels"] = patched_kernels
+        self.commits = commits
+        self.patched_kernels = patched_kernels
         # Add new codestreams to the already existing list, skipping duplicates
-        self.conf["patched_cs"] = natsorted(list(set(self.conf.get("patched_cs",
-                                                                   []) + patched_cs)))
+        self.patched_cs = natsorted(list(set(self.patched_cs + patched_cs)))
 
         return codestreams
 
@@ -99,7 +98,7 @@ class Setup(Config):
         codestreams = self.setup_codestreams()
 
         logging.info(f"Affected architectures:")
-        logging.info(f"\t{' '.join(self.conf['archs'])}")
+        logging.info(f"\t{' '.join(self.archs)}")
 
         logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed
@@ -127,7 +126,7 @@ class Setup(Config):
                 # If the config was enabled on all supported architectures,
                 # there is no point in leaving the conf being set, since the
                 # feature will be available everywhere.
-                if self.conf["archs"] == utils.ARCHS:
+                if self.archs == utils.ARCHS:
                     fdata["conf"] = ""
 
                 mod_path = cs.find_obj_path(utils.ARCH, mod)
@@ -150,9 +149,4 @@ class Setup(Config):
                         logging.warning(f"{cs_}: Symbols {m_syms} not found on {mod} object")
 
         self.flush_cs_file(codestreams)
-
-        # cpp will use this data in the next step
-        with open(self.conf_file, "w") as f:
-            f.write(json.dumps(self.conf, indent=4))
-
         logging.info("Done. Setup finished.")

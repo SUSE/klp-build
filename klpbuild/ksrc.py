@@ -23,8 +23,8 @@ from klpbuild import utils
 
 
 class GitHelper(Config):
-    def __init__(self, lp_name, lp_filter, data_dir=None, skips=""):
-        super().__init__(lp_name, lp_filter, data_dir, skips)
+    def __init__(self, lp_name, lp_filter, skips=""):
+        super().__init__(lp_name, lp_filter, skips)
 
         self.kern_src = self.get_user_path('kernel_src_dir', isopt=True)
 
@@ -41,6 +41,8 @@ class GitHelper(Config):
             "cve-5.14": "cve/linux-5.14-LTSS",
         }
 
+        self.lp_name = lp_name
+
     def format_patches(self, version):
         ver = f"v{version}"
         # index 1 will be the test file
@@ -54,12 +56,12 @@ class GitHelper(Config):
         patches_dir = Path(self.lp_path, "patches")
         shutil.rmtree(patches_dir, ignore_errors=True)
 
-        test_src = self.get_tests_path()
+        test_src = self.get_tests_path(self.lp_name)
         subprocess.check_output(
             [
                 "/usr/bin/git",
                 "-C",
-                str(self.kgraft_tests_path),
+                str(self.get_user_path('kgr_patches_tests_dir')),
                 "format-patch",
                 "-1",
                 f"{test_src}",

@@ -38,13 +38,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="SLE specific. Do not check for already patched codestreams, do the setup for all non filtered codestreams.",
     )
     setup.add_argument(
-        "--data-dir",
-        type=str,
-        required=False,
-        default=None,
-        help="The path where source files and modules will be found",
-    )
-    setup.add_argument(
         "--file-funcs",
         required=False,
         action="append",
@@ -173,7 +166,6 @@ def main_func(main_args):
         setup = Setup(
             args.name,
             args.filter,
-            args.data_dir,
             args.cve,
             args.file_funcs,
             args.mod_file_funcs,

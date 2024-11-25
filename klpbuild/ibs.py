@@ -31,6 +31,8 @@ class IBS(Config):
         super().__init__(lp_name, lp_filter)
         self.osc = Osc(url="https://api.suse.de")
 
+        self.lp_name = lp_name
+
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
@@ -280,7 +282,7 @@ class IBS(Config):
         # Download all built rpms
         self.download()
 
-        test_src = self.get_tests_path()
+        test_src = self.get_tests_path(self.lp_name)
         run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
 
         logging.info(f"Validating the downloaded RPMs...")
@@ -483,7 +485,7 @@ class IBS(Config):
 
     def create_lp_package(self, i, cs):
         kgr_path = self.get_user_path('kgr_patches_dir')
-        branch = get_cs_branch(cs, self.lp_name, kgr_path)
+        branch = get_cs_branch(cs, cs.lp_name, kgr_path)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
@@ -530,8 +532,8 @@ class IBS(Config):
         # Otherwise only warn the caller about this fact.
         # This scenario can occur in case of LPing function that is already
         # part of different LP in which case we modify the existing one.
-        if self.lp_name not in os.listdir(code_path):
-            logging.warning(f"Warning: Directory {self.lp_name} not found on branch {branch}")
+        if cs.lp_name not in os.listdir(code_path):
+            logging.warning(f"Warning: Directory {cs.lp_name} not found on branch {branch}")
 
         # Fix RELEASE version
         with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:

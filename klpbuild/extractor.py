@@ -57,7 +57,7 @@ class Extractor(Config):
         self.total = 0
         self.make_lock = Lock()
 
-        self.tem = TemplateGen(self.lp_name, self.lp_filter)
+        self.tem = TemplateGen(lp_name, lp_filter)
 
         self.env = os.environ
 
@@ -354,7 +354,7 @@ class Extractor(Config):
         return None
 
     def cmd_args(self, cs, fname, out_dir, fdata, cmd):
-        lp_out = Path(out_dir, self.lp_out_file(fname))
+        lp_out = Path(out_dir, cs.lp_out_file(fname))
 
         funcs = ",".join(fdata["symbols"])
 
@@ -451,7 +451,7 @@ class Extractor(Config):
 
         cs.files[fname]["ext_symbols"] = self.get_symbol_list(out_dir)
 
-        lp_out = Path(out_dir, self.lp_out_file(fname))
+        lp_out = Path(out_dir, cs.lp_out_file(fname))
 
         # Remove the local path prefix of the klp-ccp generated comments
         # Open the file, read, seek to the beginning, write the new data, and
@@ -557,7 +557,7 @@ class Extractor(Config):
             logging.warn(json.dumps(missing_syms, indent=4))
 
     def get_work_lp_file(self, cs, fname):
-        return Path(cs.work_dir(fname), self.lp_out_file(fname))
+        return Path(cs.work_dir(fname), cs.lp_out_file(fname))
 
     def get_cs_code(self, args):
         cs_files = {}

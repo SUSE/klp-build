@@ -17,7 +17,7 @@ from klpbuild.utils import ARCH, classify_codestreams, get_all_symbols_from_obje
 
 
 class Config:
-    def __init__(self, lp_name, lp_filter, data_dir=None, skips=""):
+    def __init__(self, lp_name, lp_filter, skips=""):
         # FIXME: Config is instantiated multiple times, meaning that the
         # config file gets loaded and the logs are printed as many times.
 
@@ -35,31 +35,29 @@ class Config:
 
         work = self.get_user_path('work_dir')
 
-        self.lp_name = lp_name
-        self.lp_path = Path(work, self.lp_name)
+        self.lp_path = Path(work, lp_name)
         self.lp_filter = lp_filter
         self.skips = skips
+        self.archs = []
+        self.cve = ""
+        self.commits = {}
+        self.patched_kernels = []
+        self.patched_cs = []
 
         self.codestreams = OrderedDict()
         self.codestreams_list = []
-        self.conf = OrderedDict(
-            {"name": str(self.lp_name), "work_dir": str(self.lp_path), "data":
-             str(data_dir), }
-        )
-
-        self.conf_file = Path(self.lp_path, "conf.json")
-        if self.conf_file.is_file():
-            with open(self.conf_file) as f:
-                self.conf = json.loads(f.read(), object_pairs_hook=OrderedDict)
-
-        self.data = Path(self.conf.get("data", "non-existent"))
-        if not self.data.exists():
-            self.data = self.get_user_path('data_dir')
+        self.data = self.get_user_path('data_dir')
 
         self.cs_file = Path(self.lp_path, "codestreams.json")
         if self.cs_file.is_file():
             with open(self.cs_file) as f:
-                self.codestreams = json.loads(f.read(), object_pairs_hook=OrderedDict)
+                jfile = json.loads(f.read(), object_pairs_hook=OrderedDict)
+                self.archs = jfile["archs"]
+                self.commits = jfile["commits"]
+                self.cve = jfile["cve"]
+                self.patched_kernels = jfile["patched_kernels"]
+                self.patched_cs = jfile["patched_cs"]
+                self.codestreams = jfile["codestreams"]
                 for _, data in self.codestreams.items():
                     self.codestreams_list.append(Codestream.from_data(self.data,
                                                                       self.lp_path,
@@ -129,33 +127,27 @@ class Config:
 
         return self.user_conf['Settings'][entry]
 
-    def lp_out_file(self, fname):
-        fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
-        return f"{self.lp_name}_{fpath}"
-
 
     # Return a Codestream object from the codestream name
     def get_cs(self, cs):
         return Codestream.from_data(self.data, self.lp_path, self.codestreams[cs])
 
 
-    def get_tests_path(self):
-        self.kgraft_tests_path = self.get_user_path('kgr_patches_tests_dir')
+    def get_tests_path(self, lp_name):
+        kgr_path = self.get_user_path('kgr_patches_tests_dir')
 
-        test_sh = Path(self.kgraft_tests_path, f"{self.lp_name}_test_script.sh")
-        test_dir_sh = Path(self.kgraft_tests_path, f"{self.lp_name}/test_script.sh")
-
+        test_sh = Path(kgr_path, f"{lp_name}_test_script.sh")
         if test_sh.is_file():
-            test_src = test_sh
-        elif test_dir_sh.is_file():
+            return test_sh
+
+        test_dir_sh = Path(kgr_path, f"{lp_name}/test_script.sh")
+        if test_dir_sh.is_file():
             # For more complex tests we support using a directory containing
             # as much files as needed. A `test_script.sh` is still required
             # as an entry point.
-            test_src = Path(os.path.dirname(test_dir_sh))
-        else:
-            raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
+            return PurePath(test_dir_sh).parent
 
-        return test_src
+        raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
 
 
     # Update and save codestreams data
@@ -163,8 +155,15 @@ class Config:
         for cs in working_cs:
             self.codestreams[cs.name()] = cs.data()
 
+        data = { "archs" : self.archs,
+                "commits" : self.commits,
+                "cve" : self.cve,
+                "patched_cs" : self.patched_cs,
+                "patched_kernels" : self.patched_kernels,
+                "codestreams" : self.codestreams }
+
         with open(self.cs_file, "w") as f:
-            f.write(json.dumps(self.codestreams, indent=4))
+            f.write(json.dumps(data, indent=4))
 
 
     # Return the codestreams list but removing already patched codestreams,
@@ -243,7 +242,7 @@ class Config:
                 continue
 
             # Skip if the arch is not supported by the livepatch code
-            if not arch in self.conf.get("archs"):
+            if not arch in self.archs:
                 continue
 
             # Assign the not found symbols on arch
