@@ -373,7 +373,11 @@ class IBS(Config):
             cs_name = self.convert_prj_to_cs(prj)
 
             # Get the codestream from the dict
-            cs = self.codestreams[cs_name]
+            cs = self.codestreams.get(cs_name, None)
+            if not cs:
+                logging.info(f"Codestream {cs_name} is stale. Deleting it.")
+                self.delete_project(0, prj, False)
+                continue
 
             # Remove previously downloaded rpms
             self.delete_rpms(cs)
