@@ -92,8 +92,7 @@ def get_elf_modinfo_entry(elffile, conf):
     # Iterate over all info on modinfo section
     for line in bytes2str(sec.data()).split("\0"):
         if line.startswith(conf):
-            key, val = line.split("=")
-            return val.strip()
+            return line.split("=")[1].strip()
 
     return ""
 
