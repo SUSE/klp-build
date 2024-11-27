@@ -482,7 +482,7 @@ class GitHelper(Config):
 
             cs.set_archs(archs)
 
-            if not cs.get_boot_file("config").exists():
+            if conf and not cs.get_boot_file("config").exists():
                 data_missing.append(cs)
                 cs_missing.append(cs.name())
                 # recheck later if we can add the missing codestreams
