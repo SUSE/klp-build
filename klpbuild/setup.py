@@ -53,6 +53,7 @@ class Setup(Config):
         self.lp_name = lp_name
         self.lp_filter = lp_filter
         self.lp_skips = skips
+        self.conf = conf
         self.no_check = no_check
         self.file_funcs = {}
 
@@ -81,9 +82,10 @@ class Setup(Config):
         ksrc = GitHelper(self.lp_name, self.lp_filter, self.lp_skips)
 
         # Called at this point because codestreams is populated
+        # FIXME: we should check all configs, like when using --conf-mod-file-funcs
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(
                                                      self.cve,
-                                                     "",
+                                                     self.conf,
                                                      self.no_check)
         self.commits = commits
         self.patched_kernels = patched_kernels
