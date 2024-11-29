@@ -12,7 +12,6 @@ from datetime import datetime
 from pathlib import Path
 from pathlib import PurePath
 
-import git
 import requests
 from natsort import natsorted
 
@@ -23,8 +22,8 @@ from klpbuild import utils
 
 
 class GitHelper(Config):
-    def __init__(self, lp_name, lp_filter, skips=""):
-        super().__init__(lp_name, lp_filter, skips)
+    def __init__(self, lp_name, lp_filter, skips):
+        super().__init__(lp_name)
 
         self.kern_src = self.get_user_path('kernel_src_dir', isopt=True)
 
@@ -42,6 +41,8 @@ class GitHelper(Config):
         }
 
         self.lp_name = lp_name
+        self.lp_filter = lp_filter
+        self.lp_skip = skips
 
     def format_patches(self, version):
         ver = f"v{version}"
@@ -143,8 +144,8 @@ class GitHelper(Config):
         print("Fetching changes from all supported branches...")
 
         # Mount the command to fetch all branches for supported codestreams
-        subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "fetch",
-                                 "--quiet", "--tags", "origin"] +
+        subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
+                                 "--quiet", "--tags", "--force", "origin"] +
                                 list(self.kernel_branches.values()))
 
         print("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
@@ -526,7 +527,8 @@ class GitHelper(Config):
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
-        working_cs = self.filter_cs(working_cs, verbose=True)
+        working_cs = utils.filter_cs(self.lp_filter, self.lp_skip,
+                                    working_cs, verbose=True)
 
         if not working_cs:
             logging.info("All supported codestreams are already patched. Exiting klp-build")

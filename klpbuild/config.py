@@ -4,20 +4,17 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import configparser
-import copy
 import json
 import logging
 import os
-import re
 from collections import OrderedDict
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from klpbuild.codestream import Codestream
-from klpbuild.utils import ARCH, classify_codestreams, get_all_symbols_from_object
 
 
 class Config:
-    def __init__(self, lp_name, lp_filter, skips=""):
+    def __init__(self, lp_name):
         # FIXME: Config is instantiated multiple times, meaning that the
         # config file gets loaded and the logs are printed as many times.
 
@@ -26,18 +23,13 @@ class Config:
         home = Path.home()
         self.user_conf_file = Path(home, ".config/klp-build/config")
         if not self.user_conf_file.is_file():
-            logging.warning(f"Warning: user configuration file not found")
+            logging.warning("Warning: user configuration file not found")
             # If there's no configuration file assume fresh install.
             # Prepare the system with a default environment and conf.
             self.setup_user_env(Path(home, "klp"))
 
         self.load_user_conf()
 
-        work = self.get_user_path('work_dir')
-
-        self.lp_path = Path(work, lp_name)
-        self.lp_filter = lp_filter
-        self.skips = skips
         self.archs = []
         self.cve = ""
         self.commits = {}
@@ -45,8 +37,8 @@ class Config:
         self.patched_cs = []
 
         self.codestreams = OrderedDict()
-        self.codestreams_list = []
         self.data = self.get_user_path('data_dir')
+        self.lp_path = Path(self.get_user_path('work_dir'), lp_name)
 
         self.cs_file = Path(self.lp_path, "codestreams.json")
         if self.cs_file.is_file():
@@ -57,15 +49,8 @@ class Config:
                 self.cve = jfile["cve"]
                 self.patched_kernels = jfile["patched_kernels"]
                 self.patched_cs = jfile["patched_cs"]
-                self.codestreams = jfile["codestreams"]
-                for _, data in self.codestreams.items():
-                    self.codestreams_list.append(Codestream.from_data(self.data,
-                                                                      self.lp_path,
-                                                                      data))
-
-        # will contain the symbols from the to be livepatched object
-        # cached by the codestream : object
-        self.obj_symbols = {}
+                for cs, data in jfile["codestreams"].items():
+                    self.codestreams[cs] = Codestream.from_data(data)
 
 
     def setup_user_env(self, basedir):
@@ -97,7 +82,7 @@ class Config:
         config.read(self.user_conf_file)
 
         # Check mandatory fields
-        for s in {'Paths', 'Settings'}:
+        for s in ['Paths', 'Settings']:
             if s not in config:
                 raise ValueError(f"config: '{s}' section not found")
 
@@ -128,11 +113,6 @@ class Config:
         return self.user_conf['Settings'][entry]
 
 
-    # Return a Codestream object from the codestream name
-    def get_cs(self, cs):
-        return Codestream.from_data(self.data, self.lp_path, self.codestreams[cs])
-
-
     def get_tests_path(self, lp_name):
         kgr_path = self.get_user_path('kgr_patches_tests_dir')
 
@@ -150,104 +130,23 @@ class Config:
         raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
 
 
-    # Update and save codestreams data
+    # Update and save codestreams data, working_cs is always a list
     def flush_cs_file(self, working_cs):
+        # Update the latest state of the codestreams
         for cs in working_cs:
-            self.codestreams[cs.name()] = cs.data()
+            self.codestreams[cs.name()] = cs
+
+        # Format each codestream for the json
+        cs_data = {}
+        for key, cs in self.codestreams.items():
+            cs_data[key] = cs.data()
 
         data = { "archs" : self.archs,
                 "commits" : self.commits,
                 "cve" : self.cve,
                 "patched_cs" : self.patched_cs,
                 "patched_kernels" : self.patched_kernels,
-                "codestreams" : self.codestreams }
+                "codestreams" : cs_data }
 
         with open(self.cs_file, "w") as f:
             f.write(json.dumps(data, indent=4))
-
-
-    # Return the codestreams list but removing already patched codestreams,
-    # codestreams without file-funcs and not matching the filter
-    def filter_cs(self, cs_list=None, verbose=False):
-        if not cs_list:
-            cs_list = self.codestreams_list
-        full_cs = copy.deepcopy(cs_list)
-
-        if verbose:
-            logging.info("Checking filter and skips...")
-
-        result = []
-        filtered = []
-        for cs in full_cs:
-            name = cs.name()
-
-            if self.lp_filter and not re.match(self.lp_filter, name):
-                filtered.append(name)
-                continue
-            elif self.skips and re.match(self.skips, name):
-                filtered.append(name)
-                continue
-
-            result.append(cs)
-
-        if verbose:
-            if filtered:
-                logging.info("Skipping codestreams:")
-                logging.info(f'\t{" ".join(classify_codestreams(filtered))}')
-
-        return result
-
-    # Cache the symbols using the object path. It differs for each
-    # codestream and architecture
-    # Return all the symbols not found per arch/obj
-    def check_symbol(self, arch, cs, mod, symbols):
-        name = cs.name()
-
-        self.obj_symbols.setdefault(arch, {})
-        self.obj_symbols[arch].setdefault(name, {})
-
-        # Checking if we already cached the results for this codestream
-        if not self.obj_symbols[arch][name].get(mod, ""):
-            obj = cs.find_obj_path(arch, mod)
-            self.obj_symbols[arch][name][mod] = get_all_symbols_from_object(obj, True)
-
-        ret = []
-
-        for symbol in symbols:
-            nsyms = self.obj_symbols[arch][name][mod].count(symbol)
-            if nsyms == 0:
-                ret.append(symbol)
-
-            elif nsyms > 1:
-                print(f"WARNING: {cs.name()}-{arch} ({cs.kernel}): symbol {symbol} duplicated on {mod}")
-
-            # If len(syms) == 1 means that we found a unique symbol, which is
-            # what we expect, and nothing need to be done.
-
-        return ret
-
-    # This functions is used to check if the symbols exist in the module they
-    # we will livepatch. In this case skip_on_host argument will be false,
-    # meaning that we want the symbol to checked against all supported
-    # architectures before creating the livepatches.
-    #
-    # It is also used when we want to check if a symbol externalized in one
-    # architecture exists in the other supported ones. In this case skip_on_host
-    # will be True, since we trust the decisions made by the extractor tool.
-    def check_symbol_archs(self, cs, mod, symbols, skip_on_host):
-        arch_sym = {}
-        # Validate only architectures supported by the codestream
-        for arch in cs.archs:
-            if arch == ARCH and skip_on_host:
-                continue
-
-            # Skip if the arch is not supported by the livepatch code
-            if not arch in self.archs:
-                continue
-
-            # Assign the not found symbols on arch
-            syms = self.check_symbol(arch, cs, mod, symbols)
-            if syms:
-                arch_sym[arch] = syms
-
-        return arch_sym

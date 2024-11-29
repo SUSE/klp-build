@@ -406,8 +406,8 @@ clean:
 
 
 class TemplateGen(Config):
-    def __init__(self, lp_name, lp_filter):
-        super().__init__(lp_name, lp_filter)
+    def __init__(self, lp_name):
+        super().__init__(lp_name)
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures

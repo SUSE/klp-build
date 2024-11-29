@@ -7,12 +7,12 @@ from pathlib import Path
 
 from klpbuild.config import Config
 
-def get_workdir(lp_name, lp_filter):
-    return Config(lp_name, lp_filter).lp_path
+def get_workdir(lp_name):
+    return Config(lp_name).lp_path
 
-def get_file_content(lp_name, filter, fname=None):
+def get_file_content(lp_name, lp_filter, fname=None):
     # Check the generated LP files
-    path = Path(get_workdir(lp_name, filter), "ccp", filter, "lp")
+    path = Path(get_workdir(lp_name), "ccp", lp_filter, "lp")
 
     if not fname:
         fname = f'livepatch_{lp_name}.c'

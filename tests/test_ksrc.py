@@ -3,8 +3,8 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
-from klpbuild.ksrc import GitHelper
 import pytest
+from klpbuild.ksrc import GitHelper
 
 def test_multiline_upstream_commit_subject():
     _, subj = GitHelper.get_commit_data("49c47cc21b5b")
@@ -14,5 +14,5 @@ def test_multiline_upstream_commit_subject():
 # This CVE is already covered on all codestreams
 def test_scan_all_cs_patched(caplog):
     with pytest.raises(SystemExit):
-        GitHelper("bsc_check", "").scan("2022-48801", "", False)
+        GitHelper("bsc_check", "", "").scan("2022-48801", "", False)
     assert "All supported codestreams are already patched" not in caplog.text

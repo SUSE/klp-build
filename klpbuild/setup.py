@@ -4,7 +4,6 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import copy
-import json
 import logging
 import re
 from pathlib import Path
@@ -31,7 +30,7 @@ class Setup(Config):
         skips,
         no_check,
     ):
-        super().__init__(lp_name, lp_filter, skips=skips)
+        super().__init__(lp_name)
 
         archs.sort()
 
@@ -52,6 +51,9 @@ class Setup(Config):
             self.cve = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
         self.lp_name = lp_name
+        self.lp_filter = lp_filter
+        self.lp_skips = skips
+        self.conf = conf
         self.no_check = no_check
         self.file_funcs = {}
 
@@ -77,12 +79,13 @@ class Setup(Config):
             self.file_funcs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
 
     def setup_codestreams(self):
-        ksrc = GitHelper(self.lp_name, self.lp_filter, skips=self.skips)
+        ksrc = GitHelper(self.lp_name, self.lp_filter, self.lp_skips)
 
         # Called at this point because codestreams is populated
+        # FIXME: we should check all configs, like when using --conf-mod-file-funcs
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(
                                                      self.cve,
-                                                     "",
+                                                     self.conf,
                                                      self.no_check)
         self.commits = commits
         self.patched_kernels = patched_kernels
@@ -141,7 +144,7 @@ class Setup(Config):
 
             # Verify if the functions exist in the specified object
             for mod, syms in mod_syms.items():
-                arch_syms = self.check_symbol_archs(cs, mod, syms, False)
+                arch_syms = cs.check_symbol_archs(self.archs, mod, syms, False)
                 if arch_syms:
                     for arch, syms in arch_syms.items():
                         m_syms = ",".join(syms)

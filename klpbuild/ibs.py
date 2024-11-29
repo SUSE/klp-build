@@ -25,13 +25,15 @@ from osctiny import Osc
 
 from klpbuild.config import Config
 from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch
+from klpbuild.utils import filter_cs
 
 class IBS(Config):
     def __init__(self, lp_name, lp_filter):
-        super().__init__(lp_name, lp_filter)
+        super().__init__(lp_name)
         self.osc = Osc(url="https://api.suse.de")
 
         self.lp_name = lp_name
+        self.lp_filter = lp_filter
 
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
@@ -303,7 +305,7 @@ class IBS(Config):
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs in self.filter_cs():
+            for cs in filter_cs(self.lp_filter, "", self.codestreams):
                 if arch not in cs.archs:
                     continue
 
@@ -370,7 +372,12 @@ class IBS(Config):
             prj = result.get("name")
             cs_name = self.convert_prj_to_cs(prj)
 
-            cs = self.get_cs(cs_name)
+            # Get the codestream from the dict
+            cs = self.codestreams.get(cs_name, None)
+            if not cs:
+                logging.info(f"Codestream {cs_name} is stale. Deleting it.")
+                self.delete_project(0, prj, False)
+                continue
 
             # Remove previously downloaded rpms
             self.delete_rpms(cs)
@@ -558,7 +565,7 @@ class IBS(Config):
         logging.info(self.osc.build.get_log(self.cs_to_project(cs), "devbuild", arch, "klp"))
 
     def push(self, wait=False):
-        cs_list = self.filter_cs()
+        cs_list = filter_cs(self.lp_filter, "", self.codestreams)
 
         if not cs_list:
             logging.error(f"push: No codestreams found for {self.lp_name}")

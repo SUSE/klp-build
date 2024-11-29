@@ -96,7 +96,7 @@ def test_check_conf_mod_file_funcs():
           mod_file_funcs=[["btsdio", "drivers/bluetooth/btsdio.c", "btsdio_probe", "btsdio_remove"]],
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
-    with open(Path(get_workdir(lp, cs), "codestreams.json")) as f:
+    with open(Path(get_workdir(lp), "codestreams.json")) as f:
         data = json.loads(f.read())["codestreams"][cs]["files"]
 
     sch = data["net/sched/sch_qfq.c"]
@@ -113,7 +113,7 @@ def test_check_conf_mod_file_funcs():
                                    "btsdio_remove"] ],
           archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
 
-    with open(Path(get_workdir(lp, cs), "codestreams.json")) as f:
+    with open(Path(get_workdir(lp), "codestreams.json")) as f:
         data = json.loads(f.read())["codestreams"][cs]["files"]
 
     sch = data["net/sched/sch_qfq.c"]

@@ -4,15 +4,19 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from klpbuild.codestream import Codestream
-from klpbuild.config import Config
-from tests.utils import get_file_content, get_workdir
-
+from klpbuild.utils import filter_cs
 
 
 def test_filter():
-    lp = "bsc9999999"
+    def list_to_dict(cs_list):
+        ret = {}
 
-    def to_cs(cs_list):
+        for cs in cs_list:
+            ret[cs] = Codestream.from_cs(cs)
+
+        return ret
+
+    def list_to_cs(cs_list):
         ret = []
 
         for cs in cs_list:
@@ -20,43 +24,37 @@ def test_filter():
 
         return ret
 
-
     # Same output because filter and skip were not informed
-    assert Config(lp, "").filter_cs(to_cs(["12.5u10", "15.6u10"])) == to_cs(["12.5u10", "15.6u10"])
+    assert filter_cs("", "", list_to_dict(["12.5u10", "15.6u10"])) \
+                            == list_to_cs(["12.5u10", "15.6u10"])
+
+
+    # Same as before, but using a list instead of a dict
+    assert filter_cs("", "", list_to_cs(["12.5u10", "15.6u10"])) \
+                            == list_to_cs(["12.5u10", "15.6u10"])
 
     # Filter only one codestream
-    assert Config(lp, "12.5u10").filter_cs(to_cs(["12.5u10", "12.5u11", "15.6u10"])) == \
-                                                    to_cs(["12.5u10"])
+    assert filter_cs("12.5u10", "", list_to_dict(["12.5u10", "12.5u11", "15.6u10"])) == \
+                                                    list_to_cs(["12.5u10"])
 
     # Filter codestreams using regex
-    assert Config(lp, "12.5u1[01]").filter_cs(to_cs(["12.5u10", "12.5u11", "15.6u10"])) \
-                                            == to_cs(["12.5u10", "12.5u11"])
+    assert filter_cs("12.5u1[01]", "", list_to_dict(["12.5u10", "12.5u11", "15.6u10"])) \
+                                            == list_to_cs(["12.5u10", "12.5u11"])
 
-    assert Config(lp, "12.5u1[01]|15.6u10").filter_cs(to_cs(["12.5u10",
-                                                             "12.5u11",
-                                                             "15.6u10"])) \
-                                            == to_cs(["12.5u10", "12.5u11", "15.6u10"])
+    assert filter_cs("12.5u1[01]|15.6u10", "", list_to_dict(["12.5u10", "12.5u11", "15.6u10"])) \
+                                            == list_to_cs(["12.5u10", "12.5u11", "15.6u10"])
 
     # Use skip with filter
-    assert Config(lp, "12.5u1[01]", skips="15.6u10").filter_cs(to_cs(["12.5u10",
-                                                                      "12.5u11",
-                                                                      "15.6u10"])) \
-                                            == to_cs(["12.5u10", "12.5u11"])
+    assert filter_cs("12.5u1[01]", "15.6u10", list_to_dict(["12.5u10", "12.5u11", "15.6u10"])) \
+                                            == list_to_cs(["12.5u10", "12.5u11"])
 
     # Use skip with filter
-    assert Config(lp, "12.5u1[01]", skips="15.6").filter_cs(to_cs(["12.5u10",
-                                                                   "12.5u11",
-                                                                   "15.6u12",
-                                                                   "15.6u13"])) \
-                                            == to_cs(["12.5u10", "12.5u11"])
+    assert filter_cs("12.5u1[01]", "15.6", list_to_dict(["12.5u10", "12.5u11", "15.6u12", "15.6u13"])) \
+                                            == list_to_cs(["12.5u10", "12.5u11"])
 
     # filter is off, but skip will also only filter the 12.5 ones
-    assert Config(lp, "", skips="15.6").filter_cs(to_cs(["12.5u10", "12.5u11",
-                                                         "15.6u12", "15.6u13"])) \
-                                            == to_cs(["12.5u10", "12.5u11"])
+    assert filter_cs("", "15.6", list_to_dict(["12.5u10", "12.5u11", "15.6u12", "15.6u13"])) \
+                                            == list_to_cs(["12.5u10", "12.5u11"])
 
-    assert Config(lp, "", skips="15.6u13").filter_cs(to_cs(["12.5u10",
-                                                            "12.5u11",
-                                                            "15.6u12",
-                                                            "15.6u13"])) \
-                                            == to_cs(["12.5u10", "12.5u11", "15.6u12"])
+    assert filter_cs("", "15.6u13", list_to_dict(["12.5u10", "12.5u11", "15.6u12", "15.6u13"])) \
+                                            == list_to_cs(["12.5u10", "12.5u11", "15.6u12"])
