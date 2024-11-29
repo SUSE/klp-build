@@ -33,6 +33,21 @@ List of accepted codestreams. Must be specified in regex format.
 Example: "15\.3u[0-9]+|15\.6u0"
 .SH COMMANDS
 .TP
+.B scan
+In the scan,
+.B klp-build
+does a shallow analysis of the given CVE, searching for already patched codestreams
+and reporting those that most likley are still affected by the bug.
+This subcommand does not store any data, as it is mainly targeted for automation
+and not for livepatch development. For the latter see the
+.B setup
+subcommand.
+.RS 7
+.TP
+.BI --cve " CVE"
+The CVE to be analyzed.
+.RE
+.TP
 .B setup
 During the setup,
 .B klp-build

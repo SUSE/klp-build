@@ -145,7 +145,7 @@ class GitHelper(Config):
 
         # Mount the command to fetch all branches for supported codestreams
         subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
-                                 "--quiet", "--tags", "--force", "origin"] +
+                                 "--quiet", "--atomic", "--force", "--tags", "origin"] +
                                 list(self.kernel_branches.values()))
 
         print("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
