@@ -181,11 +181,16 @@ class Extractor(Config):
             ofname = "." + filename.name.replace(".c", ".o.d")
             ofname = Path(filename.parent, ofname)
 
-            completed = subprocess.check_output(make_args, cwd=odir, stderr=f).decode()
-            f.write("Full output of the make command:\n")
-            f.write(str(completed).strip())
-            f.write("\n")
-            f.flush()
+            try:
+                completed = subprocess.check_output(make_args, cwd=odir,
+                                                    stderr=f).decode().strip()
+                f.write("Full output of the make command:\n")
+                f.write(str(completed))
+                f.write("\n")
+                f.flush()
+            except subprocess.CalledProcessError as exc:
+                logging.error(f"Failed to run make for {cs.name()} ({cs.kernel}). Check file {str(log_path)} for more details.")
+                raise exc
 
             # 15.4 onwards changes the regex a little: -MD -> -MMD
             # 15.6 onwards we don't have -isystem.
