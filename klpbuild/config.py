@@ -9,6 +9,7 @@ import logging
 import os
 from collections import OrderedDict
 from pathlib import Path, PurePath
+from natsort import natsorted
 
 from klpbuild.codestream import Codestream
 
@@ -49,8 +50,10 @@ class Config:
                 self.cve = jfile["cve"]
                 self.patched_kernels = jfile["patched_kernels"]
                 self.patched_cs = jfile["patched_cs"]
-                for cs, data in jfile["codestreams"].items():
-                    self.codestreams[cs] = Codestream.from_data(data)
+                json_cs = jfile["codestreams"]
+                # Sorte the codestreams before inserting in the OrderedDict
+                for cs in natsorted(json_cs.keys()):
+                    self.codestreams[cs] = Codestream.from_data(json_cs[cs])
 
 
     def setup_user_env(self, basedir):
