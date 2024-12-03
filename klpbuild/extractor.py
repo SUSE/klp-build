@@ -181,11 +181,16 @@ class Extractor(Config):
             ofname = "." + filename.name.replace(".c", ".o.d")
             ofname = Path(filename.parent, ofname)
 
-            completed = subprocess.check_output(make_args, cwd=odir, stderr=f).decode()
-            f.write("Full output of the make command:\n")
-            f.write(str(completed).strip())
-            f.write("\n")
-            f.flush()
+            try:
+                completed = subprocess.check_output(make_args, cwd=odir,
+                                                    stderr=f).decode().strip()
+                f.write("Full output of the make command:\n")
+                f.write(str(completed))
+                f.write("\n")
+                f.flush()
+            except subprocess.CalledProcessError as exc:
+                logging.error(f"Failed to run make for {cs.name()} ({cs.kernel}). Check file {str(log_path)} for more details.")
+                raise exc
 
             # 15.4 onwards changes the regex a little: -MD -> -MMD
             # 15.6 onwards we don't have -isystem.
@@ -403,6 +408,15 @@ class Extractor(Config):
 
         return ccp_args, env
 
+    def print_env_vars(self, fhandle, env):
+        fhandle.write("Env vars:\n")
+
+        for k, v in env.items():
+            if not k.startswith("KCP"):
+                continue
+
+            fhandle.write(f"{k}={v}\n")
+
     def process(self, args):
         i, fname, cs, fdata = args
 
@@ -442,6 +456,7 @@ class Extractor(Config):
         with open(out_log, "w") as f:
             # Write the command line used
             f.write(f"Executing ccp on {odir}\n")
+            self.print_env_vars(f, lenv)
             f.write("\n".join(args) + "\n")
             f.flush()
             try:

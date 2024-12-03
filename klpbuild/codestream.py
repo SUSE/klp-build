@@ -13,8 +13,8 @@ class Codestream:
                  "ktype", "needs_ibt", "project", "kernel", "archs", "files",
                  "modules", "repo")
 
-    def __init__(self, data_path, lp_path, sle, sp, update, rt, project="",
-                 kernel="", archs=[], files={}, modules={}):
+    def __init__(self, data_path, lp_path, sle, sp, update, rt, project,
+                 kernel, archs, files, modules):
         self.data_path = data_path
         self.lp_path = lp_path
         self.lp_name = PurePath(lp_path).name
@@ -43,14 +43,14 @@ class Codestream:
         else:
             sp = "0"
 
-        return cls(data_path, lp_path, int(sle), int(sp), int(u), rt, proj, kernel)
+        return cls(data_path, lp_path, int(sle), int(sp), int(u), rt, proj, kernel, [], {}, {})
 
 
     @classmethod
     def from_cs(cls, cs):
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
         return cls("", "", int(match.group(1)), int(match.group(2)),
-                   int(match.group(4)), match.group(3))
+                   int(match.group(4)), match.group(3), "", "", [], {}, {})
 
 
     @classmethod
@@ -228,6 +228,7 @@ class Codestream:
         # Return the path is the modules was previously found
         obj = self.modules.get(mod, "")
         if obj:
+            assert self.kernel in str(obj)
             return obj
 
         # We already know the path to vmlinux, so return it
