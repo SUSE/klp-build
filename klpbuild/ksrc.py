@@ -446,7 +446,7 @@ class GitHelper(Config):
         # against the codestreams informed by the user
         all_codestreams = GitHelper.download_supported_file(self.data, self.lp_path)
 
-        if not cve:
+        if not cve or no_check:
             commits = {}
             patched_kernels = []
         else:
