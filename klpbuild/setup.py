@@ -48,7 +48,7 @@ class Setup(Config):
 
         self.archs = archs
         if cve:
-            self.cve = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
+            self.cs_data.cve = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
         self.lp_name = lp_name
         self.lp_filter = lp_filter
@@ -84,13 +84,13 @@ class Setup(Config):
         # Called at this point because codestreams is populated
         # FIXME: we should check all configs, like when using --conf-mod-file-funcs
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(
-                                                     self.cve,
+                                                     self.cs_data.cve,
                                                      self.conf,
                                                      self.no_check)
-        self.commits = commits
-        self.patched_kernels = patched_kernels
+        self.cs_data.commits = commits
+        self.cs_data.patched_kernels = patched_kernels
         # Add new codestreams to the already existing list, skipping duplicates
-        self.patched_cs = natsorted(list(set(self.patched_cs + patched_cs)))
+        self.cs_data.patched_cs = natsorted(list(set(self.cs_data.patched_cs + patched_cs)))
 
         return codestreams
 

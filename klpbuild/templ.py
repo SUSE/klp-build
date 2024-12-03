@@ -411,7 +411,7 @@ class TemplateGen(Config):
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
-        self.check_enabled = self.archs != ARCHS
+        self.check_enabled = self.cs_data.archs != ARCHS
         self.lp_name = lp_name
 
         try:
@@ -508,7 +508,7 @@ class TemplateGen(Config):
 
         render_vars = {
             "include_header": "livepatch_" in out_name,
-            "cve": self.cve if self.cve else "XXXX-XXXX",
+            "cve": self.cs_data.cve if self.cs_data.cve else "XXXX-XXXX",
             "lp_name": cs.lp_name,
             "lp_num": cs.lp_name.replace("bsc", ""),
             "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
@@ -522,7 +522,7 @@ class TemplateGen(Config):
             "ext_vars": exts,
             "inc_src_file": lp_file,
             "ibt": ibt,
-            "commits": self.commits
+            "commits": self.cs_data.commits
         }
 
         with open(Path(lp_path, out_name), "w") as f:
@@ -594,14 +594,14 @@ class TemplateGen(Config):
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
     def generate_commit_msg_file(self):
-        cmts = self.commits.get("upstream", {})
+        cmts = self.cs_data.commits.get("upstream", {})
         if cmts:
             cmts = cmts["commits"]
         render_vars = {
             "lp_name": self.lp_name.replace("bsc", ""),
             "user": self.user,
             "email": self.email,
-            "cve": self.cve if self.cve else "XXXX-XXXX",
+            "cve": self.cs_data.cve if self.cs_data.cve else "XXXX-XXXX",
             "commits": cmts,
             "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
         }
