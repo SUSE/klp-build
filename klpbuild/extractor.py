@@ -408,6 +408,15 @@ class Extractor(Config):
 
         return ccp_args, env
 
+    def print_env_vars(self, fhandle, env):
+        fhandle.write("Env vars:\n")
+
+        for k, v in env.items():
+            if not k.startswith("KCP"):
+                continue
+
+            fhandle.write(f"{k}={v}\n")
+
     def process(self, args):
         i, fname, cs, fdata = args
 
@@ -447,6 +456,7 @@ class Extractor(Config):
         with open(out_log, "w") as f:
             # Write the command line used
             f.write(f"Executing ccp on {odir}\n")
+            self.print_env_vars(f, lenv)
             f.write("\n".join(args) + "\n")
             f.flush()
             try:
