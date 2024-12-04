@@ -105,8 +105,10 @@ class GitHelper(Config):
             index += 1
 
     # Currently this function returns the date of the patch and it's subject
+    @staticmethod
     def get_commit_data(commit, savedir=None):
-        req = requests.get(f"https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={commit}")
+        req = requests.get(
+            f"https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={commit}", timeout=15)
         req.raise_for_status()
 
         # Save the upstream commit if requested
@@ -133,12 +135,12 @@ class GitHelper(Config):
 
         # ensure that the user informed the commits at least once per 'project'
         if not cve:
-            logging.info(f"No CVE informed, skipping the processing of getting the patches.")
+            logging.info("No CVE informed, skipping the processing of getting the patches.")
             return {}
 
         # Support CVEs from 2020 up to 2029
         if not re.match(r"^202[0-9]-[0-9]{4,7}$", cve):
-            logging.info(f"Invalid CVE number {cve}, skipping the processing of getting the patches.")
+            logging.info("Invalid CVE number '%s', skipping the processing of getting the patches.", cve)
             return {}
 
         print("Fetching changes from all supported branches...")
@@ -163,7 +165,6 @@ class GitHelper(Config):
         # Since the CVE branch can be some patches "behind" the LTSS branch,
         # it's good to have both backports code at hand by the livepatch author
         for bc, mbranch in self.kernel_branches.items():
-            patches = []
             commits[bc] = {"commits": []}
 
             try:
@@ -332,7 +333,7 @@ class GitHelper(Config):
         ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "log",
                                        f"--grep=CVE-{cve}",
                                        f"--tags=*rpm-{kernel}",
-                                       "--pretty=format:\"%H\""]);
+                                       "--pretty=format:\"%H\""])
 
         for c in ret.decode().splitlines():
             # Remove quotes for each commit hash
@@ -410,9 +411,9 @@ class GitHelper(Config):
         cs_url = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
         suse_cert = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
         if suse_cert.exists():
-            req = requests.get(cs_url, verify=suse_cert)
+            req = requests.get(cs_url, verify=suse_cert, timeout=15)
         else:
-            req = requests.get(cs_url)
+            req = requests.get(cs_url, timeout=15)
 
         # exit on error
         req.raise_for_status()
@@ -498,7 +499,7 @@ class GitHelper(Config):
         # Found missing cs data, downloading and extract
         if data_missing:
             logging.info("Download the necessary data from the following codestreams:")
-            logging.info(f'\t{" ".join(cs_missing)}\n')
+            logging.info("\t%s\n", " ".join(cs_missing))
             IBS(self.lp_name, self.lp_filter).download_cs_data(data_missing)
             logging.info("Done.")
 
@@ -512,23 +513,23 @@ class GitHelper(Config):
 
         if conf_not_set:
             cs_list = utils.classify_codestreams(conf_not_set)
-            logging.info(f"Skipping codestreams without {conf} set:")
-            logging.info(f'\t{" ".join(cs_list)}')
+            logging.info("Skipping codestreams without %s set:", conf)
+            logging.info("\t%s", " ".join(cs_list))
 
         if patched_cs:
             cs_list = utils.classify_codestreams(patched_cs)
             logging.info("Skipping already patched codestreams:")
-            logging.info(f'\t{" ".join(cs_list)}')
+            logging.info("\t%s", " ".join(cs_list))
 
         if unaffected_cs:
             cs_list = utils.classify_codestreams(unaffected_cs)
             logging.info("Skipping unaffected codestreams (missing backports):")
-            logging.info(f'\t{" ".join(cs_list)}')
+            logging.info("\t%s", " " .join(cs_list))
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
         working_cs = utils.filter_cs(self.lp_filter, self.lp_skip,
-                                    working_cs, verbose=True)
+                                     working_cs, verbose=True)
 
         if not working_cs:
             logging.info("All supported codestreams are already patched. Exiting klp-build")
@@ -536,6 +537,6 @@ class GitHelper(Config):
 
         logging.info("All affected codestreams:")
         cs_list = utils.classify_codestreams(working_cs)
-        logging.info(f'\t{" ".join(cs_list)}')
+        logging.info("\t%s", " ".join(cs_list))
 
         return commits, patched_cs, patched_kernels, working_cs
