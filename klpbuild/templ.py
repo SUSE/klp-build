@@ -3,7 +3,6 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -392,18 +391,6 @@ def get_patched(cs_files, check_enabled):
 ${get_patched(cs_files, check_enabled)}
 """
 
-TEMPL_MAKEFILE = """\
-KDIR := ${ kdir }
-MOD_PATH := ${ pwd }
-obj-m := ${ obj }
-CFLAGS_${ obj } = -Wno-missing-declarations -Wno-missing-prototypes
-
-modules:
-\tmake -C $(KDIR) modules M=$(MOD_PATH)
-clean:
-\tmake -C $(KDIR) clean M=$(MOD_PATH)
-"""
-
 
 class TemplateGen(Config):
     def __init__(self, lp_name):
@@ -544,25 +531,6 @@ class TemplateGen(Config):
                 temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
 
             f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**render_vars))
-
-    def CreateMakefile(self, cs, fname, final):
-        if not final:
-            work_dir = cs.work_dir(fname)
-            obj = "livepatch.o"
-            lp_path = Path(work_dir, "livepatch.c")
-
-            # Add more data to make it compile correctly
-            shutil.copy(Path(work_dir, cs.lp_out_file(fname)), lp_path)
-            with open(lp_path, "a") as f:
-                f.write('#include <linux/module.h>\nMODULE_LICENSE("GPL");')
-        else:
-            work_dir = cs.lpdir()
-            obj = f"livepatch_{cs.lp_name}.o"
-
-        render_vars = {"kdir": cs.get_kernel_build_path(ARCH), "pwd": work_dir, "obj": obj}
-
-        with open(Path(work_dir, "Makefile"), "w") as f:
-            f.write(Template(TEMPL_MAKEFILE).render(**render_vars))
 
     def GenerateLivePatches(self, cs):
         lp_path = cs.lpdir()
