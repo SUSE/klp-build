@@ -529,7 +529,7 @@ class Extractor(Config):
         # already do for SUSE livepatches
         # Create the livepatches per codestream
         for cs in working_cs:
-            tem.GenerateLivePatches(cs)
+            tem.generate_livepatches(cs)
 
         self.group_equal_files(args)
 
@@ -562,8 +562,6 @@ class Extractor(Config):
                         missing_syms[arch].setdefault(obj, {})
                         missing_syms[arch][obj].setdefault(cs.name(), [])
                         missing_syms[arch][obj][cs.name()].extend(arch_syms)
-
-            tem.create_kbuild(cs)
 
         if missing_syms:
             with open(Path(self.lp_path, "missing_syms"), "w") as f:

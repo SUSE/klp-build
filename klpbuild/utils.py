@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import copy
+import git
 import gzip
 import io
 import logging
@@ -237,3 +238,18 @@ def filter_cs(lp_filter, lp_skip, cs_list, verbose=False):
             logging.info("\t%s", clist)
 
     return result
+
+def get_mail():
+    git_data = git.GitConfigParser()
+    user = git_data.get_value("user", "name")
+    email = git_data.get_value("user", "email")
+
+    return user, email
+
+def fix_mod_string(mod):
+    if not is_mod(mod):
+        return ""
+
+    # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
+    # and in kallsyms lookup
+    return mod.replace("-", "_")
