@@ -10,7 +10,7 @@ from mako.lookup import TemplateLookup
 from mako.template import Template
 
 from klpbuild.config import Config
-from klpbuild.utils import ARCH, ARCHS, is_mod
+from klpbuild.utils import ARCHS, is_mod
 
 TEMPL_H = """\
 #ifndef _${ fname.upper() }_H
@@ -412,6 +412,7 @@ class TemplateGen(Config):
             self.user = "Change me"
             self.email = "change@me"
 
+    @staticmethod
     def preproc_slashes(text):
         txt = r"<%! BS='\\' %>" + text.replace("\\", "${BS}")
         return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
@@ -421,7 +422,7 @@ class TemplateGen(Config):
         # and in kallsyms lookup
         return mod.replace("-", "_")
 
-    def GeneratePatchedFuncs(self, lp_path, cs_files):
+    def generate_patched_conf(self, lp_path, cs_files):
         render_vars = {"cs_files": cs_files, "check_enabled": self.check_enabled}
         with open(Path(lp_path, "patched_funcs.csv"), "w") as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
@@ -539,7 +540,7 @@ class TemplateGen(Config):
         files = cs.files
         is_multi_files = len(files.keys()) > 1
 
-        self.GeneratePatchedFuncs(lp_path, files)
+        self.generate_patched_conf(lp_path, files)
 
         # If there are more then one source file, we cannot fully infer what are
         # the correct configs and mods to be livepatched, so leave the mod and
@@ -556,7 +557,7 @@ class TemplateGen(Config):
             self.__GenerateLivepatchFile(lp_path, cs, None, False)
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
-    def CreateKbuildFile(self, cs):
+    def create_kbuild(self, cs):
         render_vars = {"bsc": cs.lp_name, "cs": cs, "lpdir": cs.lpdir()}
         with open(Path(cs.lpdir(), "Kbuild.inc"), "w") as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
