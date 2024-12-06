@@ -166,17 +166,14 @@ def main_func(main_args):
         setup = Setup(
             args.name,
             args.filter,
-            args.cve,
             args.file_funcs,
             args.mod_file_funcs,
             args.conf_mod_file_funcs,
             args.module,
             args.conf,
-            args.archs,
             args.skips,
-            args.no_check,
         )
-        setup.setup_project_files()
+        setup.setup_project_files(args.cve, args.arch, args.no_check)
 
     elif args.cmd == "extract":
         Extractor(args.name, args.filter, args.apply_patches, args.avoid_ext).run()
