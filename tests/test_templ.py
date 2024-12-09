@@ -3,22 +3,26 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
+import inspect
+
 from klpbuild.extractor import Extractor
 from klpbuild.setup import Setup
-import klpbuild.utils as utils
+from klpbuild import utils
 from tests.utils import get_file_content
 
-import inspect
 
 def test_templ_with_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u19"
 
-    Setup(lp_name=lp, lp_filter=cs, cve=None,
-          file_funcs=[["fs/proc/cmdline.c", "cmdline_proc_show"]],
-          mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
-          conf="CONFIG_PROC_FS",
-          archs=utils.ARCHS, skips=None, no_check=False).setup_project_files()
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_PROC_FS", "vmlinux", [
+                                  ["fs/proc/cmdline.c", "cmdline_proc_show"]], [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_PROC_FS", "no_check": False})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -39,11 +43,14 @@ def test_templ_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u19"
 
-    Setup(lp_name=lp, lp_filter=cs, cve=None,
-          file_funcs=[["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]],
-          mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
-          conf="CONFIG_IPV6",
-          archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_IPV6", "vmlinux", [
+                                  ["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]], [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_IPV6", "no_check": False})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -69,11 +76,15 @@ def test_check_header_file_included():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u17"
 
-    Setup(lp_name=lp, lp_filter=cs, cve=None,
-          file_funcs=[["net/ipv6/rpl.c", "ipv6_rpl_srh_size"], ["kernel/events/core.c", "perf_event_exec"]],
-          mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
-          conf="CONFIG_IPV6",
-          archs=[utils.ARCH], skips=None, no_check=False).setup_project_files()
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_IPV6", "vmlinux", [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"],
+                                                               ["kernel/events/core.c", "perf_event_exec"]],
+                                    [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_IPV6", "no_check": False})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -89,11 +100,14 @@ def test_templ_cve_specified():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u19"
 
-    Setup(lp_name=lp, lp_filter=cs, cve="1234-5678",
-          file_funcs=[["fs/proc/cmdline.c", "cmdline_proc_show"]],
-          mod_file_funcs=[], conf_mod_file_funcs=[], mod_arg="vmlinux",
-          conf="CONFIG_PROC_FS",
-          archs=utils.ARCHS, skips=None, no_check=True).setup_project_files()
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_PROC_FS", "vmlinux", [
+                                  ["fs/proc/cmdline.c", "cmdline_proc_show"]], [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": "1234-5678", "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_PROC_FS", "no_check": True})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 

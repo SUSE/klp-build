@@ -7,8 +7,10 @@ from pathlib import Path
 
 from klpbuild.config import Config
 
+
 def get_workdir(lp_name):
     return Config(lp_name).lp_path
+
 
 def get_file_content(lp_name, lp_filter, fname=None):
     # Check the generated LP files
