@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import configparser
+import dataclasses
 import json
 import logging
 import os
@@ -12,6 +13,15 @@ from pathlib import Path, PurePath
 from natsort import natsorted
 
 from klpbuild.codestream import Codestream
+
+
+@dataclasses.dataclass
+class CodestreamData:
+    cve: str
+    archs: list[str]
+    patched_kernels: list[str]
+    patched_cs: list[str]
+    commits: dict[str]
 
 
 class Config:
@@ -31,25 +41,20 @@ class Config:
 
         self.load_user_conf()
 
-        self.archs = []
-        self.cve = ""
-        self.commits = {}
-        self.patched_kernels = []
-        self.patched_cs = []
-
         self.codestreams = OrderedDict()
         self.data = self.get_user_path('data_dir')
         self.lp_path = Path(self.get_user_path('work_dir'), lp_name)
 
+        self.cs_data = CodestreamData("", [], [], [], {})
         self.cs_file = Path(self.lp_path, "codestreams.json")
         if self.cs_file.is_file():
             with open(self.cs_file) as f:
                 jfile = json.loads(f.read(), object_pairs_hook=OrderedDict)
-                self.archs = jfile["archs"]
-                self.commits = jfile["commits"]
-                self.cve = jfile["cve"]
-                self.patched_kernels = jfile["patched_kernels"]
-                self.patched_cs = jfile["patched_cs"]
+                self.cs_data = CodestreamData(cve=jfile["cve"],
+                                              archs=jfile["archs"],
+                                              patched_kernels=jfile["patched_kernels"],
+                                              patched_cs=jfile["patched_cs"],
+                                              commits=jfile["commits"])
                 json_cs = jfile["codestreams"]
                 # Sorte the codestreams before inserting in the OrderedDict
                 for cs in natsorted(json_cs.keys()):
@@ -71,7 +76,7 @@ class Config:
 
         config['Settings'] = {'workers': 4}
 
-        logging.info(f"Creating default user configuration: '{self.user_conf_file}'")
+        logging.info("Creating default user configuration: '%s'", self.user_conf_file)
         os.makedirs(os.path.dirname(self.user_conf_file), exist_ok=True)
         with open(self.user_conf_file, 'w') as f:
             config.write(f)
@@ -81,7 +86,7 @@ class Config:
 
     def load_user_conf(self):
         config = configparser.ConfigParser()
-        logging.info(f"Loading user configuration from '{self.user_conf_file}'")
+        logging.info("Loading user configuration from '%s'", self.user_conf_file)
         config.read(self.user_conf_file)
 
         # Check mandatory fields
@@ -101,9 +106,9 @@ class Config:
         if not p.exists():
             raise ValueError(f"'{p}' file or directory not found")
         if isdir and not p.is_dir():
-                 raise ValueError("{p} should be a directory")
+            raise ValueError("{p} should be a directory")
         if not isdir and not p.is_file():
-                 raise ValueError("{p} should be a file")
+            raise ValueError("{p} should be a file")
 
         return p
 
@@ -144,12 +149,12 @@ class Config:
         for key, cs in self.codestreams.items():
             cs_data[key] = cs.data()
 
-        data = { "archs" : self.archs,
-                "commits" : self.commits,
-                "cve" : self.cve,
-                "patched_cs" : self.patched_cs,
-                "patched_kernels" : self.patched_kernels,
-                "codestreams" : cs_data }
+        data = {"archs": self.cs_data.archs,
+                "commits": self.cs_data.commits,
+                "cve": self.cs_data.cve,
+                "patched_cs": self.cs_data.patched_cs,
+                "patched_kernels": self.cs_data.patched_kernels,
+                "codestreams": cs_data}
 
         with open(self.cs_file, "w") as f:
             f.write(json.dumps(data, indent=4))

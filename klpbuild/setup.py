@@ -20,19 +20,14 @@ class Setup(Config):
         self,
         lp_name,
         lp_filter,
-        cve,
         file_funcs,
         mod_file_funcs,
         conf_mod_file_funcs,
         mod_arg,
         conf,
-        archs,
         skips,
-        no_check,
     ):
         super().__init__(lp_name)
-
-        archs.sort()
 
         if not lp_name.startswith("bsc"):
             raise ValueError("Please use prefix 'bsc' when creating a livepatch for codestreams")
@@ -46,15 +41,10 @@ class Setup(Config):
         if not file_funcs and not mod_file_funcs and not conf_mod_file_funcs:
             raise ValueError("You need to specify at least one of the file-funcs variants!")
 
-        self.archs = archs
-        if cve:
-            self.cve = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
-
         self.lp_name = lp_name
         self.lp_filter = lp_filter
         self.lp_skips = skips
         self.conf = conf
-        self.no_check = no_check
         self.file_funcs = {}
 
         for f in file_funcs:
@@ -78,30 +68,32 @@ class Setup(Config):
 
             self.file_funcs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
 
-    def setup_codestreams(self):
+    def setup_codestreams(self, cve, no_check):
         ksrc = GitHelper(self.lp_name, self.lp_filter, self.lp_skips)
+
+        if cve:
+            cve = re.search(r"([0-9]+\-[0-9]+)", cve).group(1)
 
         # Called at this point because codestreams is populated
         # FIXME: we should check all configs, like when using --conf-mod-file-funcs
-        commits, patched_cs, patched_kernels, codestreams = ksrc.scan(
-                                                     self.cve,
-                                                     self.conf,
-                                                     self.no_check)
-        self.commits = commits
-        self.patched_kernels = patched_kernels
+        commits, patched_cs, patched_kernels, codestreams = ksrc.scan(cve,
+                                                                      self.conf,
+                                                                      no_check)
+        self.cs_data.commits = commits
+        self.cs_data.patched_kernels = patched_kernels
         # Add new codestreams to the already existing list, skipping duplicates
-        self.patched_cs = natsorted(list(set(self.patched_cs + patched_cs)))
+        self.cs_data.patched_cs = natsorted(list(set(self.cs_data.patched_cs + patched_cs)))
 
         return codestreams
 
-
-    def setup_project_files(self):
+    def setup_project_files(self, cve, archs, no_check):
         self.lp_path.mkdir(exist_ok=True)
 
-        codestreams = self.setup_codestreams()
+        codestreams = self.setup_codestreams(cve, no_check)
+        archs = archs.sort()
 
-        logging.info(f"Affected architectures:")
-        logging.info(f"\t{' '.join(self.archs)}")
+        logging.info("Affected architectures:")
+        logging.info("\t%s", ' '.join(archs))
 
         logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed
@@ -110,7 +102,6 @@ class Setup(Config):
 
             # Check if the files exist in the respective codestream directories
             mod_syms = {}
-            kernel = cs.kernel
             for f, fdata in cs.files.items():
 
                 mod = fdata["module"]
@@ -118,25 +109,25 @@ class Setup(Config):
 
                 sdir = cs.get_sdir()
                 if not Path(sdir, f).is_file():
-                    raise RuntimeError(f"{cs.name()} ({kernel}): File {f} not found on {str(sdir)}")
+                    raise RuntimeError(f"{cs.name()} ({cs.kernel}): File {f} not found on {str(sdir)}")
 
                 ipa_f = cs.get_ipa_file(f)
                 if not ipa_f.is_file():
-                    msg = f"{cs.name()} ({kernel}): File {ipa_f} not found. Creating an empty file."
+                    msg = f"{cs.name()} ({cs.kernel}): File {ipa_f} not found. Creating an empty file."
                     ipa_f.touch()
                     logging.warning(msg)
 
                 # If the config was enabled on all supported architectures,
                 # there is no point in leaving the conf being set, since the
                 # feature will be available everywhere.
-                if self.archs == utils.ARCHS:
+                if archs == utils.ARCHS:
                     fdata["conf"] = ""
 
                 mod_path = cs.find_obj_path(utils.ARCH, mod)
 
                 # Validate if the module being livepatches is supported or not
                 if utils.check_module_unsupported(mod_path):
-                    logging.warning(f"{cs.name()} ({cs.kernel}): Module {mod} is not supported by SLE")
+                    logging.warning("%s (%s}): Module %s is not supported by SLE", cs.name(), cs.kernel, mod)
 
                 cs.modules[mod] = str(mod_path)
                 mod_syms.setdefault(mod, [])
@@ -144,12 +135,12 @@ class Setup(Config):
 
             # Verify if the functions exist in the specified object
             for mod, syms in mod_syms.items():
-                arch_syms = cs.check_symbol_archs(self.archs, mod, syms, False)
+                arch_syms = cs.check_symbol_archs(archs, mod, syms, False)
                 if arch_syms:
                     for arch, syms in arch_syms.items():
                         m_syms = ",".join(syms)
                         cs_ = f"{cs.name()}-{arch} ({cs.kernel})"
-                        logging.warning(f"{cs_}: Symbols {m_syms} not found on {mod} object")
+                        logging.warning("%s: Symbols %s not found on %s object", cs_, m_syms, mod)
 
         self.flush_cs_file(codestreams)
         logging.info("Done. Setup finished.")

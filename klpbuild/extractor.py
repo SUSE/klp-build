@@ -29,6 +29,7 @@ class Extractor(Config):
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
         super().__init__(lp_name)
 
+        self.lp_name = lp_name
         self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
         self.sdir_lock.acquire()
 
@@ -57,8 +58,6 @@ class Extractor(Config):
 
         self.total = 0
         self.make_lock = Lock()
-
-        self.tem = TemplateGen(lp_name)
 
         self.env = os.environ
 
@@ -207,7 +206,7 @@ class Extractor(Config):
                 if result:
                     break
 
-                f.write(f"Not found\n")
+                f.write("Not found\n")
                 f.flush()
 
             if not result:
@@ -226,7 +225,7 @@ class Extractor(Config):
             # save the cmdline
             f.write(ret)
 
-            if not " -pg " in ret:
+            if " -pg " not in ret:
                 logging.warning(f"{cs.name()}:{file_} is not compiled with livepatch support (-pg flag)")
 
             return ret
@@ -364,7 +363,7 @@ class Extractor(Config):
 
         funcs = ",".join(fdata["symbols"])
 
-        ccp_args = [str(shutil.which("klp-ccp")) , "-P", "suse.KlpPolicy",
+        ccp_args = [str(shutil.which("klp-ccp")), "-P", "suse.KlpPolicy",
                     "--compiler=x86_64-gcc-9.1.0", "-i", f"{funcs}", "-o",
                     f"{str(lp_out)}", "--"]
 
@@ -452,7 +451,7 @@ class Extractor(Config):
         if '-fcf-protection' in cmd or cs.needs_ibt:
             cs.files[fname]["ibt"] = True
 
-        out_log = Path(out_dir, f"ccp.out.txt")
+        out_log = Path(out_dir, "ccp.out.txt")
         with open(out_log, "w") as f:
             # Write the command line used
             f.write(f"Executing ccp on {odir}\n")
@@ -479,16 +478,14 @@ class Extractor(Config):
             f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
             f.truncate()
 
-        self.tem.CreateMakefile(cs, fname, False)
-
     def run(self):
         logging.info(f"Work directory: {self.lp_path}")
 
         working_cs = utils.filter_cs(self.lp_filter, "",
-                                    self.codestreams, verbose=True)
+                                     self.codestreams, verbose=True)
 
         if len(working_cs) == 0:
-            logging.error(f"No codestreams found")
+            logging.error("No codestreams found")
             sys.exit(1)
 
         # Make it perform better by spawning a process function per
@@ -526,15 +523,17 @@ class Extractor(Config):
         # Save the ext_symbols set by execute
         self.flush_cs_file(working_cs)
 
+        tem = TemplateGen(self.lp_name)
+
         # TODO: change the templates so we generate a similar code than we
         # already do for SUSE livepatches
         # Create the livepatches per codestream
         for cs in working_cs:
-            self.tem.GenerateLivePatches(cs)
+            tem.generate_livepatches(cs)
 
         self.group_equal_files(args)
 
-        self.tem.generate_commit_msg_file()
+        tem.generate_commit_msg_file()
 
         logging.info("Checking the externalized symbols in other architectures...")
 
@@ -556,7 +555,7 @@ class Extractor(Config):
                     obj_syms[obj].extend(syms)
 
             for obj, syms in obj_syms.items():
-                missing = cs.check_symbol_archs(self.archs, obj, syms, True)
+                missing = cs.check_symbol_archs(self.cs_data.archs, obj, syms, True)
                 if missing:
                     for arch, arch_syms in missing.items():
                         missing_syms.setdefault(arch, {})
@@ -564,14 +563,12 @@ class Extractor(Config):
                         missing_syms[arch][obj].setdefault(cs.name(), [])
                         missing_syms[arch][obj][cs.name()].extend(arch_syms)
 
-            self.tem.CreateKbuildFile(cs)
-
         if missing_syms:
             with open(Path(self.lp_path, "missing_syms"), "w") as f:
                 f.write(json.dumps(missing_syms, indent=4))
 
             logging.warning("Symbols not found:")
-            logging.warn(json.dumps(missing_syms, indent=4))
+            logging.warning(json.dumps(missing_syms, indent=4))
 
     def get_work_lp_file(self, cs, fname):
         return Path(cs.work_dir(fname), cs.lp_out_file(fname))
@@ -619,7 +616,7 @@ class Extractor(Config):
         cs_cmp = []
 
         for cs in utils.filter_cs(self.lp_filter, "",
-                                 self.codestreams, verbose=True):
+                                  self.codestreams, verbose=True):
 
             cs_cmp.append(cs.name())
             for fname, _ in cs.files.items():
@@ -709,4 +706,4 @@ class Extractor(Config):
 
         logging.info("\nGrouping codestreams that share the same content and files:")
         for group in groups:
-            logging.info(f"\t{group}")
+            logging.info("\t%s", group)
