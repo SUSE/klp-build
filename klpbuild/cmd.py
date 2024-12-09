@@ -173,7 +173,7 @@ def main_func(main_args):
             args.conf,
             args.skips,
         )
-        setup.setup_project_files(args.cve, args.arch, args.no_check)
+        setup.setup_project_files(args.cve, args.archs, args.no_check)
 
     elif args.cmd == "extract":
         Extractor(args.name, args.filter, args.apply_patches, args.avoid_ext).run()
