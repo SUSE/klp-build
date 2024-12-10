@@ -90,7 +90,7 @@ class Setup(Config):
         self.lp_path.mkdir(exist_ok=True)
 
         codestreams = self.setup_codestreams(cve, no_check)
-        archs = archs.sort()
+        archs.sort()
 
         logging.info("Affected architectures:")
         logging.info("\t%s", ' '.join(archs))
