@@ -163,17 +163,13 @@ def main_func(main_args):
     args = create_parser().parse_args(main_args)
 
     if args.cmd == "setup":
-        setup = Setup(
-            args.name,
-            args.filter,
-            args.file_funcs,
-            args.mod_file_funcs,
-            args.conf_mod_file_funcs,
-            args.module,
-            args.conf,
-            args.skips,
-        )
-        setup.setup_project_files(args.cve, args.archs, args.no_check)
+        setup = Setup(args.name)
+        ffuncs = Setup.setup_file_funcs(args.conf, args.module, args.file_funcs,
+                                        args.mod_file_funcs, args.conf_mod_file_funcs)
+        codestreams = setup.setup_codestreams(
+            {"cve": args.cve, "conf": args.conf, "lp_filter": args.filter,
+                "lp_skips": args.skips, "no_check": args.no_check})
+        setup.setup_project_files(codestreams, ffuncs, args.archs)
 
     elif args.cmd == "extract":
         Extractor(args.name, args.filter, args.apply_patches, args.avoid_ext).run()
