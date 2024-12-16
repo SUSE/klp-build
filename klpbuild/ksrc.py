@@ -434,6 +434,11 @@ class GitHelper(Config):
             # and add a fifth field with the forth one + rpm- prefix, and
             # remove the build counter number
             full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
+
+            # for now, skip MICRO releases
+            if "MICRO" in full_cs:
+                continue
+
             kernel = re.sub(r"\.\d+$", "", kernel_full)
 
             codestreams.append(Codestream.from_codestream(data_path, lp_path, full_cs,
