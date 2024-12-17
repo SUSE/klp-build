@@ -113,18 +113,30 @@ class IBS(Config):
 
         rpm_file = Path(dest, rpm)
         cmd = f"rpm2cpio {rpm_file} | cpio --quiet -uidm"
-        subprocess.check_output(cmd, shell=True, cwd=path_dest)
+        subprocess.check_output(cmd, shell=True, stderr=None, cwd=path_dest)
 
         logging.info(f"({i}/{self.total}) extracted {cs.name()} {rpm}: ok")
 
     def download_and_extract(self, args):
         i, cs, _, _, arch, _, rpm, dest = args
 
-        self.download_binary_rpms(args)
+        # Try to download and extract at least twice if any problems arise
+        tries = 2
+        while tries > 0:
+            self.download_binary_rpms(args)
+            try:
+                self.extract_rpms((i, cs, arch, rpm, dest))
+                # All good, stop the loop
+                break
+            except Exception as e:
+                # There was an issue when extracting the RPMs, probably because it's broken
+                # Remove the downloaded RPMs and try again
+                tries = tries - 1
+                logging.info(f"Problem to extract {rpm}. Downloading it again")
+                Path(dest, rpm).unlink()
 
-        # Do not extract kernel-macros rpm
-        if "kernel-macros" not in rpm:
-            self.extract_rpms((i, cs, arch, rpm, dest))
+        if tries == 0:
+            raise RuntimeError(f"Failed to extract {rpm}. Aborting")
 
     def download_cs_data(self, cs_list):
         rpms = []
@@ -226,7 +238,7 @@ class IBS(Config):
             if e.errno == errno.EEXIST:
                 logging.info(f"({i}/{self.total}) {cs.name()} {rpm}: already downloaded. skipping.")
             else:
-                raise RuntimeError(f"download error on {prj}: {rpm}")
+                raise RuntimeError(f"download error on {prj}: {rpm}") from e
 
     def convert_prj_to_cs(self, prj):
         return prj.replace(f"{self.prj_prefix}-", "").replace("_", ".")
