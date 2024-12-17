@@ -24,7 +24,7 @@ from natsort import natsorted
 from osctiny import Osc
 
 from klpbuild.config import Config
-from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch
+from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch, get_kgraft_branch
 from klpbuild.utils import filter_cs
 
 class IBS(Config):
@@ -497,7 +497,6 @@ class IBS(Config):
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
 
-        logging.info(f"({i}/{self.total}) pushing {cs.name()} using branch {branch}...")
 
         # If the project exists, drop it first
         prj = self.cs_to_project(cs)
@@ -528,11 +527,22 @@ class IBS(Config):
 
         self.osc.packages.checkout(prj, "klp", prj_path)
 
+        base_branch = get_kgraft_branch(cs.name())
 
-        # Get the code from codestream
+        logging.info("(%s/%s) pushing %s using branches %s/%s...",
+                     i, self.total, cs.name(), str(base_branch), str(branch))
+
+        # Clone the repo and checkout to the codestream branch. The branch should be based on master to avoid rebasing
+        # conflicts
         subprocess.check_output(
-            ["/usr/bin/git", "clone", "--single-branch", "-b", branch, str(kgr_path), str(code_path)],
+            ["/usr/bin/git", "clone", "--branch", branch, str(kgr_path), str(code_path)],
             stderr=subprocess.STDOUT,
+        )
+
+        # Get the new bsc commit on top of the codestream branch (should be the last commit on the specific branch)
+        subprocess.check_output(
+            ["/usr/bin/git", "rebase", f"origin/{base_branch}"],
+            stderr=subprocess.STDOUT, cwd=code_path
         )
 
         # Check if the directory related to this bsc exists.
@@ -554,6 +564,9 @@ class IBS(Config):
 
         # Add all files to the project, commit the changes and delete the directory.
         for fname in prj_path.iterdir():
+            # Do not push .osc directory
+            if ".osc" in str(fname):
+                continue
             with open(fname, "rb") as fdata:
                 self.osc.packages.push_file(prj, "klp", fname.name, fdata.read())
         self.osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
