@@ -10,8 +10,8 @@ from klpbuild.utils import ARCH, is_mod, get_all_symbols_from_object
 
 class Codestream:
     __slots__ = ("data_path", "lp_path", "lp_name", "sle", "sp", "update", "rt",
-                 "ktype", "needs_ibt", "project", "kernel", "archs", "files",
-                 "modules", "repo")
+                 "ktype", "needs_ibt", "is_micro", "project", "patchid", "kernel",
+                 "archs", "files", "modules", "repo")
 
     def __init__(self, data_path, lp_path, sle, sp, update, rt, project,
                  kernel, archs, files, modules):
@@ -24,24 +24,34 @@ class Codestream:
         self.rt = rt
         self.ktype = "-rt" if rt else "-default"
         self.needs_ibt = sle > 15 or (sle == 15 and sp >= 6)
-        self.project = project
+        self.is_micro = sle == 6
+        if self.is_micro:
+            self.project, self.patchid = project.split("/")
+        else:
+            self.project = project
+            self.patchid = None
         self.kernel = kernel
         self.archs = archs
         self.files = files
         self.modules = modules
         self.repo = self.get_repo()
 
-
     @classmethod
     def from_codestream(cls, data_path, lp_path, cs, proj, kernel):
         # Parse SLE15-SP2_Update_25 to 15.2u25
         rt = "rt" if "-RT" in cs else ""
+        sp = "0"
+        u = "0"
 
-        sle, _, u = cs.replace("SLE", "").replace("-RT", "").split("_")
-        if "-SP" in sle:
-            sle, sp = sle.split("-SP")
-        else:
-            sp = "0"
+        # SLE12-SP5_Update_51
+        if "SLE" in cs:
+            sle, _, u = cs.replace("SLE", "").replace("-RT", "").split("_")
+            if "-SP" in sle:
+                sle, sp = sle.split("-SP")
+
+        # MICRO-6-0_Update_2
+        elif "MICRO" in cs:
+            sle, sp, u = cs.replace("MICRO-", "").replace("-RT", "").replace("_Update_", "-").split("-")
 
         return cls(data_path, lp_path, int(sle), int(sp), int(u), rt, proj, kernel, [], {}, {})
 
@@ -89,11 +99,14 @@ class Codestream:
 
     def get_boot_file(self, file, arch=ARCH):
         assert file in ["vmlinux", "config", "symvers"]
+        # Micro only created links on /boot for files on /usr/lib/modules
+        if self.is_micro:
+            return Path(self.get_mod_path(arch), file)
+
         return Path(self.get_data_dir(arch), "boot", f"{file}-{self.kname()}")
 
-
     def get_repo(self):
-        if self.update == 0:
+        if self.update == 0 or self.is_micro:
             return "standard"
 
         repo = f"SUSE_SLE-{self.sle}"
@@ -165,10 +178,14 @@ class Codestream:
     def is_mod_mutex(self):
         return self.sle < 15 or (self.sle == 15 and self.sp < 4)
 
-
     def get_mod_path(self, arch):
-        return Path(self.get_data_dir(arch), "lib", "modules", f"{self.kname()}")
+        # Micro already has support for usrmerge
+        if self.is_micro:
+            mod_path = Path("usr", "lib")
+        else:
+            mod_path = Path("lib")
 
+        return Path(self.get_data_dir(arch), mod_path, "modules", f"{self.kname()}")
 
     # A codestream can be patching multiple objects, so get the path related to
     # the module that we are interested
