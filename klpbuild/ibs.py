@@ -142,32 +142,41 @@ class IBS(Config):
         rpms = []
         i = 1
 
+        # The packages that we search for are:
+        # kernel-source
+        # kernel-devel
+        # kernel-(default|rt)
+        # kernel-(default|rt)-devel
+        # kernel-(default|rt)-livepatch-devel (for SLE15+)
+        # kernel-default-kgraft (for SLE12)
+        # kernel-default-kgraft-devel (for SLE12)
         cs_data = {
             "kernel-default": r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)",
             "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
         }
 
+        dest = Path(self.data, "kernel-rpms")
+        dest.mkdir(exist_ok=True, parents=True)
+
         logging.info("Getting list of files...")
         for cs in cs_list:
-            prj = cs.project
-            repo = cs.repo
-
-            path_dest = Path(self.data, "kernel-rpms")
-            path_dest.mkdir(exist_ok=True, parents=True)
-
             for arch in cs.archs:
                 for pkg, regex in cs_data.items():
+                    if cs.is_micro:
+                        # For MICRO, we use the patchid to find the list of binaries
+                        pkg = cs.patchid
+
+                    elif cs.rt:
                     # RT kernels have different package names
-                    if cs.rt:
                         if pkg == "kernel-default":
                             pkg = "kernel-rt"
                         elif pkg == "kernel-source":
                             pkg = "kernel-source-rt"
 
-                    if repo != "standard":
-                        pkg = f"{pkg}.{repo}"
+                    if cs.repo != "standard":
+                        pkg = f"{pkg}.{cs.repo}"
 
-                    ret = self.osc.build.get_binary_list(prj, repo, arch, pkg)
+                    ret = self.osc.build.get_binary_list(cs.project, cs.repo, arch, pkg)
                     for file in re.findall(regex, str(etree.tostring(ret))):
                         # FIXME: adjust the regex to only deal with strings
                         if isinstance(file, str):
@@ -187,7 +196,7 @@ class IBS(Config):
                             if arch != ARCH:
                                 continue
 
-                        rpms.append((i, cs, prj, repo, arch, pkg, rpm, path_dest))
+                        rpms.append((i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
                         i += 1
 
         logging.info(f"Downloading {len(rpms)} rpms...")
@@ -199,7 +208,7 @@ class IBS(Config):
         for cs in cs_list:
             for arch in cs.archs:
                 # Extract modules and vmlinux files that are compressed
-                mod_path = Path(cs.get_data_dir(arch), "lib", "modules", cs.kname())
+                mod_path = cs.get_mod_path(arch)
                 for fext, ecmd in [("zst", "unzstd -f -d"), ("xz", "xz --quiet -d -k")]:
                     cmd = rf'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
