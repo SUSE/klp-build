@@ -249,6 +249,8 @@ class Extractor(Config):
                         continue
 
                     _, sym, var, mod = l.split(" ")
+                    # Module names should not use dashes
+                    mod = mod.replace("-", "_")
                     if not utils.is_mod(mod):
                         mod = "vmlinux"
 
