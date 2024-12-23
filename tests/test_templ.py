@@ -113,3 +113,26 @@ def test_templ_cve_specified():
 
     # With CVE speficied, we should have it in the final file
     assert "CVE-1234-5678" in get_file_content(lp, cs)
+
+
+def test_templ_exts_mod_name():
+    """
+    This extraction should add a new external symbol from module nvme-core, but the kallsyms relocation
+    need the module to be nvme_core.
+    """
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "12.5u56"
+
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_NVME_TCP", "nvme-tcp", [
+                                  ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+
+    # The module name should be nvme_core instead of nvme-core
+    assert '{ "nvme_should_fail", (void *)&klpe_nvme_should_fail, "nvme_core" },' in get_file_content(lp, cs)
