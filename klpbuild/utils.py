@@ -13,7 +13,6 @@ import platform
 import re
 import zstandard
 
-import git
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
