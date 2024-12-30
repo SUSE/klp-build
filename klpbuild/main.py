@@ -10,7 +10,7 @@ from klpbuild.extractor import Extractor
 from klpbuild.ibs import IBS
 from klpbuild.inline import Inliner
 from klpbuild.ksrc import GitHelper
-from klpbuild.setup import Setup
+from klpbuild.plugins.setup import Setup
 from klpbuild.klplib.cmd import create_parser
 
 

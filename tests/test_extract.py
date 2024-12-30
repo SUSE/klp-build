@@ -7,7 +7,7 @@ import inspect
 import logging
 
 from klpbuild.extractor import Extractor
-from klpbuild.setup import Setup
+from klpbuild.plugins.setup import Setup
 from klpbuild import utils
 
 
