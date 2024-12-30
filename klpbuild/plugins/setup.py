@@ -11,7 +11,7 @@ from natsort import natsorted
 
 from klpbuild import utils
 from klpbuild.config import Config
-from klpbuild.ksrc import GitHelper
+from klpbuild.klplib.ksrc import GitHelper
 
 
 class Setup(Config):

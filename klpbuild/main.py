@@ -9,9 +9,10 @@ from klpbuild.klplib.codestream import Codestream
 from klpbuild.extractor import Extractor
 from klpbuild.ibs import IBS
 from klpbuild.inline import Inliner
-from klpbuild.ksrc import GitHelper
+from klpbuild.klplib.ksrc import GitHelper
 from klpbuild.plugins.setup import Setup
 from klpbuild.klplib.cmd import create_parser
+from klpbuild.klplib.ksrc import GitHelper
 
 
 def main():
