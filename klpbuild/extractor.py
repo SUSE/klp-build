@@ -587,9 +587,9 @@ class Extractor(Config):
             with open(fpath, "r+") as fi:
                 src = fi.read()
 
-                src = re.sub(r'#include ".+kconfig\.h"', "", src)
+                src = re.sub(r'#include ".+kconfig\.h"\n', "", src)
                 # Since 15.4 klp-ccp includes a compiler-version.h header
-                src = re.sub(r'#include ".+compiler\-version\.h"', "", src)
+                src = re.sub(r'#include ".+compiler\-version\.h"\n', "", src)
                 # Since RT variants, there is now an definition for auto_type
                 src = src.replace(r"#define __auto_type int\n", "")
                 # We have problems with externalized symbols on macros. Ignore
@@ -598,7 +598,7 @@ class Extractor(Config):
                 src = re.sub(f"{cs.get_data_dir(utils.ARCH)}.+{file}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
-                src = re.sub(rf"\.lineno = \d+,", "", src)
+                src = re.sub(r"\.lineno = \d+,", "", src)
 
                 # Remove any mentions to klpr_trace, since it's currently
                 # buggy in klp-ccp
@@ -606,6 +606,9 @@ class Extractor(Config):
 
                 # Reduce the noise from klp-ccp when expanding macros
                 src = re.sub(r"__compiletime_assert_\d+", "__compiletime_assert", src)
+
+                # Remove empty lines
+                src = "".join([s for s in src.strip().splitlines(True) if s.strip()])
 
                 cs_files[cs.name()].append((file, src))
 
