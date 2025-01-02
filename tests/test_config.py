@@ -3,7 +3,7 @@
 # Copyright (C) 2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-from klpbuild.codestream import Codestream
+from klpbuild.klplib.codestream import Codestream
 from klpbuild.utils import filter_codestreams
 
 

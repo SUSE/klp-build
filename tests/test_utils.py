@@ -1,5 +1,5 @@
 from klpbuild import utils
-from klpbuild.codestream import Codestream
+from klpbuild.klplib.codestream import Codestream
 
 
 def test_group_classify():

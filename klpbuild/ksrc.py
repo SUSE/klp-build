@@ -15,10 +15,10 @@ from pathlib import PurePath
 import requests
 from natsort import natsorted
 
-from klpbuild.codestream import Codestream
+from klpbuild import utils
 from klpbuild.config import Config
 from klpbuild.ibs import IBS
-from klpbuild import utils
+from klpbuild.klplib.codestream import Codestream
 
 
 class GitHelper(Config):

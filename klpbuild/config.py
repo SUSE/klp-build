@@ -12,7 +12,7 @@ from collections import OrderedDict
 from pathlib import Path, PurePath
 from natsort import natsorted
 
-from klpbuild.codestream import Codestream
+from klpbuild.klplib.codestream import Codestream
 
 
 @dataclasses.dataclass

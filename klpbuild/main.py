@@ -5,7 +5,7 @@
 
 import sys
 
-from klpbuild.codestream import Codestream
+from klpbuild.klplib.codestream import Codestream
 from klpbuild.extractor import Extractor
 from klpbuild.ibs import IBS
 from klpbuild.inline import Inliner
