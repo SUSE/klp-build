@@ -17,8 +17,8 @@ from natsort import natsorted
 
 from klpbuild import utils
 from klpbuild.config import Config
-from klpbuild.ibs import IBS
 from klpbuild.klplib.codestream import Codestream
+from klpbuild.klplib.ibs import IBS
 
 
 class GitHelper(Config):
