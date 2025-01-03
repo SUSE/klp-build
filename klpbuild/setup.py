@@ -72,6 +72,7 @@ class Setup(Config):
         self.cs_data.patched_kernels = patched_kernels
         # Add new codestreams to the already existing list, skipping duplicates
         self.cs_data.patched_cs = natsorted(list(set(self.cs_data.patched_cs + patched_cs)))
+        self.cs_data.cve = data["cve"]
 
         return codestreams
 
@@ -79,6 +80,7 @@ class Setup(Config):
         self.lp_path.mkdir(exist_ok=True)
 
         archs.sort()
+        self.cs_data.archs = archs
 
         logging.info("Affected architectures:")
         logging.info("\t%s", ' '.join(archs))
