@@ -5,7 +5,7 @@
 
 import sys
 
-from klpbuild.extractor import Extractor
+from klpbuild.plugins.extractor import Extractor
 from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.ibs import IBS

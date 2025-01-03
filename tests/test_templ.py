@@ -5,9 +5,9 @@
 
 import inspect
 
-from klpbuild.extractor import Extractor
-from klpbuild.plugins.setup import Setup
 from klpbuild.klplib import utils
+from klpbuild.plugins.extractor import Extractor
+from klpbuild.plugins.setup import Setup
 from tests.utils import get_file_content
 
 
