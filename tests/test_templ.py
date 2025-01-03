@@ -50,7 +50,7 @@ def test_templ_without_externalized_vars():
     codestreams = lp_setup.setup_codestreams(
         {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_IPV6", "no_check": False})
 
-    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+    lp_setup.setup_project_files(codestreams, ffuncs, [utils.ARCH])
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -62,7 +62,7 @@ def test_templ_without_externalized_vars():
     for check in ["LP_MODULE", "module_notify", "linux/module.h", "klp_funcs"]:
         assert check not in content
 
-    # As the config only targets x86_64, IS_ENABLED should be set
+    # As the config only targets one arch, IS_ENABLED should be set
     assert "#if IS_ENABLED" in content
 
     # Without CVE speficied, we should have XXXX-XXXX
