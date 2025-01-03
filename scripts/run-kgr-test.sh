@@ -32,7 +32,7 @@ if [ ! -f "$TEST_SCRIPT" ]; then
 fi
 
 # Check multiple places where an updated version of the VMs can be found
-for VMSDIR in "$HOME/kgr-test/vms" "$HOME/vms" "/home/nstange/vms"; do
+for VMSDIR in "$(realpath ../kgr-test/vms)" "$HOME/klp/kgr-test/vms" "$HOME/kgr-test/vms" "$HOME/vms" "/home/nstange/vms"; do
 	if [ -d "$VMSDIR" ]; then
 		echo "Using VMS from $VMSDIR"
 		break
@@ -46,9 +46,11 @@ fi
 
 # grab all vm.xml files regarding each main codestream
 xmls=""
+cs_list=""
 codestreams=$(cut -d _ -f 1 < "$CONF_IN" | uniq | tr '[:upper:]' '[:lower:]')
 for cs in $codestreams; do
 	xmls="$xmls -q $VMSDIR/$cs.xml"
+	cs_list="$cs $cs_list"
 done
 
 # ppc64 and s390 can be flaky if too many processes are triggered
@@ -59,15 +61,24 @@ else
 	JOBS=1
 fi
 
-KGR_TEST_PATH="$HOME/kgr-test/kgr-test/kgr-test.py"
-if [ ! -f "$KGR_TEST_PATH" ]; then
-	KGR_TEST_PATH="/home/nstange/kgr-test/kgr-test/kgr-test.py"
+for KGR_TEST_PATH in "$(realpath ../kgr-test/)" "$HOME/klp/kgr-test/" "/home/nstange/kgr-test"; do
+	if [ -d "$KGR_TEST_PATH" ]; then
+		echo "Using kgr-test from $KGR_TEST_PATH"
+		break
+	fi
+done
+
+if [ ! -d "$KGR_TEST_PATH" ]; then
+	echo "kgr-test missing. Aborting."
+	exit 1
 fi
 
 # Create scratch is doesn't exists
 mkdir -p ~/scratch
 
-$KGR_TEST_PATH -s ~/scratch/ \
+echo "Running tests for codestreams: $cs_list"
+
+"$KGR_TEST_PATH/kgr-test/kgr-test.py" -s ~/scratch/ \
 		$LPS \
 		-o tests.out \
 		-t repro \
