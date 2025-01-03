@@ -10,7 +10,7 @@ from pathlib import Path
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.config import Config
+from klpbuild.klplib.config import Config
 from klpbuild.klplib.ksrc import GitHelper
 
 

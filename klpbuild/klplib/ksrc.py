@@ -16,7 +16,7 @@ import requests
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.config import Config
+from klpbuild.klplib.config import Config
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.ibs import IBS
 

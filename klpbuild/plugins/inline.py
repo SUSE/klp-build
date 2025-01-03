@@ -6,7 +6,7 @@
 import shutil
 import subprocess
 
-from klpbuild.config import Config
+from klpbuild.klplib.config import Config
 from klpbuild.klplib.utils import filter_codestreams
 
 

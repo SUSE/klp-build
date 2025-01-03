@@ -6,7 +6,7 @@
 from pathlib import Path
 import json
 
-from klpbuild.config import Config
+from klpbuild.klplib.config import Config
 
 
 def get_workdir(lp_name):
