@@ -6,7 +6,7 @@
 from pathlib import Path, PurePath
 import re
 
-from klpbuild.utils import ARCH, is_mod, get_all_symbols_from_object
+from klpbuild.klplib.utils import ARCH, is_mod, get_all_symbols_from_object
 
 class Codestream:
     __slots__ = ("data_path", "lp_path", "lp_name", "sle", "sp", "update", "rt",

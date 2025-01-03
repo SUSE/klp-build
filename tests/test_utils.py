@@ -1,4 +1,4 @@
-from klpbuild import utils
+from klpbuild.klplib import utils
 from klpbuild.klplib.codestream import Codestream
 
 

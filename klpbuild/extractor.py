@@ -20,7 +20,7 @@ from filelock import FileLock
 
 from natsort import natsorted
 
-from klpbuild import utils
+from klpbuild.klplib import utils
 from klpbuild.config import Config
 from klpbuild.klplib.templ import TemplateGen
 

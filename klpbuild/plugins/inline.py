@@ -7,7 +7,7 @@ import shutil
 import subprocess
 
 from klpbuild.config import Config
-from klpbuild.utils import filter_codestreams
+from klpbuild.klplib.utils import filter_codestreams
 
 
 class Inliner(Config):

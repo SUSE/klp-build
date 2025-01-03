@@ -24,7 +24,7 @@ from natsort import natsorted
 from osctiny import Osc
 
 from klpbuild.config import Config
-from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch, get_kgraft_branch, filter_codestreams
+from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch, get_kgraft_branch, filter_codestreams
 
 class IBS(Config):
     def __init__(self, lp_name, lp_filter):

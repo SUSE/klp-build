@@ -4,7 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from klpbuild.klplib.codestream import Codestream
-from klpbuild.utils import filter_codestreams
+from klpbuild.klplib.utils import filter_codestreams
 
 
 def test_filter():

@@ -5,7 +5,7 @@
 
 import argparse
 
-from klpbuild.utils import ARCHS
+from klpbuild.klplib.utils import ARCHS
 
 
 def create_parser() -> argparse.ArgumentParser:
