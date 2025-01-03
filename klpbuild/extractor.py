@@ -22,7 +22,7 @@ from natsort import natsorted
 
 from klpbuild import utils
 from klpbuild.config import Config
-from klpbuild.templ import TemplateGen
+from klpbuild.klplib.templ import TemplateGen
 
 
 class Extractor(Config):
