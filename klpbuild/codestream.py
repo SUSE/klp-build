@@ -14,7 +14,7 @@ class Codestream:
                  "archs", "files", "modules", "repo")
 
     def __init__(self, data_path, lp_path, sle, sp, update, rt, project,
-                 kernel, archs, files, modules):
+                 patchid, kernel, archs, files, modules):
         self.data_path = data_path
         self.lp_path = lp_path
         self.lp_name = PurePath(lp_path).name
@@ -23,13 +23,10 @@ class Codestream:
         self.update = update
         self.rt = rt
         self.ktype = "-rt" if rt else "-default"
-        self.needs_ibt = sle > 15 or (sle == 15 and sp >= 6)
         self.is_micro = sle == 6
-        if self.is_micro:
-            self.project, self.patchid = project.split("/")
-        else:
-            self.project = project
-            self.patchid = None
+        self.needs_ibt = self.is_micro or sle > 15 or (sle == 15 and sp >= 6)
+        self.project = project
+        self.patchid = patchid
         self.kernel = kernel
         self.archs = archs
         self.files = files
@@ -37,7 +34,7 @@ class Codestream:
         self.repo = self.get_repo()
 
     @classmethod
-    def from_codestream(cls, data_path, lp_path, cs, proj, kernel):
+    def from_codestream(cls, data_path, lp_path, cs, proj, patchid, kernel):
         # Parse SLE15-SP2_Update_25 to 15.2u25
         rt = "rt" if "-RT" in cs else ""
         sp = "0"
@@ -53,21 +50,21 @@ class Codestream:
         elif "MICRO" in cs:
             sle, sp, u = cs.replace("MICRO-", "").replace("-RT", "").replace("_Update_", "-").split("-")
 
-        return cls(data_path, lp_path, int(sle), int(sp), int(u), rt, proj, kernel, [], {}, {})
+        return cls(data_path, lp_path, int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {})
 
 
     @classmethod
     def from_cs(cls, cs):
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
         return cls("", "", int(match.group(1)), int(match.group(2)),
-                   int(match.group(4)), match.group(3), "", "", [], {}, {})
+                   int(match.group(4)), match.group(3), "", "", "", [], {}, {})
 
 
     @classmethod
     def from_data(cls, data):
         return cls(data["data_path"], data["lp_path"], data["sle"], data["sp"],
-                   data["update"], data["rt"], data["project"], data["kernel"],
-                   data["archs"], data["files"], data["modules"])
+                   data["update"], data["rt"], data["project"], data["patchid"],
+                   data["kernel"], data["archs"], data["files"], data["modules"])
 
 
     def __eq__(self, cs):
@@ -176,7 +173,7 @@ class Codestream:
     # 15.4 onwards we don't have module_mutex, so template generates
     # different code
     def is_mod_mutex(self):
-        return self.sle < 15 or (self.sle == 15 and self.sp < 4)
+        return not self.is_micro and (self.sle < 15 or (self.sle == 15 and self.sp < 4))
 
     def get_mod_path(self, arch):
         # Micro already has support for usrmerge
@@ -342,6 +339,7 @@ class Codestream:
                 "update" : self.update,
                 "rt" : self.rt,
                 "project" : self.project,
+                "patchid": self.patchid,
                 "kernel" : self.kernel,
                 "archs" : self.archs,
                 "files" : self.files,

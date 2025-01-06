@@ -436,14 +436,16 @@ class GitHelper(Config):
             # remove the build counter number
             full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
 
-            # for now, skip MICRO releases
-            if "MICRO" in full_cs:
-                continue
-
             kernel = re.sub(r"\.\d+$", "", kernel_full)
 
+            # MICRO releases contain project/patchid format
+            if "/" in proj:
+                proj, patchid = proj.split("/")
+            else:
+                patchid = ""
+
             codestreams.append(Codestream.from_codestream(data_path, lp_path, full_cs,
-                                                          proj, kernel))
+                                                          proj, patchid, kernel))
 
         return codestreams
 

@@ -459,7 +459,7 @@ class IBS(Config):
                 # codestreams built without issues
                 if not finished:
                     states = set(archs.values())
-                    if len(states) == 1 and states.pop() == "succeeded":
+                    if len(states) == 1 and states.pop() in ["succeeded", "excluded"]:
                         finished = True
 
                 if finished:
@@ -535,7 +535,7 @@ class IBS(Config):
 
         except Exception as e:
             logging.error(e, e.response.content)
-            raise RuntimeError("")
+            raise RuntimeError("") from e
 
         # Remove previously created directories
         prj_path = Path(cs.dir(), "checkout")
