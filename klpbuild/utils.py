@@ -207,7 +207,7 @@ def check_module_unsupported(mod_path):
     return "no" == get_elf_modinfo_entry(elffile, "supported")
 
 
-def filter_cs(lp_filter, lp_skip, cs_list, verbose=False):
+def filter_codestreams(lp_filter, lp_skip, cs_list, verbose=False):
     if isinstance(cs_list, dict):
         full_cs = copy.deepcopy(list(cs_list.values()))
     else:

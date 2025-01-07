@@ -7,7 +7,7 @@ import shutil
 import subprocess
 
 from klpbuild.config import Config
-from klpbuild.utils import filter_cs
+from klpbuild.utils import filter_codestreams
 
 
 class Inliner(Config):
@@ -25,7 +25,7 @@ class Inliner(Config):
     def check_inline(self, fname, func):
         ce_args = [ str(self.ce_inline_path), "-where-is-inlined" ]
 
-        filtered = filter_cs(self.lp_filter, "", self.codestreams)
+        filtered = filter_codestreams(self.lp_filter, "", self.codestreams)
         if not filtered:
             raise RuntimeError(f"Codestream {self.lp_filter} not found. Aborting.")
 

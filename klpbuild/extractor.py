@@ -483,7 +483,7 @@ class Extractor(Config):
     def run(self):
         logging.info(f"Work directory: {self.lp_path}")
 
-        working_cs = utils.filter_cs(self.lp_filter, "",
+        working_cs = utils.filter_codestreams(self.lp_filter, "",
                                      self.codestreams, verbose=True)
 
         if len(working_cs) == 0:
@@ -620,7 +620,7 @@ class Extractor(Config):
 
         cs_cmp = []
 
-        for cs in utils.filter_cs(self.lp_filter, "",
+        for cs in utils.filter_codestreams(self.lp_filter, "",
                                   self.codestreams, verbose=True):
 
             cs_cmp.append(cs.name())

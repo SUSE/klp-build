@@ -530,7 +530,7 @@ class GitHelper(Config):
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
-        working_cs = utils.filter_cs(self.lp_filter, self.lp_skip,
+        working_cs = utils.filter_codestreams(self.lp_filter, self.lp_skip,
                                      working_cs, verbose=True)
 
         if not working_cs:
