@@ -80,14 +80,14 @@ class Codestream:
         return Path(self.data_path, arch)
 
 
-    def get_sdir(self, arch=ARCH):
+    def get_src_dir(self, arch=ARCH):
         # Only -rt codestreams have a suffix for source directory
         ktype = self.ktype.replace("-default", "")
         return Path(self.get_data_dir(arch), "usr", "src", f"linux-{self.kernel}{ktype}")
 
 
     def get_odir(self):
-        return Path(f"{self.get_sdir(ARCH)}-obj", ARCH, self.ktype.replace("-", ""))
+        return Path(f"{self.get_src_dir(ARCH)}-obj", ARCH, self.ktype.replace("-", ""))
 
 
     def get_ipa_file(self, fname):

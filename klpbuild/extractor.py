@@ -272,7 +272,7 @@ class Extractor(Config):
         return Path(self.lp_path, "fixes")
 
     def remove_patches(self, cs, fil):
-        sdir = cs.get_sdir()
+        sdir = cs.get_src_dir()
         # Check if there were patches applied previously
         patches_dir = Path(sdir, "patches")
         if not patches_dir.exists():
@@ -307,7 +307,7 @@ class Extractor(Config):
             patch_dirs.append(Path(self.get_patches_dir(), d))
 
         patched = False
-        sdir = cs.get_sdir()
+        sdir = cs.get_src_dir()
         for pdir in patch_dirs:
             if not pdir.exists():
                 fil.write(f"\nPatches dir {pdir} doesnt exists\n")
@@ -403,7 +403,7 @@ class Extractor(Config):
         env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
         env["KCP_KBUILD_ODIR"] = str(cs.get_odir())
         env["KCP_PATCHED_OBJ"] = str(cs.get_mod(fdata["module"]))
-        env["KCP_KBUILD_SDIR"] = str(cs.get_sdir())
+        env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
         env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
         env["KCP_WORK_DIR"] = str(out_dir)
 
@@ -421,7 +421,7 @@ class Extractor(Config):
     def process(self, args):
         i, fname, cs, fdata = args
 
-        sdir = cs.get_sdir()
+        sdir = cs.get_src_dir()
         odir = cs.get_odir()
 
         # The header text has two tabs

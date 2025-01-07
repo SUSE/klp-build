@@ -97,7 +97,7 @@ class Setup(Config):
                 mod = fdata["module"]
                 cs.validate_config(fdata["conf"], mod)
 
-                sdir = cs.get_sdir()
+                sdir = cs.get_src_dir()
                 if not Path(sdir, f).is_file():
                     raise RuntimeError(f"{cs.name()} ({cs.kernel}): File {f} not found on {str(sdir)}")
 
