@@ -21,6 +21,7 @@ from filelock import FileLock
 from natsort import natsorted
 
 from klpbuild.klplib import utils
+from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
 from klpbuild.klplib.config import Config
 from klpbuild.klplib.templ import TemplateGen
 
@@ -484,7 +485,8 @@ class Extractor(Config):
         logging.info(f"Work directory: {self.lp_path}")
 
         working_cs = utils.filter_codestreams(self.lp_filter, "",
-                                     self.codestreams, verbose=True)
+                                              get_codestreams_dict(),
+                                              verbose=True)
 
         if len(working_cs) == 0:
             logging.error("No codestreams found")
@@ -523,7 +525,7 @@ class Extractor(Config):
                 sys.exit(1)
 
         # Save the ext_symbols set by execute
-        self.flush_cs_file(working_cs)
+        store_codestreams(self.lp_name, working_cs)
 
         tem = TemplateGen(self.lp_name)
 
@@ -557,7 +559,7 @@ class Extractor(Config):
                     obj_syms[obj].extend(syms)
 
             for obj, syms in obj_syms.items():
-                missing = cs.check_symbol_archs(self.cs_data.archs, obj, syms, True)
+                missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True)
                 if missing:
                     for arch, arch_syms in missing.items():
                         missing_syms.setdefault(arch, {})
@@ -620,8 +622,7 @@ class Extractor(Config):
 
         cs_cmp = []
 
-        for cs in utils.filter_codestreams(self.lp_filter, "",
-                                  self.codestreams, verbose=True):
+        for cs in utils.filter_codestreams(self.lp_filter, "", get_codestreams_dict(), verbose=True):
 
             cs_cmp.append(cs.name())
             for fname, _ in cs.files.items():

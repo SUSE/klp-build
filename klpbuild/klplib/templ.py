@@ -9,6 +9,7 @@ from pathlib import Path
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
+from klpbuild.klplib.codestreams_data import get_codestreams_data
 from klpbuild.klplib.config import Config
 from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail
 
@@ -401,7 +402,7 @@ class TemplateGen(Config):
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
-        self.check_enabled = self.cs_data.archs != ARCHS
+        self.check_enabled = get_codestreams_data('archs') != ARCHS
         self.lp_name = lp_name
 
     @staticmethod
@@ -472,9 +473,13 @@ class TemplateGen(Config):
             out_name = f"livepatch_{cs.lp_name}.c"
 
         user, email = get_mail()
+        cve = get_codestreams_data('cve')
+        if not cve:
+            cve = "XXXX-XXXX"
+        cmts = get_codestreams_data('commits')
         tvars = {
             "include_header": "livepatch_" in out_name,
-            "cve": self.cs_data.cve if self.cs_data.cve else "XXXX-XXXX",
+            "cve": cve,
             "lp_name": cs.lp_name,
             "lp_num": cs.lp_name.replace("bsc", ""),
             "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
@@ -488,7 +493,7 @@ class TemplateGen(Config):
             "ext_vars": fdata.get("ext_symbols", ""),
             "inc_src_file": lp_file,
             "ibt": fdata.get("ibt", False),
-            "commits": self.cs_data.commits
+            "commits": cmts
         }
 
         with open(Path(lp_path, out_name), "w") as f:
@@ -543,15 +548,18 @@ class TemplateGen(Config):
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
     def generate_commit_msg_file(self):
-        cmts = self.cs_data.commits.get("upstream", {})
+        cmts = get_codestreams_data('commits').get("upstream", {})
         if cmts:
             cmts = cmts["commits"]
+        cve = get_codestreams_data('cve')
+        if not cve:
+            cve = "XXXX-XXXX"
         user, email = get_mail()
         render_vars = {
             "lp_name": self.lp_name.replace("bsc", ""),
             "user": user,
             "email": email,
-            "cve": self.cs_data.cve if self.cs_data.cve else "XXXX-XXXX",
+            "cve": cve,
             "commits": cmts,
             "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
         }

@@ -4,24 +4,9 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import configparser
-import dataclasses
-import json
 import logging
 import os
-from collections import OrderedDict
 from pathlib import Path, PurePath
-from natsort import natsorted
-
-from klpbuild.klplib.codestream import Codestream
-
-
-@dataclasses.dataclass
-class CodestreamData:
-    cve: str
-    archs: list[str]
-    patched_kernels: list[str]
-    patched_cs: list[str]
-    commits: dict[str, str]
 
 
 class Config:
@@ -41,24 +26,8 @@ class Config:
 
         self.load_user_conf()
 
-        self.codestreams = OrderedDict()
         self.data = self.get_user_path('data_dir')
         self.lp_path = Path(self.get_user_path('work_dir'), lp_name)
-
-        self.cs_data = CodestreamData("", [], [], [], {})
-        self.cs_file = Path(self.lp_path, "codestreams.json")
-        if self.cs_file.is_file():
-            with open(self.cs_file) as f:
-                jfile = json.loads(f.read(), object_pairs_hook=OrderedDict)
-                self.cs_data = CodestreamData(cve=jfile["cve"],
-                                              archs=jfile["archs"],
-                                              patched_kernels=jfile["patched_kernels"],
-                                              patched_cs=jfile["patched_cs"],
-                                              commits=jfile["commits"])
-                json_cs = jfile["codestreams"]
-                # Sorte the codestreams before inserting in the OrderedDict
-                for cs in natsorted(json_cs.keys()):
-                    self.codestreams[cs] = Codestream.from_data(json_cs[cs])
 
 
     def setup_user_env(self, basedir):
@@ -138,23 +107,3 @@ class Config:
         raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
 
 
-    # Update and save codestreams data, working_cs is always a list
-    def flush_cs_file(self, working_cs):
-        # Update the latest state of the codestreams
-        for cs in working_cs:
-            self.codestreams[cs.name()] = cs
-
-        # Format each codestream for the json
-        cs_data = {}
-        for key, cs in self.codestreams.items():
-            cs_data[key] = cs.data()
-
-        data = {"archs": self.cs_data.archs,
-                "commits": self.cs_data.commits,
-                "cve": self.cs_data.cve,
-                "patched_cs": self.cs_data.patched_cs,
-                "patched_kernels": self.cs_data.patched_kernels,
-                "codestreams": cs_data}
-
-        with open(self.cs_file, "w") as f:
-            f.write(json.dumps(data, indent=4))

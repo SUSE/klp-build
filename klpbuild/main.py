@@ -5,17 +5,25 @@
 
 import sys
 
-from klpbuild.plugins.extractor import Extractor
 from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestream import Codestream
+from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.ksrc import GitHelper
+from klpbuild.plugins.extractor import Extractor
 from klpbuild.plugins.inline import Inliner
 from klpbuild.plugins.setup import Setup
 
 
 def main():
     args = create_parser().parse_args(sys.argv[1:])
+
+    # NOTE: Here I'm assuming the codestream is only loaded for plugins that
+    # get the livepatch name, not sure yet it's ok to assume it
+    if hasattr(args, 'name'):
+        load_codestreams(args.name)
+    else:
+        load_codestreams('bsc_check')
 
     if args.cmd == "setup":
         setup = Setup(args.name)

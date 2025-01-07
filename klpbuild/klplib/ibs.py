@@ -23,6 +23,7 @@ from lxml.objectify import SubElement
 from natsort import natsorted
 from osctiny import Osc
 
+from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
 from klpbuild.klplib.config import Config
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams
 
@@ -160,7 +161,7 @@ class IBS(Config):
         logging.info("Getting list of files...")
         for cs in cs_list:
             for arch in cs.archs:
-                for pkg, regex in cs_data.items():
+                for pkg, regex in get_codestreams_items():
                     if cs.is_micro:
                         # For MICRO, we use the patchid to find the list of binaries
                         pkg = cs.patchid
@@ -308,7 +309,7 @@ class IBS(Config):
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs in filter_codestreams(self.lp_filter, "", self.codestreams):
+            for cs in filter_codestreams(self.lp_filter, "", get_codestreams_dict()):
                 if arch not in cs.archs:
                     continue
 
@@ -376,7 +377,7 @@ class IBS(Config):
             cs_name = self.convert_prj_to_cs(prj)
 
             # Get the codestream from the dict
-            cs = self.codestreams.get(cs_name, None)
+            cs = get_codestream_by_name(cs_name)
             if not cs:
                 logging.info(f"Codestream {cs_name} is stale. Deleting it.")
                 self.delete_project(0, prj, False)
@@ -591,7 +592,7 @@ class IBS(Config):
         logging.info(self.osc.build.get_log(self.cs_to_project(cs), "standard", arch, "klp"))
 
     def push(self, wait=False):
-        cs_list = filter_codestreams(self.lp_filter, "", self.codestreams)
+        cs_list = filter_codestreams(self.lp_filter, "", get_codestreams_dict())
 
         if not cs_list:
             logging.error(f"push: No codestreams found for {self.lp_name}")
