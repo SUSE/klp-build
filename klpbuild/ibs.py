@@ -405,7 +405,7 @@ class IBS(Config):
 
             archs = result.xpath("repository/arch")
             for arch in archs:
-                ret = self.osc.build.get_binary_list(prj, "devbuild", arch, "klp")
+                ret = self.osc.build.get_binary_list(prj, "standard", arch, "klp")
                 rpm_name = f"{arch}.rpm"
                 for rpm in ret.xpath("binary/@filename"):
                     if not rpm.endswith(rpm_name):
@@ -418,7 +418,7 @@ class IBS(Config):
                     dest = Path(cs.dir(), str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
-                    rpms.append((i, cs, prj, "devbuild", arch, "klp", rpm, dest))
+                    rpms.append((i, cs, prj, "standard", arch, "klp", rpm, dest))
                     i += 1
 
         logging.info(f"Downloading {len(rpms)} packages...")
@@ -497,7 +497,7 @@ class IBS(Config):
             "<project name=''><title></title><description></description>"
             "<build><enable/></build><publish><disable/></publish>"
             "<debuginfo><disable/></debuginfo>"
-            '<repository name="devbuild">'
+            '<repository name="standard">'
             f"<path project=\"{cs.project}\" repository=\"{cs.repo}\"/>"
             "</repository>"
             "</project>"
@@ -596,7 +596,7 @@ class IBS(Config):
         logging.info(f"({i}/{self.total}) {cs.name()} done")
 
     def log(self, cs, arch):
-        logging.info(self.osc.build.get_log(self.cs_to_project(cs), "devbuild", arch, "klp"))
+        logging.info(self.osc.build.get_log(self.cs_to_project(cs), "standard", arch, "klp"))
 
     def push(self, wait=False):
         cs_list = filter_cs(self.lp_filter, "", self.codestreams)
