@@ -344,7 +344,7 @@ class Extractor(Config):
 
 
     def get_cmd_from_json(self, cs, fname):
-        cc_file = Path(cs.get_odir(), "compile_commands.json")
+        cc_file = Path(cs.get_obj_dir(), "compile_commands.json")
         # FIXME: compile_commands.json that is packaged with SLE/openSUSE
         # doesn't quite work yet, so don't use it yet.
         return None
@@ -401,7 +401,7 @@ class Extractor(Config):
 
         env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt else "0"
         env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
-        env["KCP_KBUILD_ODIR"] = str(cs.get_odir())
+        env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
         env["KCP_PATCHED_OBJ"] = str(cs.get_mod(fdata["module"]))
         env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
         env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
@@ -422,7 +422,7 @@ class Extractor(Config):
         i, fname, cs, fdata = args
 
         sdir = cs.get_src_dir()
-        odir = cs.get_odir()
+        odir = cs.get_obj_dir()
 
         # The header text has two tabs
         cs_info = cs.name().ljust(15, " ")

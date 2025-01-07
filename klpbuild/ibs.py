@@ -222,12 +222,12 @@ class IBS(Config):
                         subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
 
             # Use the SLE .config
-            shutil.copy(cs.get_boot_file("config"), Path(cs.get_odir(), ".config"))
+            shutil.copy(cs.get_boot_file("config"), Path(cs.get_obj_dir(), ".config"))
 
             # Recreate the build link to enable us to test the generated LP
             mod_path = cs.get_kernel_build_path(ARCH)
             mod_path.unlink()
-            os.symlink(cs.get_odir(), mod_path)
+            os.symlink(cs.get_obj_dir(), mod_path)
 
         # Create symlink from lib to usr/lib so we can use virtme on the
         # extracted kernels
