@@ -156,13 +156,15 @@ class Codestream:
             return f"{self.sle}.{self.sp}rt"
         return f"{self.sle}.{self.sp}"
 
-
-    # Parse 15.2u25 to SLE15-SP2_Update_25
     def name_full(self):
-        buf = f"SLE{self.sle}"
-
-        if int(self.sp) > 0:
-            buf = f"{buf}-SP{self.sp}"
+        # Parse 15.2u25 to SLE15-SP2_Update_25
+        # Parse 6.0u2 to MICRO
+        if self.is_micro:
+            buf = f"MICRO-{self.sle}-{self.sp}"
+        else:
+            buf = f"SLE{self.sle}"
+            if int(self.sp) > 0:
+                buf = f"{buf}-SP{self.sp}"
 
         if self.rt:
             buf = f"{buf}-RT"
