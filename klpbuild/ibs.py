@@ -210,7 +210,7 @@ class IBS(Config):
                 # Extract modules and vmlinux files that are compressed
                 mod_path = cs.get_mod_path(arch)
                 for fext, ecmd in [("zst", "unzstd -f -d"), ("xz", "xz --quiet -d -k")]:
-                    cmd = rf'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
+                    cmd = rf'find {mod_path} -name "*.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
                 # Extract gzipped files per arch
