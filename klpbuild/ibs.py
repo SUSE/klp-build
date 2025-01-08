@@ -269,28 +269,18 @@ class IBS(Config):
         return missing_syms
 
     def validate_livepatch_module(self, cs, arch, rpm_dir, rpm):
-        match = re.search(r"(livepatch)-.*(default|rt)\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.", rpm)
-        if match:
-            dir_path = match.group(1)
-            ktype = match.group(2)
-            lp_file = f"livepatch-{match.group(3)}-{match.group(4)}_{match.group(5)}_{match.group(6)}.ko"
-        else:
-            ktype = "default"
-            match = re.search(r"(kgraft)\-patch\-.*default\-(\d+)\-(\d+)\.(\d+)\.", rpm)
-            if match:
-                dir_path = match.group(1)
-                lp_file = f"kgraft-patch-{match.group(2)}-{match.group(3)}_{match.group(4)}.ko"
-
         fdest = Path(rpm_dir, rpm)
         # Extract the livepatch module for later inspection
-        cmd = f"rpm2cpio {fdest} | cpio --quiet -uidm"
-        subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
+        subprocess.check_output(f"rpm2cpio {fdest} | cpio --quiet -uidm",
+                                shell=True, cwd=rpm_dir)
+
+        # There should be only one .ko file extracted
+        lp_mod_path = sorted(rpm_dir.glob("**/*.ko"))[0]
+        elffile = get_elf_object(lp_mod_path)
 
         # Check depends field
         # At this point we found that our livepatch module depends on
         # exported functions from other modules. List the modules here.
-        lp_mod_path = Path(rpm_dir, "lib", "modules", f"{cs.kernel}-{ktype}", dir_path, lp_file)
-        elffile = get_elf_object(lp_mod_path)
         deps = get_elf_modinfo_entry(elffile, "depends")
         if len(deps):
             logging.warning(f"{cs.name()}:{arch} has dependencies: {deps}.")
