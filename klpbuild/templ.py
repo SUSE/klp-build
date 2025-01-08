@@ -82,6 +82,9 @@ ${get_commits(commits, '15.4')}
  *  SLE15-SP6 commit:
 ${get_commits(commits, '15.6')}
  *
+ *  SLE MICRO-6-0 commit:
+${get_commits(commits, '6.0')}
+ *
 % endif
  *  Copyright (c) ${year} SUSE
  *  Author: ${ user } <${ email }>
