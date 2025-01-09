@@ -216,7 +216,7 @@ class IBS(Config):
                 # Extract gzipped files per arch
                 files = ["vmlinux", "symvers"]
                 for f in files:
-                    f_path = Path(cs.get_data_dir(arch), "boot", f"{f}-{cs.kname()}.gz")
+                    f_path = cs.get_boot_file(f"{f}.gz")
                     # ppc64le doesn't gzips vmlinux
                     if f_path.exists():
                         subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)

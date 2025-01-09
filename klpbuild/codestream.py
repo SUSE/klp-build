@@ -93,14 +93,14 @@ class Codestream:
     def get_ipa_file(self, fname):
         return Path(self.get_odir(), f"{fname}.000i.ipa-clones")
 
-
     def get_boot_file(self, file, arch=ARCH):
-        assert file in ["vmlinux", "config", "symvers"]
-        # Micro only created links on /boot for files on /usr/lib/modules
+        assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
         if self.is_micro:
             return Path(self.get_mod_path(arch), file)
 
-        return Path(self.get_data_dir(arch), "boot", f"{file}-{self.kname()}")
+        # Strip the suffix from the filename so we can add the kernel version in the middle
+        fname = f"{Path(file).stem}-{self.kname()}{Path(file).suffix}"
+        return Path(self.get_data_dir(arch), "boot", fname)
 
     def get_repo(self):
         if self.update == 0 or self.is_micro:
