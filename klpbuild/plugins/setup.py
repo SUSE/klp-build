@@ -21,7 +21,8 @@ class Setup(Config):
     ):
         super().__init__(lp_name)
 
-        if self.lp_path.exists() and not self.lp_path.is_dir():
+        lp_path = utils.get_workdir(lp_name)
+        if lp_path.exists() and not lp_path.is_dir():
             raise ValueError("--name needs to be a directory, or not to exist")
         self.lp_name = lp_name
 
@@ -77,7 +78,7 @@ class Setup(Config):
         return codestreams
 
     def setup_project_files(self, codestreams, ffuncs, archs):
-        self.lp_path.mkdir(exist_ok=True)
+        utils.get_workdir(self.lp_name).mkdir(exist_ok=True)
 
         archs.sort()
         set_codestreams_data(archs=archs)

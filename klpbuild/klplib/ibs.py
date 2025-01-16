@@ -25,7 +25,7 @@ from osctiny import Osc
 
 from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
 from klpbuild.klplib.config import Config, get_user_path, get_user_settings, get_tests_path
-from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams
+from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir
 
 class IBS(Config):
     def __init__(self, lp_name, lp_filter):
@@ -294,7 +294,7 @@ class IBS(Config):
         logging.info(f"Validating the downloaded RPMs...")
 
         for arch in ARCHS:
-            tests_path = Path(self.lp_path, "tests", arch)
+            tests_path = get_workdir(self.lp_name)/"tests"/arch
             test_arch_path = Path(tests_path, self.lp_name)
 
             # Remove previously created directory and archive

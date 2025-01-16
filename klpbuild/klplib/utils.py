@@ -19,6 +19,8 @@ from elftools.elf.sections import SymbolTableSection
 
 from natsort import natsorted
 
+from klpbuild.klplib.config import get_user_path
+
 ARCH = platform.processor()
 ARCHS = ["ppc64le", "s390x", "x86_64"]
 
@@ -274,3 +276,15 @@ def get_kgraft_branch(cs_name):
         return "master-livepatch-sle15sp4"
 
     return "master-livepatch-sle15sp6"
+
+def get_workdir(lp_name):
+    """
+    Get the working directory for a given livepatch name.
+
+    Args:
+        lp_name (str): The name of the livepatch.
+
+    Returns:
+        Path: The full path to the livepatch file.
+    """
+    return get_user_path('work_dir')/lp_name

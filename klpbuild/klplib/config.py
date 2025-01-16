@@ -27,7 +27,6 @@ def __check_config_is_loaded(func):
 class Config:
     def __init__(self, lp_name):
         self.data = get_user_path('data_dir')
-        self.lp_path = Path(get_user_path('work_dir'), lp_name)
 
 
 def setup_user_env(basedir):

@@ -34,8 +34,8 @@ class Extractor(Config):
         self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
         self.sdir_lock.acquire()
 
-        if not self.lp_path.exists():
-            raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
+        if not utils.get_workdir(lp_name).exists():
+            raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
         patches = self.get_patches_dir()
         self.lp_filter = lp_filter
@@ -270,7 +270,7 @@ class Extractor(Config):
 
 
     def get_patches_dir(self):
-        return Path(self.lp_path, "fixes")
+        return utils.get_workdir(self.lp_name)/"fixes"
 
     def remove_patches(self, cs, fil):
         sdir = cs.get_src_dir()
@@ -482,7 +482,7 @@ class Extractor(Config):
             f.truncate()
 
     def run(self):
-        logging.info(f"Work directory: {self.lp_path}")
+        logging.info(f"Work directory: %s", utils.get_workdir(self.lp_name))
 
         working_cs = utils.filter_codestreams(self.lp_filter, "",
                                               get_codestreams_dict(),
@@ -568,7 +568,7 @@ class Extractor(Config):
                         missing_syms[arch][obj][cs.name()].extend(arch_syms)
 
         if missing_syms:
-            with open(Path(self.lp_path, "missing_syms"), "w") as f:
+            with open(utils.get_workdir(self.lp_name)/"missing_syms", "w") as f:
                 f.write(json.dumps(missing_syms, indent=4))
 
             logging.warning("Symbols not found:")
@@ -707,7 +707,7 @@ class Extractor(Config):
         # Sort between all groups of codestreams
         groups = natsorted(groups)
 
-        with open(Path(self.lp_path, "ccp", "groups"), "w") as f:
+        with open(utils.get_workdir(self.lp_name)/"ccp"/"groups", "w") as f:
             f.write("\n".join(groups))
 
         logging.info("\nGrouping codestreams that share the same content and files:")

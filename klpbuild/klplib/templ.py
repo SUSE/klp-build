@@ -11,7 +11,7 @@ from mako.template import Template
 
 from klpbuild.klplib.codestreams_data import get_codestreams_data
 from klpbuild.klplib.config import Config
-from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail
+from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir
 
 TEMPL_H = """\
 #ifndef _${ fname.upper() }_H
@@ -563,5 +563,5 @@ class TemplateGen(Config):
             "commits": cmts,
             "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
         }
-        with open(Path(self.lp_path, "commit.msg"), "w") as f:
+        with open(get_workdir(self.lp_name)/"commit.msg", "w") as f:
             f.write(Template(TEMPL_COMMIT).render(**render_vars))

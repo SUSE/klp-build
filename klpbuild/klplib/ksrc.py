@@ -55,7 +55,7 @@ class GitHelper(Config):
             logging.warning("kgr_patches_dir not found, patches will be incomplete")
 
         # Remove dir to avoid leftover patches with different names
-        patches_dir = Path(self.lp_path, "patches")
+        patches_dir = utils.get_workdir(self.lp_name)/"patches"
         shutil.rmtree(patches_dir, ignore_errors=True)
 
         test_src = get_tests_path(self.lp_name)
@@ -158,7 +158,7 @@ class GitHelper(Config):
         # List of upstream commits, in creation date order
         ucommits = []
 
-        upatches = Path(self.lp_path, "upstream")
+        upatches = utils.get_workdir(self.lp_name)/"upstream"
         upatches.mkdir(exist_ok=True, parents=True)
 
         # Get backported commits from all possible branches, in order to get
@@ -202,7 +202,7 @@ class GitHelper(Config):
                     continue
 
                 idx += 1
-                branch_path = Path(self.lp_path, "fixes", bc)
+                branch_path = utils.get_workdir(self.lp_name)/"fixes"/bc
                 branch_path.mkdir(exist_ok=True, parents=True)
 
                 pfile = subprocess.check_output(
@@ -466,7 +466,7 @@ class GitHelper(Config):
     def scan(self, cve, conf, no_check):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
-        all_codestreams = GitHelper.download_supported_file(self.data, self.lp_path)
+        all_codestreams = GitHelper.download_supported_file(self.data, utils.get_workdir(self.lp_name))
 
         if not cve or no_check:
             commits = {}
