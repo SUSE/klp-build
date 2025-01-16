@@ -550,9 +550,19 @@ class IBS(Config):
             stderr=subprocess.STDOUT,
         )
 
+        # Add remote with all codestreams, because the clone above will set the remote origin
+        # to the local directory, so it can't find the remote codestreams
+        subprocess.check_output(["/usr/bin/git", "remote", "add", "kgr",
+                                "gitlab@gitlab.suse.de:kernel/kgraft-patches.git"],
+                                stderr=subprocess.STDOUT, cwd=code_path)
+
+        # Fetch all remote codestreams so we can rebase in the next step
+        subprocess.check_output(["/usr/bin/git", "fetch", "kgr",  str(base_branch)],
+                                stderr=subprocess.STDOUT, cwd=code_path)
+
         # Get the new bsc commit on top of the codestream branch (should be the last commit on the specific branch)
         subprocess.check_output(
-            ["/usr/bin/git", "rebase", f"origin/{base_branch}"],
+            ["/usr/bin/git", "rebase", f"kgr/{base_branch}"],
             stderr=subprocess.STDOUT, cwd=code_path
         )
 
