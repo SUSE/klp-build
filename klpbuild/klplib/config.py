@@ -24,13 +24,13 @@ def check_config_is_loaded(func):
 
 class Config:
     def __init__(self, lp_name):
-        home = Path.home()
-        self.user_conf_file = Path(home, ".config/klp-build/config")
-        if not self.user_conf_file.is_file():
+
+        user_conf_file = get_user_conf_file()
+        if not user_conf_file.is_file():
             logging.warning("Warning: user configuration file not found")
             # If there's no configuration file assume fresh install.
             # Prepare the system with a default environment and conf.
-            self.setup_user_env(Path(home, "klp"))
+            self.setup_user_env(Path.home()/"klp")
 
         self.data = self.get_user_path('data_dir')
         self.lp_path = Path(self.get_user_path('work_dir'), lp_name)
@@ -39,6 +39,7 @@ class Config:
     def setup_user_env(self, basedir):
         workdir = Path(basedir, "livepatches")
         datadir = Path(basedir, "data")
+        user_conf_file = get_user_conf_file()
 
         config = ConfigParser(allow_no_value=True)
 
@@ -51,17 +52,19 @@ class Config:
 
         config['Settings'] = {'workers': 4}
 
-        logging.info("Creating default user configuration: '%s'", self.user_conf_file)
-        os.makedirs(os.path.dirname(self.user_conf_file), exist_ok=True)
-        with open(self.user_conf_file, 'w') as f:
+        logging.info("Creating default user configuration: '%s'", user_conf_file)
+        os.makedirs(os.path.dirname(user_conf_file), exist_ok=True)
+        with open(user_conf_file, 'w') as f:
             config.write(f)
 
         os.makedirs(workdir, exist_ok=True)
         os.makedirs(datadir, exist_ok=True)
 
     def load_user_conf(self):
-        logging.info("Loading user configuration from '%s'", self.user_conf_file)
-        _config.read(self.user_conf_file)
+
+        user_conf_file = get_user_conf_file()
+        logging.info("Loading user configuration from '%s'", user_conf_file)
+        _config.read(user_conf_file)
 
         # Check mandatory fields
         for s in ['Paths', 'Settings']:
@@ -113,4 +116,5 @@ class Config:
 
         raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
 
-
+def get_user_conf_file():
+    return Path.home()/".config/klp-build/config"
