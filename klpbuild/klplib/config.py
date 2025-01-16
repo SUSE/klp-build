@@ -14,8 +14,6 @@ class Config:
         # FIXME: Config is instantiated multiple times, meaning that the
         # config file gets loaded and the logs are printed as many times.
 
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
-
         home = Path.home()
         self.user_conf_file = Path(home, ".config/klp-build/config")
         if not self.user_conf_file.is_file():

@@ -3,6 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import logging
 import sys
 
 from klpbuild.klplib.cmd import create_parser
@@ -17,6 +18,8 @@ from klpbuild.plugins.setup import Setup
 
 def main():
     args = create_parser().parse_args(sys.argv[1:])
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     # NOTE: Here I'm assuming the codestream is only loaded for plugins that
     # get the livepatch name, not sure yet it's ok to assume it
