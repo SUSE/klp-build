@@ -16,14 +16,13 @@ import requests
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.config import Config, get_user_path, get_tests_path
+from klpbuild.klplib.config import get_user_path, get_tests_path
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.ibs import IBS
 
 
-class GitHelper(Config):
+class GitHelper():
     def __init__(self, lp_name, lp_filter, skips):
-        super().__init__(lp_name)
 
         self.kern_src = get_user_path('kernel_src_dir', isopt=True)
 

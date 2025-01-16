@@ -24,9 +24,6 @@ def __check_config_is_loaded(func):
         return func(*args, **kwargs)
     return wrapper
 
-class Config:
-    def __init__(self, lp_name):
-        pass
 
 def setup_user_env(basedir):
     workdir = Path(basedir)/"livepatches"

@@ -10,16 +10,14 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestreams_data import get_codestreams_data, set_codestreams_data, store_codestreams
-from klpbuild.klplib.config import Config
 from klpbuild.klplib.ksrc import GitHelper
 
 
-class Setup(Config):
+class Setup():
     def __init__(
         self,
         lp_name,
     ):
-        super().__init__(lp_name)
 
         lp_path = utils.get_workdir(lp_name)
         if lp_path.exists() and not lp_path.is_dir():

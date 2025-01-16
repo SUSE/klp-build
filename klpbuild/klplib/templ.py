@@ -10,7 +10,6 @@ from mako.lookup import TemplateLookup
 from mako.template import Template
 
 from klpbuild.klplib.codestreams_data import get_codestreams_data
-from klpbuild.klplib.config import Config
 from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir
 
 TEMPL_H = """\
@@ -396,9 +395,8 @@ ${get_patched(cs_files, check_enabled)}
 """
 
 
-class TemplateGen(Config):
+class TemplateGen():
     def __init__(self, lp_name):
-        super().__init__(lp_name)
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures

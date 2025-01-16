@@ -22,13 +22,12 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
-from klpbuild.klplib.config import Config, get_user_settings
+from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.templ import TemplateGen
 
 
-class Extractor(Config):
+class Extractor():
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
-        super().__init__(lp_name)
 
         self.lp_name = lp_name
         self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")

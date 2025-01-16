@@ -7,13 +7,11 @@ import shutil
 import subprocess
 
 from klpbuild.klplib.codestreams_data import get_codestreams_dict
-from klpbuild.klplib.config import Config
 from klpbuild.klplib.utils import filter_codestreams, get_workdir
 
 
-class Inliner(Config):
+class Inliner():
     def __init__(self, lp_name, lp_filter):
-        super().__init__(lp_name)
 
         if not get_workdir(lp_name).exists():
             raise ValueError(f"{get_workdir(lp_name)} not created. Run the setup subcommand first")
