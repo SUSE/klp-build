@@ -277,6 +277,7 @@ def get_kgraft_branch(cs_name):
 
     return "master-livepatch-sle15sp6"
 
+
 def get_workdir(lp_name):
     """
     Get the working directory for a given livepatch name.
@@ -288,3 +289,13 @@ def get_workdir(lp_name):
         Path: The full path to the livepatch file.
     """
     return get_user_path('work_dir')/lp_name
+
+
+def get_datadir():
+    """
+    Get the data directory.
+
+    Returns:
+        Path: The full path to the livepatch file.
+    """
+    return get_user_path('data_dir')

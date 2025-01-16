@@ -466,7 +466,7 @@ class GitHelper(Config):
     def scan(self, cve, conf, no_check):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
-        all_codestreams = GitHelper.download_supported_file(self.data, utils.get_workdir(self.lp_name))
+        all_codestreams = GitHelper.download_supported_file(utils.get_datadir(), utils.get_workdir(self.lp_name))
 
         if not cve or no_check:
             commits = {}

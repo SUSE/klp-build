@@ -26,8 +26,7 @@ def __check_config_is_loaded(func):
 
 class Config:
     def __init__(self, lp_name):
-        self.data = get_user_path('data_dir')
-
+        pass
 
 def setup_user_env(basedir):
     workdir = Path(basedir)/"livepatches"
@@ -99,7 +98,7 @@ def get_tests_path(lp_name):
 def get_user_path(entry, isdir=True, isopt=False):
     if entry not in _config['Paths']:
         if isopt:
-            return ""
+            return Path("")
         raise ValueError(f"config: '{entry}' entry not found")
 
     p = Path(_config['Paths'][entry])

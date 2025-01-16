@@ -31,7 +31,7 @@ class Extractor(Config):
         super().__init__(lp_name)
 
         self.lp_name = lp_name
-        self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
+        self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
         self.sdir_lock.acquire()
 
         if not utils.get_workdir(lp_name).exists():

@@ -25,7 +25,7 @@ from osctiny import Osc
 
 from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
 from klpbuild.klplib.config import Config, get_user_path, get_user_settings, get_tests_path
-from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir
+from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir
 
 class IBS(Config):
     def __init__(self, lp_name, lp_filter):
@@ -155,7 +155,7 @@ class IBS(Config):
             "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
         }
 
-        dest = Path(self.data, "kernel-rpms")
+        dest = get_datadir()/"kernel-rpms"
         dest.mkdir(exist_ok=True, parents=True)
 
         logging.info("Getting list of files...")
@@ -231,9 +231,9 @@ class IBS(Config):
 
         # Create symlink from lib to usr/lib so we can use virtme on the
         # extracted kernels
-        usr_lib = Path(self.data, ARCH, "usr", "lib")
+        usr_lib = get_datadir()/ARCH/"usr"/"lib"
         if not usr_lib.exists():
-            usr_lib.symlink_to(Path(self.data, ARCH, "lib"))
+            usr_lib.symlink_to(get_datadir()/ARCH/"lib")
 
         logging.info("Finished extract vmlinux and modules...")
 
