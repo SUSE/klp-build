@@ -24,7 +24,7 @@ from natsort import natsorted
 from osctiny import Osc
 
 from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
-from klpbuild.klplib.config import Config
+from klpbuild.klplib.config import Config, get_user_path, get_user_settings, get_tests_path
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams
 
 class IBS(Config):
@@ -38,7 +38,7 @@ class IBS(Config):
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
-        self.workers = int(self.get_user_settings("workers"))
+        self.workers = int(get_user_settings("workers"))
 
         # Total number of work items
         self.total = 0
@@ -288,7 +288,7 @@ class IBS(Config):
         # Download all built rpms
         self.download()
 
-        test_src = self.get_tests_path(self.lp_name)
+        test_src = get_tests_path(self.lp_name)
         run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
 
         logging.info(f"Validating the downloaded RPMs...")
@@ -495,7 +495,7 @@ class IBS(Config):
         return prj
 
     def create_lp_package(self, i, cs):
-        kgr_path = self.get_user_path('kgr_patches_dir')
+        kgr_path = get_user_path('kgr_patches_dir')
         branch = get_cs_branch(cs, cs.lp_name, kgr_path)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")

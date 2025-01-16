@@ -10,7 +10,7 @@ from collections import OrderedDict
 from natsort import natsorted
 
 from klpbuild.klplib.codestream import Codestream
-from klpbuild.klplib.config import Config
+from klpbuild.klplib.config import get_user_path
 
 # Dataclass for storing codestream data
 @dataclasses.dataclass
@@ -90,7 +90,7 @@ def __get_cs_file(lp_name):
     Returns:
         Path: The path to the codestreams JSON file.
     """
-    workdir = Config(lp_name).get_user_path('work_dir')
+    workdir = get_user_path('work_dir')
     return workdir/lp_name/'codestreams.json'
 
 

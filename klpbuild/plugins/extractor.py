@@ -22,7 +22,7 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
-from klpbuild.klplib.config import Config
+from klpbuild.klplib.config import Config, get_user_settings
 from klpbuild.klplib.templ import TemplateGen
 
 
@@ -42,7 +42,7 @@ class Extractor(Config):
         self.apply_patches = apply_patches
         self.avoid_ext = avoid_ext
 
-        workers = self.get_user_settings('workers', True)
+        workers = get_user_settings('workers', True)
         if workers == "":
             self.workers = 4
         else:
