@@ -3,17 +3,27 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-import configparser
+from functools import wraps
+from pathlib import Path, PurePath
+from configparser import ConfigParser
 import logging
 import os
-from pathlib import Path, PurePath
 
+_loaded = False
+_config = ConfigParser()
+
+def check_config_is_loaded(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        global _loaded
+        if not _loaded : 
+            self.load_user_conf()
+            _loaded = True
+        return func(self, *args, **kwargs)
+    return wrapper
 
 class Config:
     def __init__(self, lp_name):
-        # FIXME: Config is instantiated multiple times, meaning that the
-        # config file gets loaded and the logs are printed as many times.
-
         home = Path.home()
         self.user_conf_file = Path(home, ".config/klp-build/config")
         if not self.user_conf_file.is_file():
@@ -21,8 +31,6 @@ class Config:
             # If there's no configuration file assume fresh install.
             # Prepare the system with a default environment and conf.
             self.setup_user_env(Path(home, "klp"))
-
-        self.load_user_conf()
 
         self.data = self.get_user_path('data_dir')
         self.lp_path = Path(self.get_user_path('work_dir'), lp_name)
@@ -32,7 +40,7 @@ class Config:
         workdir = Path(basedir, "livepatches")
         datadir = Path(basedir, "data")
 
-        config = configparser.ConfigParser(allow_no_value=True)
+        config = ConfigParser(allow_no_value=True)
 
         config['Paths'] = {'work_dir': workdir,
                            'data_dir': datadir,
@@ -52,24 +60,23 @@ class Config:
         os.makedirs(datadir, exist_ok=True)
 
     def load_user_conf(self):
-        config = configparser.ConfigParser()
         logging.info("Loading user configuration from '%s'", self.user_conf_file)
-        config.read(self.user_conf_file)
+        _config.read(self.user_conf_file)
 
         # Check mandatory fields
         for s in ['Paths', 'Settings']:
-            if s not in config:
+            if s not in _config:
                 raise ValueError(f"config: '{s}' section not found")
 
-        self.user_conf = config
 
+    @check_config_is_loaded
     def get_user_path(self, entry, isdir=True, isopt=False):
-        if entry not in self.user_conf['Paths']:
+        if entry not in _config['Paths']:
             if isopt:
                 return ""
             raise ValueError(f"config: '{entry}' entry not found")
 
-        p = Path(self.user_conf['Paths'][entry])
+        p = Path(_config['Paths'][entry])
         if not p.exists():
             raise ValueError(f"'{p}' file or directory not found")
         if isdir and not p.is_dir():
@@ -79,15 +86,17 @@ class Config:
 
         return p
 
+    @check_config_is_loaded
     def get_user_settings(self, entry, isopt=False):
-        if entry not in self.user_conf['Settings']:
+        if entry not in _config['Settings']:
             if isopt:
                 return ""
             raise ValueError(f"config: '{entry}' entry not found")
 
-        return self.user_conf['Settings'][entry]
+        return _config['Settings'][entry]
 
 
+    @check_config_is_loaded
     def get_tests_path(self, lp_name):
         kgr_path = self.get_user_path('kgr_patches_tests_dir')
 
