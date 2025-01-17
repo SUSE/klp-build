@@ -142,32 +142,41 @@ class IBS(Config):
         rpms = []
         i = 1
 
+        # The packages that we search for are:
+        # kernel-source
+        # kernel-devel
+        # kernel-(default|rt)
+        # kernel-(default|rt)-devel
+        # kernel-(default|rt)-livepatch-devel (for SLE15+)
+        # kernel-default-kgraft (for SLE12)
+        # kernel-default-kgraft-devel (for SLE12)
         cs_data = {
             "kernel-default": r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)",
             "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
         }
 
+        dest = Path(self.data, "kernel-rpms")
+        dest.mkdir(exist_ok=True, parents=True)
+
         logging.info("Getting list of files...")
         for cs in cs_list:
-            prj = cs.project
-            repo = cs.repo
-
-            path_dest = Path(self.data, "kernel-rpms")
-            path_dest.mkdir(exist_ok=True, parents=True)
-
             for arch in cs.archs:
                 for pkg, regex in cs_data.items():
+                    if cs.is_micro:
+                        # For MICRO, we use the patchid to find the list of binaries
+                        pkg = cs.patchid
+
+                    elif cs.rt:
                     # RT kernels have different package names
-                    if cs.rt:
                         if pkg == "kernel-default":
                             pkg = "kernel-rt"
                         elif pkg == "kernel-source":
                             pkg = "kernel-source-rt"
 
-                    if repo != "standard":
-                        pkg = f"{pkg}.{repo}"
+                    if cs.repo != "standard":
+                        pkg = f"{pkg}.{cs.repo}"
 
-                    ret = self.osc.build.get_binary_list(prj, repo, arch, pkg)
+                    ret = self.osc.build.get_binary_list(cs.project, cs.repo, arch, pkg)
                     for file in re.findall(regex, str(etree.tostring(ret))):
                         # FIXME: adjust the regex to only deal with strings
                         if isinstance(file, str):
@@ -187,7 +196,7 @@ class IBS(Config):
                             if arch != ARCH:
                                 continue
 
-                        rpms.append((i, cs, prj, repo, arch, pkg, rpm, path_dest))
+                        rpms.append((i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
                         i += 1
 
         logging.info(f"Downloading {len(rpms)} rpms...")
@@ -199,15 +208,15 @@ class IBS(Config):
         for cs in cs_list:
             for arch in cs.archs:
                 # Extract modules and vmlinux files that are compressed
-                mod_path = Path(cs.get_data_dir(arch), "lib", "modules", cs.kname())
+                mod_path = cs.get_mod_path(arch)
                 for fext, ecmd in [("zst", "unzstd -f -d"), ("xz", "xz --quiet -d -k")]:
-                    cmd = rf'find {mod_path} -name "*ko.{fext}" -exec {ecmd} --quiet {{}} \;'
+                    cmd = rf'find {mod_path} -name "*.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
                 # Extract gzipped files per arch
                 files = ["vmlinux", "symvers"]
                 for f in files:
-                    f_path = Path(cs.get_data_dir(arch), "boot", f"{f}-{cs.kname()}.gz")
+                    f_path = cs.get_boot_file(f"{f}.gz")
                     # ppc64le doesn't gzips vmlinux
                     if f_path.exists():
                         subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
@@ -260,28 +269,18 @@ class IBS(Config):
         return missing_syms
 
     def validate_livepatch_module(self, cs, arch, rpm_dir, rpm):
-        match = re.search(r"(livepatch)-.*(default|rt)\-(\d+)\-(\d+)\.(\d+)\.(\d+)\.", rpm)
-        if match:
-            dir_path = match.group(1)
-            ktype = match.group(2)
-            lp_file = f"livepatch-{match.group(3)}-{match.group(4)}_{match.group(5)}_{match.group(6)}.ko"
-        else:
-            ktype = "default"
-            match = re.search(r"(kgraft)\-patch\-.*default\-(\d+)\-(\d+)\.(\d+)\.", rpm)
-            if match:
-                dir_path = match.group(1)
-                lp_file = f"kgraft-patch-{match.group(2)}-{match.group(3)}_{match.group(4)}.ko"
-
         fdest = Path(rpm_dir, rpm)
         # Extract the livepatch module for later inspection
-        cmd = f"rpm2cpio {fdest} | cpio --quiet -uidm"
-        subprocess.check_output(cmd, shell=True, cwd=rpm_dir)
+        subprocess.check_output(f"rpm2cpio {fdest} | cpio --quiet -uidm",
+                                shell=True, cwd=rpm_dir)
+
+        # There should be only one .ko file extracted
+        lp_mod_path = sorted(rpm_dir.glob("**/*.ko"))[0]
+        elffile = get_elf_object(lp_mod_path)
 
         # Check depends field
         # At this point we found that our livepatch module depends on
         # exported functions from other modules. List the modules here.
-        lp_mod_path = Path(rpm_dir, "lib", "modules", f"{cs.kernel}-{ktype}", dir_path, lp_file)
-        elffile = get_elf_object(lp_mod_path)
         deps = get_elf_modinfo_entry(elffile, "depends")
         if len(deps):
             logging.warning(f"{cs.name()}:{arch} has dependencies: {deps}.")
@@ -396,7 +395,7 @@ class IBS(Config):
 
             archs = result.xpath("repository/arch")
             for arch in archs:
-                ret = self.osc.build.get_binary_list(prj, "devbuild", arch, "klp")
+                ret = self.osc.build.get_binary_list(prj, "standard", arch, "klp")
                 rpm_name = f"{arch}.rpm"
                 for rpm in ret.xpath("binary/@filename"):
                     if not rpm.endswith(rpm_name):
@@ -409,7 +408,7 @@ class IBS(Config):
                     dest = Path(cs.dir(), str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
-                    rpms.append((i, cs, prj, "devbuild", arch, "klp", rpm, dest))
+                    rpms.append((i, cs, prj, "standard", arch, "klp", rpm, dest))
                     i += 1
 
         logging.info(f"Downloading {len(rpms)} packages...")
@@ -450,7 +449,7 @@ class IBS(Config):
                 # codestreams built without issues
                 if not finished:
                     states = set(archs.values())
-                    if len(states) == 1 and states.pop() == "succeeded":
+                    if len(states) == 1 and states.pop() in ["succeeded", "excluded"]:
                         finished = True
 
                 if finished:
@@ -488,7 +487,7 @@ class IBS(Config):
             "<project name=''><title></title><description></description>"
             "<build><enable/></build><publish><disable/></publish>"
             "<debuginfo><disable/></debuginfo>"
-            '<repository name="devbuild">'
+            '<repository name="standard">'
             f"<path project=\"{cs.project}\" repository=\"{cs.repo}\"/>"
             "</repository>"
             "</project>"
@@ -526,7 +525,7 @@ class IBS(Config):
 
         except Exception as e:
             logging.error(e, e.response.content)
-            raise RuntimeError("")
+            raise RuntimeError("") from e
 
         # Remove previously created directories
         prj_path = Path(cs.dir(), "checkout")
@@ -551,9 +550,19 @@ class IBS(Config):
             stderr=subprocess.STDOUT,
         )
 
+        # Add remote with all codestreams, because the clone above will set the remote origin
+        # to the local directory, so it can't find the remote codestreams
+        subprocess.check_output(["/usr/bin/git", "remote", "add", "kgr",
+                                "gitlab@gitlab.suse.de:kernel/kgraft-patches.git"],
+                                stderr=subprocess.STDOUT, cwd=code_path)
+
+        # Fetch all remote codestreams so we can rebase in the next step
+        subprocess.check_output(["/usr/bin/git", "fetch", "kgr",  str(base_branch)],
+                                stderr=subprocess.STDOUT, cwd=code_path)
+
         # Get the new bsc commit on top of the codestream branch (should be the last commit on the specific branch)
         subprocess.check_output(
-            ["/usr/bin/git", "rebase", f"origin/{base_branch}"],
+            ["/usr/bin/git", "rebase", f"kgr/{base_branch}"],
             stderr=subprocess.STDOUT, cwd=code_path
         )
 
@@ -587,7 +596,7 @@ class IBS(Config):
         logging.info(f"({i}/{self.total}) {cs.name()} done")
 
     def log(self, cs, arch):
-        logging.info(self.osc.build.get_log(self.cs_to_project(cs), "devbuild", arch, "klp"))
+        logging.info(self.osc.build.get_log(self.cs_to_project(cs), "standard", arch, "klp"))
 
     def push(self, wait=False):
         cs_list = filter_cs(self.lp_filter, "", self.codestreams)

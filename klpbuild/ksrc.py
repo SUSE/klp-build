@@ -35,6 +35,8 @@ class GitHelper(Config):
             "15.5": "SLE15-SP5-LTSS",
             "15.6": "SLE15-SP6",
             "15.6rt": "SLE15-SP6-RT",
+            "6.0": "SUSE-2024",
+            "6.0rt": "SUSE-2024-RT",
             "cve-5.3": "cve/linux-5.3-LTSS",
             "cve-5.14": "cve/linux-5.14-LTSS",
         }
@@ -434,14 +436,16 @@ class GitHelper(Config):
             # remove the build counter number
             full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
 
-            # for now, skip MICRO releases
-            if "MICRO" in full_cs:
-                continue
-
             kernel = re.sub(r"\.\d+$", "", kernel_full)
 
+            # MICRO releases contain project/patchid format
+            if "/" in proj:
+                proj, patchid = proj.split("/")
+            else:
+                patchid = ""
+
             codestreams.append(Codestream.from_codestream(data_path, lp_path, full_cs,
-                                                          proj, kernel))
+                                                          proj, patchid, kernel))
 
         return codestreams
 
@@ -480,13 +484,7 @@ class GitHelper(Config):
                     unaffected_cs.append(cs)
                     continue
 
-            # Set supported archs for the codestream
-            # RT is supported only on x86_64 at the moment
-            archs = ["x86_64"]
-            if not cs.rt:
-                archs.extend(["ppc64le", "s390x"])
-
-            cs.set_archs(archs)
+            cs.set_archs()
 
             if conf and not cs.get_boot_file("config").exists():
                 data_missing.append(cs)

@@ -389,7 +389,7 @@ class Extractor(Config):
         ]:
             cmd = cmd.replace(opt, "")
 
-        if cs.sle >= 15 and cs.sp >= 4:
+        if cs.is_micro or (cs.sle >= 15 and cs.sp >= 4):
             cmd += " -D__has_attribute(x)=0"
 
         ccp_args.extend(cmd.split(" "))

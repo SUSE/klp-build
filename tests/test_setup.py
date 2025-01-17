@@ -7,6 +7,7 @@ import pytest
 
 from klpbuild.setup import Setup
 from klpbuild import utils
+from tests.utils import get_codestreams_file
 
 CS = "15.5u19"
 DEFAULT_DATA = {"cve": None, "lp_filter": CS, "lp_skips": None, "conf": "CONFIG_TUN", "no_check": False}
@@ -75,6 +76,25 @@ def test_invalid_sym(caplog):
         lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
     assert "Symbols tun_chr_ioctll not found on tun" in caplog.text
+
+
+def test_valid_micro_patchid():
+    # Make sure that patchid is informed for SLE MICRO
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    lp_setup = Setup(lp)
+
+    ffuncs = {"drivers/net/tun.c": {"module": "tun", "conf": "CONFIG_TUN",
+                                    "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}}
+
+    micro_cs = "6.0u2"
+    micro_data = {"cve": None, "lp_filter": micro_cs, "lp_skips": None, "conf": "CONFIG_TUN", "no_check": False}
+
+    codestreams = lp_setup.setup_codestreams(micro_data)
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+
+    cs_conf = get_codestreams_file(lp)["codestreams"][micro_cs]
+
+    assert cs_conf["patchid"]
 
 
 def test_valite_conf_mod_file_funcs():
