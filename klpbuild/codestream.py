@@ -118,10 +118,18 @@ class Codestream:
 
         return f"{repo}_Products_SLERT_Update"
 
+    def set_archs(self):
+        # RT is supported only on x86_64 at the moment
+        if self.rt:
+            self.archs = ["x86_64"]
 
-    def set_archs(self, archs):
-        self.archs = archs
+        # MICRO 6.0 doest support ppc64le
+        elif "6.0" in self.name():
+            self.archs = ["x86_64", "s390x"]
 
+        # We support all architecture for all other codestreams
+        else:
+            self.archs = ["x86_64", "s390x", "ppc64le"]
 
     def set_files(self, files):
         self.files = files

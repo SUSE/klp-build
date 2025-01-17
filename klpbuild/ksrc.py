@@ -484,13 +484,7 @@ class GitHelper(Config):
                     unaffected_cs.append(cs)
                     continue
 
-            # Set supported archs for the codestream
-            # RT is supported only on x86_64 at the moment
-            archs = ["x86_64"]
-            if not cs.rt:
-                archs.extend(["ppc64le", "s390x"])
-
-            cs.set_archs(archs)
+            cs.set_archs()
 
             if conf and not cs.get_boot_file("config").exists():
                 data_missing.append(cs)
