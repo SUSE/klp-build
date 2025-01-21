@@ -162,3 +162,27 @@ def test_templ_micro_is_ibt():
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
     assert 'KLP_RELOC_SYMBOL' in get_file_content(lp, cs)
+
+
+def test_templ_kbuild_has_contents():
+    """
+    Making sure that Kbuild.inc has the correct content
+    """
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "6.0u2"
+
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_NVME_TCP", "nvme-tcp", [
+                                  ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+
+    kbuild_data = get_file_content(lp, cs, "Kbuild.inc")
+    assert "CFLAGS_livepatch_bsc_test_templ_kbuild_has_contents.o += -Werror" in kbuild_data
+    assert "CFLAGS_bsc_test_templ_kbuild_has_contents/livepatch_bsc_test_templ_kbuild_has_contents.o += -Werror" \
+        in kbuild_data
