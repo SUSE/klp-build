@@ -23,9 +23,8 @@ from lxml.objectify import SubElement
 from natsort import natsorted
 from osctiny import Osc
 
-from klpbuild.config import Config
-from klpbuild.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch, get_kgraft_branch
-from klpbuild.utils import filter_cs
+from klpbuild.klplib.config import Config
+from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch, get_kgraft_branch, filter_codestreams
 
 class IBS(Config):
     def __init__(self, lp_name, lp_filter):
@@ -222,12 +221,12 @@ class IBS(Config):
                         subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
 
             # Use the SLE .config
-            shutil.copy(cs.get_boot_file("config"), Path(cs.get_odir(), ".config"))
+            shutil.copy(cs.get_boot_file("config"), Path(cs.get_obj_dir(), ".config"))
 
             # Recreate the build link to enable us to test the generated LP
             mod_path = cs.get_kernel_build_path(ARCH)
             mod_path.unlink()
-            os.symlink(cs.get_odir(), mod_path)
+            os.symlink(cs.get_obj_dir(), mod_path)
 
         # Create symlink from lib to usr/lib so we can use virtme on the
         # extracted kernels
@@ -316,7 +315,7 @@ class IBS(Config):
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs in filter_cs(self.lp_filter, "", self.codestreams):
+            for cs in filter_codestreams(self.lp_filter, "", self.codestreams):
                 if arch not in cs.archs:
                     continue
 
@@ -599,7 +598,7 @@ class IBS(Config):
         logging.info(self.osc.build.get_log(self.cs_to_project(cs), "standard", arch, "klp"))
 
     def push(self, wait=False):
-        cs_list = filter_cs(self.lp_filter, "", self.codestreams)
+        cs_list = filter_codestreams(self.lp_filter, "", self.codestreams)
 
         if not cs_list:
             logging.error(f"push: No codestreams found for {self.lp_name}")

@@ -9,8 +9,8 @@ from pathlib import Path
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
-from klpbuild.config import Config
-from klpbuild.utils import ARCHS, fix_mod_string, get_mail
+from klpbuild.klplib.config import Config
+from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail
 
 TEMPL_H = """\
 #ifndef _${ fname.upper() }_H

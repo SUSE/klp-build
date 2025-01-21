@@ -6,7 +6,7 @@
 from pathlib import Path, PurePath
 import re
 
-from klpbuild.utils import ARCH, is_mod, get_all_symbols_from_object
+from klpbuild.klplib.utils import ARCH, is_mod, get_all_symbols_from_object
 
 class Codestream:
     __slots__ = ("data_path", "lp_path", "lp_name", "sle", "sp", "update", "rt",
@@ -80,18 +80,18 @@ class Codestream:
         return Path(self.data_path, arch)
 
 
-    def get_sdir(self, arch=ARCH):
+    def get_src_dir(self, arch=ARCH):
         # Only -rt codestreams have a suffix for source directory
         ktype = self.ktype.replace("-default", "")
         return Path(self.get_data_dir(arch), "usr", "src", f"linux-{self.kernel}{ktype}")
 
 
-    def get_odir(self):
-        return Path(f"{self.get_sdir(ARCH)}-obj", ARCH, self.ktype.replace("-", ""))
+    def get_obj_dir(self):
+        return Path(f"{self.get_src_dir(ARCH)}-obj", ARCH, self.ktype.replace("-", ""))
 
 
     def get_ipa_file(self, fname):
-        return Path(self.get_odir(), f"{fname}.000i.ipa-clones")
+        return Path(self.get_obj_dir(), f"{fname}.000i.ipa-clones")
 
     def get_boot_file(self, file, arch=ARCH):
         assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")

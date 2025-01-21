@@ -13,7 +13,6 @@ import platform
 import re
 import zstandard
 
-import git
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
@@ -207,7 +206,7 @@ def check_module_unsupported(mod_path):
     return "no" == get_elf_modinfo_entry(elffile, "supported")
 
 
-def filter_cs(lp_filter, lp_skip, cs_list, verbose=False):
+def filter_codestreams(lp_filter, lp_skip, cs_list, verbose=False):
     if isinstance(cs_list, dict):
         full_cs = copy.deepcopy(list(cs_list.values()))
     else:

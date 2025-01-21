@@ -6,9 +6,9 @@
 import inspect
 import logging
 
-from klpbuild.extractor import Extractor
-from klpbuild.setup import Setup
-from klpbuild import utils
+from klpbuild.plugins.extractor import Extractor
+from klpbuild.plugins.setup import Setup
+from klpbuild.klplib import utils
 
 
 def test_detect_file_without_ftrace_support(caplog):

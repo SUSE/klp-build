@@ -20,9 +20,9 @@ from filelock import FileLock
 
 from natsort import natsorted
 
-from klpbuild import utils
-from klpbuild.config import Config
-from klpbuild.templ import TemplateGen
+from klpbuild.klplib import utils
+from klpbuild.klplib.config import Config
+from klpbuild.klplib.templ import TemplateGen
 
 
 class Extractor(Config):
@@ -272,7 +272,7 @@ class Extractor(Config):
         return Path(self.lp_path, "fixes")
 
     def remove_patches(self, cs, fil):
-        sdir = cs.get_sdir()
+        sdir = cs.get_src_dir()
         # Check if there were patches applied previously
         patches_dir = Path(sdir, "patches")
         if not patches_dir.exists():
@@ -307,7 +307,7 @@ class Extractor(Config):
             patch_dirs.append(Path(self.get_patches_dir(), d))
 
         patched = False
-        sdir = cs.get_sdir()
+        sdir = cs.get_src_dir()
         for pdir in patch_dirs:
             if not pdir.exists():
                 fil.write(f"\nPatches dir {pdir} doesnt exists\n")
@@ -344,7 +344,7 @@ class Extractor(Config):
 
 
     def get_cmd_from_json(self, cs, fname):
-        cc_file = Path(cs.get_odir(), "compile_commands.json")
+        cc_file = Path(cs.get_obj_dir(), "compile_commands.json")
         # FIXME: compile_commands.json that is packaged with SLE/openSUSE
         # doesn't quite work yet, so don't use it yet.
         return None
@@ -401,9 +401,9 @@ class Extractor(Config):
 
         env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt else "0"
         env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
-        env["KCP_KBUILD_ODIR"] = str(cs.get_odir())
+        env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
         env["KCP_PATCHED_OBJ"] = str(cs.get_mod(fdata["module"]))
-        env["KCP_KBUILD_SDIR"] = str(cs.get_sdir())
+        env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
         env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
         env["KCP_WORK_DIR"] = str(out_dir)
 
@@ -421,8 +421,8 @@ class Extractor(Config):
     def process(self, args):
         i, fname, cs, fdata = args
 
-        sdir = cs.get_sdir()
-        odir = cs.get_odir()
+        sdir = cs.get_src_dir()
+        odir = cs.get_obj_dir()
 
         # The header text has two tabs
         cs_info = cs.name().ljust(15, " ")
@@ -483,7 +483,7 @@ class Extractor(Config):
     def run(self):
         logging.info(f"Work directory: {self.lp_path}")
 
-        working_cs = utils.filter_cs(self.lp_filter, "",
+        working_cs = utils.filter_codestreams(self.lp_filter, "",
                                      self.codestreams, verbose=True)
 
         if len(working_cs) == 0:
@@ -620,7 +620,7 @@ class Extractor(Config):
 
         cs_cmp = []
 
-        for cs in utils.filter_cs(self.lp_filter, "",
+        for cs in utils.filter_codestreams(self.lp_filter, "",
                                   self.codestreams, verbose=True):
 
             cs_cmp.append(cs.name())
