@@ -519,7 +519,6 @@ class TemplateGen(Config):
         is_multi_files = len(files.keys()) > 1
 
         self.__generate_patched_conf(cs)
-        self.__create_kbuild(cs)
 
         # If there are more then one source file, we cannot fully infer what are
         # the correct configs and mods to be livepatched, so leave the mod and
@@ -534,6 +533,8 @@ class TemplateGen(Config):
         # of the other source files
         if is_multi_files:
             self.__generate_lp_file(lp_path, cs, None, False)
+
+        self.__create_kbuild(cs)
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def __create_kbuild(self, cs):
