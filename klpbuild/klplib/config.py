@@ -4,7 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from functools import wraps
-from pathlib import Path, PurePath
+from pathlib import Path
 from configparser import ConfigParser
 import logging
 import os
@@ -56,36 +56,6 @@ def get_user_settings(entry, isopt=False):
         raise ValueError(f"config: '{entry}' entry not found")
 
     return _config['Settings'][entry]
-
-
-@__check_config_is_loaded
-def get_tests_path(lp_name):
-    """
-    Retrieves the path of the test script associated with a given live patch name.
-
-    Args:
-        lp_name (str): The live patch name to search for the test script.
-
-    Raises:
-        RuntimeError: If no test script is found.
-
-    Returns:
-        Path: The path to the test script or directory containing it.
-    """
-    kgr_path = get_user_path('kgr_patches_tests_dir')
-
-    test_sh = Path(kgr_path, f"{lp_name}_test_script.sh")
-    if test_sh.is_file():
-        return test_sh
-
-    test_dir_sh = Path(kgr_path, f"{lp_name}/test_script.sh")
-    if test_dir_sh.is_file():
-        # For more complex tests we support using a directory containing
-        # as much files as needed. A `test_script.sh` is still required
-        # as an entry point.
-        return PurePath(test_dir_sh).parent
-
-    raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
 
 
 @__check_config_is_loaded

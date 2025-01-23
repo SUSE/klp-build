@@ -16,7 +16,7 @@ import requests
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.config import get_user_path, get_tests_path
+from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.ibs import IBS
 
@@ -57,7 +57,7 @@ class GitHelper():
         patches_dir = utils.get_workdir(self.lp_name)/"patches"
         shutil.rmtree(patches_dir, ignore_errors=True)
 
-        test_src = get_tests_path(self.lp_name)
+        test_src = utils.get_tests_path(self.lp_name)
         subprocess.check_output(
             [
                 "/usr/bin/git",
