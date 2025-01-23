@@ -277,13 +277,6 @@ class IBS(Config):
         lp_mod_path = sorted(rpm_dir.glob("**/*.ko"))[0]
         elffile = get_elf_object(lp_mod_path)
 
-        # Check depends field
-        # At this point we found that our livepatch module depends on
-        # exported functions from other modules. List the modules here.
-        deps = get_elf_modinfo_entry(elffile, "depends")
-        if len(deps):
-            logging.warning(f"{cs.name()}:{arch} has dependencies: {deps}.")
-
         funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
         if funcs:
             logging.warning(f'{cs.name()}:{arch} Undefined functions: {" ".join(funcs)}')
