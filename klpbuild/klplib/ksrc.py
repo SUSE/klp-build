@@ -240,6 +240,7 @@ class GitHelper(Config):
                             "-C",
                             self.kern_src,
                             "log",
+                            "--numstat",
                             "--no-merges",
                             "--pretty=oneline",
                             f"remotes/origin/{mbranch}",
@@ -256,9 +257,17 @@ class GitHelper(Config):
                     commits[bc]["commits"] = ["Not affected"]
                     continue
 
-                # Skip the Update commits, that only change the References tag
-                for hash_entry in phashes.splitlines():
+                iphashes = iter(phashes.splitlines())
+                for hash_entry in iphashes:
+                    stats = next(iphashes)
+
+                    # Skip the Update commits, that only change the References tag
                     if "Update" in hash_entry and "patches.suse" in hash_entry:
+                        continue
+
+                    # Skip commits that change one single line. Most likely just a
+                    # reference update.
+                    if stats.split()[0] is "1":
                         continue
 
                     # Sometimes we can have a commit that touches two files. In
@@ -334,13 +343,17 @@ class GitHelper(Config):
         ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "log",
                                        f"--grep=CVE-{cve}",
                                        f"--tags=*rpm-{kernel}",
-                                       "--pretty=format:\"%H\""])
+                                       "--pretty=oneline"])
 
-        for c in ret.decode().splitlines():
-            # Remove quotes for each commit hash
-            commits.append(c.replace("\"", ""))
+        for line in ret.decode().splitlines():
+            # Skip the Update commits, that only change the References tag
+            if "Update" in line and "patches.suse" in line:
+                continue
 
-        # "patched kernels" are those who contain all commits.
+            # Parse commit's hash
+            commits.append(line.split()[0])
+
+        # "patched kernels" are those which contain all commits.
         return len(suse_commits) == len(commits), commits
 
     def get_patched_kernels(self, codestreams, commits, cve):
