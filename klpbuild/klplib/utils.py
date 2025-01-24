@@ -13,7 +13,6 @@ import platform
 import re
 import zstandard
 
-import git
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
@@ -207,7 +206,7 @@ def check_module_unsupported(mod_path):
     return "no" == get_elf_modinfo_entry(elffile, "supported")
 
 
-def filter_cs(lp_filter, lp_skip, cs_list, verbose=False):
+def filter_codestreams(lp_filter, lp_skip, cs_list, verbose=False):
     if isinstance(cs_list, dict):
         full_cs = copy.deepcopy(list(cs_list.values()))
     else:
@@ -253,3 +252,25 @@ def fix_mod_string(mod):
     # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
     # and in kallsyms lookup
     return mod.replace("-", "_")
+
+
+def get_kgraft_branch(cs_name):
+    if "6.0" in cs_name:
+        branch = "MICRO-6-0"
+
+        if "rt" in cs_name:
+            branch = branch + "-RT"
+
+        _, update = cs_name.split("u")
+        return f"{branch}_Update_{update}"
+
+    if '12.' in cs_name:
+        return "master-livepatch-sle12"
+
+    if '15.2' in cs_name or '15.3' in cs_name:
+        return "master-livepatch"
+
+    if "15.4" in cs_name or "15.5" in cs_name:
+        return "master-livepatch-sle15sp4"
+
+    return "master-livepatch-sle15sp6"

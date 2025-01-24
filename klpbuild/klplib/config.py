@@ -12,7 +12,7 @@ from collections import OrderedDict
 from pathlib import Path, PurePath
 from natsort import natsorted
 
-from klpbuild.codestream import Codestream
+from klpbuild.klplib.codestream import Codestream
 
 
 @dataclasses.dataclass
@@ -21,7 +21,7 @@ class CodestreamData:
     archs: list[str]
     patched_kernels: list[str]
     patched_cs: list[str]
-    commits: dict[str]
+    commits: dict[str, str]
 
 
 class Config:

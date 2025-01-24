@@ -9,8 +9,8 @@ from pathlib import Path
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
-from klpbuild.config import Config
-from klpbuild.utils import ARCHS, fix_mod_string, get_mail
+from klpbuild.klplib.config import Config
+from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail
 
 TEMPL_H = """\
 #ifndef _${ fname.upper() }_H
@@ -81,6 +81,9 @@ ${get_commits(commits, '15.4')}
  *
  *  SLE15-SP6 commit:
 ${get_commits(commits, '15.6')}
+ *
+ *  SLE MICRO-6-0 commit:
+${get_commits(commits, '6.0')}
  *
 % endif
  *  Copyright (c) ${year} SUSE
@@ -516,7 +519,6 @@ class TemplateGen(Config):
         is_multi_files = len(files.keys()) > 1
 
         self.__generate_patched_conf(cs)
-        self.__create_kbuild(cs)
 
         # If there are more then one source file, we cannot fully infer what are
         # the correct configs and mods to be livepatched, so leave the mod and
@@ -531,6 +533,8 @@ class TemplateGen(Config):
         # of the other source files
         if is_multi_files:
             self.__generate_lp_file(lp_path, cs, None, False)
+
+        self.__create_kbuild(cs)
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def __create_kbuild(self, cs):

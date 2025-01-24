@@ -4,7 +4,7 @@
 # Author: Marcos Paulo de Souza
 
 import pytest
-from klpbuild.ksrc import GitHelper
+from klpbuild.klplib.ksrc import GitHelper
 
 def test_multiline_upstream_commit_subject():
     _, subj = GitHelper.get_commit_data("49c47cc21b5b")

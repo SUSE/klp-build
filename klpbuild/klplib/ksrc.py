@@ -15,10 +15,10 @@ from pathlib import PurePath
 import requests
 from natsort import natsorted
 
-from klpbuild.codestream import Codestream
-from klpbuild.config import Config
-from klpbuild.ibs import IBS
-from klpbuild import utils
+from klpbuild.klplib import utils
+from klpbuild.klplib.config import Config
+from klpbuild.klplib.codestream import Codestream
+from klpbuild.klplib.ibs import IBS
 
 
 class GitHelper(Config):
@@ -35,6 +35,8 @@ class GitHelper(Config):
             "15.5": "SLE15-SP5-LTSS",
             "15.6": "SLE15-SP6",
             "15.6rt": "SLE15-SP6-RT",
+            "6.0": "SUSE-2024",
+            "6.0rt": "SUSE-2024-RT",
             "cve-5.3": "cve/linux-5.3-LTSS",
             "cve-5.14": "cve/linux-5.14-LTSS",
         }
@@ -238,6 +240,7 @@ class GitHelper(Config):
                             "-C",
                             self.kern_src,
                             "log",
+                            "--numstat",
                             "--no-merges",
                             "--pretty=oneline",
                             f"remotes/origin/{mbranch}",
@@ -254,9 +257,17 @@ class GitHelper(Config):
                     commits[bc]["commits"] = ["Not affected"]
                     continue
 
-                # Skip the Update commits, that only change the References tag
-                for hash_entry in phashes.splitlines():
+                iphashes = iter(phashes.splitlines())
+                for hash_entry in iphashes:
+                    stats = next(iphashes)
+
+                    # Skip the Update commits, that only change the References tag
                     if "Update" in hash_entry and "patches.suse" in hash_entry:
+                        continue
+
+                    # Skip commits that change one single line. Most likely just a
+                    # reference update.
+                    if stats.split()[0] is "1":
                         continue
 
                     # Sometimes we can have a commit that touches two files. In
@@ -332,13 +343,17 @@ class GitHelper(Config):
         ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "log",
                                        f"--grep=CVE-{cve}",
                                        f"--tags=*rpm-{kernel}",
-                                       "--pretty=format:\"%H\""])
+                                       "--pretty=oneline"])
 
-        for c in ret.decode().splitlines():
-            # Remove quotes for each commit hash
-            commits.append(c.replace("\"", ""))
+        for line in ret.decode().splitlines():
+            # Skip the Update commits, that only change the References tag
+            if "Update" in line and "patches.suse" in line:
+                continue
 
-        # "patched kernels" are those who contain all commits.
+            # Parse commit's hash
+            commits.append(line.split()[0])
+
+        # "patched kernels" are those which contain all commits.
         return len(suse_commits) == len(commits), commits
 
     def get_patched_kernels(self, codestreams, commits, cve):
@@ -434,14 +449,16 @@ class GitHelper(Config):
             # remove the build counter number
             full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
 
-            # for now, skip MICRO releases
-            if "MICRO" in full_cs:
-                continue
-
             kernel = re.sub(r"\.\d+$", "", kernel_full)
 
+            # MICRO releases contain project/patchid format
+            if "/" in proj:
+                proj, patchid = proj.split("/")
+            else:
+                patchid = ""
+
             codestreams.append(Codestream.from_codestream(data_path, lp_path, full_cs,
-                                                          proj, kernel))
+                                                          proj, patchid, kernel))
 
         return codestreams
 
@@ -480,13 +497,7 @@ class GitHelper(Config):
                     unaffected_cs.append(cs)
                     continue
 
-            # Set supported archs for the codestream
-            # RT is supported only on x86_64 at the moment
-            archs = ["x86_64"]
-            if not cs.rt:
-                archs.extend(["ppc64le", "s390x"])
-
-            cs.set_archs(archs)
+            cs.set_archs()
 
             if conf and not cs.get_boot_file("config").exists():
                 data_missing.append(cs)
@@ -532,7 +543,7 @@ class GitHelper(Config):
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
-        working_cs = utils.filter_cs(self.lp_filter, self.lp_skip,
+        working_cs = utils.filter_codestreams(self.lp_filter, self.lp_skip,
                                      working_cs, verbose=True)
 
         if not working_cs:

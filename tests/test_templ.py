@@ -5,9 +5,9 @@
 
 import inspect
 
-from klpbuild.extractor import Extractor
-from klpbuild.setup import Setup
-from klpbuild import utils
+from klpbuild.klplib import utils
+from klpbuild.plugins.extractor import Extractor
+from klpbuild.plugins.setup import Setup
 from tests.utils import get_file_content
 
 
@@ -91,6 +91,11 @@ def test_check_header_file_included():
     # test the livepatch_ prefix file
     assert "Upstream commit:" in get_file_content(lp, cs)
 
+    # Check for all supported codestreams
+    for item in ["SLE12-SP5", "SLE15-SP2 and -SP3", "SLE15-SP4 and -SP5",
+                 "SLE15-SP6", "SLE MICRO-6-0"]:
+        assert item in get_file_content(lp, cs)
+
     # Check the other two files
     assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_kernel_events_core.c")
     assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_net_ipv6_rpl.c")
@@ -136,3 +141,48 @@ def test_templ_exts_mod_name():
 
     # The module name should be nvme_core instead of nvme-core
     assert '{ "nvme_should_fail", (void *)&klpe_nvme_should_fail, "nvme_core" },' in get_file_content(lp, cs)
+
+
+def test_templ_micro_is_ibt():
+    """
+    SLE Micro is based on kernel 6.4, make sure it uses IBT.
+    """
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "6.0u2"
+
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_NVME_TCP", "nvme-tcp", [
+                                  ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+
+    assert 'KLP_RELOC_SYMBOL' in get_file_content(lp, cs)
+
+
+def test_templ_kbuild_has_contents():
+    """
+    Making sure that Kbuild.inc has the correct content
+    """
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "6.0u2"
+
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_NVME_TCP", "nvme-tcp", [
+                                  ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+
+    kbuild_data = get_file_content(lp, cs, "Kbuild.inc")
+    assert "CFLAGS_livepatch_bsc_test_templ_kbuild_has_contents.o += -Werror" in kbuild_data
+    assert "CFLAGS_bsc_test_templ_kbuild_has_contents/livepatch_bsc_test_templ_kbuild_has_contents.o += -Werror" \
+        in kbuild_data

@@ -4,8 +4,9 @@
 # Author: Marcos Paulo de Souza
 
 from pathlib import Path
+import json
 
-from klpbuild.config import Config
+from klpbuild.klplib.config import Config
 
 
 def get_workdir(lp_name):
@@ -21,3 +22,8 @@ def get_file_content(lp_name, lp_filter, fname=None):
 
     with open(Path(path, fname)) as f:
         return f.read()
+
+
+def get_codestreams_file(lp_name):
+    with open(Path(get_workdir(lp_name), "codestreams.json")) as f:
+        return json.loads(f.read())
