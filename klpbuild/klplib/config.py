@@ -19,16 +19,16 @@ def __check_config_is_loaded(func):
     def wrapper(*args, **kwargs):
         global _loaded
         if not _loaded : 
-            load_user_conf()
+            __load_user_conf()
             _loaded = True
         return func(*args, **kwargs)
     return wrapper
 
 
-def setup_user_env(basedir):
+def __setup_user_env(basedir):
     workdir = Path(basedir)/"livepatches"
     datadir = Path(basedir)/"data"
-    user_conf_file = get_user_conf_file()
+    user_conf_file = __get_user_conf_file()
 
     config = ConfigParser(allow_no_value=True)
 
@@ -49,11 +49,11 @@ def setup_user_env(basedir):
     os.makedirs(workdir, exist_ok=True)
     os.makedirs(datadir, exist_ok=True)
 
-def load_user_conf():
-    user_conf_file = get_user_conf_file()
+def __load_user_conf():
+    user_conf_file = __get_user_conf_file()
     if not user_conf_file.is_file():
         logging.warning("Warning: user configuration file not found")
-        setup_user_env(Path.home()/"klp")
+        __setup_user_env(Path.home()/"klp")
 
     logging.info("Loading user configuration from '%s'", user_conf_file)
     _config.read(user_conf_file)
@@ -108,5 +108,5 @@ def get_user_path(entry, isdir=True, isopt=False):
 
     return p
 
-def get_user_conf_file():
+def __get_user_conf_file():
     return Path.home()/".config/klp-build/config"
