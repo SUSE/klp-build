@@ -6,7 +6,7 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
     name="klp-build",
-    version="0.0.1",
+    version="0.0.2",
     author="Marcos Paulo de Souza",
     author_email="mpdesouza@suse.com",
     description="The kernel livepatching creation tool",
