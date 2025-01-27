@@ -16,16 +16,15 @@ import requests
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.config import Config
+from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.ibs import IBS
 
 
-class GitHelper(Config):
+class GitHelper():
     def __init__(self, lp_name, lp_filter, skips):
-        super().__init__(lp_name)
 
-        self.kern_src = self.get_user_path('kernel_src_dir', isopt=True)
+        self.kern_src = get_user_path('kernel_src_dir', isopt=True)
 
         self.kernel_branches = {
             "12.5": "SLE12-SP5",
@@ -50,20 +49,20 @@ class GitHelper(Config):
         # index 1 will be the test file
         index = 2
 
-        kgr_patches = self.get_user_path('kgr_patches_dir')
+        kgr_patches = get_user_path('kgr_patches_dir')
         if not kgr_patches:
             logging.warning("kgr_patches_dir not found, patches will be incomplete")
 
         # Remove dir to avoid leftover patches with different names
-        patches_dir = Path(self.lp_path, "patches")
+        patches_dir = utils.get_workdir(self.lp_name)/"patches"
         shutil.rmtree(patches_dir, ignore_errors=True)
 
-        test_src = self.get_tests_path(self.lp_name)
+        test_src = utils.get_tests_path(self.lp_name)
         subprocess.check_output(
             [
                 "/usr/bin/git",
                 "-C",
-                str(self.get_user_path('kgr_patches_tests_dir')),
+                str(get_user_path('kgr_patches_tests_dir')),
                 "format-patch",
                 "-1",
                 f"{test_src}",
@@ -158,7 +157,7 @@ class GitHelper(Config):
         # List of upstream commits, in creation date order
         ucommits = []
 
-        upatches = Path(self.lp_path, "upstream")
+        upatches = utils.get_workdir(self.lp_name)/"upstream"
         upatches.mkdir(exist_ok=True, parents=True)
 
         # Get backported commits from all possible branches, in order to get
@@ -202,7 +201,7 @@ class GitHelper(Config):
                     continue
 
                 idx += 1
-                branch_path = Path(self.lp_path, "fixes", bc)
+                branch_path = utils.get_workdir(self.lp_name)/"fixes"/bc
                 branch_path.mkdir(exist_ok=True, parents=True)
 
                 pfile = subprocess.check_output(
@@ -466,7 +465,7 @@ class GitHelper(Config):
     def scan(self, cve, conf, no_check):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
-        all_codestreams = GitHelper.download_supported_file(self.data, self.lp_path)
+        all_codestreams = GitHelper.download_supported_file(utils.get_datadir(), utils.get_workdir(self.lp_name))
 
         if not cve or no_check:
             commits = {}

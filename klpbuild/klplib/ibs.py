@@ -23,12 +23,13 @@ from lxml.objectify import SubElement
 from natsort import natsorted
 from osctiny import Osc
 
-from klpbuild.klplib.config import Config
-from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch, get_kgraft_branch, filter_codestreams
+from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
+from klpbuild.klplib.config import get_user_path, get_user_settings
+from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path
 
-class IBS(Config):
+
+class IBS():
     def __init__(self, lp_name, lp_filter):
-        super().__init__(lp_name)
         self.osc = Osc(url="https://api.suse.de")
 
         self.lp_name = lp_name
@@ -37,7 +38,7 @@ class IBS(Config):
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
-        self.workers = int(self.get_user_settings("workers"))
+        self.workers = int(get_user_settings("workers"))
 
         # Total number of work items
         self.total = 0
@@ -154,13 +155,13 @@ class IBS(Config):
             "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
         }
 
-        dest = Path(self.data, "kernel-rpms")
+        dest = get_datadir()/"kernel-rpms"
         dest.mkdir(exist_ok=True, parents=True)
 
         logging.info("Getting list of files...")
         for cs in cs_list:
             for arch in cs.archs:
-                for pkg, regex in cs_data.items():
+                for pkg, regex in get_codestreams_items():
                     if cs.is_micro:
                         # For MICRO, we use the patchid to find the list of binaries
                         pkg = cs.patchid
@@ -230,9 +231,9 @@ class IBS(Config):
 
         # Create symlink from lib to usr/lib so we can use virtme on the
         # extracted kernels
-        usr_lib = Path(self.data, ARCH, "usr", "lib")
+        usr_lib = get_datadir()/ARCH/"usr"/"lib"
         if not usr_lib.exists():
-            usr_lib.symlink_to(Path(self.data, ARCH, "lib"))
+            usr_lib.symlink_to(get_datadir()/ARCH/"lib")
 
         logging.info("Finished extract vmlinux and modules...")
 
@@ -287,13 +288,13 @@ class IBS(Config):
         # Download all built rpms
         self.download()
 
-        test_src = self.get_tests_path(self.lp_name)
+        test_src = get_tests_path(self.lp_name)
         run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
 
         logging.info(f"Validating the downloaded RPMs...")
 
         for arch in ARCHS:
-            tests_path = Path(self.lp_path, "tests", arch)
+            tests_path = get_workdir(self.lp_name)/"tests"/arch
             test_arch_path = Path(tests_path, self.lp_name)
 
             # Remove previously created directory and archive
@@ -308,7 +309,7 @@ class IBS(Config):
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs in filter_codestreams(self.lp_filter, "", self.codestreams):
+            for cs in filter_codestreams(self.lp_filter, "", get_codestreams_dict()):
                 if arch not in cs.archs:
                     continue
 
@@ -376,7 +377,7 @@ class IBS(Config):
             cs_name = self.convert_prj_to_cs(prj)
 
             # Get the codestream from the dict
-            cs = self.codestreams.get(cs_name, None)
+            cs = get_codestream_by_name(cs_name)
             if not cs:
                 logging.info(f"Codestream {cs_name} is stale. Deleting it.")
                 self.delete_project(0, prj, False)
@@ -494,7 +495,7 @@ class IBS(Config):
         return prj
 
     def create_lp_package(self, i, cs):
-        kgr_path = self.get_user_path('kgr_patches_dir')
+        kgr_path = get_user_path('kgr_patches_dir')
         branch = get_cs_branch(cs, cs.lp_name, kgr_path)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
@@ -591,7 +592,7 @@ class IBS(Config):
         logging.info(self.osc.build.get_log(self.cs_to_project(cs), "standard", arch, "klp"))
 
     def push(self, wait=False):
-        cs_list = filter_codestreams(self.lp_filter, "", self.codestreams)
+        cs_list = filter_codestreams(self.lp_filter, "", get_codestreams_dict())
 
         if not cs_list:
             logging.error(f"push: No codestreams found for {self.lp_name}")

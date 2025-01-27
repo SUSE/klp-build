@@ -16,8 +16,11 @@ import zstandard
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
+from pathlib import Path, PurePath
 
 from natsort import natsorted
+
+from klpbuild.klplib.config import get_user_path
 
 ARCH = platform.processor()
 ARCHS = ["ppc64le", "s390x", "x86_64"]
@@ -274,3 +277,55 @@ def get_kgraft_branch(cs_name):
         return "master-livepatch-sle15sp4"
 
     return "master-livepatch-sle15sp6"
+
+
+def get_workdir(lp_name):
+    """
+    Get the working directory for a given livepatch name.
+
+    Args:
+        lp_name (str): The name of the livepatch.
+
+    Returns:
+        Path: The full path to the livepatch file.
+    """
+    return get_user_path('work_dir')/lp_name
+
+
+def get_datadir():
+    """
+    Get the data directory.
+
+    Returns:
+        Path: The full path to the livepatch file.
+    """
+    return get_user_path('data_dir')
+
+
+def get_tests_path(lp_name):
+    """
+    Retrieves the path of the test script associated with a given live patch name.
+
+    Args:
+        lp_name (str): The live patch name to search for the test script.
+
+    Raises:
+        RuntimeError: If no test script is found.
+
+    Returns:
+        Path: The path to the test script or directory containing it.
+    """
+    kgr_path = get_user_path('kgr_patches_tests_dir')
+
+    test_sh = kgr_path/(lp_name+"_test_script.sh")
+    if test_sh.is_file():
+        return test_sh
+
+    test_dir_sh = kgr_path/lp_name/"test_script.sh"
+    if test_dir_sh.is_file():
+        # For more complex tests we support using a directory containing
+        # as much files as needed. A `test_script.sh` is still required
+        # as an entry point.
+        return PurePath(test_dir_sh).parent
+
+    raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")

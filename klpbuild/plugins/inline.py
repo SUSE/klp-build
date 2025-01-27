@@ -6,16 +6,15 @@
 import shutil
 import subprocess
 
-from klpbuild.klplib.config import Config
-from klpbuild.klplib.utils import filter_codestreams
+from klpbuild.klplib.codestreams_data import get_codestreams_dict
+from klpbuild.klplib.utils import filter_codestreams, get_workdir
 
 
-class Inliner(Config):
+class Inliner():
     def __init__(self, lp_name, lp_filter):
-        super().__init__(lp_name)
 
-        if not self.lp_path.exists():
-            raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
+        if not get_workdir(lp_name).exists():
+            raise ValueError(f"{get_workdir(lp_name)} not created. Run the setup subcommand first")
 
         self.lp_filter = lp_filter
         self.ce_inline_path = shutil.which("ce-inline")
@@ -25,7 +24,7 @@ class Inliner(Config):
     def check_inline(self, fname, func):
         ce_args = [ str(self.ce_inline_path), "-where-is-inlined" ]
 
-        filtered = filter_codestreams(self.lp_filter, "", self.codestreams)
+        filtered = filter_codestreams(self.lp_filter, "", get_codestreams_dict())
         if not filtered:
             raise RuntimeError(f"Codestream {self.lp_filter} not found. Aborting.")
 

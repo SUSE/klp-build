@@ -6,22 +6,21 @@
 import copy
 import logging
 from pathlib import Path
-
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.config import Config
+from klpbuild.klplib.codestreams_data import get_codestreams_data, set_codestreams_data, store_codestreams
 from klpbuild.klplib.ksrc import GitHelper
 
 
-class Setup(Config):
+class Setup():
     def __init__(
         self,
         lp_name,
     ):
-        super().__init__(lp_name)
 
-        if self.lp_path.exists() and not self.lp_path.is_dir():
+        lp_path = utils.get_workdir(lp_name)
+        if lp_path.exists() and not lp_path.is_dir():
             raise ValueError("--name needs to be a directory, or not to exist")
         self.lp_name = lp_name
 
@@ -68,19 +67,19 @@ class Setup(Config):
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(data["cve"],
                                                                       data["conf"],
                                                                       data["no_check"])
-        self.cs_data.commits = commits
-        self.cs_data.patched_kernels = patched_kernels
         # Add new codestreams to the already existing list, skipping duplicates
-        self.cs_data.patched_cs = natsorted(list(set(self.cs_data.patched_cs + patched_cs)))
-        self.cs_data.cve = data["cve"]
+        old_patched_cs = get_codestreams_data('patched_cs')
+        new_patched_cs = natsorted(list(set(old_patched_cs + patched_cs)))
 
+        set_codestreams_data(commits=commits, patched_kernels=patched_kernels,
+                             patched_cs=new_patched_cs, cve=data['cve'])
         return codestreams
 
     def setup_project_files(self, codestreams, ffuncs, archs):
-        self.lp_path.mkdir(exist_ok=True)
+        utils.get_workdir(self.lp_name).mkdir(exist_ok=True)
 
         archs.sort()
-        self.cs_data.archs = archs
+        set_codestreams_data(archs=archs)
 
         logging.info("Affected architectures:")
         logging.info("\t%s", ' '.join(archs))
@@ -130,5 +129,5 @@ class Setup(Config):
                         logging.warning("%s-%s (%s): Symbols %s not found on %s object",
                                         cs.name(), arch, cs.kernel, ",".join(syms), mod)
 
-        self.flush_cs_file(codestreams)
+        store_codestreams(self.lp_name, codestreams)
         logging.info("Done. Setup finished.")

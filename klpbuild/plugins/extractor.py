@@ -21,27 +21,27 @@ from filelock import FileLock
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.config import Config
+from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
+from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.templ import TemplateGen
 
 
-class Extractor(Config):
+class Extractor():
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
-        super().__init__(lp_name)
 
         self.lp_name = lp_name
-        self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
+        self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
         self.sdir_lock.acquire()
 
-        if not self.lp_path.exists():
-            raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
+        if not utils.get_workdir(lp_name).exists():
+            raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
         patches = self.get_patches_dir()
         self.lp_filter = lp_filter
         self.apply_patches = apply_patches
         self.avoid_ext = avoid_ext
 
-        workers = self.get_user_settings('workers', True)
+        workers = get_user_settings('workers', True)
         if workers == "":
             self.workers = 4
         else:
@@ -269,7 +269,7 @@ class Extractor(Config):
 
 
     def get_patches_dir(self):
-        return Path(self.lp_path, "fixes")
+        return utils.get_workdir(self.lp_name)/"fixes"
 
     def remove_patches(self, cs, fil):
         sdir = cs.get_src_dir()
@@ -481,10 +481,11 @@ class Extractor(Config):
             f.truncate()
 
     def run(self):
-        logging.info(f"Work directory: {self.lp_path}")
+        logging.info(f"Work directory: %s", utils.get_workdir(self.lp_name))
 
         working_cs = utils.filter_codestreams(self.lp_filter, "",
-                                     self.codestreams, verbose=True)
+                                              get_codestreams_dict(),
+                                              verbose=True)
 
         if len(working_cs) == 0:
             logging.error("No codestreams found")
@@ -523,7 +524,7 @@ class Extractor(Config):
                 sys.exit(1)
 
         # Save the ext_symbols set by execute
-        self.flush_cs_file(working_cs)
+        store_codestreams(self.lp_name, working_cs)
 
         tem = TemplateGen(self.lp_name)
 
@@ -557,7 +558,7 @@ class Extractor(Config):
                     obj_syms[obj].extend(syms)
 
             for obj, syms in obj_syms.items():
-                missing = cs.check_symbol_archs(self.cs_data.archs, obj, syms, True)
+                missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True)
                 if missing:
                     for arch, arch_syms in missing.items():
                         missing_syms.setdefault(arch, {})
@@ -566,7 +567,7 @@ class Extractor(Config):
                         missing_syms[arch][obj][cs.name()].extend(arch_syms)
 
         if missing_syms:
-            with open(Path(self.lp_path, "missing_syms"), "w") as f:
+            with open(utils.get_workdir(self.lp_name)/"missing_syms", "w") as f:
                 f.write(json.dumps(missing_syms, indent=4))
 
             logging.warning("Symbols not found:")
@@ -620,8 +621,7 @@ class Extractor(Config):
 
         cs_cmp = []
 
-        for cs in utils.filter_codestreams(self.lp_filter, "",
-                                  self.codestreams, verbose=True):
+        for cs in utils.filter_codestreams(self.lp_filter, "", get_codestreams_dict(), verbose=True):
 
             cs_cmp.append(cs.name())
             for fname, _ in cs.files.items():
@@ -706,7 +706,7 @@ class Extractor(Config):
         # Sort between all groups of codestreams
         groups = natsorted(groups)
 
-        with open(Path(self.lp_path, "ccp", "groups"), "w") as f:
+        with open(utils.get_workdir(self.lp_name)/"ccp"/"groups", "w") as f:
             f.write("\n".join(groups))
 
         logging.info("\nGrouping codestreams that share the same content and files:")
