@@ -7,7 +7,6 @@ import logging
 import sys
 
 from klpbuild.klplib.cmd import create_parser
-from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.ksrc import GitHelper
@@ -41,8 +40,7 @@ def main():
         Extractor(args.name, args.filter, args.apply_patches, args.avoid_ext).run()
 
     elif args.cmd == "cs-diff":
-        lp_filter = args.cs[0] + "|" + args.cs[1]
-        Extractor(args.name, lp_filter, False, []).diff_cs()
+        Extractor(args.name, args.filter, False, []).cs_diff()
 
     elif args.cmd == "check-inline":
         Inliner(args.name, args.codestream).check_inline(args.file, args.symbol)
@@ -63,7 +61,7 @@ def main():
         IBS(args.name, args.filter).push(args.wait)
 
     elif args.cmd == "log":
-        IBS(args.name, args.filter).log(Codestream.from_cs(args.cs), args.arch)
+        IBS(args.name, args.filter).log(args.arch)
 
     elif args.cmd == "cleanup":
         IBS(args.name, args.filter).cleanup()

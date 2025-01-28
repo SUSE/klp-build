@@ -615,14 +615,18 @@ class Extractor():
 
         return cs_files
 
-    # cs_list should be only two entries
-    def diff_cs(self):
+    def cs_diff(self):
+        """
+        To compare two codestreams the filter should result in exactly two codestreams
+        """
+        cs_args = utils.filter_codestreams(self.lp_filter, "", get_codestreams_dict(), verbose=True)
+        if len(cs_args) != 2:
+            logging.error("The filter specified found %d while it should point to only 2.", len(cs_args))
+            sys.exit(1)
+
         args = []
-
         cs_cmp = []
-
-        for cs in utils.filter_codestreams(self.lp_filter, "", get_codestreams_dict(), verbose=True):
-
+        for cs in cs_args:
             cs_cmp.append(cs.name())
             for fname, _ in cs.files.items():
                 args.append((_, fname, cs, _))

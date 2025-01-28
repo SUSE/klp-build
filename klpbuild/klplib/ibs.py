@@ -23,6 +23,7 @@ from lxml.objectify import SubElement
 from natsort import natsorted
 from osctiny import Osc
 
+from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
 from klpbuild.klplib.config import get_user_path, get_user_settings
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path
@@ -593,7 +594,8 @@ class IBS():
 
         logging.info(f"({i}/{self.total}) {cs.name()} done")
 
-    def log(self, cs, arch):
+    def log(self, arch):
+        cs = Codestream.from_cs(self.lp_filter)
         logging.info(self.osc.build.get_log(self.cs_to_project(cs), "standard", arch, "klp"))
 
     def push(self, wait=False):

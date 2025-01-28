@@ -108,9 +108,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--apply-patches", action="store_true", help="Apply patches found by get-patches subcommand, if they exist"
     )
     diff_opts = sub.add_parser("cs-diff", parents=[parentparser])
-    diff_opts.add_argument(
-        "--cs", nargs=2, type=str, required=True, help="SLE specific. Apply diff on two different codestreams"
-    )
 
     fmt = sub.add_parser(
         "format-patches", parents=[parentparser], help="SLE specific. Extract patches from kgraft-patches"
@@ -147,9 +144,6 @@ def create_parser() -> argparse.ArgumentParser:
     status.add_argument("--wait", action="store_true", help="Wait until all codestreams builds are finished")
 
     log = sub.add_parser("log", parents=[parentparser], help="SLE specific. Get build log from IBS")
-    log.add_argument("--cs", type=str, required=True, help="The codestream to get the log from")
     log.add_argument("--arch", type=str, default="x86_64", choices=ARCHS, help="Build architecture")
 
     return parser
-
-
