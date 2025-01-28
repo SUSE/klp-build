@@ -30,7 +30,10 @@ livepatches.
 .TP
 .BI --filter " FILTER"
 List of accepted codestreams. Must be specified in regex format.
-Example: "15\.3u[0-9]+|15\.6u0"
+Example: '15\.3u[0-9]+|15\.6u0'
+.br
+You can also use a negative regex in order to filter out a specific codestream.
+Example: '^(?!12.5u12).*'
 .SH COMMANDS
 .TP
 .B scan
@@ -94,10 +97,6 @@ will be livepatched instead.
 .TP
 .BI --archs " {ppc64le,s390x,x86_64} [{ppc64le,s390x,x86_64} ...]"
 Supported architectures for this livepatch.
-.TP
-.BI --skips " SKIPS"
-List of excluded codestreams. Must be specified in regex format.
-Example: "15\.3u[0-9]+|15\.6u0"
 .RE
 .B check-inline
 .RS 7
@@ -185,11 +184,11 @@ Wait until all codestreams builds are finished.
 Get build logs from SUSE'S Build Service.
 .RS 7
 .TP
-.BI --cs " CS"
-The codestream to get the log from.
-.TP
 .BI --arch " {ppc64le,s390x,x86_64}"
 Build architecture.
+.TP
+.BI --filter
+Required. Needs to specify only specific codestream.
 .RE
 .SH FILES
 .TP

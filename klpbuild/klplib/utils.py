@@ -209,14 +209,14 @@ def check_module_unsupported(mod_path):
     return "no" == get_elf_modinfo_entry(elffile, "supported")
 
 
-def filter_codestreams(lp_filter, lp_skip, cs_list, verbose=False):
+def filter_codestreams(lp_filter, cs_list, verbose=False):
     if isinstance(cs_list, dict):
         full_cs = copy.deepcopy(list(cs_list.values()))
     else:
         full_cs = copy.deepcopy(cs_list)
 
     if verbose:
-        logging.info("Checking filter and skips...")
+        logging.info("Checking filter...")
 
     result = []
     filtered = []
@@ -224,10 +224,6 @@ def filter_codestreams(lp_filter, lp_skip, cs_list, verbose=False):
         name = cs.name()
 
         if lp_filter and not re.match(lp_filter, name):
-            filtered.append(name)
-            continue
-
-        if lp_skip and re.match(lp_skip, name):
             filtered.append(name)
             continue
 

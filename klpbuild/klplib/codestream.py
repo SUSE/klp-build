@@ -73,7 +73,6 @@ class Codestream:
                 self.update == cs.update and \
                 self.rt == cs.rt
 
-
     def get_data_dir(self, arch):
         # For the SLE usage, it should point to the place where the codestreams
         # are downloaded

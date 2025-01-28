@@ -483,9 +483,7 @@ class Extractor():
     def run(self):
         logging.info(f"Work directory: %s", utils.get_workdir(self.lp_name))
 
-        working_cs = utils.filter_codestreams(self.lp_filter, "",
-                                              get_codestreams_dict(),
-                                              verbose=True)
+        working_cs = utils.filter_codestreams(self.lp_filter, get_codestreams_dict(), verbose=True)
 
         if len(working_cs) == 0:
             logging.error("No codestreams found")
@@ -619,7 +617,7 @@ class Extractor():
         """
         To compare two codestreams the filter should result in exactly two codestreams
         """
-        cs_args = utils.filter_codestreams(self.lp_filter, "", get_codestreams_dict(), verbose=True)
+        cs_args = utils.filter_codestreams(self.lp_filter, get_codestreams_dict(), verbose=True)
         if len(cs_args) != 2:
             logging.error("The filter specified found %d while it should point to only 2.", len(cs_args))
             sys.exit(1)
@@ -639,12 +637,10 @@ class Extractor():
 
         assert len(f1) == len(f2)
 
-        for i in range(len(f1)):
-            content1 = f1[i][1].splitlines()
-            content2 = f2[i][1].splitlines()
-
-            for l in dl.unified_diff(content1, content2, fromfile=f1[i][0], tofile=f2[i][0]):
-                print(l)
+        for _, (v1, v2) in enumerate(zip(f1, f2)):
+            for line in dl.unified_diff(v1[1].splitlines(), v2[1].splitlines(), fromfile=f"{cs_cmp[0]} {v1[0]}",
+                                        tofile=f"{cs_cmp[1]} {v1[0]}"):
+                print(line)
 
     # Get the code for each codestream, removing boilerplate code
     def group_equal_files(self, args):
