@@ -161,7 +161,7 @@ class IBS():
         logging.info("Getting list of files...")
         for cs in cs_list:
             for arch in cs.archs:
-                for pkg, regex in get_codestreams_items():
+                for pkg, regex in cs_data.items():
                     if cs.is_micro:
                         # For MICRO, we use the patchid to find the list of binaries
                         pkg = cs.patchid
