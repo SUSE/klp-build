@@ -315,7 +315,7 @@ class IBS():
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs in filter_codestreams(self.lp_filter, "", get_codestreams_dict()):
+            for cs in filter_codestreams(self.lp_filter, get_codestreams_dict()):
                 if arch not in cs.archs:
                     continue
 
@@ -599,7 +599,7 @@ class IBS():
         logging.info(self.osc.build.get_log(self.cs_to_project(cs), "standard", arch, "klp"))
 
     def push(self, wait=False):
-        cs_list = filter_codestreams(self.lp_filter, "", get_codestreams_dict())
+        cs_list = filter_codestreams(self.lp_filter, get_codestreams_dict())
 
         if not cs_list:
             logging.error(f"push: No codestreams found for {self.lp_name}")

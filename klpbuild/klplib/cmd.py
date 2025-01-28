@@ -71,7 +71,6 @@ def create_parser() -> argparse.ArgumentParser:
         nargs="+",
         help="SLE specific. Supported architectures for this livepatch",
     )
-    setup.add_argument("--skips", help="List of codestreams to filter out")
 
     check_inline = sub.add_parser("check-inline", parents=[parentparser])
     check_inline.add_argument(

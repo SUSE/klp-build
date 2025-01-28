@@ -22,7 +22,7 @@ from klpbuild.klplib.ibs import IBS
 
 
 class GitHelper():
-    def __init__(self, lp_name, lp_filter, skips):
+    def __init__(self, lp_name, lp_filter):
 
         self.kern_src = get_user_path('kernel_src_dir', isopt=True)
 
@@ -42,7 +42,6 @@ class GitHelper():
 
         self.lp_name = lp_name
         self.lp_filter = lp_filter
-        self.lp_skip = skips
 
     def format_patches(self, version):
         ver = f"v{version}"
@@ -542,8 +541,7 @@ class GitHelper():
 
         # working_cs will contain the final dict of codestreams that wast set
         # by the user, avoid downloading missing codestreams that are not affected
-        working_cs = utils.filter_codestreams(self.lp_filter, self.lp_skip,
-                                     working_cs, verbose=True)
+        working_cs = utils.filter_codestreams(self.lp_filter, working_cs, verbose=True)
 
         if not working_cs:
             logging.info("All supported codestreams are already patched. Exiting klp-build")

@@ -19,7 +19,7 @@ def test_detect_file_without_ftrace_support(caplog):
     ffuncs = Setup.setup_file_funcs("CONFIG_SMP", "vmlinux", [["lib/seq_buf.c", "seq_buf_putmem_hex"]],
                                     [], [])
     codestreams = setup.setup_codestreams({"cve": None, "conf": "CONFIG_SMP",
-                                          "no_check": False, "lp_filter": cs, "lp_skips": None})
+                                          "no_check": False, "lp_filter": cs})
     setup.setup_project_files(codestreams, ffuncs, [utils.ARCH])
 
     with caplog.at_level(logging.WARNING):

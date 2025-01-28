@@ -33,7 +33,7 @@ def main():
                                         args.mod_file_funcs, args.conf_mod_file_funcs)
         codestreams = setup.setup_codestreams(
             {"cve": args.cve, "conf": args.conf, "lp_filter": args.filter,
-                "lp_skips": args.skips, "no_check": args.no_check})
+                "no_check": args.no_check})
         setup.setup_project_files(codestreams, ffuncs, args.archs)
 
     elif args.cmd == "extract":
@@ -46,13 +46,13 @@ def main():
         Inliner(args.name, args.codestream).check_inline(args.file, args.symbol)
 
     elif args.cmd == "get-patches":
-        GitHelper(args.name, args.filter, "").get_commits(args.cve)
+        GitHelper(args.name, args.filter).get_commits(args.cve)
 
     elif args.cmd == "scan":
-        GitHelper("bsc_check", "", "").scan(args.cve, args.conf, False)
+        GitHelper("bsc_check", "").scan(args.cve, args.conf, False)
 
     elif args.cmd == "format-patches":
-        GitHelper(args.name, args.filter, "").format_patches(args.version)
+        GitHelper(args.name, args.filter).format_patches(args.version)
 
     elif args.cmd == "status":
         IBS(args.name, args.filter).status(args.wait)
