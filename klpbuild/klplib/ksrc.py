@@ -135,7 +135,7 @@ class GitHelper():
                                 list(self.kernel_branches.values()))
 
 
-    def get_commits(self, lp_name, cve):
+    def get_commits(self, cve, savedir=None):
         if not self.kern_src:
             logging.info("kernel_src_dir not found, skip getting SUSE commits")
             return {}
@@ -159,8 +159,10 @@ class GitHelper():
         # List of upstream commits, in creation date order
         ucommits = []
 
-        upstream_patches_dir = utils.get_workdir(lp_name)/"upstream"
-        upstream_patches_dir.mkdir(exist_ok=True, parents=True)
+        upstream_patches_dir = None
+        if savedir:
+            upstream_patches_dir = Path(savedir)/"upstream"
+            upstream_patches_dir.mkdir(exist_ok=True, parents=True)
 
         # Get backported commits from all possible branches, in order to get
         # different versions of the same backport done in the CVE branches.
@@ -203,8 +205,6 @@ class GitHelper():
                     continue
 
                 idx += 1
-                branch_path = utils.get_workdir(lp_name)/"fixes"/bc
-                branch_path.mkdir(exist_ok=True, parents=True)
 
                 pfile = subprocess.check_output(
                     ["/usr/bin/git", "-C", self.kern_src, "show", f"remotes/origin/{mbranch}:{patch}"],
@@ -214,9 +214,12 @@ class GitHelper():
                 # removing the patches.suse dir from the filepath
                 basename = PurePath(patch).name.replace(".patch", "")
 
-                # Save the patch for later review from the livepatch developer
-                with open(Path(branch_path, f"{idx:02d}-{basename}.patch"), "w") as f:
-                    f.write(pfile)
+                if savedir:
+                    branch_path = Path(savedir)/"fixes"/bc
+                    branch_path.mkdir(exist_ok=True, parents=True)
+                    # Save the patch for later review from the livepatch developer
+                    with open(Path(branch_path, f"{idx:02d}-{basename}.patch"), "w") as f:
+                        f.write(pfile)
 
                 # Get the upstream commit and save it. The Git-commit can be
                 # missing from the patch if the commit is not backporting the
@@ -429,7 +432,7 @@ class GitHelper():
             commits = {}
             patched_kernels = []
         else:
-            commits = self.get_commits(lp_name, cve)
+            commits = self.get_commits(cve, utils.get_workdir(lp_name))
             patched_kernels = self.get_patched_kernels(all_codestreams, commits, cve)
 
         # list of codestreams that matches the file-funcs argument

@@ -10,6 +10,7 @@ from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.ksrc import GitHelper
+from klpbuild.klplib.utils import get_workdir
 from klpbuild.plugins.extractor import Extractor
 from klpbuild.plugins.inline import Inliner
 from klpbuild.plugins.setup import Setup
@@ -46,7 +47,7 @@ def main():
         Inliner(args.name, args.codestream).check_inline(args.file, args.symbol)
 
     elif args.cmd == "get-patches":
-        GitHelper(args.filter).get_commits(args.name, args.cve)
+        GitHelper(args.filter).get_commits(args.cve, get_workdir(args.name))
 
     elif args.cmd == "scan":
         GitHelper("").scan("bsc_check", args.cve, args.conf, False)
