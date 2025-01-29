@@ -57,6 +57,8 @@ class Codestream:
     @classmethod
     def from_cs(cls, cs):
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
+        if not match:
+            raise ValueError("Filter regexp error!")
         return cls("", "", int(match.group(1)), int(match.group(2)),
                    int(match.group(4)), match.group(3), "", "", "", [], {}, {})
 
