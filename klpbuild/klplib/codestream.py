@@ -145,7 +145,7 @@ class Codestream:
 
 
     def lpdir(self):
-        return Path(self.lp_path, "ccp", self.name(), "lp")
+        return self.dir()/"lp"
 
 
     def work_dir(self, fname):
