@@ -430,7 +430,7 @@ class Extractor():
 
         logging.info(f"{idx} {cs_info} {fname}")
 
-        out_dir = cs.work_dir(fname)
+        out_dir = cs.get_ccp_work_dir(fname)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # create symlink to the respective codestream file
@@ -572,7 +572,7 @@ class Extractor():
             logging.warning(json.dumps(missing_syms, indent=4))
 
     def get_work_lp_file(self, cs, fname):
-        return Path(cs.work_dir(fname), cs.lp_out_file(fname))
+        return Path(cs.get_ccp_work_dir(fname), cs.lp_out_file(fname))
 
     def get_cs_code(self, args):
         cs_files = {}

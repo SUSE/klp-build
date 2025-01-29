@@ -453,7 +453,7 @@ class TemplateGen():
 
     def __generate_lp_file(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
-            lp_inc_dir = str(cs.work_dir(src_file))
+            lp_inc_dir = str(cs.get_ccp_work_dir(src_file))
             lp_file = cs.lp_out_file(src_file)
             fdata = cs.files[str(src_file)]
         else:
