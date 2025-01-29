@@ -126,6 +126,15 @@ class GitHelper():
         return d, msg
 
 
+    def fetch_kernel_branches(self):
+        logging.info("Fetching changes from all supported branches...")
+
+        # Mount the command to fetch all branches for supported codestreams
+        subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
+                                 "--quiet", "--atomic", "--force", "--tags", "origin"] +
+                                list(self.kernel_branches.values()))
+
+
     def get_commits(self, lp_name, cve):
         if not self.kern_src:
             logging.info("kernel_src_dir not found, skip getting SUSE commits")
@@ -141,12 +150,7 @@ class GitHelper():
             logging.info("Invalid CVE number '%s', skipping the processing of getting the patches.", cve)
             return {}
 
-        print("Fetching changes from all supported branches...")
-
-        # Mount the command to fetch all branches for supported codestreams
-        subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
-                                 "--quiet", "--atomic", "--force", "--tags", "origin"] +
-                                list(self.kernel_branches.values()))
+        self.fetch_kernel_branches()
 
         print("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
