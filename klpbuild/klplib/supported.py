@@ -14,6 +14,12 @@ SUPPORTED_CS_URL = "https://gitlab.suse.de/live-patching/sle-live-patching-data/
 SUSE_CERT = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
 
 def get_supported_codestreams():
+    """
+    Download and parse the list of supported codestreams.
+
+    Returns:
+        list[Codestream]: A list of supported codestreams.
+    """
     supported_codestreams = []
 
     for line in __download_supported_file():
@@ -37,6 +43,13 @@ def get_supported_codestreams():
 
 
 def __download_supported_file():
+    """
+    Download and return the lines of the supported file.
+
+    Returns:
+        list[str]: The list of lines of the supported file, excluding the
+        header.
+    """
     logging.info("Downloading codestreams file")
 
     if SUSE_CERT.exists():
