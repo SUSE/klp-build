@@ -22,7 +22,7 @@ from klpbuild.klplib.supported import get_supported_codestreams
 
 
 class GitHelper():
-    def __init__(self, lp_name, lp_filter):
+    def __init__(self, lp_filter):
 
         self.kern_src = get_user_path('kernel_src_dir', isopt=True)
 
@@ -39,10 +39,9 @@ class GitHelper():
             "cve-5.14": "cve/linux-5.14-LTSS",
         }
 
-        self.lp_name = lp_name
         self.lp_filter = lp_filter
 
-    def format_patches(self, version):
+    def format_patches(self, lp_name, version):
         ver = f"v{version}"
         # index 1 will be the test file
         index = 2
@@ -52,10 +51,10 @@ class GitHelper():
             logging.warning("kgr_patches_dir not found, patches will be incomplete")
 
         # Remove dir to avoid leftover patches with different names
-        patches_dir = utils.get_workdir(self.lp_name)/"patches"
+        patches_dir = utils.get_workdir(lp_name)/"patches"
         shutil.rmtree(patches_dir, ignore_errors=True)
 
-        test_src = utils.get_tests_path(self.lp_name)
+        test_src = utils.get_tests_path(lp_name)
         subprocess.check_output(
             [
                 "/usr/bin/git",
@@ -75,11 +74,11 @@ class GitHelper():
         )
 
         # Filter only the branches related to this BSC
-        for branch in utils.get_lp_branches(self.lp_name, kgr_patches):
+        for branch in utils.get_lp_branches(lp_name, kgr_patches):
             print(branch)
-            bname = branch.replace(self.lp_name + "_", "")
+            bname = branch.replace(lp_name + "_", "")
             bs = " ".join(bname.split("_"))
-            bsc = self.lp_name.replace("bsc", "bsc#")
+            bsc = lp_name.replace("bsc", "bsc#")
 
             prefix = f"PATCH {ver} {bsc} {bs}"
 
@@ -126,7 +125,8 @@ class GitHelper():
 
         return d, msg
 
-    def get_commits(self, cve):
+
+    def get_commits(self, lp_name, cve):
         if not self.kern_src:
             logging.info("kernel_src_dir not found, skip getting SUSE commits")
             return {}
@@ -155,7 +155,7 @@ class GitHelper():
         # List of upstream commits, in creation date order
         ucommits = []
 
-        upatches = utils.get_workdir(self.lp_name)/"upstream"
+        upatches = utils.get_workdir(lp_name)/"upstream"
         upatches.mkdir(exist_ok=True, parents=True)
 
         # Get backported commits from all possible branches, in order to get
@@ -199,7 +199,7 @@ class GitHelper():
                     continue
 
                 idx += 1
-                branch_path = utils.get_workdir(self.lp_name)/"fixes"/bc
+                branch_path = utils.get_workdir(lp_name)/"fixes"/bc
                 branch_path.mkdir(exist_ok=True, parents=True)
 
                 pfile = subprocess.check_output(
@@ -416,7 +416,7 @@ class GitHelper():
         return len(commits[cs.name_cs()]["commits"]) > 0
 
 
-    def scan(self, cve, conf, no_check):
+    def scan(self, lp_name, cve, conf, no_check):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
         all_codestreams = get_supported_codestreams()
@@ -425,7 +425,7 @@ class GitHelper():
             commits = {}
             patched_kernels = []
         else:
-            commits = self.get_commits(cve)
+            commits = self.get_commits(lp_name, cve)
             patched_kernels = self.get_patched_kernels(all_codestreams, commits, cve)
 
         # list of codestreams that matches the file-funcs argument
@@ -468,7 +468,7 @@ class GitHelper():
         if data_missing:
             logging.info("Download the necessary data from the following codestreams:")
             logging.info("\t%s\n", " ".join(cs_missing))
-            IBS(self.lp_name, self.lp_filter).download_cs_data(data_missing)
+            IBS(lp_name, self.lp_filter).download_cs_data(data_missing)
             logging.info("Done.")
 
             for cs in data_missing:

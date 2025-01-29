@@ -46,13 +46,13 @@ def main():
         Inliner(args.name, args.codestream).check_inline(args.file, args.symbol)
 
     elif args.cmd == "get-patches":
-        GitHelper(args.name, args.filter).get_commits(args.cve)
+        GitHelper(args.filter).get_commits(args.name, args.cve)
 
     elif args.cmd == "scan":
-        GitHelper("bsc_check", "").scan(args.cve, args.conf, False)
+        GitHelper("").scan("bsc_check", args.cve, args.conf, False)
 
     elif args.cmd == "format-patches":
-        GitHelper(args.name, args.filter).format_patches(args.version)
+        GitHelper(args.filter).format_patches(args.name, args.version)
 
     elif args.cmd == "status":
         IBS(args.name, args.filter).status(args.wait)
