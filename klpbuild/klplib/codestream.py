@@ -45,10 +45,11 @@ class Codestream:
             sle, _, u = cs.replace("SLE", "").replace("-RT", "").split("_")
             if "-SP" in sle:
                 sle, sp = sle.split("-SP")
-
         # MICRO-6-0_Update_2
         elif "MICRO" in cs:
             sle, sp, u = cs.replace("MICRO-", "").replace("-RT", "").replace("_Update_", "-").split("-")
+        else:
+            assert False, "codestream name should contain either SLE or MICRO!"
 
         return cls(data_path, lp_path, int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {})
 
