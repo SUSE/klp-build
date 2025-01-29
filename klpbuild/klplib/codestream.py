@@ -6,18 +6,15 @@
 from pathlib import Path, PurePath
 import re
 
-from klpbuild.klplib.utils import ARCH, is_mod, get_all_symbols_from_object, get_datadir
+from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
 
 class Codestream:
-    __slots__ = ("data_path", "lp_path", "lp_name", "sle", "sp", "update", "rt",
-                 "ktype", "needs_ibt", "is_micro", "project", "patchid", "kernel",
-                 "archs", "files", "modules", "repo")
+    __slots__ = ("sle", "sp", "update", "rt", "ktype", "needs_ibt", "is_micro",
+                 "project", "patchid", "kernel", "archs", "files", "modules",
+                 "repo")
 
-    def __init__(self, data_path, lp_path, sle, sp, update, rt, project,
-                 patchid, kernel, archs, files, modules):
-        self.data_path = data_path
-        self.lp_path = lp_path
-        self.lp_name = PurePath(lp_path).name
+    def __init__(self, sle, sp, update, rt, project, patchid, kernel, archs,
+                 files, modules):
         self.sle = sle
         self.sp = sp
         self.update = update
@@ -34,7 +31,7 @@ class Codestream:
         self.repo = self.get_repo()
 
     @classmethod
-    def from_codestream(cls, data_path, lp_path, cs, proj, patchid, kernel):
+    def from_codestream(cls, cs, proj, patchid, kernel):
         # Parse SLE15-SP2_Update_25 to 15.2u25
         rt = "rt" if "-RT" in cs else ""
         sp = "0"
@@ -51,7 +48,7 @@ class Codestream:
         else:
             assert False, "codestream name should contain either SLE or MICRO!"
 
-        return cls(data_path, lp_path, int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {})
+        return cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {})
 
 
     @classmethod
@@ -59,15 +56,15 @@ class Codestream:
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
         if not match:
             raise ValueError("Filter regexp error!")
-        return cls("", "", int(match.group(1)), int(match.group(2)),
+        return cls(int(match.group(1)), int(match.group(2)),
                    int(match.group(4)), match.group(3), "", "", "", [], {}, {})
 
 
     @classmethod
     def from_data(cls, data):
-        return cls(data["data_path"], data["lp_path"], data["sle"], data["sp"],
-                   data["update"], data["rt"], data["project"], data["patchid"],
-                   data["kernel"], data["archs"], data["files"], data["modules"])
+        return cls(data["sle"], data["sp"], data["update"], data["rt"],
+                   data["project"], data["patchid"], data["kernel"],
+                   data["archs"], data["files"], data["modules"])
 
 
     def __eq__(self, cs):
@@ -143,35 +140,45 @@ class Codestream:
         return f"{self.sle}.{self.sp}u{self.update}"
 
 
-    def get_ccp_dir(self):
+    def get_ccp_dir(self, lp_name):
         """
         Get the path to the ccp directory of the current codestream.
+
+        Args:
+            lp_name (str): The name of the live patch.
 
         Returns:
             Path: The path to the ccp directory of the current codestream.
         """
-        return Path(self.lp_path, "ccp", self.name())
+        return get_workdir(lp_name)/"ccp"/self.name()
 
 
-    def get_lp_dir(self):
+    def get_lp_dir(self, lp_name):
         """
         Get the path to the extracted livepatches directory of the current codestream.
+
+        Args:
+            lp_name (str): The name of the live patch.
 
         returns:
             path: The path to the extracted livepatches directory of the current codestream.
         """
-        return self.get_ccp_dir()/"lp"
+        return self.get_ccp_dir(lp_name)/"lp"
 
 
-    def get_ccp_work_dir(self, fname):
+    def get_ccp_work_dir(self, lp_name, fname):
         """
         Get the path to the klp-ccp working directory of the current codestream.
+
+        Args:
+            lp_name (str): The name of the live patch.
+            fname (str): The name of the file we're extracting.
 
         returns:
             Path: The path to the klp-ccp working directory of the current codestream.
         """
         fpath = f'work_{str(fname).replace("/", "_")}'
-        return self.get_ccp_dir()/fpath
+        return self.get_ccp_dir(lp_name)/fpath
 
 
     def name_cs(self):
@@ -294,9 +301,9 @@ class Codestream:
         return Path(mod_path, obj)
 
 
-    def lp_out_file(self, fname):
+    def lp_out_file(self, lp_name, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
-        return f"{self.lp_name}_{fpath}"
+        return f"{lp_name}_{fpath}"
 
 
     # Cache the symbols using the object path. It differs for each
@@ -370,7 +377,4 @@ class Codestream:
                 "files" : self.files,
                 "modules" : self.modules,
                 "repo" : self.repo,
-                "data_path" : str(self.data_path),
-                "lp_path" : str(self.lp_path),
-                "lp_name" : str(self.lp_name),
                 }

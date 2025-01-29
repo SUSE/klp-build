@@ -417,7 +417,7 @@ class GitHelper():
 
 
     @staticmethod
-    def download_supported_file(data_path, lp_path):
+    def download_supported_file():
         logging.info("Downloading codestreams file")
         cs_url = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
         suse_cert = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
@@ -454,8 +454,8 @@ class GitHelper():
             else:
                 patchid = ""
 
-            codestreams.append(Codestream.from_codestream(data_path, lp_path, full_cs,
-                                                          proj, patchid, kernel))
+            codestreams.append(Codestream.from_codestream(full_cs, proj,
+                                                          patchid, kernel))
 
         return codestreams
 
@@ -463,7 +463,7 @@ class GitHelper():
     def scan(self, cve, conf, no_check):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
-        all_codestreams = GitHelper.download_supported_file(utils.get_datadir(), utils.get_workdir(self.lp_name))
+        all_codestreams = GitHelper.download_supported_file()
 
         if not cve or no_check:
             commits = {}
