@@ -150,7 +150,13 @@ class Codestream:
         return Path(self.lp_path, "ccp", self.name())
 
 
-    def lpdir(self):
+    def get_lp_dir(self):
+        """
+        Get the path to the extracted livepatches directory of the current codestream.
+
+        returns:
+            path: The path to the extracted livepatches directory of the current codestream.
+        """
         return self.get_ccp_dir()/"lp"
 
 

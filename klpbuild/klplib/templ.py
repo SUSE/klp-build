@@ -410,7 +410,7 @@ class TemplateGen():
 
     def __generate_patched_conf(self, cs):
         render_vars = {"cs_files": cs.files, "check_enabled": self.check_enabled}
-        with open(Path(cs.lpdir(), "patched_funcs.csv"), "w") as f:
+        with open(Path(cs.get_lp_dir(), "patched_funcs.csv"), "w") as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
     def __generate_header_file(self, lp_path, cs):
@@ -515,7 +515,7 @@ class TemplateGen():
             f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**tvars))
 
     def generate_livepatches(self, cs):
-        lp_path = cs.lpdir()
+        lp_path = cs.get_lp_dir()
         lp_path.mkdir(exist_ok=True)
 
         files = cs.files
@@ -541,8 +541,8 @@ class TemplateGen():
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def __create_kbuild(self, cs):
-        render_vars = {"bsc": cs.lp_name, "cs": cs, "lpdir": cs.lpdir()}
-        with open(Path(cs.lpdir(), "Kbuild.inc"), "w") as f:
+        render_vars = {"bsc": cs.lp_name, "cs": cs, "lpdir": cs.get_lp_dir()}
+        with open(Path(cs.get_lp_dir(), "Kbuild.inc"), "w") as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
     def generate_commit_msg_file(self):
