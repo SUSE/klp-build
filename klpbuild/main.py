@@ -54,9 +54,6 @@ def main():
     elif args.cmd == "get-patches":
         GitHelper(args.lp_filter).get_commits(args.cve, get_workdir(args.name))
 
-    elif args.cmd == "scan":
-        GitHelper("").scan(args.cve, args.conf, False)
-
     elif args.cmd == "format-patches":
         GitHelper(args.lp_filter).format_patches(args.name, args.version)
 
