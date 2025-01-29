@@ -160,7 +160,13 @@ class Codestream:
         return self.get_cpp_dir()/"lp"
 
 
-    def work_dir(self, fname):
+    def get_cpp_work_dir(self, fname):
+        """
+        Get the path to the klp-ccp working directory of the current codestream.
+
+        returns:
+            Path: The path to the klp-ccp working directory of the current codestream.
+        """
         fpath = f'work_{str(fname).replace("/", "_")}'
         return self.get_cpp_dir()/fpath
 
