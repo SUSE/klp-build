@@ -431,7 +431,7 @@ class TemplateGen():
         # Only add the inc_dir if CE is used, since it's the only backend that
         # produces the proto.h headers
         if len(proto_files) > 0:
-            lp_inc_dir = cs.dir()
+            lp_inc_dir = cs.get_ccp_dir()
 
         # Only populate the config check in the header if the livepatch is
         # patching code under only one config. Otherwise let the developer to

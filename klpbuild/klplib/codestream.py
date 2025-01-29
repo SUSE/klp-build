@@ -140,17 +140,23 @@ class Codestream:
         return f"{self.sle}.{self.sp}u{self.update}"
 
 
-    def dir(self):
+    def get_ccp_dir(self):
+        """
+        Get the path to the ccp directory of the current codestream.
+
+        Returns:
+            Path: The path to the ccp directory of the current codestream.
+        """
         return Path(self.lp_path, "ccp", self.name())
 
 
     def lpdir(self):
-        return self.dir()/"lp"
+        return self.get_ccp_dir()/"lp"
 
 
     def work_dir(self, fname):
         fpath = f'work_{str(fname).replace("/", "_")}'
-        return Path(self.dir(), fpath)
+        return self.get_ccp_dir()/fpath
 
 
     def name_cs(self):

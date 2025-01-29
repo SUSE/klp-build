@@ -495,7 +495,7 @@ class Extractor():
         i = 1
         for cs in working_cs:
             # remove any previously generated files and leftover patches
-            shutil.rmtree(cs.dir(), ignore_errors=True)
+            shutil.rmtree(cs.get_ccp_dir(), ignore_errors=True)
             self.remove_patches(cs, self.quilt_log)
 
             # Apply patches before the LPs were created
