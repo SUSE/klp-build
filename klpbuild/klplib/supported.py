@@ -13,7 +13,30 @@ from klpbuild.klplib.codestream import Codestream
 SUPPORTED_CS_URL = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
 SUSE_CERT = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
 
-def download_supported_file():
+def get_supported_codestreams():
+    supported_codestreams = []
+
+    for line in __download_supported_file():
+        # remove the last two columns, which are dates of the line
+        # and add a fifth field with the forth one + rpm- prefix, and
+        # remove the build counter number
+        full_cs, proj, kernel_full, _, _ = line.split(",")
+
+        kernel = re.sub(r"\.\d+$", "", kernel_full)
+
+        # MICRO releases contain project/patchid format
+        if "/" in proj:
+            proj, patchid = proj.split("/")
+        else:
+            patchid = ""
+
+        supported_codestreams.append(Codestream.from_codestream(full_cs, proj,
+                                                                patchid,
+                                                                kernel))
+    return supported_codestreams
+
+
+def __download_supported_file():
     logging.info("Downloading codestreams file")
 
     if SUSE_CERT.exists():
@@ -24,32 +47,6 @@ def download_supported_file():
     # exit on error
     req.raise_for_status()
 
-    first_line = True
-    codestreams = []
-    for line in req.iter_lines():
-        # skip empty lines
-        if not line:
-            continue
+    # Skip file header and empty lines
+    return [line.decode('utf-8').strip() for line in req.iter_lines() if line][1:]
 
-        # skip file header
-        if first_line:
-            first_line = False
-            continue
-
-        # remove the last two columns, which are dates of the line
-        # and add a fifth field with the forth one + rpm- prefix, and
-        # remove the build counter number
-        full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
-
-        kernel = re.sub(r"\.\d+$", "", kernel_full)
-
-        # MICRO releases contain project/patchid format
-        if "/" in proj:
-            proj, patchid = proj.split("/")
-        else:
-            patchid = ""
-
-        codestreams.append(Codestream.from_codestream(full_cs, proj, patchid,
-                                                      kernel))
-
-    return codestreams

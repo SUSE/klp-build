@@ -18,7 +18,7 @@ from natsort import natsorted
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ibs import IBS
-from klpbuild.klplib.supported import download_supported_file
+from klpbuild.klplib.supported import get_supported_codestreams
 
 
 class GitHelper():
@@ -419,7 +419,7 @@ class GitHelper():
     def scan(self, cve, conf, no_check):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
-        all_codestreams = download_supported_file()
+        all_codestreams = get_supported_codestreams()
 
         if not cve or no_check:
             commits = {}
