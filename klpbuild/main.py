@@ -11,6 +11,7 @@ from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.ksrc import GitHelper
 from klpbuild.klplib.utils import get_workdir
+from klpbuild.klplib.plugins import try_run_plugin
 from klpbuild.plugins.extractor import Extractor
 from klpbuild.plugins.inline import Inliner
 from klpbuild.plugins.setup import Setup
@@ -24,6 +25,14 @@ def main():
     if hasattr(args, 'name'):
         load_codestreams(args.name)
 
+    try:
+        try_run_plugin(args.cmd, args)
+        return
+    except (AssertionError, ModuleNotFoundError):
+        logging.debug("Plugin %s cannot be loaded dinamically!", args.cmd)
+
+    # NOTE: all the code below should be gone when all the modules will be
+    # converted into plugins
     if args.cmd == "setup":
         setup = Setup(args.name)
         ffuncs = Setup.setup_file_funcs(args.conf, args.module, args.file_funcs,
