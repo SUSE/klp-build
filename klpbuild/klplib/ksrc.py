@@ -159,8 +159,8 @@ class GitHelper():
         # List of upstream commits, in creation date order
         ucommits = []
 
-        upatches = utils.get_workdir(lp_name)/"upstream"
-        upatches.mkdir(exist_ok=True, parents=True)
+        upstream_patches_dir = utils.get_workdir(lp_name)/"upstream"
+        upstream_patches_dir.mkdir(exist_ok=True, parents=True)
 
         # Get backported commits from all possible branches, in order to get
         # different versions of the same backport done in the CVE branches.
@@ -284,7 +284,7 @@ class GitHelper():
         # created/merged.
         ucommits_sort = []
         for c in ucommits:
-            d, msg = GitHelper.get_commit_data(c, upatches)
+            d, msg = GitHelper.get_commit_data(c, upstream_patches_dir)
             ucommits_sort.append((d, c, msg))
 
         ucommits_sort.sort()
