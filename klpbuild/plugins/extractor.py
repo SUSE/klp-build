@@ -594,7 +594,7 @@ class Extractor():
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f"{cs.get_data_dir(utils.ARCH)}.+{file}", "", src)
+                src = re.sub(f"{utils.get_datadir(utils.ARCH)}.+{file}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(r"\.lineno = \d+,", "", src)

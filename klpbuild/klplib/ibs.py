@@ -109,7 +109,7 @@ class IBS():
         if arch != "x86_64" and "-extra" in rpm:
             return
 
-        path_dest = cs.get_data_dir(arch)
+        path_dest = get_datadir(arch)
         path_dest.mkdir(exist_ok=True, parents=True)
 
         rpm_file = Path(dest, rpm)

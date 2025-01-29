@@ -6,7 +6,7 @@
 from pathlib import Path, PurePath
 import re
 
-from klpbuild.klplib.utils import ARCH, is_mod, get_all_symbols_from_object
+from klpbuild.klplib.utils import ARCH, is_mod, get_all_symbols_from_object, get_datadir
 
 class Codestream:
     __slots__ = ("data_path", "lp_path", "lp_name", "sle", "sp", "update", "rt",
@@ -73,16 +73,11 @@ class Codestream:
                 self.update == cs.update and \
                 self.rt == cs.rt
 
-    def get_data_dir(self, arch):
-        # For the SLE usage, it should point to the place where the codestreams
-        # are downloaded
-        return Path(self.data_path, arch)
-
 
     def get_src_dir(self, arch=ARCH):
         # Only -rt codestreams have a suffix for source directory
         ktype = self.ktype.replace("-default", "")
-        return Path(self.get_data_dir(arch), "usr", "src", f"linux-{self.kernel}{ktype}")
+        return get_datadir(arch)/"usr"/"src"/f"linux-{self.kernel}{ktype}"
 
 
     def get_obj_dir(self):
@@ -99,7 +94,7 @@ class Codestream:
 
         # Strip the suffix from the filename so we can add the kernel version in the middle
         fname = f"{Path(file).stem}-{self.kname()}{Path(file).suffix}"
-        return Path(self.get_data_dir(arch), "boot", fname)
+        return get_datadir(arch)/"boot"/fname
 
     def get_repo(self):
         if self.update == 0 or self.is_micro:
@@ -191,7 +186,7 @@ class Codestream:
         else:
             mod_path = Path("lib")
 
-        return Path(self.get_data_dir(arch), mod_path, "modules", f"{self.kname()}")
+        return get_datadir(arch)/mod_path/"modules"/self.kname()
 
     # A codestream can be patching multiple objects, so get the path related to
     # the module that we are interested
