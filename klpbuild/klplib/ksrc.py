@@ -17,8 +17,8 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
-from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.ibs import IBS
+from klpbuild.klplib.supported import download_supported_file
 
 
 class GitHelper():
@@ -416,54 +416,10 @@ class GitHelper():
         return len(commits[cs.name_cs()]["commits"]) > 0
 
 
-    @staticmethod
-    def download_supported_file():
-        logging.info("Downloading codestreams file")
-        cs_url = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
-        suse_cert = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
-        if suse_cert.exists():
-            req = requests.get(cs_url, verify=suse_cert, timeout=15)
-        else:
-            req = requests.get(cs_url, timeout=15)
-
-        # exit on error
-        req.raise_for_status()
-
-        first_line = True
-        codestreams = []
-        for line in req.iter_lines():
-            # skip empty lines
-            if not line:
-                continue
-
-            # skip file header
-            if first_line:
-                first_line = False
-                continue
-
-            # remove the last two columns, which are dates of the line
-            # and add a fifth field with the forth one + rpm- prefix, and
-            # remove the build counter number
-            full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
-
-            kernel = re.sub(r"\.\d+$", "", kernel_full)
-
-            # MICRO releases contain project/patchid format
-            if "/" in proj:
-                proj, patchid = proj.split("/")
-            else:
-                patchid = ""
-
-            codestreams.append(Codestream.from_codestream(full_cs, proj,
-                                                          patchid, kernel))
-
-        return codestreams
-
-
     def scan(self, cve, conf, no_check):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
-        all_codestreams = GitHelper.download_supported_file()
+        all_codestreams = download_supported_file()
 
         if not cve or no_check:
             commits = {}
