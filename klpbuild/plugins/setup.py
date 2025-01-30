@@ -64,10 +64,11 @@ class Setup():
 
         # Called at this point because codestreams is populated
         # FIXME: we should check all configs, like when using --conf-mod-file-funcs
-        commits, patched_cs, patched_kernels, codestreams = ksrc.scan(self.lp_name,
-                                                                      data["cve"],
+        commits, patched_cs, patched_kernels, codestreams = ksrc.scan(data["cve"],
                                                                       data["conf"],
-                                                                      data["no_check"])
+                                                                      data["no_check"],
+                                                                      utils.get_workdir(self.lp_name))
+
         # Add new codestreams to the already existing list, skipping duplicates
         old_patched_cs = get_codestreams_data('patched_cs')
         new_patched_cs = natsorted(list(set(old_patched_cs + patched_cs)))
