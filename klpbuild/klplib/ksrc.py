@@ -423,7 +423,7 @@ class GitHelper():
         return len(commits[cs.name_cs()]["commits"]) > 0
 
 
-    def scan(self, lp_name, cve, conf, no_check):
+    def scan(self, cve, conf, no_check, savedir=None):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
         all_codestreams = get_supported_codestreams()
@@ -432,7 +432,7 @@ class GitHelper():
             commits = {}
             patched_kernels = []
         else:
-            commits = self.get_commits(cve, utils.get_workdir(lp_name))
+            commits = self.get_commits(cve, savedir)
             patched_kernels = self.get_patched_kernels(all_codestreams, commits, cve)
 
         # list of codestreams that matches the file-funcs argument
@@ -475,7 +475,7 @@ class GitHelper():
         if data_missing:
             logging.info("Download the necessary data from the following codestreams:")
             logging.info("\t%s\n", " ".join(cs_missing))
-            IBS(lp_name, self.lp_filter).download_cs_data(data_missing)
+            IBS("", self.lp_filter).download_cs_data(data_missing)
             logging.info("Done.")
 
             for cs in data_missing:

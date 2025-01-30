@@ -21,12 +21,8 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    # NOTE: Here I'm assuming the codestream is only loaded for plugins that
-    # get the livepatch name, not sure yet it's ok to assume it
     if hasattr(args, 'name'):
         load_codestreams(args.name)
-    else:
-        load_codestreams('bsc_check')
 
     if args.cmd == "setup":
         setup = Setup(args.name)
@@ -50,7 +46,7 @@ def main():
         GitHelper(args.filter).get_commits(args.cve, get_workdir(args.name))
 
     elif args.cmd == "scan":
-        GitHelper("").scan("bsc_check", args.cve, args.conf, False)
+        GitHelper("").scan(args.cve, args.conf, False)
 
     elif args.cmd == "format-patches":
         GitHelper(args.filter).format_patches(args.name, args.version)
