@@ -20,7 +20,7 @@ def test_templ_with_externalized_vars():
                                   ["fs/proc/cmdline.c", "cmdline_proc_show"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_PROC_FS", "no_check": False})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_PROC_FS", "no_check": False})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
@@ -48,7 +48,7 @@ def test_templ_without_externalized_vars():
                                   ["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_IPV6", "no_check": False})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_IPV6", "no_check": False})
 
     lp_setup.setup_project_files(codestreams, ffuncs, [utils.ARCH])
 
@@ -82,7 +82,7 @@ def test_check_header_file_included():
                                     [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_IPV6", "no_check": False})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_IPV6", "no_check": False})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
@@ -110,7 +110,7 @@ def test_templ_cve_specified():
                                   ["fs/proc/cmdline.c", "cmdline_proc_show"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": "1234-5678", "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_PROC_FS", "no_check": True})
+        {"cve": "1234-5678", "lp_filter": cs, "conf": "CONFIG_PROC_FS", "no_check": True})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
@@ -133,7 +133,7 @@ def test_templ_exts_mod_name():
                                   ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_NVME_TCP", "no_check": True})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
@@ -155,7 +155,7 @@ def test_templ_micro_is_ibt():
                                   ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_NVME_TCP", "no_check": True})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
@@ -176,7 +176,7 @@ def test_templ_kbuild_has_contents():
                                   ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_NVME_TCP", "no_check": True})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 

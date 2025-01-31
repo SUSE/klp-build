@@ -60,7 +60,7 @@ class Setup():
         if not self.lp_name.startswith("bsc"):
             raise ValueError("Please use prefix 'bsc' when creating a livepatch for codestreams")
 
-        ksrc = GitHelper(self.lp_name, data["lp_filter"], data["lp_skips"])
+        ksrc = GitHelper(self.lp_name, data["lp_filter"])
 
         # Called at this point because codestreams is populated
         # FIXME: we should check all configs, like when using --conf-mod-file-funcs
