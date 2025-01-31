@@ -73,7 +73,7 @@ ${get_commits(commits, 'upstream')}
  *  SLE12-SP5 commit:
 ${get_commits(commits, '12.5')}
  *
- *  SLE15-SP2 and -SP3 commit:
+ *  SLE15-SP3 commit:
 ${get_commits(commits, 'cve-5.3')}
  *
  *  SLE15-SP4 and -SP5 commit:

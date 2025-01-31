@@ -92,7 +92,7 @@ def test_check_header_file_included():
     assert "Upstream commit:" in get_file_content(lp, cs)
 
     # Check for all supported codestreams
-    for item in ["SLE12-SP5", "SLE15-SP2 and -SP3", "SLE15-SP4 and -SP5",
+    for item in ["SLE12-SP5", "SLE15-SP3", "SLE15-SP4 and -SP5",
                  "SLE15-SP6", "SLE MICRO-6-0"]:
         assert item in get_file_content(lp, cs)
 
