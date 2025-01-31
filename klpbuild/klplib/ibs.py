@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 #
-# Copyright (C) 2021-2024 SUSE
+# Copyright (C) 2021-2025 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import concurrent.futures
@@ -138,10 +138,7 @@ class IBS():
         if tries == 0:
             raise RuntimeError(f"Failed to extract {rpm}. Aborting")
 
-    def download_cs_data(self, cs_list):
-        rpms = []
-        i = 1
-
+    def get_cs_packages(self, cs_list, dest):
         # The packages that we search for are:
         # kernel-source
         # kernel-devel
@@ -155,19 +152,19 @@ class IBS():
             "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
         }
 
-        dest = get_datadir()/"kernel-rpms"
-        dest.mkdir(exist_ok=True, parents=True)
+        rpms = []
+        i = 1
 
         logging.info("Getting list of files...")
         for cs in cs_list:
             for arch in cs.archs:
-                for pkg, regex in get_codestreams_items():
+                for pkg, regex in cs_data.items():
                     if cs.is_micro:
                         # For MICRO, we use the patchid to find the list of binaries
                         pkg = cs.patchid
 
                     elif cs.rt:
-                    # RT kernels have different package names
+                        # RT kernels have different package names
                         if pkg == "kernel-default":
                             pkg = "kernel-rt"
                         elif pkg == "kernel-source":
@@ -186,7 +183,7 @@ class IBS():
 
                         # Download all packages for the HOST arch
                         # For the others only download kernel-default
-                        if arch != ARCH and not re.search("kernel-default-\d", rpm):
+                        if arch != ARCH and not re.search(r"kernel-default-\d", rpm):
                             continue
 
                         # Extract the source and kernel-devel in the current
@@ -198,6 +195,14 @@ class IBS():
 
                         rpms.append((i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
                         i += 1
+
+        return rpms
+
+    def download_cs_data(self, cs_list):
+        dest = get_datadir()/"kernel-rpms"
+        dest.mkdir(exist_ok=True, parents=True)
+
+        rpms = self.get_cs_packages(cs_list, dest)
 
         logging.info(f"Downloading {len(rpms)} rpms...")
         self.total = len(rpms)
