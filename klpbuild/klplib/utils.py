@@ -267,7 +267,7 @@ def get_kgraft_branch(cs_name):
     if '12.' in cs_name:
         return "master-livepatch-sle12"
 
-    if '15.2' in cs_name or '15.3' in cs_name:
+    if '15.3' in cs_name:
         return "master-livepatch"
 
     if "15.4" in cs_name or "15.5" in cs_name:
