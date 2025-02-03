@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import argparse
+import sys
 
 from klpbuild.klplib.utils import ARCHS
 
@@ -18,7 +19,8 @@ def create_parser() -> argparse.ArgumentParser:
         help="The livepatch name. This will be the directory name of the "
         "resulting livepatches.",
     )
-    parentparser.add_argument("--filter", type=str, help=r"Filter out codestreams using a regex. Example: 15\.3u[0-9]+")
+    parentparser.add_argument("--filter", type=str, required='log' in sys.argv,
+                              help=r"Filter out codestreams using a regex. Example: 15\.3u[0-9]+")
 
     parser = argparse.ArgumentParser(add_help=False)
     sub = parser.add_subparsers(dest="cmd")
@@ -71,7 +73,6 @@ def create_parser() -> argparse.ArgumentParser:
         nargs="+",
         help="SLE specific. Supported architectures for this livepatch",
     )
-    setup.add_argument("--skips", help="List of codestreams to filter out")
 
     check_inline = sub.add_parser("check-inline", parents=[parentparser])
     check_inline.add_argument(
@@ -108,9 +109,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--apply-patches", action="store_true", help="Apply patches found by get-patches subcommand, if they exist"
     )
     diff_opts = sub.add_parser("cs-diff", parents=[parentparser])
-    diff_opts.add_argument(
-        "--cs", nargs=2, type=str, required=True, help="SLE specific. Apply diff on two different codestreams"
-    )
 
     fmt = sub.add_parser(
         "format-patches", parents=[parentparser], help="SLE specific. Extract patches from kgraft-patches"
@@ -147,9 +145,6 @@ def create_parser() -> argparse.ArgumentParser:
     status.add_argument("--wait", action="store_true", help="Wait until all codestreams builds are finished")
 
     log = sub.add_parser("log", parents=[parentparser], help="SLE specific. Get build log from IBS")
-    log.add_argument("--cs", type=str, required=True, help="The codestream to get the log from")
     log.add_argument("--arch", type=str, default="x86_64", choices=ARCHS, help="Build architecture")
 
     return parser
-
-

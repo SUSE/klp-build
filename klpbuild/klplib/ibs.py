@@ -23,6 +23,7 @@ from lxml.objectify import SubElement
 from natsort import natsorted
 from osctiny import Osc
 
+from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
 from klpbuild.klplib.config import get_user_path, get_user_settings
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path
@@ -314,7 +315,7 @@ class IBS():
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs in filter_codestreams(self.lp_filter, "", get_codestreams_dict()):
+            for cs in filter_codestreams(self.lp_filter, get_codestreams_dict()):
                 if arch not in cs.archs:
                     continue
 
@@ -593,11 +594,23 @@ class IBS():
 
         logging.info(f"({i}/{self.total}) {cs.name()} done")
 
-    def log(self, cs, arch):
-        logging.info(self.osc.build.get_log(self.cs_to_project(cs), "standard", arch, "klp"))
+    def log(self, arch):
+        cs_list = filter_codestreams(self.lp_filter, get_codestreams_dict())
+
+        if not cs_list:
+            logging.error("log: No codestreams found for filter %s", self.lp_filter)
+            sys.exit(1)
+
+        if len(cs_list) > 1:
+            cs_names = [cs.name() for cs in cs_list]
+            logging.error("Filter '%s' returned %d entries (%s), while expecting just one. Aborting. ",
+                          self.lp_filter, len(cs_list), " ".join(cs_names))
+            sys.exit(1)
+
+        logging.info(self.osc.build.get_log(self.cs_to_project(cs_list[0]), "standard", arch, "klp"))
 
     def push(self, wait=False):
-        cs_list = filter_codestreams(self.lp_filter, "", get_codestreams_dict())
+        cs_list = filter_codestreams(self.lp_filter, get_codestreams_dict())
 
         if not cs_list:
             logging.error(f"push: No codestreams found for {self.lp_name}")
