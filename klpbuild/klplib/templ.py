@@ -410,11 +410,11 @@ class TemplateGen():
 
     def __generate_patched_conf(self, cs):
         render_vars = {"cs_files": cs.files, "check_enabled": self.check_enabled}
-        with open(Path(cs.lpdir(), "patched_funcs.csv"), "w") as f:
+        with open(Path(cs.get_lp_dir(self.lp_name), "patched_funcs.csv"), "w") as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
     def __generate_header_file(self, lp_path, cs):
-        out_name = f"livepatch_{cs.lp_name}.h"
+        out_name = f"livepatch_{self.lp_name}.h"
 
         lp_inc_dir = Path()
         proto_files = []
@@ -431,7 +431,7 @@ class TemplateGen():
         # Only add the inc_dir if CE is used, since it's the only backend that
         # produces the proto.h headers
         if len(proto_files) > 0:
-            lp_inc_dir = cs.dir()
+            lp_inc_dir = cs.get_ccp_dir(self.lp_name)
 
         # Only populate the config check in the header if the livepatch is
         # patching code under only one config. Otherwise let the developer to
@@ -453,8 +453,8 @@ class TemplateGen():
 
     def __generate_lp_file(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
-            lp_inc_dir = str(cs.work_dir(src_file))
-            lp_file = cs.lp_out_file(src_file)
+            lp_inc_dir = str(cs.get_ccp_work_dir(self.lp_name, src_file))
+            lp_file = cs.lp_out_file(self.lp_name, src_file)
             fdata = cs.files[str(src_file)]
         else:
             lp_inc_dir = Path("non-existent")
@@ -468,7 +468,7 @@ class TemplateGen():
         if use_src_name:
             out_name = lp_file
         else:
-            out_name = f"livepatch_{cs.lp_name}.c"
+            out_name = f"livepatch_{self.lp_name}.c"
 
         user, email = get_mail()
         cve = get_codestreams_data('cve')
@@ -478,8 +478,8 @@ class TemplateGen():
         tvars = {
             "include_header": "livepatch_" in out_name,
             "cve": cve,
-            "lp_name": cs.lp_name,
-            "lp_num": cs.lp_name.replace("bsc", ""),
+            "lp_name": self.lp_name,
+            "lp_num": self.lp_name.replace("bsc", ""),
             "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
             "year": datetime.today().year,
             "user": user,
@@ -515,7 +515,7 @@ class TemplateGen():
             f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**tvars))
 
     def generate_livepatches(self, cs):
-        lp_path = cs.lpdir()
+        lp_path = cs.get_lp_dir(self.lp_name)
         lp_path.mkdir(exist_ok=True)
 
         files = cs.files
@@ -541,8 +541,8 @@ class TemplateGen():
 
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     def __create_kbuild(self, cs):
-        render_vars = {"bsc": cs.lp_name, "cs": cs, "lpdir": cs.lpdir()}
-        with open(Path(cs.lpdir(), "Kbuild.inc"), "w") as f:
+        render_vars = {"bsc": self.lp_name, "cs": cs, "lpdir": cs.get_lp_dir(self.lp_name)}
+        with open(Path(cs.get_lp_dir(self.lp_name), "Kbuild.inc"), "w") as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
     def generate_commit_msg_file(self):

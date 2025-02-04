@@ -288,14 +288,17 @@ def get_workdir(lp_name):
     return get_user_path('work_dir')/lp_name
 
 
-def get_datadir():
+def get_datadir(arch=""):
     """
     Get the data directory.
 
     Returns:
         Path: The full path to the livepatch file.
     """
-    return get_user_path('data_dir')
+    if arch:
+        assert arch in ARCHS
+    data_dir = get_user_path('data_dir')
+    return data_dir/arch if arch else data_dir
 
 
 def get_tests_path(lp_name):

@@ -361,7 +361,7 @@ class Extractor():
         return None
 
     def cmd_args(self, cs, fname, out_dir, fdata, cmd):
-        lp_out = Path(out_dir, cs.lp_out_file(fname))
+        lp_out = Path(out_dir, cs.lp_out_file(self.lp_name, fname))
 
         funcs = ",".join(fdata["symbols"])
 
@@ -430,7 +430,7 @@ class Extractor():
 
         logging.info(f"{idx} {cs_info} {fname}")
 
-        out_dir = cs.work_dir(fname)
+        out_dir = cs.get_ccp_work_dir(self.lp_name, fname)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # create symlink to the respective codestream file
@@ -468,7 +468,7 @@ class Extractor():
 
         cs.files[fname]["ext_symbols"] = self.get_symbol_list(out_dir)
 
-        lp_out = Path(out_dir, cs.lp_out_file(fname))
+        lp_out = Path(out_dir, cs.lp_out_file(self.lp_name, fname))
 
         # Remove the local path prefix of the klp-ccp generated comments
         # Open the file, read, seek to the beginning, write the new data, and
@@ -495,7 +495,7 @@ class Extractor():
         i = 1
         for cs in working_cs:
             # remove any previously generated files and leftover patches
-            shutil.rmtree(cs.dir(), ignore_errors=True)
+            shutil.rmtree(cs.get_ccp_dir(self.lp_name), ignore_errors=True)
             self.remove_patches(cs, self.quilt_log)
 
             # Apply patches before the LPs were created
@@ -572,7 +572,7 @@ class Extractor():
             logging.warning(json.dumps(missing_syms, indent=4))
 
     def get_work_lp_file(self, cs, fname):
-        return Path(cs.work_dir(fname), cs.lp_out_file(fname))
+        return Path(cs.get_ccp_work_dir(self.lp_name, fname), cs.lp_out_file(self.lp_name, fname))
 
     def get_cs_code(self, args):
         cs_files = {}
@@ -594,7 +594,7 @@ class Extractor():
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f"{cs.get_data_dir(utils.ARCH)}.+{file}", "", src)
+                src = re.sub(f"{utils.get_datadir(utils.ARCH)}.+{file}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(r"\.lineno = \d+,", "", src)

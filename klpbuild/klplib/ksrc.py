@@ -17,12 +17,12 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
-from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.ibs import IBS
+from klpbuild.klplib.supported import get_supported_codestreams
 
 
 class GitHelper():
-    def __init__(self, lp_name, lp_filter):
+    def __init__(self, lp_filter):
 
         self.kern_src = get_user_path('kernel_src_dir', isopt=True)
 
@@ -39,10 +39,9 @@ class GitHelper():
             "cve-5.14": "cve/linux-5.14-LTSS",
         }
 
-        self.lp_name = lp_name
         self.lp_filter = lp_filter
 
-    def format_patches(self, version):
+    def format_patches(self, lp_name, version):
         ver = f"v{version}"
         # index 1 will be the test file
         index = 2
@@ -52,10 +51,10 @@ class GitHelper():
             logging.warning("kgr_patches_dir not found, patches will be incomplete")
 
         # Remove dir to avoid leftover patches with different names
-        patches_dir = utils.get_workdir(self.lp_name)/"patches"
+        patches_dir = utils.get_workdir(lp_name)/"patches"
         shutil.rmtree(patches_dir, ignore_errors=True)
 
-        test_src = utils.get_tests_path(self.lp_name)
+        test_src = utils.get_tests_path(lp_name)
         subprocess.check_output(
             [
                 "/usr/bin/git",
@@ -75,11 +74,11 @@ class GitHelper():
         )
 
         # Filter only the branches related to this BSC
-        for branch in utils.get_lp_branches(self.lp_name, kgr_patches):
+        for branch in utils.get_lp_branches(lp_name, kgr_patches):
             print(branch)
-            bname = branch.replace(self.lp_name + "_", "")
+            bname = branch.replace(lp_name + "_", "")
             bs = " ".join(bname.split("_"))
-            bsc = self.lp_name.replace("bsc", "bsc#")
+            bsc = lp_name.replace("bsc", "bsc#")
 
             prefix = f"PATCH {ver} {bsc} {bs}"
 
@@ -126,7 +125,17 @@ class GitHelper():
 
         return d, msg
 
-    def get_commits(self, cve):
+
+    def fetch_kernel_branches(self):
+        logging.info("Fetching changes from all supported branches...")
+
+        # Mount the command to fetch all branches for supported codestreams
+        subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
+                                 "--quiet", "--atomic", "--force", "--tags", "origin"] +
+                                list(self.kernel_branches.values()))
+
+
+    def get_commits(self, cve, savedir=None):
         if not self.kern_src:
             logging.info("kernel_src_dir not found, skip getting SUSE commits")
             return {}
@@ -141,12 +150,7 @@ class GitHelper():
             logging.info("Invalid CVE number '%s', skipping the processing of getting the patches.", cve)
             return {}
 
-        print("Fetching changes from all supported branches...")
-
-        # Mount the command to fetch all branches for supported codestreams
-        subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
-                                 "--quiet", "--atomic", "--force", "--tags", "origin"] +
-                                list(self.kernel_branches.values()))
+        self.fetch_kernel_branches()
 
         print("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
@@ -155,8 +159,10 @@ class GitHelper():
         # List of upstream commits, in creation date order
         ucommits = []
 
-        upatches = utils.get_workdir(self.lp_name)/"upstream"
-        upatches.mkdir(exist_ok=True, parents=True)
+        upstream_patches_dir = None
+        if savedir:
+            upstream_patches_dir = Path(savedir)/"upstream"
+            upstream_patches_dir.mkdir(exist_ok=True, parents=True)
 
         # Get backported commits from all possible branches, in order to get
         # different versions of the same backport done in the CVE branches.
@@ -199,8 +205,6 @@ class GitHelper():
                     continue
 
                 idx += 1
-                branch_path = utils.get_workdir(self.lp_name)/"fixes"/bc
-                branch_path.mkdir(exist_ok=True, parents=True)
 
                 pfile = subprocess.check_output(
                     ["/usr/bin/git", "-C", self.kern_src, "show", f"remotes/origin/{mbranch}:{patch}"],
@@ -210,9 +214,12 @@ class GitHelper():
                 # removing the patches.suse dir from the filepath
                 basename = PurePath(patch).name.replace(".patch", "")
 
-                # Save the patch for later review from the livepatch developer
-                with open(Path(branch_path, f"{idx:02d}-{basename}.patch"), "w") as f:
-                    f.write(pfile)
+                if savedir:
+                    branch_path = Path(savedir)/"fixes"/bc
+                    branch_path.mkdir(exist_ok=True, parents=True)
+                    # Save the patch for later review from the livepatch developer
+                    with open(Path(branch_path, f"{idx:02d}-{basename}.patch"), "w") as f:
+                        f.write(pfile)
 
                 # Get the upstream commit and save it. The Git-commit can be
                 # missing from the patch if the commit is not backporting the
@@ -280,7 +287,7 @@ class GitHelper():
         # created/merged.
         ucommits_sort = []
         for c in ucommits:
-            d, msg = GitHelper.get_commit_data(c, upatches)
+            d, msg = GitHelper.get_commit_data(c, upstream_patches_dir)
             ucommits_sort.append((d, c, msg))
 
         ucommits_sort.sort()
@@ -416,60 +423,16 @@ class GitHelper():
         return len(commits[cs.name_cs()]["commits"]) > 0
 
 
-    @staticmethod
-    def download_supported_file(data_path, lp_path):
-        logging.info("Downloading codestreams file")
-        cs_url = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
-        suse_cert = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
-        if suse_cert.exists():
-            req = requests.get(cs_url, verify=suse_cert, timeout=15)
-        else:
-            req = requests.get(cs_url, timeout=15)
-
-        # exit on error
-        req.raise_for_status()
-
-        first_line = True
-        codestreams = []
-        for line in req.iter_lines():
-            # skip empty lines
-            if not line:
-                continue
-
-            # skip file header
-            if first_line:
-                first_line = False
-                continue
-
-            # remove the last two columns, which are dates of the line
-            # and add a fifth field with the forth one + rpm- prefix, and
-            # remove the build counter number
-            full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
-
-            kernel = re.sub(r"\.\d+$", "", kernel_full)
-
-            # MICRO releases contain project/patchid format
-            if "/" in proj:
-                proj, patchid = proj.split("/")
-            else:
-                patchid = ""
-
-            codestreams.append(Codestream.from_codestream(data_path, lp_path, full_cs,
-                                                          proj, patchid, kernel))
-
-        return codestreams
-
-
-    def scan(self, cve, conf, no_check):
+    def scan(self, cve, conf, no_check, savedir=None):
         # Always get the latest supported.csv file and check the content
         # against the codestreams informed by the user
-        all_codestreams = GitHelper.download_supported_file(utils.get_datadir(), utils.get_workdir(self.lp_name))
+        all_codestreams = get_supported_codestreams()
 
         if not cve or no_check:
             commits = {}
             patched_kernels = []
         else:
-            commits = self.get_commits(cve)
+            commits = self.get_commits(cve, savedir)
             patched_kernels = self.get_patched_kernels(all_codestreams, commits, cve)
 
         # list of codestreams that matches the file-funcs argument
@@ -512,7 +475,7 @@ class GitHelper():
         if data_missing:
             logging.info("Download the necessary data from the following codestreams:")
             logging.info("\t%s\n", " ".join(cs_missing))
-            IBS(self.lp_name, self.lp_filter).download_cs_data(data_missing)
+            IBS("", self.lp_filter).download_cs_data(data_missing)
             logging.info("Done.")
 
             for cs in data_missing:

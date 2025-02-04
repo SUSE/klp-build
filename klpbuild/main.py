@@ -10,6 +10,7 @@ from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.ksrc import GitHelper
+from klpbuild.klplib.utils import get_workdir
 from klpbuild.plugins.extractor import Extractor
 from klpbuild.plugins.inline import Inliner
 from klpbuild.plugins.setup import Setup
@@ -20,12 +21,8 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    # NOTE: Here I'm assuming the codestream is only loaded for plugins that
-    # get the livepatch name, not sure yet it's ok to assume it
     if hasattr(args, 'name'):
         load_codestreams(args.name)
-    else:
-        load_codestreams('bsc_check')
 
     if args.cmd == "setup":
         setup = Setup(args.name)
@@ -46,13 +43,13 @@ def main():
         Inliner(args.name, args.codestream).check_inline(args.file, args.symbol)
 
     elif args.cmd == "get-patches":
-        GitHelper(args.name, args.filter).get_commits(args.cve)
+        GitHelper(args.filter).get_commits(args.cve, get_workdir(args.name))
 
     elif args.cmd == "scan":
-        GitHelper("bsc_check", "").scan(args.cve, args.conf, False)
+        GitHelper("").scan(args.cve, args.conf, False)
 
     elif args.cmd == "format-patches":
-        GitHelper(args.name, args.filter).format_patches(args.version)
+        GitHelper(args.filter).format_patches(args.name, args.version)
 
     elif args.cmd == "status":
         IBS(args.name, args.filter).status(args.wait)

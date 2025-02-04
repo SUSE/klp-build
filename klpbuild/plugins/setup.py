@@ -60,13 +60,15 @@ class Setup():
         if not self.lp_name.startswith("bsc"):
             raise ValueError("Please use prefix 'bsc' when creating a livepatch for codestreams")
 
-        ksrc = GitHelper(self.lp_name, data["lp_filter"])
+        ksrc = GitHelper(data["lp_filter"])
 
         # Called at this point because codestreams is populated
         # FIXME: we should check all configs, like when using --conf-mod-file-funcs
         commits, patched_cs, patched_kernels, codestreams = ksrc.scan(data["cve"],
                                                                       data["conf"],
-                                                                      data["no_check"])
+                                                                      data["no_check"],
+                                                                      utils.get_workdir(self.lp_name))
+
         # Add new codestreams to the already existing list, skipping duplicates
         old_patched_cs = get_codestreams_data('patched_cs')
         new_patched_cs = natsorted(list(set(old_patched_cs + patched_cs)))

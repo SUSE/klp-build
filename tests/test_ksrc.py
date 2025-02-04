@@ -14,5 +14,5 @@ def test_multiline_upstream_commit_subject():
 # This CVE is already covered on all codestreams
 def test_scan_all_cs_patched(caplog):
     with pytest.raises(SystemExit):
-        GitHelper("bsc_check", "").scan("2022-48801", "", False)
+        GitHelper("").scan("2022-48801", "", False)
     assert "All supported codestreams are already patched" not in caplog.text

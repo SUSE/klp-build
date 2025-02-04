@@ -109,7 +109,7 @@ class IBS():
         if arch != "x86_64" and "-extra" in rpm:
             return
 
-        path_dest = cs.get_data_dir(arch)
+        path_dest = get_datadir(arch)
         path_dest.mkdir(exist_ok=True, parents=True)
 
         rpm_file = Path(dest, rpm)
@@ -319,7 +319,7 @@ class IBS():
                 if arch not in cs.archs:
                     continue
 
-                rpm_dir = Path(cs.dir(), arch, "rpm")
+                rpm_dir = Path(cs.get_ccp_dir(self.lp_name), arch, "rpm")
                 if not rpm_dir.exists():
                     logging.info(f"{cs.name()}/{arch}: rpm dir not found. Skipping.")
                     continue
@@ -371,7 +371,7 @@ class IBS():
     def delete_rpms(self, cs):
         try:
             for arch in cs.archs:
-                shutil.rmtree(Path(cs.dir(), arch, "rpm"), ignore_errors=True)
+                shutil.rmtree(Path(cs.get_ccp_dir(self.lp_name), arch, "rpm"), ignore_errors=True)
         except KeyError:
             pass
 
@@ -404,7 +404,7 @@ class IBS():
                         continue
 
                     # Create a directory for each arch supported
-                    dest = Path(cs.dir(), str(arch), "rpm")
+                    dest = Path(cs.get_ccp_dir(self.lp_name), str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
                     rpms.append((i, cs, prj, "standard", arch, "klp", rpm, dest))
@@ -502,7 +502,7 @@ class IBS():
 
     def create_lp_package(self, i, cs):
         kgr_path = get_user_path('kgr_patches_dir')
-        branch = get_cs_branch(cs, cs.lp_name, kgr_path)
+        branch = get_cs_branch(cs, self.lp_name, kgr_path)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
@@ -527,11 +527,11 @@ class IBS():
             raise RuntimeError("") from e
 
         # Remove previously created directories
-        prj_path = Path(cs.dir(), "checkout")
+        prj_path = Path(cs.get_ccp_dir(self.lp_name), "checkout")
         if prj_path.exists():
             shutil.rmtree(prj_path)
 
-        code_path = Path(cs.dir(), "code")
+        code_path = Path(cs.get_ccp_dir(self.lp_name), "code")
         if code_path.exists():
             shutil.rmtree(code_path)
 
@@ -569,8 +569,8 @@ class IBS():
         # Otherwise only warn the caller about this fact.
         # This scenario can occur in case of LPing function that is already
         # part of different LP in which case we modify the existing one.
-        if cs.lp_name not in os.listdir(code_path):
-            logging.warning(f"Warning: Directory {cs.lp_name} not found on branch {branch}")
+        if self.lp_name not in os.listdir(code_path):
+            logging.warning(f"Warning: Directory {self.lp_name} not found on branch {branch}")
 
         # Fix RELEASE version
         with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
