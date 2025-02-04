@@ -6,6 +6,7 @@
 import argparse
 
 from klpbuild.klplib.utils import ARCHS
+from klpbuild.klplib.plugins import register_plugins_argparser
 
 def add_arg_lp_name(parentparser, mandatory=True):
     parentparser.add_argument(
@@ -32,6 +33,10 @@ def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=False)
     sub = parentparser.add_subparsers(dest="cmd")
 
+    register_plugins_argparser(sub)
+
+    # NOTE: all the code below should be gone when all the module will be
+    # converted into plugins
     setup = sub.add_parser("setup")
     add_arg_lp_name(setup)
     add_arg_lp_filter(setup)
@@ -140,13 +145,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--cve", required=True, help="SLE specific. CVE number to search for related backported patches"
     )
 
-    scan = sub.add_parser("scan")
-    scan.add_argument(
-        "--cve", required=True, help="SLE specific. Shows which codestreams are vulnerable to the CVE"
-    )
-    scan.add_argument(
-        "--conf", required=False, help="SLE specific. Helps to check only the codestreams that have this config set."
-    )
 
     cleanup =sub.add_parser("cleanup", help="SLE specific. Remove livepatch packages from IBS")
     add_arg_lp_name(cleanup)

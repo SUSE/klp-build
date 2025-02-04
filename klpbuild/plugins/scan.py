@@ -11,11 +11,27 @@ from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.ksrc import GitHelper
 
+PLUGIN_CMD = "scan"
+
+def register_argparser(subparser):
+    scan = subparser.add_parser(PLUGIN_CMD)
+    scan.add_argument(
+        "--cve",
+        required=True,
+        help="SLE specific. Shows which codestreams are vulnerable to the CVE"
+    )
+    scan.add_argument(
+        "--conf",
+        required=False,
+        help="SLE specific. Helps to check only the codestreams that have this config set."
+    )
+
 
 def run(cve, conf, lp_filter, no_check):
     no_check = False
 
     return scan(cve, conf, no_check, lp_filter)
+
 
 def scan(cve, conf, no_check, lp_filter, savedir=None):
     gh = GitHelper(lp_filter)
