@@ -269,7 +269,7 @@ class GitHelper():
 
                     # Skip commits that change one single line. Most likely just a
                     # reference update.
-                    if stats.split()[0] is "1":
+                    if stats.split()[0] == "1":
                         continue
 
                     # Sometimes we can have a commit that touches two files. In
