@@ -19,7 +19,7 @@ def create_parser() -> argparse.ArgumentParser:
         help="The livepatch name. This will be the directory name of the "
         "resulting livepatches.",
     )
-    parentparser.add_argument("--filter", type=str, required='log' in sys.argv,
+    parentparser.add_argument("--filter", type=str, required='log' in sys.argv, dest="lp_filter",
                               help=r"Filter out codestreams using a regex. Example: 15\.3u[0-9]+")
 
     parser = argparse.ArgumentParser(add_help=False)
