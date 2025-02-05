@@ -5,6 +5,7 @@
 
 import concurrent.futures
 import errno
+import importlib
 import logging
 import os
 import re
@@ -14,7 +15,6 @@ import sys
 import time
 from operator import itemgetter
 from pathlib import Path
-import pkg_resources
 
 import requests
 from lxml import etree
@@ -295,7 +295,7 @@ class IBS():
         self.download()
 
         test_src = get_tests_path(self.lp_name)
-        run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
+        run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
 
         logging.info(f"Validating the downloaded RPMs...")
 
