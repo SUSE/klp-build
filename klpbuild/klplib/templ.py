@@ -27,10 +27,6 @@ void ${ fname }_cleanup(void);
 static inline void ${ fname }_cleanup(void) {}
 % endif %
 
-% for p in proto_files:
-<%include file="${ p }"/>
-% endfor
-
 % if check_enabled:
 #else /* !IS_ENABLED(${ config }) */
 % endif
@@ -417,7 +413,6 @@ class TemplateGen():
         out_name = f"livepatch_{self.lp_name}.h"
 
         lp_inc_dir = Path()
-        proto_files = []
         configs = set()
         config = ""
         mod = ""
@@ -428,11 +423,6 @@ class TemplateGen():
             # or not, so we can overwrite the module.
             mod = data["module"]
 
-        # Only add the inc_dir if CE is used, since it's the only backend that
-        # produces the proto.h headers
-        if len(proto_files) > 0:
-            lp_inc_dir = cs.get_ccp_dir(self.lp_name)
-
         # Only populate the config check in the header if the livepatch is
         # patching code under only one config. Otherwise let the developer to
         # fill it.
@@ -442,7 +432,6 @@ class TemplateGen():
         render_vars = {
             "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
             "check_enabled": self.check_enabled,
-            "proto_files": proto_files,
             "config": config,
             "mod": mod,
         }
