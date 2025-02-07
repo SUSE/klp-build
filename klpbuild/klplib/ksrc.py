@@ -160,6 +160,25 @@ class GitHelper():
 
         return diff.returncode
 
+    def get_commit_files(self, commit, regex=None):
+        """
+        Get the files that have been modified in one specific commit.
+        Optionally only get those that match the given regular expression.
+
+        Args:
+            commit (str): The commit to be anylized.
+            regex (str): Optional regex.
+
+        returns:
+            List: Return the files that match the regex, if set. Otherwise,
+            return all the files.
+        """
+
+        ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src,
+                                       "diff-tree", "--no-commit-id", "--name-only",
+                                       commit, "-r"]).decode()
+
+        return re.findall(regex, ret) if regex else ret.splitlines()
 
     def get_commits(self, cve, savedir=None):
         if not self.kern_src:
@@ -384,15 +403,29 @@ class GitHelper():
         ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "log",
                                        f"--grep=CVE-{cve}",
                                        f"--tags=*rpm-{kernel}",
-                                       "--pretty=oneline"])
+                                       "--format='%at-%H-%f'"]).decode().splitlines()
+        # Sort by date
+        ret.sort(reverse=True)
 
-        for line in ret.decode().splitlines():
+        for line in ret:
             # Skip the Update commits, that only change the References tag
             if "Update" in line and "patches.suse" in line:
                 continue
 
             # Parse commit's hash
-            commits.append(line.split()[0])
+            c = line.split("-")[1]
+
+            files = self.get_commit_files(c, r"patches\.suse\/.+\.patch")
+            if len(files) == 0:
+                continue
+
+            # Match 1:1 with the commits found in SLE branch
+            for s in suse_commits:
+                diff = self.diff_commits(s, c, files)
+                if not diff:
+                    # Found same commit
+                    commits.append(c)
+                    break
 
         # "patched kernels" are those which contain all commits.
         return len(suse_commits) == len(commits), commits
