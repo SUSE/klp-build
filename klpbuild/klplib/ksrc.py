@@ -133,6 +133,34 @@ class GitHelper():
                                 list(self.kernel_branches.values()))
 
 
+    def diff_commits(self, base, new, patch):
+        """
+        Check if there's any difference between the two given commits.
+
+        Args:
+            base (str): Commit to use as base in the diff.
+            new (str): Commit to compare with the base.
+            patch (list): Target files in the diff.
+
+        returns:
+            Boolean: True if both commits differ. False otherwise.
+        """
+
+        if base == "":
+            return True
+
+        # Compare lines starting with '+' or '-'.
+        # This should be enough to ignore sneaky metadata updates on
+        # the file and duplicated commits.
+        diff = subprocess.run(["/usr/bin/git", "-C", str(self.kern_src), "diff",
+                               "--numstat", r"-G'^\+|^-'", base, new,
+                               "--", str(patch)],
+                              stdout = subprocess.DEVNULL,
+                              stderr = subprocess.DEVNULL)
+
+        return diff.returncode
+
+
     def get_commits(self, cve, savedir=None):
         if not self.kern_src:
             logging.info("kernel_src_dir not found, skip getting SUSE commits")
@@ -243,6 +271,7 @@ class GitHelper():
                             self.kern_src,
                             "log",
                             "--numstat",
+                            "--reverse",
                             "--no-merges",
                             "--pretty=oneline",
                             f"remotes/origin/{mbranch}",
@@ -260,6 +289,7 @@ class GitHelper():
                     continue
 
                 iphashes = iter(phashes.splitlines())
+                base = ""
                 for hash_entry in iphashes:
                     stats = next(iphashes)
 
@@ -272,13 +302,22 @@ class GitHelper():
                     if stats.split()[0] == "1":
                         continue
 
+                    hash_commit = hash_entry.split(" ")[0]
+
                     # Sometimes we can have a commit that touches two files. In
                     # these cases we can have duplicated hash commits, since git
                     # history for each individual file will show the same hash.
                     # Skip if the same hash already exists.
-                    hash_commit = hash_entry.split(" ")[0]
-                    if hash_commit not in commits[bc]["commits"]:
-                        commits[bc]["commits"].append(hash_commit)
+                    if hash_commit in commits[bc]["commits"]:
+                        continue
+
+                    diff = self.diff_commits(base, hash_commit, patch)
+                    # Skip commit if the file's content is the same as the previous one.
+                    if not diff:
+                        continue
+
+                    base = hash_commit
+                    commits[bc]["commits"].append(hash_commit)
 
         # Grab each commits subject and date for each commit. The commit dates
         # will be used to sort the patches in the order they were
