@@ -38,6 +38,15 @@ def test_templ_with_externalized_vars():
     # klp_funcs should be present
     assert "klp_funcs" in content
 
+    # With external symbols but only from vmlinux, so we have _init don't we don't need an _exit
+    # Also, as it's enabled on all ARCHs we don't need the ENABLED checks
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" in header
+    assert "_init(void) { return 0; }" not in header
+    assert "_cleanup(void);" not in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" not in header
+
 
 def test_templ_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
@@ -67,6 +76,14 @@ def test_templ_without_externalized_vars():
 
     # Without CVE speficied, we should have XXXX-XXXX
     assert "CVE-XXXX-XXXX" in content
+
+    # Without external symbols we don't need to implement the _init/_exit functions
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" not in header
+    assert "_init(void) { return 0; }" in header
+    assert "_cleanup(void);" not in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" not in header
 
 
 # For multifile patches, a third file will be generated and called
@@ -112,12 +129,21 @@ def test_templ_cve_specified():
     codestreams = lp_setup.setup_codestreams(
         {"cve": "1234-5678", "lp_filter": cs, "conf": "CONFIG_PROC_FS", "no_check": True})
 
-    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+    lp_setup.setup_project_files(codestreams, ffuncs, [utils.ARCH])
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
     # With CVE speficied, we should have it in the final file
     assert "CVE-1234-5678" in get_file_content(lp, cs)
+
+    # This livepatch targets only the running platform, so the IS_ENABLED needs to be there
+    # And with it, both prototypes and empty functions needs to be there. The _cleanup is a
+    # prototype of the IS_ENABLED path is only a prototype because the symbol is from vmlinux
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" in header
+    assert "_init(void) { return 0; }" in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" in header
 
 
 def test_templ_exts_mod_name():
@@ -142,10 +168,22 @@ def test_templ_exts_mod_name():
     # The module name should be nvme_core instead of nvme-core
     assert '{ "nvme_should_fail", (void *)&klpe_nvme_should_fail, "nvme_core" },' in get_file_content(lp, cs)
 
+    # With external symbols from a module we expect both _init/_cleanup to be prototypes, since
+    # the livepatch lookup will have a notifier for the module, and the notifier needs to be removed on
+    # _cleanup path.
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" in header
+    assert "_init(void) { return 0; }" not in header
+    assert "_cleanup(void);" in header
+    assert "_cleanup(void) {}" not in header
+    # IS_ENABLED should not be present because the LP is targetted to all codestreams.
+    assert "IS_ENABLED" not in header
+
 
 def test_templ_micro_is_ibt():
     """
     SLE Micro is based on kernel 6.4, make sure it uses IBT.
+    For IBT we don't need to use kallsyms, so the _init and _cleanup should be empty;
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "6.0u2"
@@ -162,6 +200,13 @@ def test_templ_micro_is_ibt():
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
     assert 'KLP_RELOC_SYMBOL' in get_file_content(lp, cs)
+
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" not in header
+    assert "_init(void) { return 0; }" in header
+    assert "_cleanup(void);" not in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" not in header
 
 
 def test_templ_kbuild_has_contents():
