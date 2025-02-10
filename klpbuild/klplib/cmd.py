@@ -4,28 +4,42 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import argparse
-import sys
 
 from klpbuild.klplib.utils import ARCHS
+from klpbuild.klplib.plugins import register_plugins_argparser
 
-
-def create_parser() -> argparse.ArgumentParser:
-    parentparser = argparse.ArgumentParser(add_help=False)
+def add_arg_lp_name(parentparser, mandatory=True):
     parentparser.add_argument(
         "-n",
         "--name",
         type=str,
-        required=True,
+        required=mandatory,
         help="The livepatch name. This will be the directory name of the "
         "resulting livepatches.",
     )
-    parentparser.add_argument("--filter", type=str, required='log' in sys.argv,
-                              help=r"Filter out codestreams using a regex. Example: 15\.3u[0-9]+")
 
-    parser = argparse.ArgumentParser(add_help=False)
-    sub = parser.add_subparsers(dest="cmd")
 
-    setup = sub.add_parser("setup", parents=[parentparser])
+def add_arg_lp_filter(parentparser, mandatory=False):
+    parentparser.add_argument(
+        "--filter",
+        type=str,
+        required=mandatory,
+        dest="lp_filter",
+        help=r"Filter out codestreams using a regex. Example: 15\.3u[0-9]+"
+    )
+
+
+def create_parser() -> argparse.ArgumentParser:
+    parentparser = argparse.ArgumentParser(add_help=False)
+    sub = parentparser.add_subparsers(dest="cmd")
+
+    register_plugins_argparser(sub)
+
+    # NOTE: all the code below should be gone when all the module will be
+    # converted into plugins
+    setup = sub.add_parser("setup")
+    add_arg_lp_name(setup)
+    add_arg_lp_filter(setup)
     setup.add_argument("--cve", type=str, help="SLE specific. The CVE assigned to this livepatch")
     setup.add_argument("--conf", type=str, required=True, help="The kernel CONFIG used to be build the livepatch")
     setup.add_argument(
@@ -74,7 +88,9 @@ def create_parser() -> argparse.ArgumentParser:
         help="SLE specific. Supported architectures for this livepatch",
     )
 
-    check_inline = sub.add_parser("check-inline", parents=[parentparser])
+    check_inline = sub.add_parser("check-inline")
+    add_arg_lp_name(check_inline)
+    add_arg_lp_filter(check_inline)
     check_inline.add_argument(
         "--codestream",
         type=str,
@@ -95,7 +111,9 @@ def create_parser() -> argparse.ArgumentParser:
         help="Symbol to be found",
     )
 
-    extract_opts = sub.add_parser("extract", parents=[parentparser])
+    extract_opts = sub.add_parser("extract")
+    add_arg_lp_name(extract_opts)
+    add_arg_lp_filter(extract_opts)
     extract_opts.add_argument(
         "--avoid-ext",
         nargs="+",
@@ -108,43 +126,52 @@ def create_parser() -> argparse.ArgumentParser:
     extract_opts.add_argument(
         "--apply-patches", action="store_true", help="Apply patches found by get-patches subcommand, if they exist"
     )
-    diff_opts = sub.add_parser("cs-diff", parents=[parentparser])
+
+    diff_opts = sub.add_parser("cs-diff")
+    add_arg_lp_name(diff_opts)
+    add_arg_lp_filter(diff_opts)
 
     fmt = sub.add_parser(
-        "format-patches", parents=[parentparser], help="SLE specific. Extract patches from kgraft-patches"
+        "format-patches", help="SLE specific. Extract patches from kgraft-patches"
     )
+    add_arg_lp_name(fmt)
+    add_arg_lp_filter(fmt)
     fmt.add_argument("-v", "--version", type=int, required=True, help="Version to be added, like vX")
 
-    patches = sub.add_parser("get-patches", parents=[parentparser])
+    patches = sub.add_parser("get-patches")
+    add_arg_lp_name(patches)
+    add_arg_lp_filter(patches)
     patches.add_argument(
         "--cve", required=True, help="SLE specific. CVE number to search for related backported patches"
     )
 
-    scan = sub.add_parser("scan")
-    scan.add_argument(
-        "--cve", required=True, help="SLE specific. Shows which codestreams are vulnerable to the CVE"
-    )
-    scan.add_argument(
-        "--conf", required=False, help="SLE specific. Helps to check only the codestreams that have this config set."
-    )
 
-    sub.add_parser("cleanup", parents=[parentparser], help="SLE specific. Remove livepatch packages from IBS")
+    cleanup =sub.add_parser("cleanup", help="SLE specific. Remove livepatch packages from IBS")
+    add_arg_lp_name(cleanup)
+    add_arg_lp_filter(cleanup)
 
-    sub.add_parser(
+    test = sub.add_parser(
         "prepare-tests",
-        parents=[parentparser],
         help="SLE specific. Download the built tests and check for LP dependencies",
     )
+    add_arg_lp_name(test)
+    add_arg_lp_filter(test)
 
     push = sub.add_parser(
-        "push", parents=[parentparser], help="SLE specific. Push livepatch packages to IBS to be built"
+        "push", help="SLE specific. Push livepatch packages to IBS to be built"
     )
+    add_arg_lp_name(push)
+    add_arg_lp_filter(push)
     push.add_argument("--wait", action="store_true", help="Wait until all codestreams builds are finished")
 
-    status = sub.add_parser("status", parents=[parentparser], help="SLE specific. Check livepatch build status on IBS")
+    status = sub.add_parser("status", help="SLE specific. Check livepatch build status on IBS")
+    add_arg_lp_name(status)
+    add_arg_lp_filter(status)
     status.add_argument("--wait", action="store_true", help="Wait until all codestreams builds are finished")
 
-    log = sub.add_parser("log", parents=[parentparser], help="SLE specific. Get build log from IBS")
+    log = sub.add_parser("log", help="SLE specific. Get build log from IBS")
+    add_arg_lp_name(log)
+    add_arg_lp_filter(log, mandatory=True)
     log.add_argument("--arch", type=str, default="x86_64", choices=ARCHS, help="Build architecture")
 
-    return parser
+    return parentparser
