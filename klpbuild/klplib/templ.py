@@ -12,36 +12,48 @@ from mako.template import Template
 from klpbuild.klplib.codestreams_data import get_codestreams_data
 from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir
 
+
+TEMPL_NO_SYMS_H = """\
+#ifndef _${ fname.upper() }_H
+#define _${ fname.upper() }_H
+
+static inline int ${ fname }_init(void) { return 0; }
+static inline void ${ fname }_cleanup(void) {}
+
+#endif /* _${ fname.upper() }_H */
+"""
+
+
 TEMPL_H = """\
 #ifndef _${ fname.upper() }_H
 #define _${ fname.upper() }_H
 
 % if check_enabled:
 #if IS_ENABLED(${ config })
-% endif
 
 int ${ fname }_init(void);
-% if mod:
+% if has_cleanup:
 void ${ fname }_cleanup(void);
 % else:
 static inline void ${ fname }_cleanup(void) {}
 % endif %
 
-% for p in proto_files:
-<%include file="${ p }"/>
-% endfor
-
-% if check_enabled:
 #else /* !IS_ENABLED(${ config }) */
-% endif
 
 static inline int ${ fname }_init(void) { return 0; }
 static inline void ${ fname }_cleanup(void) {}
 
-% if check_enabled:
 #endif /* IS_ENABLED(${ config }) */
+
+% else:
+int ${ fname }_init(void);
+% if has_cleanup:
+void ${ fname }_cleanup(void);
+% else:
+static inline void ${ fname }_cleanup(void) {}
 % endif
 
+% endif
 #endif /* _${ fname.upper() }_H */
 """
 
@@ -417,21 +429,21 @@ class TemplateGen():
         out_name = f"livepatch_{self.lp_name}.h"
 
         lp_inc_dir = Path()
-        proto_files = []
         configs = set()
         config = ""
         mod = ""
+        has_ext = False
+        has_cleanup = False
 
         for f, data in cs.files.items():
             configs.add(data["conf"])
-            # At this point we only care to know if we are livepatching a module
-            # or not, so we can overwrite the module.
-            mod = data["module"]
+            # If we have external symbols we need an init function to load them. If the module
+            # isn't vmlinux then we also need an _exit function
+            if data["ext_symbols"]:
+                has_ext = True
 
-        # Only add the inc_dir if CE is used, since it's the only backend that
-        # produces the proto.h headers
-        if len(proto_files) > 0:
-            lp_inc_dir = cs.get_ccp_dir(self.lp_name)
+                if data["module"] != "vmlinux":
+                    has_cleanup = True
 
         # Only populate the config check in the header if the livepatch is
         # patching code under only one config. Otherwise let the developer to
@@ -442,14 +454,18 @@ class TemplateGen():
         render_vars = {
             "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
             "check_enabled": self.check_enabled,
-            "proto_files": proto_files,
             "config": config,
-            "mod": mod,
+            "has_cleanup": has_cleanup,
         }
+
+        header_templ = TEMPL_H
+        # If we don't have any external symbols then we don't need the empty _init/_exit functions
+        if cs.needs_ibt or not has_ext:
+            header_templ = TEMPL_NO_SYMS_H
 
         with open(Path(lp_path, out_name), "w") as f:
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
-            f.write(Template(TEMPL_H, lookup=lpdir).render(**render_vars))
+            f.write(Template(header_templ, lookup=lpdir).render(**render_vars))
 
     def __generate_lp_file(self, lp_path, cs, src_file, use_src_name=False):
         if src_file:
