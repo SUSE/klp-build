@@ -6,7 +6,6 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
     name="klp-build",
-    version="0.0.2",
     author="Marcos Paulo de Souza",
     author_email="mpdesouza@suse.com",
     description="The kernel livepatching creation tool",
@@ -36,5 +35,11 @@ setuptools.setup(
         "filelock",
         "pyelftools",
         "zstandard"
+    ],
+    setuptools_git_versioning={
+        "enabled": True,
+    },
+    setup_requires=[
+        "setuptools-git-versioning>=2.0,<3"
     ],
 )
