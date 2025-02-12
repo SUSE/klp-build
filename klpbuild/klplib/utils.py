@@ -16,7 +16,7 @@ import zstandard
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
-from pathlib import Path, PurePath
+from pathlib import PurePath
 
 from natsort import natsorted
 
@@ -204,8 +204,8 @@ def get_cs_branch(cs, lp_name, git_dir):
     return branch_name
 
 
-def check_module_unsupported(mod_path):
-    elffile = get_elf_object(mod_path)
+def check_module_unsupported(arch, mod_path):
+    elffile = get_elf_object(get_datadir(arch)/mod_path)
     return "no" == get_elf_modinfo_entry(elffile, "supported")
 
 

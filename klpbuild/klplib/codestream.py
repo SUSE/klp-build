@@ -271,7 +271,8 @@ class Codestream:
 
     # Return only the name of the module to be livepatched
     def find_obj_path(self, arch, mod):
-        # Return the path is the modules was previously found
+        # Return the path if the modules was previously found for ARCH, or refetch if
+        # the obejct is for a different architecture
         obj = self.modules.get(mod, "")
         if obj:
             assert self.kernel in str(obj)
@@ -279,7 +280,7 @@ class Codestream:
 
         # We already know the path to vmlinux, so return it
         if not is_mod(mod):
-            return self.get_boot_file("vmlinux", arch)
+            return self.get_boot_file("vmlinux", arch).relative_to(get_datadir(arch))
 
         # Module name use underscores, but the final module object uses hyphens.
         mod = mod.replace("_", "[-_]")
@@ -298,7 +299,7 @@ class Codestream:
             if Path(mod_path, obj).exists():
                 break
 
-        return Path(mod_path, obj)
+        return Path(mod_path, obj).relative_to(get_datadir(arch))
 
 
     def lp_out_file(self, lp_name, fname):
@@ -316,7 +317,7 @@ class Codestream:
         cache[arch].setdefault(name, {})
 
         if not cache[arch][name].get(mod, ""):
-            obj = self.find_obj_path(arch, mod)
+            obj = get_datadir(arch)/self.find_obj_path(arch, mod)
             cache[arch][name][mod] = get_all_symbols_from_object(obj, True)
 
         ret = []

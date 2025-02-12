@@ -115,7 +115,7 @@ class Setup():
                 mod_path = cs.find_obj_path(utils.ARCH, mod)
 
                 # Validate if the module being livepatched is supported or not
-                if utils.check_module_unsupported(mod_path):
+                if utils.check_module_unsupported(utils.ARCH, mod_path):
                     logging.warning("%s (%s}): Module %s is not supported by SLE", cs.name(), cs.kernel, mod)
 
                 cs.modules[mod] = str(mod_path)
