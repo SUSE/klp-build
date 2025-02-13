@@ -7,7 +7,7 @@ import shutil
 import subprocess
 
 from klpbuild.klplib.codestreams_data import get_codestreams_dict
-from klpbuild.klplib.utils import filter_codestreams, get_workdir
+from klpbuild.klplib.utils import filter_codestreams, get_datadir, get_workdir, ARCH
 
 
 class Inliner():
@@ -36,7 +36,7 @@ class Inliner():
         if not mod:
             raise RuntimeError(f"File {fname} not in setup phase. Aborting.")
 
-        ce_args.extend(["-debuginfo", str(cs.get_mod(mod))])
+        ce_args.extend(["-debuginfo", str(get_datadir(ARCH)/cs.get_mod(mod))])
 
         # clang-extract works without ipa-clones, so don't hard require it
         ipa_f = cs.get_ipa_file(fname)
