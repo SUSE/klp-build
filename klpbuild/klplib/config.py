@@ -152,7 +152,7 @@ def __load_user_conf():
         logging.warning("Warning: user configuration file not found")
         __setup_user_env(Path.home()/"klp")
 
-    logging.info("Loading user configuration from '%s'", user_conf_file)
+    logging.debug("Loading user configuration from '%s'", user_conf_file)
     _config.read(user_conf_file)
 
     # Check mandatory fields
