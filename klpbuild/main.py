@@ -28,7 +28,12 @@ def main():
     try:
         try_run_plugin(args.cmd, args)
         return
-    except (AssertionError, ModuleNotFoundError):
+    except (AssertionError, ModuleNotFoundError) as e:
+        # TODO: this should be removed as soon as all the modules are converted
+        # into plugins
+        if isinstance(e, AssertionError) and not "is not a plugin!" in str(e):
+                raise
+
         logging.debug("Plugin %s cannot be loaded dinamically!", args.cmd)
 
     # NOTE: all the code below should be gone when all the modules will be
