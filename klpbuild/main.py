@@ -20,7 +20,8 @@ from klpbuild.plugins.setup import Setup
 def main():
     args = create_parser().parse_args(sys.argv[1:])
 
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=logging_level, format="%(message)s")
 
     if hasattr(args, 'name'):
         load_codestreams(args.name)

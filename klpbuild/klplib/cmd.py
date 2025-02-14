@@ -33,6 +33,13 @@ def create_parser() -> argparse.ArgumentParser:
     parentparser = argparse.ArgumentParser(add_help=True)
     sub = parentparser.add_subparsers(dest="cmd")
 
+    parentparser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Produce more verbose output"
+    )
+
     register_plugins_argparser(sub)
 
     # NOTE: all the code below should be gone when all the module will be
