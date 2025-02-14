@@ -30,7 +30,7 @@ def add_arg_lp_filter(parentparser, mandatory=False):
 
 
 def create_parser() -> argparse.ArgumentParser:
-    parentparser = argparse.ArgumentParser(add_help=False)
+    parentparser = argparse.ArgumentParser(add_help=True)
     sub = parentparser.add_subparsers(dest="cmd")
 
     register_plugins_argparser(sub)
