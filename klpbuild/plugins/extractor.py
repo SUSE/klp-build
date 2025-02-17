@@ -695,7 +695,7 @@ class Extractor():
         # same code
         groups = []
         for cs_list in cs_equal:
-            groups.append(" ".join(utils.classify_codestreams(cs_list)))
+            groups.append(utils.classify_codestreams_str(cs_list))
 
         # Sort between all groups of codestreams
         groups = natsorted(groups)

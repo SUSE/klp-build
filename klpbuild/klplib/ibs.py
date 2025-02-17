@@ -26,7 +26,7 @@ from osctiny import Osc
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
 from klpbuild.klplib.config import get_user_path, get_user_settings
-from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path, classify_codestreams
+from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path, classify_codestreams_str
 
 
 class IBS():
@@ -616,8 +616,8 @@ class IBS():
             logging.error(f"push: No codestreams found for {self.lp_name}")
             sys.exit(1)
 
-        cs_ = classify_codestreams(cs_list)
-        logging.info("Pushing %d codestreams: %s", len(cs_list), " ".join(cs_))
+        logging.info("Pushing %d codestreams: %s", len(cs_list),
+                     classify_codestreams_str(cs_list))
 
         self.total = len(cs_list)
         i = 1
