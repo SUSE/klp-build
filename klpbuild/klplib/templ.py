@@ -193,6 +193,8 @@ TEMPL_PATCH_VMLINUX = """\
 
 % if ext_vars:
 % if ibt:
+#include <linux/livepatch.h>
+
 ${get_exts("vmlinux", ext_vars)}
 % else: # ibt
 #include <linux/kernel.h>
@@ -234,6 +236,8 @@ TEMPL_PATCH_MODULE = """\
 
 % if ext_vars:
 % if ibt:
+#include <linux/livepatch.h>
+
 ${get_exts(mod, ext_vars)}
 % else: # ibt
 #include <linux/kernel.h>

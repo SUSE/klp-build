@@ -83,6 +83,10 @@ def classify_codestreams(cs_list):
     return natsorted(ret_list)
 
 
+def classify_codestreams_str(cs_list):
+    return " ".join(classify_codestreams(cs_list))
+
+
 def is_mod(mod):
     return mod != "vmlinux"
 
@@ -232,8 +236,7 @@ def filter_codestreams(lp_filter, cs_list, verbose=False):
     if verbose:
         if filtered:
             logging.info("Skipping codestreams:")
-            clist = " ".join(classify_codestreams(filtered))
-            logging.info("\t%s", clist)
+            logging.info("\t%s", classify_codestreams_str(filtered))
 
     return result
 

@@ -98,19 +98,16 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
                 conf_not_set.append(cs)
 
     if conf_not_set:
-        cs_list = utils.classify_codestreams(conf_not_set)
         logging.info("Skipping codestreams without %s set:", conf)
-        logging.info("\t%s", " ".join(cs_list))
+        logging.info("\t%s", utils.classify_codestreams_str(conf_not_set))
 
     if patched_cs:
-        cs_list = utils.classify_codestreams(patched_cs)
         logging.info("Skipping already patched codestreams:")
-        logging.info("\t%s", " ".join(cs_list))
+        logging.info("\t%s", utils.classify_codestreams_str(patched_cs))
 
     if unaffected_cs:
-        cs_list = utils.classify_codestreams(unaffected_cs)
         logging.info("Skipping unaffected codestreams (missing backports):")
-        logging.info("\t%s", " " .join(cs_list))
+        logging.info("\t%s", utils.classify_codestreams_str(unaffected_cs))
 
     # working_cs will contain the final dict of codestreams that wast set
     # by the user, avoid downloading missing codestreams that are not affected
@@ -121,7 +118,6 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
         sys.exit(0)
 
     logging.info("All affected codestreams:")
-    cs_list = utils.classify_codestreams(working_cs)
-    logging.info("\t%s", " ".join(cs_list))
+    logging.info("\t%s", utils.classify_codestreams_str(working_cs))
 
     return commits, patched_cs, patched_kernels, working_cs

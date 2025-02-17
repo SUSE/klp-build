@@ -30,8 +30,9 @@ def test_templ_with_externalized_vars():
     # LP_MODULE, linux/module.h is not included
     # As the code is using the default archs, which is all of them, the
     # IS_ENABLED macro shouldn't exist
+    # the include of livepatch.h should not be present because 15.5 doesn't use IBT
     content = get_file_content(lp, cs)
-    for check in ["LP_MODULE", "module_notify", "linux/module.h", "#if IS_ENABLED"]:
+    for check in ["LP_MODULE", "module_notify", "linux/module.h", "#if IS_ENABLED", "linux/livepatch.h"]:
         assert check not in content
 
     # For this file and symbol, there is one symbol to be looked up, so
@@ -67,8 +68,9 @@ def test_templ_without_externalized_vars():
     # LP_MODULE, linux/module.h is not included
     # For this file and symbol, no externalized symbols are used, so
     # klp_funcs shouldn't be preset.
+    # the include of livepatch.h should not be present because 15.5 doesn't use IBT
     content = get_file_content(lp, cs)
-    for check in ["LP_MODULE", "module_notify", "linux/module.h", "klp_funcs"]:
+    for check in ["LP_MODULE", "module_notify", "linux/module.h", "klp_funcs", "linux/livepatch.h>"]:
         assert check not in content
 
     # As the config only targets one arch, IS_ENABLED should be set
@@ -199,8 +201,50 @@ def test_templ_micro_is_ibt():
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
-    assert 'KLP_RELOC_SYMBOL' in get_file_content(lp, cs)
+    src = get_file_content(lp, cs)
+    # Requires the include since it's a codestream that uses IBT and has externalized symbols
+    assert 'include <linux/livepatch.h>' in src
+    assert 'KLP_RELOC_SYMBOL' in src
 
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" not in header
+    assert "_init(void) { return 0; }" in header
+    assert "_cleanup(void);" not in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" not in header
+
+
+def test_templ_ibt_without_externalized_vars():
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "6.0u2"
+
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_IPV6", "vmlinux", [
+                                  ["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]], [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_IPV6", "no_check": False})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+
+    # As we passed vmlinux as module, we don't have the module notifier and
+    # LP_MODULE, linux/module.h is not included
+    # For this file and symbol, no externalized symbols are used, so
+    # klp_funcs shouldn't be preset.
+    # the include of livepatch.h should not be present because there are no externalized variables
+    content = get_file_content(lp, cs)
+    for check in ["LP_MODULE", "module_notify", "linux/module.h", "klp_funcs", "linux/livepatch.h>"]:
+        assert check not in content
+
+    # As the config only targets one arch, IS_ENABLED should be set
+    assert "#if IS_ENABLED" not in content
+
+    # Without CVE speficied, we should have XXXX-XXXX
+    assert "CVE-XXXX-XXXX" in content
+
+    # Without external symbols we don't need to implement the _init/_exit functions
     header = get_file_content(lp, cs, f"livepatch_{lp}.h")
     assert "_init(void);" not in header
     assert "_init(void) { return 0; }" in header
