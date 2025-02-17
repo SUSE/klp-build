@@ -34,7 +34,8 @@ setuptools.setup(
         "requests",
         "filelock",
         "pyelftools",
-        "zstandard"
+        "zstandard",
+        "python-bugzilla"
     ],
     setuptools_git_versioning={
         "enabled": True,

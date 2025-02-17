@@ -124,7 +124,8 @@ def __setup_user_env(basedir):
                        '#kgr_patches_tests_dir': 'kgraft-patches_testscripts/',
                        '#kernel_src_dir': 'kernel-src/'}
 
-    config['Settings'] = {'workers': 4}
+    config['Settings'] = {'workers': 4,
+                          'bugzilla_api_key': 'changeit'}
 
     logging.info("Creating default user configuration: '%s'", user_conf_file)
     os.makedirs(os.path.dirname(user_conf_file), exist_ok=True)
