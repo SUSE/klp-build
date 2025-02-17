@@ -23,7 +23,7 @@ from natsort import natsorted
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
 from klpbuild.klplib.config import get_user_settings
-from klpbuild.klplib.templ import TemplateGen
+from klpbuild.klplib.templ import TemplateGen, generate_commit_msg_file
 
 
 class Extractor():
@@ -534,7 +534,7 @@ class Extractor():
 
         self.group_equal_files(working_cs)
 
-        tem.generate_commit_msg_file()
+        generate_commit_msg_file(self.lp_name)
 
         logging.info("Checking the externalized symbols in other architectures...")
 

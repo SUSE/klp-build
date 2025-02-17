@@ -565,21 +565,22 @@ class TemplateGen():
         with open(Path(cs.get_lp_dir(self.lp_name), "Kbuild.inc"), "w") as f:
             f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
-    def generate_commit_msg_file(self):
-        cmts = get_codestreams_data('commits').get("upstream", {})
-        if cmts:
-            cmts = cmts["commits"]
-        cve = get_codestreams_data('cve')
-        if not cve:
-            cve = "XXXX-XXXX"
-        user, email = get_mail()
-        render_vars = {
-            "lp_name": self.lp_name.replace("bsc", ""),
-            "user": user,
-            "email": email,
-            "cve": cve,
-            "commits": cmts,
-            "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
-        }
-        with open(get_workdir(self.lp_name)/"commit.msg", "w") as f:
-            f.write(Template(TEMPL_COMMIT).render(**render_vars))
+
+def generate_commit_msg_file(lp_name):
+    cmts = get_codestreams_data('commits').get("upstream", {})
+    if cmts:
+        cmts = cmts["commits"]
+    cve = get_codestreams_data('cve')
+    if not cve:
+        cve = "XXXX-XXXX"
+    user, email = get_mail()
+    render_vars = {
+        "lp_name": lp_name.replace("bsc", ""),
+        "user": user,
+        "email": email,
+        "cve": cve,
+        "commits": cmts,
+        "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
+    }
+    with open(get_workdir(lp_name)/"commit.msg", "w") as f:
+        f.write(Template(TEMPL_COMMIT).render(**render_vars))
