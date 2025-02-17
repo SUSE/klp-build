@@ -11,8 +11,10 @@ from natsort import natsorted
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestreams_data import get_codestreams_data, set_codestreams_data, store_codestreams
 from klpbuild.klplib.ksrc import GitHelper
+from klpbuild.klplib.templ import generate_commit_msg_file
 
 from klpbuild.plugins.scan import scan
+
 
 class Setup():
     def __init__(
@@ -84,6 +86,8 @@ class Setup():
 
         logging.info("Affected architectures:")
         logging.info("\t%s", ' '.join(archs))
+
+        generate_commit_msg_file(self.lp_name)
 
         logging.info("Checking files, symbols, modules...")
         # Setup the missing codestream info needed
