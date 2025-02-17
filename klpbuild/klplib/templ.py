@@ -9,8 +9,9 @@ from pathlib import Path
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
+from klpbuild.klplib.bugzilla import get_bug_title
 from klpbuild.klplib.codestreams_data import get_codestreams_data
-from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir
+from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir, get_lp_number
 
 
 TEMPL_NO_SYMS_H = """\
@@ -359,7 +360,7 @@ void ${ fname }_cleanup(void)
 """
 
 TEMPL_COMMIT = """\
-Fix for CVE-${cve} ("CHANGE ME!")
+Fix for CVE-${cve} ("${title}")
 
 Live patch for CVE-${cve}. ${msg}:
 % for cmsg in commits:
@@ -499,7 +500,7 @@ class TemplateGen():
             "include_header": "livepatch_" in out_name,
             "cve": cve,
             "lp_name": self.lp_name,
-            "lp_num": self.lp_name.replace("bsc", ""),
+            "lp_num": get_lp_number(self.lp_name),
             "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
             "year": datetime.today().year,
             "user": user,
@@ -581,6 +582,7 @@ def generate_commit_msg_file(lp_name):
         "cve": cve,
         "commits": cmts,
         "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
+        "title": get_bug_title(get_lp_number(lp_name)),
     }
     with open(get_workdir(lp_name)/"commit.msg", "w") as f:
         f.write(Template(TEMPL_COMMIT).render(**render_vars))

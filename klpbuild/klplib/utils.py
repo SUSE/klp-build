@@ -91,6 +91,10 @@ def is_mod(mod):
     return mod != "vmlinux"
 
 
+def get_lp_number(lp_name):
+    return lp_name.replace("bsc", "")
+
+
 def get_elf_modinfo_entry(elffile, conf):
     sec = elffile.get_section_by_name(".modinfo")
     if not sec:
