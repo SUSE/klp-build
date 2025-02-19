@@ -1,0 +1,37 @@
+# @file ci-cache.yml
+---
+name: Update caches
+
+on:
+  push:
+    branches:
+      - "devel"
+
+jobs:
+  distribution-check:
+    runs-on: ubuntu-latest
+    container:
+      image: opensuse/tumbleweed:latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install git
+      run: zypper in -y git
+
+    - name: Get month
+      id: get-month
+      run: |
+        echo "month=$(date +%m)" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Cache kernel-source
+      id: cache-ksrc
+      uses: actions/cache@v4
+      with:
+        path: build/kernel-source
+        key: kernel-source-${{ steps.get-month.outputs.month }}
+
+    - if: ${{ steps.cache-ksrc.outputs.cache-hit != 'true' }}
+      name: Download kernel-source
+      continue-on-error: true
+      run: git clone https://github.com/SUSE/kernel-source build/kernel-source
