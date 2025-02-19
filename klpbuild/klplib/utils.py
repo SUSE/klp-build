@@ -9,6 +9,7 @@ import gzip
 import io
 import logging
 import lzma
+import os
 import platform
 import re
 import zstandard
@@ -335,3 +336,6 @@ def get_tests_path(lp_name):
         return PurePath(test_dir_sh).parent
 
     raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
+
+def in_test_mode():
+    return os.getenv("TEST_MODE", 'n') == 'y'
