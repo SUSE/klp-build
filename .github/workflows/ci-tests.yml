@@ -2,7 +2,16 @@
 ---
 name: klp-build tests
 
-on: [push, pull_request]
+on:
+  pull_request:
+    branches:
+      - 'devel'
+      - 'main'
+  push:
+    branches:
+      - '*'
+      - '!devel'
+      - '!main'
 
 jobs:
   distribution-check:
