@@ -14,7 +14,6 @@ from klpbuild.klplib.utils import get_workdir
 from klpbuild.klplib.plugins import try_run_plugin
 from klpbuild.plugins.extractor import Extractor
 from klpbuild.plugins.inline import Inliner
-from klpbuild.plugins.setup import Setup
 
 
 def main():
@@ -39,16 +38,7 @@ def main():
 
     # NOTE: all the code below should be gone when all the modules will be
     # converted into plugins
-    if args.cmd == "setup":
-        setup = Setup(args.lp_name)
-        ffuncs = Setup.setup_file_funcs(args.conf, args.module, args.file_funcs,
-                                        args.mod_file_funcs, args.conf_mod_file_funcs)
-        codestreams = setup.setup_codestreams(
-            {"cve": args.cve, "conf": args.conf, "lp_filter": args.lp_filter,
-                "no_check": args.no_check})
-        setup.setup_project_files(codestreams, ffuncs, args.archs)
-
-    elif args.cmd == "extract":
+    if args.cmd == "extract":
         Extractor(args.lp_name, args.lp_filter, args.apply_patches, args.avoid_ext).run()
 
     elif args.cmd == "cs-diff":

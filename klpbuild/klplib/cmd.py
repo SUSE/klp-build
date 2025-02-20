@@ -45,57 +45,6 @@ def create_parser() -> argparse.ArgumentParser:
 
     # NOTE: all the code below should be gone when all the module will be
     # converted into plugins
-    setup = sub.add_parser("setup")
-    add_arg_lp_name(setup)
-    add_arg_lp_filter(setup)
-    setup.add_argument("--cve", type=str, help="SLE specific. The CVE assigned to this livepatch")
-    setup.add_argument("--conf", type=str, required=True, help="The kernel CONFIG used to be build the livepatch")
-    setup.add_argument(
-        "--no-check",
-        action="store_true",
-        help="SLE specific. Do not check for already patched codestreams, do the setup for all non filtered codestreams.",
-    )
-    setup.add_argument(
-        "--file-funcs",
-        required=False,
-        action="append",
-        nargs="*",
-        default=[],
-        help="File and functions to be livepatched. Can be set "
-        "multiple times. The format is --file-funcs file/path.c func1 "
-        "func2 --file-func file/patch2 func1...",
-    )
-    setup.add_argument(
-        "--mod-file-funcs",
-        required=False,
-        action="append",
-        nargs="*",
-        default=[],
-        help="Module, file and functions to be livepatched. Can be set "
-        "multiple times. The format is --file-funcs module1 file/path.c func1 "
-        "func2 --file-func module2 file/patch2 func1...",
-    )
-    setup.add_argument(
-        "--conf-mod-file-funcs",
-        required=False,
-        action="append",
-        nargs="*",
-        default=[],
-        help="Conf, module, file and functions to be livepatched. Can be set "
-        "multiple times. The format is --file-funcs conf1 module1 file/path.c func1 "
-        "func2 --file-func conf2 module2 file/patch2 func1...",
-    )
-    setup.add_argument(
-        "--module", type=str, default="vmlinux", help="The module that will be livepatched for all files"
-    )
-    setup.add_argument(
-        "--archs",
-        default=ARCHS,
-        choices=ARCHS,
-        nargs="+",
-        help="SLE specific. Supported architectures for this livepatch",
-    )
-
     check_inline = sub.add_parser("check-inline")
     add_arg_lp_name(check_inline)
     add_arg_lp_filter(check_inline)
