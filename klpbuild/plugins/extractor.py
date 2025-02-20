@@ -534,8 +534,6 @@ class Extractor():
 
         self.group_equal_files(working_cs)
 
-        tem.generate_commit_msg_file()
-
         logging.info("Checking the externalized symbols in other architectures...")
 
         missing_syms = OrderedDict()
