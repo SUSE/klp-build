@@ -10,7 +10,6 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestreams_data import get_codestreams_data, set_codestreams_data, store_codestreams
-from klpbuild.klplib.ksrc import GitHelper
 from klpbuild.klplib.templ import generate_commit_msg_file
 
 from klpbuild.plugins.scan import scan
