@@ -35,6 +35,14 @@ class GitHelper():
             "6.0rt": "SUSE-2024-RT",
             "cve-5.3": "cve/linux-5.3-LTSS",
             "cve-5.14": "cve/linux-5.14-LTSS",
+        } if not utils.in_test_mode() else {
+            "15.3": "SLE15-SP3-RT-LTSS",
+            "15.4": "SLE15-SP4-RT-LTSS",
+            "15.5": "SLE15-SP5-RT-LTSS",
+            "15.6": "SLE15-SP6",
+            "15.6rt": "SLE15-SP6-RT",
+            "6.0": "SUSE-2024",
+            "6.0rt": "SUSE-2024-RT",
         }
 
         self.lp_filter = lp_filter
@@ -127,10 +135,11 @@ class GitHelper():
     def fetch_kernel_branches(self):
         logging.info("Fetching changes from all supported branches...")
 
-        # Mount the command to fetch all branches for supported codestreams
-        subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
-                                 "--quiet", "--atomic", "--force", "--tags", "origin"] +
-                                list(self.kernel_branches.values()))
+        if not utils.in_test_mode():
+            # Mount the command to fetch all branches for supported codestreams
+            subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
+                                     "--quiet", "--atomic", "--force", "--tags", "origin"] +
+                                    list(self.kernel_branches.values()))
 
 
     def diff_commits(self, base, new, patch):

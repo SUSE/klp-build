@@ -150,11 +150,11 @@ def test_templ_cve_specified():
 
 def test_templ_exts_mod_name():
     """
-    This extraction should add a new external symbol from module nvme-core, but the kallsyms relocation
-    need the module to be nvme_core.
+    This extraction should add a new external symbol from module nvme-tcp, but the kallsyms relocation
+    need the module to be nvme_tcp.
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "12.5u56"
+    cs = "15.3u42"
 
     lp_setup = Setup(lp)
     ffuncs = Setup.setup_file_funcs("CONFIG_NVME_TCP", "nvme-tcp", [
@@ -167,8 +167,8 @@ def test_templ_exts_mod_name():
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
-    # The module name should be nvme_core instead of nvme-core
-    assert '{ "nvme_should_fail", (void *)&klpe_nvme_should_fail, "nvme_core" },' in get_file_content(lp, cs)
+    # The module name should be nvme_tcp instead of nvme-tcp
+    assert '{ "nvme_tcp_try_send", (void *)&klpe_nvme_tcp_try_send, "nvme_tcp" },' in get_file_content(lp, cs)
 
     # With external symbols from a module we expect both _init/_cleanup to be prototypes, since
     # the livepatch lookup will have a notifier for the module, and the notifier needs to be removed on

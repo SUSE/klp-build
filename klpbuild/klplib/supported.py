@@ -8,6 +8,7 @@ import re
 import requests
 from pathlib import Path
 
+from klpbuild.klplib import utils
 from klpbuild.klplib.codestream import Codestream
 
 SUPPORTED_CS_URL = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
@@ -21,8 +22,9 @@ def get_supported_codestreams():
         list[Codestream]: A list of supported codestreams.
     """
     supported_codestreams = []
+    lines = __download_supported_file() if not utils.in_test_mode() else __load_supported_file();
 
-    for line in __download_supported_file():
+    for line in lines:
         # remove the last two columns, which are dates of the line
         # and add a fifth field with the forth one + rpm- prefix, and
         # remove the build counter number
@@ -41,6 +43,16 @@ def get_supported_codestreams():
                                                                 kernel))
     return supported_codestreams
 
+def __load_supported_file():
+    """
+    Read and return the lines of the supported file.
+
+    Returns:
+        list[str]: The list of lines of the supported file, excluding the
+        header.
+    """
+    with open("tests/supported.csv") as file:
+        return file.readlines()[1:]
 
 def __download_supported_file():
     """
