@@ -135,10 +135,11 @@ class GitHelper():
     def fetch_kernel_branches(self):
         logging.info("Fetching changes from all supported branches...")
 
-        # Mount the command to fetch all branches for supported codestreams
-        subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
-                                 "--quiet", "--atomic", "--force", "--tags", "origin"] +
-                                list(self.kernel_branches.values()))
+        if not utils.in_test_mode():
+            # Mount the command to fetch all branches for supported codestreams
+            subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
+                                     "--quiet", "--atomic", "--force", "--tags", "origin"] +
+                                    list(self.kernel_branches.values()))
 
 
     def diff_commits(self, base, new, patch):
