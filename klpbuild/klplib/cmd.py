@@ -14,6 +14,7 @@ def add_arg_lp_name(parentparser, mandatory=True):
         "--name",
         type=str,
         required=mandatory,
+        dest="lp_name",
         help="The livepatch name. This will be the directory name of the "
         "resulting livepatches.",
     )
