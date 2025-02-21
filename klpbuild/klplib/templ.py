@@ -471,67 +471,55 @@ class TemplateGen():
             lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
             f.write(Template(header_templ, lookup=lpdir).render(**render_vars))
 
-    def __generate_lp_file(self, lp_path, cs, src_file, use_src_name=False):
-        if src_file:
-            lp_inc_dir = str(cs.get_ccp_work_dir(self.lp_name, src_file))
-            lp_file = cs.lp_out_file(self.lp_name, src_file)
-            fdata = cs.files[str(src_file)]
-        else:
-            lp_inc_dir = Path("non-existent")
-            lp_file = None
-            fdata = {}
-
-        # if use_src_name is True, the final file will be:
-        #       bscXXXXXXX_{src_name}.c
-        # else:
-        #       livepatch_bscXXXXXXXX.c
-        if use_src_name:
-            out_name = lp_file
-        else:
-            out_name = f"livepatch_{self.lp_name}.c"
-
-        user, email = get_mail()
+    def __generate_lp_file(self, lp_path, cs, src_file, out_name):
         cve = get_codestreams_data('cve')
         if not cve:
             cve = "XXXX-XXXX"
-        cmts = get_codestreams_data('commits')
+        user, email = get_mail()
         tvars = {
-            "include_header": "livepatch_" in out_name,
+            "check_enabled": self.check_enabled,
+            "commits": get_codestreams_data('commits'),
+            "config": "CONFIG_CHANGE_ME",
             "cve": cve,
+            "email": email,
+            "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
+            "include_header": "livepatch_" in out_name,
             "lp_name": self.lp_name,
             "lp_num": get_lp_number(self.lp_name),
-            "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
-            "year": datetime.today().year,
             "user": user,
-            "email": email,
-            "config": fdata.get("conf", ""),
-            "mod": fix_mod_string(fdata.get("module", "")),
-            "mod_mutex": cs.is_mod_mutex(),
-            "check_enabled": self.check_enabled,
-            "ext_vars": fdata.get("ext_symbols", ""),
-            "inc_src_file": lp_file,
-            "ibt": fdata.get("ibt", False),
-            "commits": cmts
+            "year": datetime.today().year,
         }
 
-        with open(Path(lp_path, out_name), "w") as f:
-            lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
+        # If we have multiple source files for the same livepatch,
+        # create one hollow file to wire-up the multiple _init and
+        # _clean functions
+        #
+        # If we are patching a module, we should have the
+        # module_notifier armed to signal whenever the module comes on
+        # in order to do the symbol lookups. Otherwise only _init is
+        # needed, and only if there are externalized symbols being used.
+        if not src_file:
+            temp_str = TEMPL_HOLLOW
+            lp_inc_dir = Path("non-existent")
+        else:
+            fdata = cs.files[str(src_file)]
+            tvars.update({
+                "config": fdata.get("conf", ""),
+                "ext_vars": fdata.get("ext_symbols", ""),
+                "ibt": fdata.get("ibt", False),
+                "inc_src_file": cs.lp_out_file(self.lp_name, src_file),
+                "mod": fix_mod_string(fdata.get("module", "")),
+                "mod_mutex": cs.is_mod_mutex(),
+            })
 
-            # If we have multiple source files for the same livepatch,
-            # create one hollow file to wire-up the multiple _init and
-            # _clean functions
-            #
-            # If we are patching a module, we should have the
-            # module_notifier armed to signal whenever the module comes on
-            # in order to do the symbol lookups. Otherwise only _init is
-            # needed, and only if there are externalized symbols being used.
-            if not lp_file:
-                temp_str = TEMPL_HOLLOW
-            elif tvars["mod"]:
+            if tvars["mod"]:
                 temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_MODULE
             else:
                 temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
+            lp_inc_dir = cs.get_ccp_work_dir(self.lp_name, src_file)
 
+        lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
+        with open(Path(lp_path, out_name), "w") as f:
             f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**tvars))
 
     def generate_livepatches(self, cs):
@@ -548,14 +536,21 @@ class TemplateGen():
         # config entries empty
         self.__generate_header_file(lp_path, cs)
 
-        # Run the template engine for each touched source file.
+        # Run the template engine for each generated source file.
         for src_file, _ in files.items():
-            self.__generate_lp_file(lp_path, cs, src_file, is_multi_files)
+            # if use_src_name is True, the final file will be:
+            #       bscXXXXXXX_{src_name}.c
+            # else:
+            #       livepatch_bscXXXXXXXX.c
+            out_name = f"livepatch_{self.lp_name}.c" if not is_multi_files else \
+                cs.lp_out_file(self.lp_name, src_file)
+
+            self.__generate_lp_file(lp_path, cs, src_file, out_name)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
         if is_multi_files:
-            self.__generate_lp_file(lp_path, cs, None, False)
+            self.__generate_lp_file(lp_path, cs, None, f"livepatch_{self.lp_name}.c")
 
         self.__create_kbuild(cs)
 
