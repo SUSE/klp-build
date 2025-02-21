@@ -436,7 +436,6 @@ class TemplateGen():
         lp_inc_dir = Path()
         configs = set()
         config = ""
-        mod = ""
         has_ext = False
         has_cleanup = False
 
