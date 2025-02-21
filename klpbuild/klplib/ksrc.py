@@ -81,7 +81,7 @@ class GitHelper():
 
         # Filter only the branches related to this BSC
         for branch in utils.get_lp_branches(lp_name, kgr_patches):
-            print(branch)
+            logging.info(branch)
             bname = branch.replace(lp_name + "_", "")
             bs = " ".join(bname.split("_"))
             bsc = lp_name.replace("bsc", "bsc#")
@@ -206,7 +206,7 @@ class GitHelper():
 
         self.fetch_kernel_branches()
 
-        print("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
+        logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
         # Store all commits from each branch and upstream
         commits = {}
@@ -309,7 +309,7 @@ class GitHelper():
                         stderr=subprocess.STDOUT,
                     ).decode("ISO-8859-1")
                 except subprocess.CalledProcessError:
-                    print(
+                    logging.warn(
                         f"File {fname} doesn't exists {mbranch}. It could "
                         " be removed, so the branch is not affected by the issue."
                     )
@@ -360,16 +360,16 @@ class GitHelper():
         for d, c, msg in ucommits_sort:
             commits["upstream"]["commits"].append(f'{c} ("{msg}")')
 
-        print("")
+        logging.info("")
 
         for key, val in commits.items():
-            print(f"{key}")
+            logging.info(f"{key}")
             branch_commits = val["commits"]
             if not branch_commits:
-                print("None")
+                logging.info("None")
             for c in branch_commits:
-                print(c)
-            print("")
+                logging.info(c)
+            logging.info("")
 
         return commits
 
@@ -451,7 +451,7 @@ class GitHelper():
             logging.info("No CVE informed, skipping the processing of getting the patched kernels.")
             return []
 
-        print("Searching for already patched codestreams...")
+        logging.info("Searching for already patched codestreams...")
 
         kernels = []
 
@@ -475,17 +475,17 @@ class GitHelper():
                 if not patched and kernel not in suse_tags:
                     continue
 
-                print(f"\n{cs.name()} ({kernel}):")
+                logging.debug(f"\n{cs.name()} ({kernel}):")
 
                 # If no patches/commits were found for this kernel, fallback to
                 # the commits in the main SLE branch. In either case, we can
                 # assume that this kernel is already patched.
                 for c in kern_commits if patched else suse_commits:
-                    print(f"{c}")
+                    logging.debug(f"{c}")
 
                 kernels.append(kernel)
 
-        print("")
+        logging.debug("")
 
         # remove duplicates
         return natsorted(list(set(kernels)))
