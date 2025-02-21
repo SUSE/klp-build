@@ -552,13 +552,14 @@ class TemplateGen():
         if is_multi_files:
             self.__generate_lp_file(lp_path, cs, None, f"livepatch_{self.lp_name}.c")
 
-        self.__create_kbuild(cs)
+        create_kbuild(self.lp_name, cs)
 
+
+def create_kbuild(lp_name, cs):
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
-    def __create_kbuild(self, cs):
-        render_vars = {"bsc": self.lp_name, "cs": cs, "lpdir": cs.get_lp_dir(self.lp_name)}
-        with open(Path(cs.get_lp_dir(self.lp_name), "Kbuild.inc"), "w") as f:
-            f.write(Template(TEMPL_KBUILD).render(**render_vars))
+    render_vars = {"bsc": lp_name, "cs": cs, "lpdir": cs.get_lp_dir(lp_name)}
+    with open(Path(cs.get_lp_dir(lp_name), "Kbuild.inc"), "w") as f:
+        f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
 
 def generate_commit_msg_file(lp_name):
