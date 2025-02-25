@@ -11,7 +11,27 @@ from mako.template import Template
 
 from klpbuild.klplib.bugzilla import get_bug_title
 from klpbuild.klplib.codestreams_data import get_codestreams_data
-from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir, get_lp_number
+from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir, get_lp_number, get_fname
+
+
+MACRO_PROTO_SYMS = """\
+<%
+def get_protos(proto_syms):
+        proto_list = []
+
+        if not proto_syms:
+            return ''
+
+        for fname, data in proto_syms.items():
+            proto_list.append(f"int {fname}_init(void);")
+            if data["cleanup"]:
+                proto_list.append(f"void {fname}_cleanup(void);\\n")
+            else:
+                proto_list.append(f"static inline void {fname}_cleanup(void);\\n")
+
+        return '\\n' + '\\n'.join(proto_list)
+%>\
+"""
 
 
 TEMPL_NO_SYMS_H = """\
@@ -38,7 +58,7 @@ void ${ fname }_cleanup(void);
 % else:
 static inline void ${ fname }_cleanup(void) {}
 % endif %
-
+${get_protos(proto_syms)}
 #else /* !IS_ENABLED(${ config }) */
 
 static inline int ${ fname }_init(void) { return 0; }
@@ -53,7 +73,7 @@ void ${ fname }_cleanup(void);
 % else:
 static inline void ${ fname }_cleanup(void) {}
 % endif
-
+${get_protos(proto_syms)}
 % endif
 #endif /* _${ fname.upper() }_H */
 """
@@ -432,43 +452,58 @@ class TemplateGen():
 
     def __generate_header_file(self, lp_path, cs):
         out_name = f"livepatch_{self.lp_name}.h"
-
-        lp_inc_dir = Path()
-        configs = set()
-        config = ""
-        has_ext = False
-        has_cleanup = False
-
-        for f, data in cs.files.items():
-            configs.add(data["conf"])
-            # If we have external symbols we need an init function to load them. If the module
-            # isn't vmlinux then we also need an _exit function
-            if data["ext_symbols"]:
-                has_ext = True
-
-                if data["module"] != "vmlinux":
-                    has_cleanup = True
-
-        # Only populate the config check in the header if the livepatch is
-        # patching code under only one config. Otherwise let the developer to
-        # fill it.
-        if len(configs) == 1:
-            config = configs.pop()
-
         render_vars = {
-            "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
-            "check_enabled": self.check_enabled,
-            "config": config,
-            "has_cleanup": has_cleanup,
+            "fname": get_fname(out_name),
         }
 
-        header_templ = TEMPL_H
-        # If we don't have any external symbols then we don't need the empty _init/_exit functions
-        if cs.needs_ibt or not has_ext:
-            header_templ = TEMPL_NO_SYMS_H
+        # We don't need any setups on IBT besides the livepatch_init/cleanup ones
+        header_templ = TEMPL_NO_SYMS_H
+
+        if not cs.needs_ibt:
+            configs = set()
+            config = ""
+            has_cleanup = False
+            proto_syms = {}
+
+            for src_file, data in cs.files.items():
+                configs.add(data["conf"])
+                # If we have external symbols we need an init function to load them. If the module
+                # isn't vmlinux then we also need an _exit function
+                if data["ext_symbols"]:
+                    if data["module"] != "vmlinux":
+                        # Used by the livepatch_cleanup
+                        has_cleanup = True
+
+                    proto_fname = get_fname(cs.lp_out_file(self.lp_name, src_file))
+                    proto_syms[proto_fname] = {"cleanup": data["module"] != "vmlinux"}
+
+            # If we don't have any external symbols then we don't need the empty _init/_exit functions
+            if proto_syms.keys():
+                # Only populate the config check in the header if the livepatch is
+                # patching code under only one config. Otherwise let the developer to
+                # fill it.
+                if len(configs) == 1:
+                    config = configs.pop()
+
+                # We there was only one entry in the proto_syms means that we have only one file in
+                # in this livepatch, so we are already covered
+                # Situations where we don't need any extra symbol prototypes:
+                # * we don't have any externalized symbols
+                # * the livepatch has only one file (_init/_cleanup for livepatch_ are created by default)
+                if len(proto_syms.keys()) == 1 and len(cs.files.keys()) == 1:
+                    proto_syms = {}
+
+                render_vars.update({
+                    "check_enabled": self.check_enabled,
+                    "config": config,
+                    "has_cleanup": has_cleanup,
+                    "proto_syms": proto_syms,
+                })
+
+                header_templ = MACRO_PROTO_SYMS + TEMPL_H
 
         with open(Path(lp_path, out_name), "w") as f:
-            lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
+            lpdir = TemplateLookup(directories=[Path()], preprocessor=TemplateGen.preproc_slashes)
             f.write(Template(header_templ, lookup=lpdir).render(**render_vars))
 
     def __generate_lp_file(self, lp_path, cs, src_file, out_name):
@@ -482,7 +517,7 @@ class TemplateGen():
             "config": "CONFIG_CHANGE_ME",
             "cve": cve,
             "email": email,
-            "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
+            "fname": get_fname(out_name),
             "include_header": "livepatch_" in out_name,
             "lp_name": self.lp_name,
             "lp_num": get_lp_number(self.lp_name),
