@@ -4,7 +4,6 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import copy
-import git
 import gzip
 import io
 import logging
@@ -12,12 +11,13 @@ import lzma
 import os
 import platform
 import re
+import git
 import zstandard
 
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 from natsort import natsorted
 
@@ -259,6 +259,17 @@ def fix_mod_string(mod):
     # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
     # and in kallsyms lookup
     return mod.replace("-", "_")
+
+
+def get_fname(src_name):
+    """
+    Get the source name and transforms into a string version of it, without the extension.
+
+    Returns:
+        String: The same src_name string without externsion and hyphens replaced by underscores.
+    """
+
+    return str(Path(src_name).with_suffix("")).replace("-", "_")
 
 
 def get_kgraft_branch(cs_name):
