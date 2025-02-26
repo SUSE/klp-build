@@ -9,8 +9,41 @@ from pathlib import Path
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
-from klpbuild.klplib.config import Config
-from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail
+from klpbuild.klplib.bugzilla import get_bug_title
+from klpbuild.klplib.codestreams_data import get_codestreams_data
+from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir, get_lp_number, get_fname
+
+
+MACRO_PROTO_SYMS = """\
+<%
+def get_protos(proto_syms):
+        proto_list = []
+
+        if not proto_syms:
+            return ''
+
+        for fname, data in proto_syms.items():
+            proto_list.append(f"int {fname}_init(void);")
+            if data["cleanup"]:
+                proto_list.append(f"void {fname}_cleanup(void);\\n")
+            else:
+                proto_list.append(f"static inline void {fname}_cleanup(void);\\n")
+
+        return '\\n' + '\\n'.join(proto_list)
+%>\
+"""
+
+
+TEMPL_NO_SYMS_H = """\
+#ifndef _${ fname.upper() }_H
+#define _${ fname.upper() }_H
+
+static inline int ${ fname }_init(void) { return 0; }
+static inline void ${ fname }_cleanup(void) {}
+
+#endif /* _${ fname.upper() }_H */
+"""
+
 
 TEMPL_H = """\
 #ifndef _${ fname.upper() }_H
@@ -18,30 +51,30 @@ TEMPL_H = """\
 
 % if check_enabled:
 #if IS_ENABLED(${ config })
-% endif
 
 int ${ fname }_init(void);
-% if mod:
+% if has_cleanup:
 void ${ fname }_cleanup(void);
 % else:
 static inline void ${ fname }_cleanup(void) {}
 % endif %
-
-% for p in proto_files:
-<%include file="${ p }"/>
-% endfor
-
-% if check_enabled:
+${get_protos(proto_syms)}
 #else /* !IS_ENABLED(${ config }) */
-% endif
 
 static inline int ${ fname }_init(void) { return 0; }
 static inline void ${ fname }_cleanup(void) {}
 
-% if check_enabled:
 #endif /* IS_ENABLED(${ config }) */
-% endif
 
+% else:
+int ${ fname }_init(void);
+% if has_cleanup:
+void ${ fname }_cleanup(void);
+% else:
+static inline void ${ fname }_cleanup(void) {}
+% endif
+${get_protos(proto_syms)}
+% endif
 #endif /* _${ fname.upper() }_H */
 """
 
@@ -181,6 +214,8 @@ TEMPL_PATCH_VMLINUX = """\
 
 % if ext_vars:
 % if ibt:
+#include <linux/livepatch.h>
+
 ${get_exts("vmlinux", ext_vars)}
 % else: # ibt
 #include <linux/kernel.h>
@@ -222,6 +257,8 @@ TEMPL_PATCH_MODULE = """\
 
 % if ext_vars:
 % if ibt:
+#include <linux/livepatch.h>
+
 ${get_exts(mod, ext_vars)}
 % else: # ibt
 #include <linux/kernel.h>
@@ -343,7 +380,7 @@ void ${ fname }_cleanup(void)
 """
 
 TEMPL_COMMIT = """\
-Fix for CVE-${cve} ("CHANGE ME!")
+Fix for CVE-${cve} ("${title}")
 
 Live patch for CVE-${cve}. ${msg}:
 % for cmsg in commits:
@@ -395,13 +432,12 @@ ${get_patched(cs_files, check_enabled)}
 """
 
 
-class TemplateGen(Config):
+class TemplateGen():
     def __init__(self, lp_name):
-        super().__init__(lp_name)
 
         # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
         # is not enabled on all architectures
-        self.check_enabled = self.cs_data.archs != ARCHS
+        self.check_enabled = get_codestreams_data('archs') != ARCHS
         self.lp_name = lp_name
 
     @staticmethod
@@ -411,108 +447,118 @@ class TemplateGen(Config):
 
     def __generate_patched_conf(self, cs):
         render_vars = {"cs_files": cs.files, "check_enabled": self.check_enabled}
-        with open(Path(cs.lpdir(), "patched_funcs.csv"), "w") as f:
+        with open(Path(cs.get_lp_dir(self.lp_name), "patched_funcs.csv"), "w") as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
     def __generate_header_file(self, lp_path, cs):
-        out_name = f"livepatch_{cs.lp_name}.h"
-
-        lp_inc_dir = Path()
-        proto_files = []
-        configs = set()
-        config = ""
-        mod = ""
-
-        for f, data in cs.files.items():
-            configs.add(data["conf"])
-            # At this point we only care to know if we are livepatching a module
-            # or not, so we can overwrite the module.
-            mod = data["module"]
-
-        # Only add the inc_dir if CE is used, since it's the only backend that
-        # produces the proto.h headers
-        if len(proto_files) > 0:
-            lp_inc_dir = cs.dir()
-
-        # Only populate the config check in the header if the livepatch is
-        # patching code under only one config. Otherwise let the developer to
-        # fill it.
-        if len(configs) == 1:
-            config = configs.pop()
-
+        out_name = f"livepatch_{self.lp_name}.h"
         render_vars = {
-            "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
-            "check_enabled": self.check_enabled,
-            "proto_files": proto_files,
-            "config": config,
-            "mod": mod,
+            "fname": get_fname(out_name),
         }
 
+        # We don't need any setups on IBT besides the livepatch_init/cleanup ones
+        header_templ = TEMPL_NO_SYMS_H
+
+        if not cs.needs_ibt:
+            configs = set()
+            config = ""
+            has_cleanup = False
+            proto_syms = {}
+
+            for src_file, data in cs.files.items():
+                configs.add(data["conf"])
+                # If we have external symbols we need an init function to load them. If the module
+                # isn't vmlinux then we also need an _exit function
+                if data["ext_symbols"]:
+                    if data["module"] != "vmlinux":
+                        # Used by the livepatch_cleanup
+                        has_cleanup = True
+
+                    proto_fname = get_fname(cs.lp_out_file(self.lp_name, src_file))
+                    proto_syms[proto_fname] = {"cleanup": data["module"] != "vmlinux"}
+
+            # If we don't have any external symbols then we don't need the empty _init/_exit functions
+            if proto_syms.keys():
+                # Only populate the config check in the header if the livepatch is
+                # patching code under only one config. Otherwise let the developer to
+                # fill it.
+                if len(configs) == 1:
+                    config = configs.pop()
+
+                # We there was only one entry in the proto_syms means that we have only one file in
+                # in this livepatch, so we are already covered
+                # Situations where we don't need any extra symbol prototypes:
+                # * we don't have any externalized symbols
+                # * the livepatch has only one file (_init/_cleanup for livepatch_ are created by default)
+                if len(proto_syms.keys()) == 1 and len(cs.files.keys()) == 1:
+                    proto_syms = {}
+
+                render_vars.update({
+                    "check_enabled": self.check_enabled,
+                    "config": config,
+                    "has_cleanup": has_cleanup,
+                    "proto_syms": proto_syms,
+                })
+
+                header_templ = MACRO_PROTO_SYMS + TEMPL_H
+
         with open(Path(lp_path, out_name), "w") as f:
-            lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
-            f.write(Template(TEMPL_H, lookup=lpdir).render(**render_vars))
+            lpdir = TemplateLookup(directories=[Path()], preprocessor=TemplateGen.preproc_slashes)
+            f.write(Template(header_templ, lookup=lpdir).render(**render_vars))
 
-    def __generate_lp_file(self, lp_path, cs, src_file, use_src_name=False):
-        if src_file:
-            lp_inc_dir = str(cs.work_dir(src_file))
-            lp_file = cs.lp_out_file(src_file)
-            fdata = cs.files[str(src_file)]
-        else:
-            lp_inc_dir = Path("non-existent")
-            lp_file = None
-            fdata = {}
-
-        # if use_src_name is True, the final file will be:
-        #       bscXXXXXXX_{src_name}.c
-        # else:
-        #       livepatch_bscXXXXXXXX.c
-        if use_src_name:
-            out_name = lp_file
-        else:
-            out_name = f"livepatch_{cs.lp_name}.c"
-
+    def __generate_lp_file(self, lp_path, cs, src_file, out_name):
+        cve = get_codestreams_data('cve')
+        if not cve:
+            cve = "XXXX-XXXX"
         user, email = get_mail()
         tvars = {
-            "include_header": "livepatch_" in out_name,
-            "cve": self.cs_data.cve if self.cs_data.cve else "XXXX-XXXX",
-            "lp_name": cs.lp_name,
-            "lp_num": cs.lp_name.replace("bsc", ""),
-            "fname": str(Path(out_name).with_suffix("")).replace("-", "_"),
-            "year": datetime.today().year,
-            "user": user,
-            "email": email,
-            "config": fdata.get("conf", ""),
-            "mod": fix_mod_string(fdata.get("module", "")),
-            "mod_mutex": cs.is_mod_mutex(),
             "check_enabled": self.check_enabled,
-            "ext_vars": fdata.get("ext_symbols", ""),
-            "inc_src_file": lp_file,
-            "ibt": fdata.get("ibt", False),
-            "commits": self.cs_data.commits
+            "commits": get_codestreams_data('commits'),
+            "config": "CONFIG_CHANGE_ME",
+            "cve": cve,
+            "email": email,
+            "fname": get_fname(out_name),
+            "include_header": "livepatch_" in out_name,
+            "lp_name": self.lp_name,
+            "lp_num": get_lp_number(self.lp_name),
+            "user": user,
+            "year": datetime.today().year,
         }
 
-        with open(Path(lp_path, out_name), "w") as f:
-            lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
+        # If we have multiple source files for the same livepatch,
+        # create one hollow file to wire-up the multiple _init and
+        # _clean functions
+        #
+        # If we are patching a module, we should have the
+        # module_notifier armed to signal whenever the module comes on
+        # in order to do the symbol lookups. Otherwise only _init is
+        # needed, and only if there are externalized symbols being used.
+        if not src_file:
+            temp_str = TEMPL_HOLLOW
+            lp_inc_dir = Path("non-existent")
+        else:
+            fdata = cs.files[str(src_file)]
+            tvars.update({
+                "config": fdata.get("conf", ""),
+                "ext_vars": fdata.get("ext_symbols", ""),
+                "ibt": fdata.get("ibt", False),
+                "inc_src_file": cs.lp_out_file(self.lp_name, src_file),
+                "mod": fix_mod_string(fdata.get("module", "")),
+                "mod_mutex": cs.is_mod_mutex(),
+            })
 
-            # If we have multiple source files for the same livepatch,
-            # create one hollow file to wire-up the multiple _init and
-            # _clean functions
-            #
-            # If we are patching a module, we should have the
-            # module_notifier armed to signal whenever the module comes on
-            # in order to do the symbol lookups. Otherwise only _init is
-            # needed, and only if there are externalized symbols being used.
-            if not lp_file:
-                temp_str = TEMPL_HOLLOW
-            elif tvars["mod"]:
+            if tvars["mod"]:
                 temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_MODULE
             else:
                 temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
+            lp_inc_dir = cs.get_ccp_work_dir(self.lp_name, src_file)
 
+        lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=TemplateGen.preproc_slashes)
+        with open(Path(lp_path, out_name), "w") as f:
             f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**tvars))
 
     def generate_livepatches(self, cs):
-        lp_path = cs.lpdir()
+        lp_path = cs.get_lp_dir(self.lp_name)
         lp_path.mkdir(exist_ok=True)
 
         files = cs.files
@@ -525,35 +571,48 @@ class TemplateGen(Config):
         # config entries empty
         self.__generate_header_file(lp_path, cs)
 
-        # Run the template engine for each touched source file.
+        # Run the template engine for each generated source file.
         for src_file, _ in files.items():
-            self.__generate_lp_file(lp_path, cs, src_file, is_multi_files)
+            # if use_src_name is True, the final file will be:
+            #       bscXXXXXXX_{src_name}.c
+            # else:
+            #       livepatch_bscXXXXXXXX.c
+            out_name = f"livepatch_{self.lp_name}.c" if not is_multi_files else \
+                cs.lp_out_file(self.lp_name, src_file)
+
+            self.__generate_lp_file(lp_path, cs, src_file, out_name)
 
         # One additional file to encapsulate the _init and _clenaup methods
         # of the other source files
         if is_multi_files:
-            self.__generate_lp_file(lp_path, cs, None, False)
+            self.__generate_lp_file(lp_path, cs, None, f"livepatch_{self.lp_name}.c")
 
-        self.__create_kbuild(cs)
+        create_kbuild(self.lp_name, cs)
 
+
+def create_kbuild(lp_name, cs):
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
-    def __create_kbuild(self, cs):
-        render_vars = {"bsc": cs.lp_name, "cs": cs, "lpdir": cs.lpdir()}
-        with open(Path(cs.lpdir(), "Kbuild.inc"), "w") as f:
-            f.write(Template(TEMPL_KBUILD).render(**render_vars))
+    render_vars = {"bsc": lp_name, "cs": cs, "lpdir": cs.get_lp_dir(lp_name)}
+    with open(Path(cs.get_lp_dir(lp_name), "Kbuild.inc"), "w") as f:
+        f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
-    def generate_commit_msg_file(self):
-        cmts = self.cs_data.commits.get("upstream", {})
-        if cmts:
-            cmts = cmts["commits"]
-        user, email = get_mail()
-        render_vars = {
-            "lp_name": self.lp_name.replace("bsc", ""),
-            "user": user,
-            "email": email,
-            "cve": self.cs_data.cve if self.cs_data.cve else "XXXX-XXXX",
-            "commits": cmts,
-            "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
-        }
-        with open(Path(self.lp_path, "commit.msg"), "w") as f:
-            f.write(Template(TEMPL_COMMIT).render(**render_vars))
+
+def generate_commit_msg_file(lp_name):
+    cmts = get_codestreams_data('commits').get("upstream", {})
+    if cmts:
+        cmts = cmts["commits"]
+    cve = get_codestreams_data('cve')
+    if not cve:
+        cve = "XXXX-XXXX"
+    user, email = get_mail()
+    render_vars = {
+        "lp_name": lp_name.replace("bsc", ""),
+        "user": user,
+        "email": email,
+        "cve": cve,
+        "commits": cmts,
+        "msg": "Upstream commits" if len(cmts) > 1 else "Upstream commit",
+        "title": get_bug_title(get_lp_number(lp_name)),
+    }
+    with open(get_workdir(lp_name)/"commit.msg", "w") as f:
+        f.write(Template(TEMPL_COMMIT).render(**render_vars))

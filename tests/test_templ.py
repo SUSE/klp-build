@@ -20,7 +20,7 @@ def test_templ_with_externalized_vars():
                                   ["fs/proc/cmdline.c", "cmdline_proc_show"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_PROC_FS", "no_check": False})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_PROC_FS", "no_check": False})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
@@ -30,13 +30,23 @@ def test_templ_with_externalized_vars():
     # LP_MODULE, linux/module.h is not included
     # As the code is using the default archs, which is all of them, the
     # IS_ENABLED macro shouldn't exist
+    # the include of livepatch.h should not be present because 15.5 doesn't use IBT
     content = get_file_content(lp, cs)
-    for check in ["LP_MODULE", "module_notify", "linux/module.h", "#if IS_ENABLED"]:
+    for check in ["LP_MODULE", "module_notify", "linux/module.h", "#if IS_ENABLED", "linux/livepatch.h"]:
         assert check not in content
 
     # For this file and symbol, there is one symbol to be looked up, so
     # klp_funcs should be present
     assert "klp_funcs" in content
+
+    # With external symbols but only from vmlinux, so we have _init don't we don't need an _exit
+    # Also, as it's enabled on all ARCHs we don't need the ENABLED checks
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" in header
+    assert "_init(void) { return 0; }" not in header
+    assert "_cleanup(void);" not in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" not in header
 
 
 def test_templ_without_externalized_vars():
@@ -48,7 +58,7 @@ def test_templ_without_externalized_vars():
                                   ["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_IPV6", "no_check": False})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_IPV6", "no_check": False})
 
     lp_setup.setup_project_files(codestreams, ffuncs, [utils.ARCH])
 
@@ -58,8 +68,9 @@ def test_templ_without_externalized_vars():
     # LP_MODULE, linux/module.h is not included
     # For this file and symbol, no externalized symbols are used, so
     # klp_funcs shouldn't be preset.
+    # the include of livepatch.h should not be present because 15.5 doesn't use IBT
     content = get_file_content(lp, cs)
-    for check in ["LP_MODULE", "module_notify", "linux/module.h", "klp_funcs"]:
+    for check in ["LP_MODULE", "module_notify", "linux/module.h", "klp_funcs", "linux/livepatch.h>"]:
         assert check not in content
 
     # As the config only targets one arch, IS_ENABLED should be set
@@ -67,6 +78,14 @@ def test_templ_without_externalized_vars():
 
     # Without CVE speficied, we should have XXXX-XXXX
     assert "CVE-XXXX-XXXX" in content
+
+    # Without external symbols we don't need to implement the _init/_exit functions
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" not in header
+    assert "_init(void) { return 0; }" in header
+    assert "_cleanup(void);" not in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" not in header
 
 
 # For multifile patches, a third file will be generated and called
@@ -82,7 +101,7 @@ def test_check_header_file_included():
                                     [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_IPV6", "no_check": False})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_IPV6", "no_check": False})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
@@ -100,6 +119,15 @@ def test_check_header_file_included():
     assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_kernel_events_core.c")
     assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_net_ipv6_rpl.c")
 
+    # Check that for file kernel/events/core.c there are externalized symbols, so the prototype
+    # of init/cleanup are created on header
+    # As net/ipv6/rpl.c there are no externalized symbols we expect that it's prototype isn't
+    # created on livepatch_header file
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "kernel_events_core_init(void);" in header
+    assert "kernel_events_core_cleanup(void);" in header
+    assert "net_ipv6_rpl" not in header
+
 
 def test_templ_cve_specified():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
@@ -110,42 +138,63 @@ def test_templ_cve_specified():
                                   ["fs/proc/cmdline.c", "cmdline_proc_show"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": "1234-5678", "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_PROC_FS", "no_check": True})
+        {"cve": "1234-5678", "lp_filter": cs, "conf": "CONFIG_PROC_FS", "no_check": True})
 
-    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+    lp_setup.setup_project_files(codestreams, ffuncs, [utils.ARCH])
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
     # With CVE speficied, we should have it in the final file
     assert "CVE-1234-5678" in get_file_content(lp, cs)
 
+    # This livepatch targets only the running platform, so the IS_ENABLED needs to be there
+    # And with it, both prototypes and empty functions needs to be there. The _cleanup is a
+    # prototype of the IS_ENABLED path is only a prototype because the symbol is from vmlinux
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" in header
+    assert "_init(void) { return 0; }" in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" in header
+
 
 def test_templ_exts_mod_name():
     """
-    This extraction should add a new external symbol from module nvme-core, but the kallsyms relocation
-    need the module to be nvme_core.
+    This extraction should add a new external symbol from module nvme-tcp, but the kallsyms relocation
+    need the module to be nvme_tcp.
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "12.5u56"
+    cs = "15.3u42"
 
     lp_setup = Setup(lp)
     ffuncs = Setup.setup_file_funcs("CONFIG_NVME_TCP", "nvme-tcp", [
                                   ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_NVME_TCP", "no_check": True})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
-    # The module name should be nvme_core instead of nvme-core
-    assert '{ "nvme_should_fail", (void *)&klpe_nvme_should_fail, "nvme_core" },' in get_file_content(lp, cs)
+    # The module name should be nvme_tcp instead of nvme-tcp
+    assert '{ "nvme_tcp_try_send", (void *)&klpe_nvme_tcp_try_send, "nvme_tcp" },' in get_file_content(lp, cs)
+
+    # With external symbols from a module we expect both _init/_cleanup to be prototypes, since
+    # the livepatch lookup will have a notifier for the module, and the notifier needs to be removed on
+    # _cleanup path.
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" in header
+    assert "_init(void) { return 0; }" not in header
+    assert "_cleanup(void);" in header
+    assert "_cleanup(void) {}" not in header
+    # IS_ENABLED should not be present because the LP is targetted to all codestreams.
+    assert "IS_ENABLED" not in header
 
 
 def test_templ_micro_is_ibt():
     """
     SLE Micro is based on kernel 6.4, make sure it uses IBT.
+    For IBT we don't need to use kallsyms, so the _init and _cleanup should be empty;
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "6.0u2"
@@ -155,13 +204,62 @@ def test_templ_micro_is_ibt():
                                   ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_NVME_TCP", "no_check": True})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
-    assert 'KLP_RELOC_SYMBOL' in get_file_content(lp, cs)
+    src = get_file_content(lp, cs)
+    # Requires the include since it's a codestream that uses IBT and has externalized symbols
+    assert 'include <linux/livepatch.h>' in src
+    assert 'KLP_RELOC_SYMBOL' in src
+
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" not in header
+    assert "_init(void) { return 0; }" in header
+    assert "_cleanup(void);" not in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" not in header
+
+
+def test_templ_ibt_without_externalized_vars():
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "6.0u2"
+
+    lp_setup = Setup(lp)
+    ffuncs = Setup.setup_file_funcs("CONFIG_IPV6", "vmlinux", [
+                                  ["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]], [], [])
+
+    codestreams = lp_setup.setup_codestreams(
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_IPV6", "no_check": False})
+
+    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+
+    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+
+    # As we passed vmlinux as module, we don't have the module notifier and
+    # LP_MODULE, linux/module.h is not included
+    # For this file and symbol, no externalized symbols are used, so
+    # klp_funcs shouldn't be preset.
+    # the include of livepatch.h should not be present because there are no externalized variables
+    content = get_file_content(lp, cs)
+    for check in ["LP_MODULE", "module_notify", "linux/module.h", "klp_funcs", "linux/livepatch.h>"]:
+        assert check not in content
+
+    # As the config only targets one arch, IS_ENABLED should be set
+    assert "#if IS_ENABLED" not in content
+
+    # Without CVE speficied, we should have XXXX-XXXX
+    assert "CVE-XXXX-XXXX" in content
+
+    # Without external symbols we don't need to implement the _init/_exit functions
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "_init(void);" not in header
+    assert "_init(void) { return 0; }" in header
+    assert "_cleanup(void);" not in header
+    assert "_cleanup(void) {}" in header
+    assert "IS_ENABLED" not in header
 
 
 def test_templ_kbuild_has_contents():
@@ -176,7 +274,7 @@ def test_templ_kbuild_has_contents():
                                   ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
 
     codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "lp_skips": None, "conf": "CONFIG_NVME_TCP", "no_check": True})
+        {"cve": None, "lp_filter": cs, "conf": "CONFIG_NVME_TCP", "no_check": True})
 
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 

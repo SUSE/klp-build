@@ -10,7 +10,7 @@ from tests.utils import get_codestreams_file
 from klpbuild.klplib import utils
 
 CS = "15.5u19"
-DEFAULT_DATA = {"cve": None, "lp_filter": CS, "lp_skips": None, "conf": "CONFIG_TUN", "no_check": False}
+DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_TUN", "no_check": False}
 
 
 def test_missing_file_funcs():
@@ -87,7 +87,7 @@ def test_valid_micro_patchid():
                                     "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}}
 
     micro_cs = "6.0u2"
-    micro_data = {"cve": None, "lp_filter": micro_cs, "lp_skips": None, "conf": "CONFIG_TUN", "no_check": False}
+    micro_data = {"cve": None, "lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": False}
 
     codestreams = lp_setup.setup_codestreams(micro_data)
     lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)

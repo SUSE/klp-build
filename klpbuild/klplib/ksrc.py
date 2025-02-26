@@ -16,16 +16,13 @@ import requests
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.config import Config
-from klpbuild.klplib.codestream import Codestream
-from klpbuild.klplib.ibs import IBS
+from klpbuild.klplib.config import get_user_path
 
 
-class GitHelper(Config):
-    def __init__(self, lp_name, lp_filter, skips):
-        super().__init__(lp_name)
+class GitHelper():
+    def __init__(self, lp_filter):
 
-        self.kern_src = self.get_user_path('kernel_src_dir', isopt=True)
+        self.kern_src = get_user_path('kernel_src_dir', isopt=True)
 
         self.kernel_branches = {
             "12.5": "SLE12-SP5",
@@ -38,31 +35,37 @@ class GitHelper(Config):
             "6.0rt": "SUSE-2024-RT",
             "cve-5.3": "cve/linux-5.3-LTSS",
             "cve-5.14": "cve/linux-5.14-LTSS",
+        } if not utils.in_test_mode() else {
+            "15.3": "SLE15-SP3-RT-LTSS",
+            "15.4": "SLE15-SP4-RT-LTSS",
+            "15.5": "SLE15-SP5-RT-LTSS",
+            "15.6": "SLE15-SP6",
+            "15.6rt": "SLE15-SP6-RT",
+            "6.0": "SUSE-2024",
+            "6.0rt": "SUSE-2024-RT",
         }
 
-        self.lp_name = lp_name
         self.lp_filter = lp_filter
-        self.lp_skip = skips
 
-    def format_patches(self, version):
+    def format_patches(self, lp_name, version):
         ver = f"v{version}"
         # index 1 will be the test file
         index = 2
 
-        kgr_patches = self.get_user_path('kgr_patches_dir')
+        kgr_patches = get_user_path('kgr_patches_dir')
         if not kgr_patches:
             logging.warning("kgr_patches_dir not found, patches will be incomplete")
 
         # Remove dir to avoid leftover patches with different names
-        patches_dir = Path(self.lp_path, "patches")
+        patches_dir = utils.get_workdir(lp_name)/"patches"
         shutil.rmtree(patches_dir, ignore_errors=True)
 
-        test_src = self.get_tests_path(self.lp_name)
+        test_src = utils.get_tests_path(lp_name)
         subprocess.check_output(
             [
                 "/usr/bin/git",
                 "-C",
-                str(self.get_user_path('kgr_patches_tests_dir')),
+                str(get_user_path('kgr_patches_tests_dir')),
                 "format-patch",
                 "-1",
                 f"{test_src}",
@@ -77,11 +80,11 @@ class GitHelper(Config):
         )
 
         # Filter only the branches related to this BSC
-        for branch in utils.get_lp_branches(self.lp_name, kgr_patches):
-            print(branch)
-            bname = branch.replace(self.lp_name + "_", "")
+        for branch in utils.get_lp_branches(lp_name, kgr_patches):
+            logging.info(branch)
+            bname = branch.replace(lp_name + "_", "")
             bs = " ".join(bname.split("_"))
-            bsc = self.lp_name.replace("bsc", "bsc#")
+            bsc = lp_name.replace("bsc", "bsc#")
 
             prefix = f"PATCH {ver} {bsc} {bs}"
 
@@ -128,7 +131,65 @@ class GitHelper(Config):
 
         return d, msg
 
-    def get_commits(self, cve):
+
+    def fetch_kernel_branches(self):
+        logging.info("Fetching changes from all supported branches...")
+
+        if not utils.in_test_mode():
+            # Mount the command to fetch all branches for supported codestreams
+            subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
+                                     "--quiet", "--atomic", "--force", "--tags", "origin"] +
+                                    list(self.kernel_branches.values()))
+
+
+    def diff_commits(self, base, new, patch, pattern=""):
+        """
+        Check if there's any difference between the two given commits.
+
+        Args:
+            base (str): Commit to use as base in the diff.
+            new (str): Commit to compare with the base.
+            patch (list): Target files in the diff.
+
+        returns:
+            Boolean: True if both commits differ. False otherwise.
+        """
+
+        if base == "":
+            return True
+
+        # Compare lines starting with '+' or '-'.
+        # This should be enough to ignore sneaky metadata updates on
+        # the file and duplicated commits.
+        diff = subprocess.run(["/usr/bin/git", "-C", str(self.kern_src), "diff",
+                               "--numstat", pattern, base, new,
+                               "--", str(patch)],
+                              stdout = subprocess.DEVNULL,
+                              stderr = subprocess.DEVNULL)
+
+        return diff.returncode
+
+    def get_commit_files(self, commit, regex=None):
+        """
+        Get the files that have been modified in one specific commit.
+        Optionally only get those that match the given regular expression.
+
+        Args:
+            commit (str): The commit to be anylized.
+            regex (str): Optional regex.
+
+        returns:
+            List: Return the files that match the regex, if set. Otherwise,
+            return all the files.
+        """
+
+        ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src,
+                                       "diff-tree", "--no-commit-id", "--name-only",
+                                       commit, "-r"]).decode()
+
+        return re.findall(regex, ret) if regex else ret.splitlines()
+
+    def get_commits(self, cve, savedir=None):
         if not self.kern_src:
             logging.info("kernel_src_dir not found, skip getting SUSE commits")
             return {}
@@ -143,22 +204,19 @@ class GitHelper(Config):
             logging.info("Invalid CVE number '%s', skipping the processing of getting the patches.", cve)
             return {}
 
-        print("Fetching changes from all supported branches...")
+        self.fetch_kernel_branches()
 
-        # Mount the command to fetch all branches for supported codestreams
-        subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
-                                 "--quiet", "--atomic", "--force", "--tags", "origin"] +
-                                list(self.kernel_branches.values()))
-
-        print("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
+        logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
         # Store all commits from each branch and upstream
         commits = {}
         # List of upstream commits, in creation date order
         ucommits = []
 
-        upatches = Path(self.lp_path, "upstream")
-        upatches.mkdir(exist_ok=True, parents=True)
+        upstream_patches_dir = None
+        if savedir:
+            upstream_patches_dir = Path(savedir)/"upstream"
+            upstream_patches_dir.mkdir(exist_ok=True, parents=True)
 
         # Get backported commits from all possible branches, in order to get
         # different versions of the same backport done in the CVE branches.
@@ -201,8 +259,6 @@ class GitHelper(Config):
                     continue
 
                 idx += 1
-                branch_path = Path(self.lp_path, "fixes", bc)
-                branch_path.mkdir(exist_ok=True, parents=True)
 
                 pfile = subprocess.check_output(
                     ["/usr/bin/git", "-C", self.kern_src, "show", f"remotes/origin/{mbranch}:{patch}"],
@@ -212,9 +268,12 @@ class GitHelper(Config):
                 # removing the patches.suse dir from the filepath
                 basename = PurePath(patch).name.replace(".patch", "")
 
-                # Save the patch for later review from the livepatch developer
-                with open(Path(branch_path, f"{idx:02d}-{basename}.patch"), "w") as f:
-                    f.write(pfile)
+                if savedir:
+                    branch_path = Path(savedir)/"fixes"/bc
+                    branch_path.mkdir(exist_ok=True, parents=True)
+                    # Save the patch for later review from the livepatch developer
+                    with open(Path(branch_path, f"{idx:02d}-{basename}.patch"), "w") as f:
+                        f.write(pfile)
 
                 # Get the upstream commit and save it. The Git-commit can be
                 # missing from the patch if the commit is not backporting the
@@ -240,6 +299,7 @@ class GitHelper(Config):
                             self.kern_src,
                             "log",
                             "--numstat",
+                            "--reverse",
                             "--no-merges",
                             "--pretty=oneline",
                             f"remotes/origin/{mbranch}",
@@ -249,7 +309,7 @@ class GitHelper(Config):
                         stderr=subprocess.STDOUT,
                     ).decode("ISO-8859-1")
                 except subprocess.CalledProcessError:
-                    print(
+                    logging.warn(
                         f"File {fname} doesn't exists {mbranch}. It could "
                         " be removed, so the branch is not affected by the issue."
                     )
@@ -257,6 +317,7 @@ class GitHelper(Config):
                     continue
 
                 iphashes = iter(phashes.splitlines())
+                base = ""
                 for hash_entry in iphashes:
                     stats = next(iphashes)
 
@@ -266,23 +327,32 @@ class GitHelper(Config):
 
                     # Skip commits that change one single line. Most likely just a
                     # reference update.
-                    if stats.split()[0] is "1":
+                    if stats.split()[0] == "1":
                         continue
+
+                    hash_commit = hash_entry.split(" ")[0]
 
                     # Sometimes we can have a commit that touches two files. In
                     # these cases we can have duplicated hash commits, since git
                     # history for each individual file will show the same hash.
                     # Skip if the same hash already exists.
-                    hash_commit = hash_entry.split(" ")[0]
-                    if hash_commit not in commits[bc]["commits"]:
-                        commits[bc]["commits"].append(hash_commit)
+                    if hash_commit in commits[bc]["commits"]:
+                        continue
+
+                    diff = self.diff_commits(base, hash_commit, patch, r"-G'^\+|^-'")
+                    # Skip commit if the file's content is the same as the previous one.
+                    if not diff:
+                        continue
+
+                    base = hash_commit
+                    commits[bc]["commits"].append(hash_commit)
 
         # Grab each commits subject and date for each commit. The commit dates
         # will be used to sort the patches in the order they were
         # created/merged.
         ucommits_sort = []
         for c in ucommits:
-            d, msg = GitHelper.get_commit_data(c, upatches)
+            d, msg = GitHelper.get_commit_data(c, upstream_patches_dir)
             ucommits_sort.append((d, c, msg))
 
         ucommits_sort.sort()
@@ -290,16 +360,16 @@ class GitHelper(Config):
         for d, c, msg in ucommits_sort:
             commits["upstream"]["commits"].append(f'{c} ("{msg}")')
 
-        print("")
+        logging.info("")
 
         for key, val in commits.items():
-            print(f"{key}")
+            logging.info(f"{key}")
             branch_commits = val["commits"]
             if not branch_commits:
-                print("None")
+                logging.info("None")
             for c in branch_commits:
-                print(c)
-            print("")
+                logging.info(c)
+            logging.info("")
 
         return commits
 
@@ -342,15 +412,29 @@ class GitHelper(Config):
         ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "log",
                                        f"--grep=CVE-{cve}",
                                        f"--tags=*rpm-{kernel}",
-                                       "--pretty=oneline"])
+                                       "--format='%at-%H-%s'"]).decode().splitlines()
+        # Sort by date
+        ret.sort(reverse=True)
 
-        for line in ret.decode().splitlines():
+        for line in ret:
             # Skip the Update commits, that only change the References tag
             if "Update" in line and "patches.suse" in line:
                 continue
 
             # Parse commit's hash
-            commits.append(line.split()[0])
+            c = line.split("-")[1]
+
+            files = self.get_commit_files(c, r"patches\.suse\/.+\.patch")
+            if len(files) == 0:
+                continue
+
+            # Match 1:1 with the commits found in SLE branch
+            for s in suse_commits:
+                diff = self.diff_commits(s, c, files)
+                if not diff:
+                    # Found same commit
+                    commits.append(c)
+                    break
 
         # "patched kernels" are those which contain all commits.
         return len(suse_commits) == len(commits), commits
@@ -367,7 +451,7 @@ class GitHelper(Config):
             logging.info("No CVE informed, skipping the processing of getting the patched kernels.")
             return []
 
-        print("Searching for already patched codestreams...")
+        logging.info("Searching for already patched codestreams...")
 
         kernels = []
 
@@ -391,17 +475,17 @@ class GitHelper(Config):
                 if not patched and kernel not in suse_tags:
                     continue
 
-                print(f"\n{cs.name()} ({kernel}):")
+                logging.debug(f"\n{cs.name()} ({kernel}):")
 
                 # If no patches/commits were found for this kernel, fallback to
                 # the commits in the main SLE branch. In either case, we can
                 # assume that this kernel is already patched.
                 for c in kern_commits if patched else suse_commits:
-                    print(f"{c}")
+                    logging.debug(f"{c}")
 
                 kernels.append(kernel)
 
-        print("")
+        logging.debug("")
 
         # remove duplicates
         return natsorted(list(set(kernels)))
@@ -417,140 +501,3 @@ class GitHelper(Config):
 
         return len(commits[cs.name_cs()]["commits"]) > 0
 
-
-    @staticmethod
-    def download_supported_file(data_path, lp_path):
-        logging.info("Downloading codestreams file")
-        cs_url = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
-        suse_cert = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
-        if suse_cert.exists():
-            req = requests.get(cs_url, verify=suse_cert, timeout=15)
-        else:
-            req = requests.get(cs_url, timeout=15)
-
-        # exit on error
-        req.raise_for_status()
-
-        first_line = True
-        codestreams = []
-        for line in req.iter_lines():
-            # skip empty lines
-            if not line:
-                continue
-
-            # skip file header
-            if first_line:
-                first_line = False
-                continue
-
-            # remove the last two columns, which are dates of the line
-            # and add a fifth field with the forth one + rpm- prefix, and
-            # remove the build counter number
-            full_cs, proj, kernel_full, _, _ = line.decode("utf-8").strip().split(",")
-
-            kernel = re.sub(r"\.\d+$", "", kernel_full)
-
-            # MICRO releases contain project/patchid format
-            if "/" in proj:
-                proj, patchid = proj.split("/")
-            else:
-                patchid = ""
-
-            codestreams.append(Codestream.from_codestream(data_path, lp_path, full_cs,
-                                                          proj, patchid, kernel))
-
-        return codestreams
-
-
-    def scan(self, cve, conf, no_check):
-        # Always get the latest supported.csv file and check the content
-        # against the codestreams informed by the user
-        all_codestreams = GitHelper.download_supported_file(self.data, self.lp_path)
-
-        if not cve or no_check:
-            commits = {}
-            patched_kernels = []
-        else:
-            commits = self.get_commits(cve)
-            patched_kernels = self.get_patched_kernels(all_codestreams, commits, cve)
-
-        # list of codestreams that matches the file-funcs argument
-        working_cs = []
-        patched_cs = []
-        unaffected_cs = []
-        data_missing = []
-        cs_missing = []
-        conf_not_set = []
-
-        if no_check:
-            logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
-
-        for cs in all_codestreams:
-            # Skip patched codestreams
-            if not no_check:
-                if cs.kernel in patched_kernels:
-                    patched_cs.append(cs.name())
-                    continue
-
-                if not GitHelper.cs_is_affected(cs, cve, commits):
-                    unaffected_cs.append(cs)
-                    continue
-
-            cs.set_archs()
-
-            if conf and not cs.get_boot_file("config").exists():
-                data_missing.append(cs)
-                cs_missing.append(cs.name())
-                # recheck later if we can add the missing codestreams
-                continue
-
-            if conf and not cs.get_all_configs(conf):
-                conf_not_set.append(cs)
-                continue
-
-            working_cs.append(cs)
-
-        # Found missing cs data, downloading and extract
-        if data_missing:
-            logging.info("Download the necessary data from the following codestreams:")
-            logging.info("\t%s\n", " ".join(cs_missing))
-            IBS(self.lp_name, self.lp_filter).download_cs_data(data_missing)
-            logging.info("Done.")
-
-            for cs in data_missing:
-                # Ok, the downloaded codestream has the configuration set
-                if cs.get_all_configs(conf):
-                    working_cs.append(cs)
-                # Nope, the config is missing, so don't add it to working_cs
-                else:
-                    conf_not_set.append(cs)
-
-        if conf_not_set:
-            cs_list = utils.classify_codestreams(conf_not_set)
-            logging.info("Skipping codestreams without %s set:", conf)
-            logging.info("\t%s", " ".join(cs_list))
-
-        if patched_cs:
-            cs_list = utils.classify_codestreams(patched_cs)
-            logging.info("Skipping already patched codestreams:")
-            logging.info("\t%s", " ".join(cs_list))
-
-        if unaffected_cs:
-            cs_list = utils.classify_codestreams(unaffected_cs)
-            logging.info("Skipping unaffected codestreams (missing backports):")
-            logging.info("\t%s", " " .join(cs_list))
-
-        # working_cs will contain the final dict of codestreams that wast set
-        # by the user, avoid downloading missing codestreams that are not affected
-        working_cs = utils.filter_codestreams(self.lp_filter, self.lp_skip,
-                                     working_cs, verbose=True)
-
-        if not working_cs:
-            logging.info("All supported codestreams are already patched. Exiting klp-build")
-            sys.exit(0)
-
-        logging.info("All affected codestreams:")
-        cs_list = utils.classify_codestreams(working_cs)
-        logging.info("\t%s", " ".join(cs_list))
-
-        return commits, patched_cs, patched_kernels, working_cs

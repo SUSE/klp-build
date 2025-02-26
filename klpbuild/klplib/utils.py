@@ -4,20 +4,24 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import copy
-import git
 import gzip
 import io
 import logging
 import lzma
+import os
 import platform
 import re
+import git
 import zstandard
 
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
+from pathlib import Path, PurePath
 
 from natsort import natsorted
+
+from klpbuild.klplib.config import get_user_path
 
 ARCH = platform.processor()
 ARCHS = ["ppc64le", "s390x", "x86_64"]
@@ -80,8 +84,16 @@ def classify_codestreams(cs_list):
     return natsorted(ret_list)
 
 
+def classify_codestreams_str(cs_list):
+    return " ".join(classify_codestreams(cs_list))
+
+
 def is_mod(mod):
     return mod != "vmlinux"
+
+
+def get_lp_number(lp_name):
+    return lp_name.replace("bsc", "")
 
 
 def get_elf_modinfo_entry(elffile, conf):
@@ -201,19 +213,19 @@ def get_cs_branch(cs, lp_name, git_dir):
     return branch_name
 
 
-def check_module_unsupported(mod_path):
-    elffile = get_elf_object(mod_path)
+def check_module_unsupported(arch, mod_path):
+    elffile = get_elf_object(get_datadir(arch)/mod_path)
     return "no" == get_elf_modinfo_entry(elffile, "supported")
 
 
-def filter_codestreams(lp_filter, lp_skip, cs_list, verbose=False):
+def filter_codestreams(lp_filter, cs_list, verbose=False):
     if isinstance(cs_list, dict):
         full_cs = copy.deepcopy(list(cs_list.values()))
     else:
         full_cs = copy.deepcopy(cs_list)
 
     if verbose:
-        logging.info("Checking filter and skips...")
+        logging.info("Checking filter...")
 
     result = []
     filtered = []
@@ -224,17 +236,12 @@ def filter_codestreams(lp_filter, lp_skip, cs_list, verbose=False):
             filtered.append(name)
             continue
 
-        if lp_skip and re.match(lp_skip, name):
-            filtered.append(name)
-            continue
-
         result.append(cs)
 
     if verbose:
         if filtered:
             logging.info("Skipping codestreams:")
-            clist = " ".join(classify_codestreams(filtered))
-            logging.info("\t%s", clist)
+            logging.info("\t%s", classify_codestreams_str(filtered))
 
     return result
 
@@ -252,6 +259,17 @@ def fix_mod_string(mod):
     # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
     # and in kallsyms lookup
     return mod.replace("-", "_")
+
+
+def get_fname(src_name):
+    """
+    Get the source name and transforms into a string version of it, without the extension.
+
+    Returns:
+        String: The same src_name string without externsion and hyphens replaced by underscores.
+    """
+
+    return str(Path(src_name).with_suffix("")).replace("-", "_")
 
 
 def get_kgraft_branch(cs_name):
@@ -274,3 +292,61 @@ def get_kgraft_branch(cs_name):
         return "master-livepatch-sle15sp4"
 
     return "master-livepatch-sle15sp6"
+
+
+def get_workdir(lp_name):
+    """
+    Get the working directory for a given livepatch name.
+
+    Args:
+        lp_name (str): The name of the livepatch.
+
+    Returns:
+        Path: The full path to the livepatch file.
+    """
+    return get_user_path('work_dir')/lp_name
+
+
+def get_datadir(arch=""):
+    """
+    Get the data directory.
+
+    Returns:
+        Path: The full path to the livepatch file.
+    """
+    if arch:
+        assert arch in ARCHS
+    data_dir = get_user_path('data_dir')
+    return data_dir/arch if arch else data_dir
+
+
+def get_tests_path(lp_name):
+    """
+    Retrieves the path of the test script associated with a given live patch name.
+
+    Args:
+        lp_name (str): The live patch name to search for the test script.
+
+    Raises:
+        RuntimeError: If no test script is found.
+
+    Returns:
+        Path: The path to the test script or directory containing it.
+    """
+    kgr_path = get_user_path('kgr_patches_tests_dir')
+
+    test_sh = kgr_path/(lp_name+"_test_script.sh")
+    if test_sh.is_file():
+        return test_sh
+
+    test_dir_sh = kgr_path/lp_name/"test_script.sh"
+    if test_dir_sh.is_file():
+        # For more complex tests we support using a directory containing
+        # as much files as needed. A `test_script.sh` is still required
+        # as an entry point.
+        return PurePath(test_dir_sh).parent
+
+    raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
+
+def in_test_mode():
+    return os.getenv("TEST_MODE", 'n') == 'y'

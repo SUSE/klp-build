@@ -21,27 +21,27 @@ from filelock import FileLock
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.config import Config
+from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
+from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.templ import TemplateGen
 
 
-class Extractor(Config):
+class Extractor():
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
-        super().__init__(lp_name)
 
         self.lp_name = lp_name
-        self.sdir_lock = FileLock(Path(self.data, utils.ARCH, "sdir.lock"))
+        self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
         self.sdir_lock.acquire()
 
-        if not self.lp_path.exists():
-            raise ValueError(f"{self.lp_path} not created. Run the setup subcommand first")
+        if not utils.get_workdir(lp_name).exists():
+            raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
         patches = self.get_patches_dir()
         self.lp_filter = lp_filter
         self.apply_patches = apply_patches
         self.avoid_ext = avoid_ext
 
-        workers = self.get_user_settings('workers', True)
+        workers = get_user_settings('workers', True)
         if workers == "":
             self.workers = 4
         else:
@@ -269,7 +269,7 @@ class Extractor(Config):
 
 
     def get_patches_dir(self):
-        return Path(self.lp_path, "fixes")
+        return utils.get_workdir(self.lp_name)/"fixes"
 
     def remove_patches(self, cs, fil):
         sdir = cs.get_src_dir()
@@ -361,7 +361,7 @@ class Extractor(Config):
         return None
 
     def cmd_args(self, cs, fname, out_dir, fdata, cmd):
-        lp_out = Path(out_dir, cs.lp_out_file(fname))
+        lp_out = Path(out_dir, cs.lp_out_file(self.lp_name, fname))
 
         funcs = ",".join(fdata["symbols"])
 
@@ -402,7 +402,7 @@ class Extractor(Config):
         env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt else "0"
         env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
         env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
-        env["KCP_PATCHED_OBJ"] = str(cs.get_mod(fdata["module"]))
+        env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.ARCH)/cs.get_mod(fdata["module"]))
         env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
         env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
         env["KCP_WORK_DIR"] = str(out_dir)
@@ -430,7 +430,7 @@ class Extractor(Config):
 
         logging.info(f"{idx} {cs_info} {fname}")
 
-        out_dir = cs.work_dir(fname)
+        out_dir = cs.get_ccp_work_dir(self.lp_name, fname)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # create symlink to the respective codestream file
@@ -468,7 +468,7 @@ class Extractor(Config):
 
         cs.files[fname]["ext_symbols"] = self.get_symbol_list(out_dir)
 
-        lp_out = Path(out_dir, cs.lp_out_file(fname))
+        lp_out = Path(out_dir, cs.lp_out_file(self.lp_name, fname))
 
         # Remove the local path prefix of the klp-ccp generated comments
         # Open the file, read, seek to the beginning, write the new data, and
@@ -481,10 +481,9 @@ class Extractor(Config):
             f.truncate()
 
     def run(self):
-        logging.info(f"Work directory: {self.lp_path}")
+        logging.info(f"Work directory: %s", utils.get_workdir(self.lp_name))
 
-        working_cs = utils.filter_codestreams(self.lp_filter, "",
-                                     self.codestreams, verbose=True)
+        working_cs = utils.filter_codestreams(self.lp_filter, get_codestreams_dict(), verbose=True)
 
         if len(working_cs) == 0:
             logging.error("No codestreams found")
@@ -496,7 +495,7 @@ class Extractor(Config):
         i = 1
         for cs in working_cs:
             # remove any previously generated files and leftover patches
-            shutil.rmtree(cs.dir(), ignore_errors=True)
+            shutil.rmtree(cs.get_ccp_dir(self.lp_name), ignore_errors=True)
             self.remove_patches(cs, self.quilt_log)
 
             # Apply patches before the LPs were created
@@ -523,7 +522,7 @@ class Extractor(Config):
                 sys.exit(1)
 
         # Save the ext_symbols set by execute
-        self.flush_cs_file(working_cs)
+        store_codestreams(self.lp_name, working_cs)
 
         tem = TemplateGen(self.lp_name)
 
@@ -533,9 +532,7 @@ class Extractor(Config):
         for cs in working_cs:
             tem.generate_livepatches(cs)
 
-        self.group_equal_files(args)
-
-        tem.generate_commit_msg_file()
+        self.group_equal_files(working_cs)
 
         logging.info("Checking the externalized symbols in other architectures...")
 
@@ -557,7 +554,7 @@ class Extractor(Config):
                     obj_syms[obj].extend(syms)
 
             for obj, syms in obj_syms.items():
-                missing = cs.check_symbol_archs(self.cs_data.archs, obj, syms, True)
+                missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True)
                 if missing:
                     for arch, arch_syms in missing.items():
                         missing_syms.setdefault(arch, {})
@@ -566,88 +563,83 @@ class Extractor(Config):
                         missing_syms[arch][obj][cs.name()].extend(arch_syms)
 
         if missing_syms:
-            with open(Path(self.lp_path, "missing_syms"), "w") as f:
+            with open(utils.get_workdir(self.lp_name)/"missing_syms", "w") as f:
                 f.write(json.dumps(missing_syms, indent=4))
 
             logging.warning("Symbols not found:")
             logging.warning(json.dumps(missing_syms, indent=4))
 
-    def get_work_lp_file(self, cs, fname):
-        return Path(cs.work_dir(fname), cs.lp_out_file(fname))
-
-    def get_cs_code(self, args):
+    def get_cs_code(self, working_cs):
         cs_files = {}
 
         # Mount the cs_files dict
-        for arg in args:
-            _, file, cs, _ = arg
+        for cs in working_cs:
             cs_files.setdefault(cs.name(), [])
 
-            fpath = self.get_work_lp_file(cs, file)
-            with open(fpath, "r+") as fi:
-                src = fi.read()
+            for fpath in cs.get_lp_dir(self.lp_name).iterdir():
+                fname = fpath.name
+                with open(fpath.absolute(), "r+") as fi:
+                    src = fi.read()
 
-                src = re.sub(r'#include ".+kconfig\.h"\n', "", src)
-                # Since 15.4 klp-ccp includes a compiler-version.h header
-                src = re.sub(r'#include ".+compiler\-version\.h"\n', "", src)
-                # Since RT variants, there is now an definition for auto_type
-                src = src.replace(r"#define __auto_type int\n", "")
-                # We have problems with externalized symbols on macros. Ignore
-                # codestream names specified on paths that are placed on the
-                # expanded macros
-                src = re.sub(f"{cs.get_data_dir(utils.ARCH)}.+{file}", "", src)
-                # We can have more details that can differ for long expanded
-                # macros, like the patterns bellow
-                src = re.sub(r"\.lineno = \d+,", "", src)
+                    src = re.sub(r'#include ".+kconfig\.h"\n', "", src)
+                    # Since 15.4 klp-ccp includes a compiler-version.h header
+                    src = re.sub(r'#include ".+compiler\-version\.h"\n', "", src)
+                    # Since RT variants, there is now an definition for auto_type
+                    src = src.replace(r"#define __auto_type int\n", "")
+                    # We have problems with externalized symbols on macros. Ignore
+                    # codestream names specified on paths that are placed on the
+                    # expanded macros
+                    src = re.sub(f"{utils.get_datadir(utils.ARCH)}.+{fname}", "", src)
+                    # We can have more details that can differ for long expanded
+                    # macros, like the patterns bellow
+                    src = re.sub(r"\.lineno = \d+,", "", src)
 
-                # Remove any mentions to klpr_trace, since it's currently
-                # buggy in klp-ccp
-                src = re.sub(r".+klpr_trace.+", "", src)
+                    # Remove any mentions to klpr_trace, since it's currently
+                    # buggy in klp-ccp
+                    src = re.sub(r".+klpr_trace.+", "", src)
 
-                # Reduce the noise from klp-ccp when expanding macros
-                src = re.sub(r"__compiletime_assert_\d+", "__compiletime_assert", src)
+                    # Reduce the noise from klp-ccp when expanding macros
+                    src = re.sub(r"__compiletime_assert_\d+", "__compiletime_assert", src)
 
-                # Remove empty lines
-                src = "".join([s for s in src.strip().splitlines(True) if s.strip()])
+                    # Remove empty lines
+                    src = "".join([s for s in src.strip().splitlines(True) if s.strip()])
 
-                cs_files[cs.name()].append((file, src))
+                    cs_files[cs.name()].append((fname, src))
 
         return cs_files
 
-    # cs_list should be only two entries
-    def diff_cs(self):
-        args = []
+    def cs_diff(self):
+        """
+        To compare two codestreams the filter should result in exactly two codestreams
+        """
+        cs_args = utils.filter_codestreams(self.lp_filter, get_codestreams_dict(), verbose=True)
+        if len(cs_args) != 2:
+            logging.error("The filter specified found %d while it should point to only 2.", len(cs_args))
+            sys.exit(1)
 
-        cs_cmp = []
+        assert len(cs_args) == 2
 
-        for cs in utils.filter_codestreams(self.lp_filter, "",
-                                  self.codestreams, verbose=True):
+        cs_code = self.get_cs_code(cs_args)
 
-            cs_cmp.append(cs.name())
-            for fname, _ in cs.files.items():
-                args.append((_, fname, cs, _))
+        cs1 = cs_args[0].name()
+        cs2 = cs_args[1].name()
 
-        assert len(cs_cmp) == 2
-
-        cs_code = self.get_cs_code(args)
-        f1 = cs_code.get(cs_cmp[0])
-        f2 = cs_code.get(cs_cmp[1])
+        f1 = cs_code.get(cs1)
+        f2 = cs_code.get(cs2)
 
         assert len(f1) == len(f2)
 
-        for i in range(len(f1)):
-            content1 = f1[i][1].splitlines()
-            content2 = f2[i][1].splitlines()
-
-            for l in dl.unified_diff(content1, content2, fromfile=f1[i][0], tofile=f2[i][0]):
-                print(l)
+        for _, (v1, v2) in enumerate(zip(f1, f2)):
+            for line in dl.unified_diff(v1[1].splitlines(), v2[1].splitlines(), fromfile=f"{cs1} {v1[0]}",
+                                        tofile=f"{cs2} {v1[0]}"):
+                print(line)
 
     # Get the code for each codestream, removing boilerplate code
-    def group_equal_files(self, args):
+    def group_equal_files(self, working_cs):
         cs_equal = []
         processed = []
 
-        cs_files = self.get_cs_code(args)
+        cs_files = self.get_cs_code(working_cs)
         toprocess = list(cs_files.keys())
         while len(toprocess):
             current_cs_list = []
@@ -701,12 +693,12 @@ class Extractor(Config):
         # same code
         groups = []
         for cs_list in cs_equal:
-            groups.append(" ".join(utils.classify_codestreams(cs_list)))
+            groups.append(utils.classify_codestreams_str(cs_list))
 
         # Sort between all groups of codestreams
         groups = natsorted(groups)
 
-        with open(Path(self.lp_path, "ccp", "groups"), "w") as f:
+        with open(utils.get_workdir(self.lp_name)/"ccp"/"groups", "w") as f:
             f.write("\n".join(groups))
 
         logging.info("\nGrouping codestreams that share the same content and files:")

@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0-only
 #
-# Copyright (C) 2021-2024 SUSE
+# Copyright (C) 2021-2025 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import concurrent.futures
 import errno
+import importlib
 import logging
 import os
 import re
@@ -14,7 +15,6 @@ import sys
 import time
 from operator import itemgetter
 from pathlib import Path
-import pkg_resources
 
 import requests
 from lxml import etree
@@ -23,12 +23,14 @@ from lxml.objectify import SubElement
 from natsort import natsorted
 from osctiny import Osc
 
-from klpbuild.klplib.config import Config
-from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_elf_object, get_elf_modinfo_entry, get_cs_branch, get_kgraft_branch, filter_codestreams
+from klpbuild.klplib.codestream import Codestream
+from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
+from klpbuild.klplib.config import get_user_path, get_user_settings
+from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path, classify_codestreams_str
 
-class IBS(Config):
+
+class IBS():
     def __init__(self, lp_name, lp_filter):
-        super().__init__(lp_name)
         self.osc = Osc(url="https://api.suse.de")
 
         self.lp_name = lp_name
@@ -37,7 +39,7 @@ class IBS(Config):
         self.ibs_user = self.osc.username
         self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
 
-        self.workers = int(self.get_user_settings("workers"))
+        self.workers = int(get_user_settings("workers"))
 
         # Total number of work items
         self.total = 0
@@ -107,7 +109,7 @@ class IBS(Config):
         if arch != "x86_64" and "-extra" in rpm:
             return
 
-        path_dest = cs.get_data_dir(arch)
+        path_dest = get_datadir(arch)
         path_dest.mkdir(exist_ok=True, parents=True)
 
         rpm_file = Path(dest, rpm)
@@ -137,10 +139,7 @@ class IBS(Config):
         if tries == 0:
             raise RuntimeError(f"Failed to extract {rpm}. Aborting")
 
-    def download_cs_data(self, cs_list):
-        rpms = []
-        i = 1
-
+    def get_cs_packages(self, cs_list, dest):
         # The packages that we search for are:
         # kernel-source
         # kernel-devel
@@ -154,8 +153,8 @@ class IBS(Config):
             "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
         }
 
-        dest = Path(self.data, "kernel-rpms")
-        dest.mkdir(exist_ok=True, parents=True)
+        rpms = []
+        i = 1
 
         logging.info("Getting list of files...")
         for cs in cs_list:
@@ -166,7 +165,7 @@ class IBS(Config):
                         pkg = cs.patchid
 
                     elif cs.rt:
-                    # RT kernels have different package names
+                        # RT kernels have different package names
                         if pkg == "kernel-default":
                             pkg = "kernel-rt"
                         elif pkg == "kernel-source":
@@ -185,7 +184,7 @@ class IBS(Config):
 
                         # Download all packages for the HOST arch
                         # For the others only download kernel-default
-                        if arch != ARCH and not re.search("kernel-default-\d", rpm):
+                        if arch != ARCH and not re.search(r"kernel-default-\d", rpm):
                             continue
 
                         # Extract the source and kernel-devel in the current
@@ -197,6 +196,14 @@ class IBS(Config):
 
                         rpms.append((i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
                         i += 1
+
+        return rpms
+
+    def download_cs_data(self, cs_list):
+        dest = get_datadir()/"kernel-rpms"
+        dest.mkdir(exist_ok=True, parents=True)
+
+        rpms = self.get_cs_packages(cs_list, dest)
 
         logging.info(f"Downloading {len(rpms)} rpms...")
         self.total = len(rpms)
@@ -230,9 +237,9 @@ class IBS(Config):
 
         # Create symlink from lib to usr/lib so we can use virtme on the
         # extracted kernels
-        usr_lib = Path(self.data, ARCH, "usr", "lib")
+        usr_lib = get_datadir()/ARCH/"usr"/"lib"
         if not usr_lib.exists():
-            usr_lib.symlink_to(Path(self.data, ARCH, "lib"))
+            usr_lib.symlink_to(get_datadir()/ARCH/"lib")
 
         logging.info("Finished extract vmlinux and modules...")
 
@@ -287,13 +294,13 @@ class IBS(Config):
         # Download all built rpms
         self.download()
 
-        test_src = self.get_tests_path(self.lp_name)
-        run_test = pkg_resources.resource_filename("scripts", "run-kgr-test.sh")
+        test_src = get_tests_path(self.lp_name)
+        run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
 
         logging.info(f"Validating the downloaded RPMs...")
 
         for arch in ARCHS:
-            tests_path = Path(self.lp_path, "tests", arch)
+            tests_path = get_workdir(self.lp_name)/"tests"/arch
             test_arch_path = Path(tests_path, self.lp_name)
 
             # Remove previously created directory and archive
@@ -308,11 +315,11 @@ class IBS(Config):
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs in filter_codestreams(self.lp_filter, "", self.codestreams):
+            for cs in filter_codestreams(self.lp_filter, get_codestreams_dict()):
                 if arch not in cs.archs:
                     continue
 
-                rpm_dir = Path(cs.dir(), arch, "rpm")
+                rpm_dir = Path(cs.get_ccp_dir(self.lp_name), arch, "rpm")
                 if not rpm_dir.exists():
                     logging.info(f"{cs.name()}/{arch}: rpm dir not found. Skipping.")
                     continue
@@ -364,7 +371,7 @@ class IBS(Config):
     def delete_rpms(self, cs):
         try:
             for arch in cs.archs:
-                shutil.rmtree(Path(cs.dir(), arch, "rpm"), ignore_errors=True)
+                shutil.rmtree(Path(cs.get_ccp_dir(self.lp_name), arch, "rpm"), ignore_errors=True)
         except KeyError:
             pass
 
@@ -376,7 +383,7 @@ class IBS(Config):
             cs_name = self.convert_prj_to_cs(prj)
 
             # Get the codestream from the dict
-            cs = self.codestreams.get(cs_name, None)
+            cs = get_codestream_by_name(cs_name)
             if not cs:
                 logging.info(f"Codestream {cs_name} is stale. Deleting it.")
                 self.delete_project(0, prj, False)
@@ -397,7 +404,7 @@ class IBS(Config):
                         continue
 
                     # Create a directory for each arch supported
-                    dest = Path(cs.dir(), str(arch), "rpm")
+                    dest = Path(cs.get_ccp_dir(self.lp_name), str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
                     rpms.append((i, cs, prj, "standard", arch, "klp", rpm, dest))
@@ -494,8 +501,8 @@ class IBS(Config):
         return prj
 
     def create_lp_package(self, i, cs):
-        kgr_path = self.get_user_path('kgr_patches_dir')
-        branch = get_cs_branch(cs, cs.lp_name, kgr_path)
+        kgr_path = get_user_path('kgr_patches_dir')
+        branch = get_cs_branch(cs, self.lp_name, kgr_path)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
@@ -520,11 +527,11 @@ class IBS(Config):
             raise RuntimeError("") from e
 
         # Remove previously created directories
-        prj_path = Path(cs.dir(), "checkout")
+        prj_path = Path(cs.get_ccp_dir(self.lp_name), "checkout")
         if prj_path.exists():
             shutil.rmtree(prj_path)
 
-        code_path = Path(cs.dir(), "code")
+        code_path = Path(cs.get_ccp_dir(self.lp_name), "code")
         if code_path.exists():
             shutil.rmtree(code_path)
 
@@ -562,8 +569,8 @@ class IBS(Config):
         # Otherwise only warn the caller about this fact.
         # This scenario can occur in case of LPing function that is already
         # part of different LP in which case we modify the existing one.
-        if cs.lp_name not in os.listdir(code_path):
-            logging.warning(f"Warning: Directory {cs.lp_name} not found on branch {branch}")
+        if self.lp_name not in os.listdir(code_path):
+            logging.warning(f"Warning: Directory {self.lp_name} not found on branch {branch}")
 
         # Fix RELEASE version
         with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
@@ -587,17 +594,30 @@ class IBS(Config):
 
         logging.info(f"({i}/{self.total}) {cs.name()} done")
 
-    def log(self, cs, arch):
-        logging.info(self.osc.build.get_log(self.cs_to_project(cs), "standard", arch, "klp"))
+    def log(self, arch):
+        cs_list = filter_codestreams(self.lp_filter, get_codestreams_dict())
+
+        if not cs_list:
+            logging.error("log: No codestreams found for filter %s", self.lp_filter)
+            sys.exit(1)
+
+        if len(cs_list) > 1:
+            cs_names = [cs.name() for cs in cs_list]
+            logging.error("Filter '%s' returned %d entries (%s), while expecting just one. Aborting. ",
+                          self.lp_filter, len(cs_list), " ".join(cs_names))
+            sys.exit(1)
+
+        logging.info(self.osc.build.get_log(self.cs_to_project(cs_list[0]), "standard", arch, "klp"))
 
     def push(self, wait=False):
-        cs_list = filter_codestreams(self.lp_filter, "", self.codestreams)
+        cs_list = filter_codestreams(self.lp_filter, get_codestreams_dict())
 
         if not cs_list:
             logging.error(f"push: No codestreams found for {self.lp_name}")
             sys.exit(1)
 
-        logging.info(f"Preparing {len(cs_list)} projects on IBS...")
+        logging.info("Pushing %d codestreams: %s", len(cs_list),
+                     classify_codestreams_str(cs_list))
 
         self.total = len(cs_list)
         i = 1
