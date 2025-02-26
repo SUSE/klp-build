@@ -142,7 +142,7 @@ class GitHelper():
                                     list(self.kernel_branches.values()))
 
 
-    def diff_commits(self, base, new, patch):
+    def diff_commits(self, base, new, patch, pattern=""):
         """
         Check if there's any difference between the two given commits.
 
@@ -162,7 +162,7 @@ class GitHelper():
         # This should be enough to ignore sneaky metadata updates on
         # the file and duplicated commits.
         diff = subprocess.run(["/usr/bin/git", "-C", str(self.kern_src), "diff",
-                               "--numstat", r"-G'^\+|^-'", base, new,
+                               "--numstat", pattern, base, new,
                                "--", str(patch)],
                               stdout = subprocess.DEVNULL,
                               stderr = subprocess.DEVNULL)
@@ -339,7 +339,7 @@ class GitHelper():
                     if hash_commit in commits[bc]["commits"]:
                         continue
 
-                    diff = self.diff_commits(base, hash_commit, patch)
+                    diff = self.diff_commits(base, hash_commit, patch, r"-G'^\+|^-'")
                     # Skip commit if the file's content is the same as the previous one.
                     if not diff:
                         continue
@@ -412,7 +412,7 @@ class GitHelper():
         ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "log",
                                        f"--grep=CVE-{cve}",
                                        f"--tags=*rpm-{kernel}",
-                                       "--format='%at-%H-%f'"]).decode().splitlines()
+                                       "--format='%at-%H-%s'"]).decode().splitlines()
         # Sort by date
         ret.sort(reverse=True)
 
