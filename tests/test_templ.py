@@ -119,6 +119,15 @@ def test_check_header_file_included():
     assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_kernel_events_core.c")
     assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_net_ipv6_rpl.c")
 
+    # Check that for file kernel/events/core.c there are externalized symbols, so the prototype
+    # of init/cleanup are created on header
+    # As net/ipv6/rpl.c there are no externalized symbols we expect that it's prototype isn't
+    # created on livepatch_header file
+    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
+    assert "kernel_events_core_init(void);" in header
+    assert "kernel_events_core_cleanup(void);" in header
+    assert "net_ipv6_rpl" not in header
+
 
 def test_templ_cve_specified():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
