@@ -7,7 +7,7 @@ import inspect
 
 from klpbuild.klplib import utils
 from klpbuild.plugins.extractor import Extractor
-from klpbuild.plugins.setup import Setup
+from klpbuild.plugins.setup import setup
 from tests.utils import get_file_content
 
 
@@ -15,14 +15,19 @@ def test_templ_with_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u19"
 
-    lp_setup = Setup(lp)
-    ffuncs = Setup.setup_file_funcs("CONFIG_PROC_FS", "vmlinux", [
-                                  ["fs/proc/cmdline.c", "cmdline_proc_show"]], [], [])
-
-    codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "conf": "CONFIG_PROC_FS", "no_check": False})
-
-    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+    setup_args = {
+        "lp_name" : lp,
+        "lp_filter": cs,
+        "no_check": False,
+        "archs" : utils.ARCHS,
+        "cve": None,
+        "conf": "CONFIG_PROC_FS",
+        "module" : "vmlinux",
+        "file_funcs" : [["fs/proc/cmdline.c", "cmdline_proc_show"]],
+        "mod_file_funcs" : [],
+        "conf_mod_file_funcs" : []
+    }
+    setup(**setup_args)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -53,14 +58,19 @@ def test_templ_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u19"
 
-    lp_setup = Setup(lp)
-    ffuncs = Setup.setup_file_funcs("CONFIG_IPV6", "vmlinux", [
-                                  ["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]], [], [])
-
-    codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "conf": "CONFIG_IPV6", "no_check": False})
-
-    lp_setup.setup_project_files(codestreams, ffuncs, [utils.ARCH])
+    setup_args = {
+        "lp_name" : lp,
+        "lp_filter": cs,
+        "no_check": False,
+        "archs" : [utils.ARCH],
+        "cve": None,
+        "conf": "CONFIG_IPV6",
+        "module" : "vmlinux",
+        "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]],
+        "mod_file_funcs" : [],
+        "conf_mod_file_funcs" : []
+    }
+    setup(**setup_args)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -95,15 +105,21 @@ def test_check_header_file_included():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u17"
 
-    lp_setup = Setup(lp)
-    ffuncs = Setup.setup_file_funcs("CONFIG_IPV6", "vmlinux", [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"],
-                                                               ["kernel/events/core.c", "perf_event_exec"]],
-                                    [], [])
+    setup_args = {
+        "lp_name" : lp,
+        "lp_filter": cs,
+        "no_check": False,
+        "archs" : utils.ARCHS,
+        "cve": None,
+        "conf": "CONFIG_IPV6",
+        "module" : "vmlinux",
+        "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"],
+                        ["kernel/events/core.c", "perf_event_exec"]],
+        "mod_file_funcs" : [],
+        "conf_mod_file_funcs" : []
+    }
+    setup(**setup_args)
 
-    codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "conf": "CONFIG_IPV6", "no_check": False})
-
-    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -133,14 +149,19 @@ def test_templ_cve_specified():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.5u19"
 
-    lp_setup = Setup(lp)
-    ffuncs = Setup.setup_file_funcs("CONFIG_PROC_FS", "vmlinux", [
-                                  ["fs/proc/cmdline.c", "cmdline_proc_show"]], [], [])
-
-    codestreams = lp_setup.setup_codestreams(
-        {"cve": "1234-5678", "lp_filter": cs, "conf": "CONFIG_PROC_FS", "no_check": True})
-
-    lp_setup.setup_project_files(codestreams, ffuncs, [utils.ARCH])
+    setup_args = {
+        "lp_name" : lp,
+        "lp_filter": cs,
+        "no_check": True,
+        "archs" : [utils.ARCH],
+        "cve": "1234-5678",
+        "conf": "CONFIG_PROC_FS",
+        "module" : "vmlinux",
+        "file_funcs" : [["fs/proc/cmdline.c", "cmdline_proc_show"]],
+        "mod_file_funcs" : [],
+        "conf_mod_file_funcs" : []
+    }
+    setup(**setup_args)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -165,14 +186,19 @@ def test_templ_exts_mod_name():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "15.3u42"
 
-    lp_setup = Setup(lp)
-    ffuncs = Setup.setup_file_funcs("CONFIG_NVME_TCP", "nvme-tcp", [
-                                  ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
-
-    codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "conf": "CONFIG_NVME_TCP", "no_check": True})
-
-    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+    setup_args = {
+        "lp_name" : lp,
+        "lp_filter": cs,
+        "no_check": True,
+        "archs" : utils.ARCHS,
+        "cve": None,
+        "conf": "CONFIG_NVME_TCP",
+        "module" : "nvme-tcp",
+        "file_funcs" : [["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]],
+        "mod_file_funcs" : [],
+        "conf_mod_file_funcs" : []
+    }
+    setup(**setup_args)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -199,14 +225,20 @@ def test_templ_micro_is_ibt():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "6.0u2"
 
-    lp_setup = Setup(lp)
-    ffuncs = Setup.setup_file_funcs("CONFIG_NVME_TCP", "nvme-tcp", [
-                                  ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
+    setup_args = {
+        "lp_name" : lp,
+        "lp_filter": cs,
+        "no_check": True,
+        "archs" : utils.ARCHS,
+        "cve": None,
+        "conf": "CONFIG_NVME_TCP",
+        "module" : "nvme-tcp",
+        "file_funcs" : [["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]],
+        "mod_file_funcs" : [],
+        "conf_mod_file_funcs" : []
+    }
+    setup(**setup_args)
 
-    codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "conf": "CONFIG_NVME_TCP", "no_check": True})
-
-    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -227,14 +259,19 @@ def test_templ_ibt_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "6.0u2"
 
-    lp_setup = Setup(lp)
-    ffuncs = Setup.setup_file_funcs("CONFIG_IPV6", "vmlinux", [
-                                  ["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]], [], [])
-
-    codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "conf": "CONFIG_IPV6", "no_check": False})
-
-    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+    setup_args = {
+        "lp_name" : lp,
+        "lp_filter": cs,
+        "no_check": False,
+        "archs" : utils.ARCHS,
+        "cve": None,
+        "conf": "CONFIG_IPV6",
+        "module" : "vmlinux",
+        "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]],
+        "mod_file_funcs" : [],
+        "conf_mod_file_funcs" : []
+    }
+    setup(**setup_args)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
@@ -269,14 +306,19 @@ def test_templ_kbuild_has_contents():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "6.0u2"
 
-    lp_setup = Setup(lp)
-    ffuncs = Setup.setup_file_funcs("CONFIG_NVME_TCP", "nvme-tcp", [
-                                  ["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]], [], [])
-
-    codestreams = lp_setup.setup_codestreams(
-        {"cve": None, "lp_filter": cs, "conf": "CONFIG_NVME_TCP", "no_check": True})
-
-    lp_setup.setup_project_files(codestreams, ffuncs, utils.ARCHS)
+    setup_args = {
+        "lp_name" : lp,
+        "lp_filter": cs,
+        "no_check": True,
+        "archs" : utils.ARCHS,
+        "cve": None,
+        "conf": "CONFIG_NVME_TCP",
+        "module" : "nvme-tcp",
+        "file_funcs" : [["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]],
+        "mod_file_funcs" : [],
+        "conf_mod_file_funcs" : []
+    }
+    setup(**setup_args)
 
     Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
 
