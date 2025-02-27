@@ -78,7 +78,7 @@ def run(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
 
 def setup(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
           mod_file_funcs, conf_mod_file_funcs):
-    # TODO: make sure archs is an array
+    assert isinstance(archs, list)
 
     lp_path = utils.get_workdir(lp_name)
     if lp_path.exists() and not lp_path.is_dir():
