@@ -205,7 +205,7 @@ class IBS():
 
         rpms = self.get_cs_packages(cs_list, dest)
 
-        logging.info(f"Downloading {len(rpms)} rpms...")
+        logging.info("Downloading %s rpms...", len(rpms))
         self.total = len(rpms)
         self.do_work(self.download_and_extract, rpms)
 
@@ -215,7 +215,7 @@ class IBS():
             for arch in cs.archs:
                 # Extract modules and vmlinux files that are compressed
                 mod_path = cs.get_mod_path(arch)
-                for fext, ecmd in [("zst", "unzstd -f -d"), ("xz", "xz --quiet -d -k")]:
+                for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d -k")]:
                     cmd = rf'find {mod_path} -name "*.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
 
