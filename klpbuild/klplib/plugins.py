@@ -28,7 +28,8 @@ def try_run_plugin(name, args):
     """
     logging.debug("Trying to run plugin %s", name)
 
-    module = __get_plugin(name)
+    real_name = name.replace("-", "_")
+    module = __get_plugin(real_name)
     assert hasattr(module, "run"), f"Module {name} is not a plugin!"
 
     run_func = getattr(module, "run")

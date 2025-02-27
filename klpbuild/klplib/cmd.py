@@ -88,12 +88,6 @@ def create_parser() -> argparse.ArgumentParser:
     add_arg_lp_name(diff_opts)
     add_arg_lp_filter(diff_opts)
 
-    fmt = sub.add_parser(
-        "format-patches", help="SLE specific. Extract patches from kgraft-patches"
-    )
-    add_arg_lp_name(fmt)
-    add_arg_lp_filter(fmt)
-    fmt.add_argument("-v", "--version", type=int, required=True, help="Version to be added, like vX")
 
     patches = sub.add_parser("get-patches")
     add_arg_lp_name(patches)

@@ -50,9 +50,6 @@ def main():
     elif args.cmd == "get-patches":
         GitHelper(args.lp_filter).get_commits(args.cve, get_workdir(args.lp_name))
 
-    elif args.cmd == "format-patches":
-        GitHelper(args.lp_filter).format_patches(args.lp_name, args.version)
-
     elif args.cmd == "status":
         IBS(args.lp_name, args.lp_filter).status(args.wait)
 
