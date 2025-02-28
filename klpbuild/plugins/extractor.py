@@ -341,13 +341,12 @@ class Extractor():
         if not patched:
             raise RuntimeError(f"{cs.name()}({cs.kernel}): Failed to apply patches. Aborting")
 
-
-
     def get_cmd_from_json(self, cs, fname):
-        cc_file = Path(cs.get_obj_dir(), "compile_commands.json")
-        # FIXME: compile_commands.json that is packaged with SLE/openSUSE
-        # doesn't quite work yet, so don't use it yet.
-        return None
+        cc_file = cs.get_obj_dir()/"compile_commands.json"
+
+        # Older codestreams doens't support compile_commands.json, so use make for them
+        if not cc_file.exists():
+            return None
 
         with open(cc_file) as f:
             buf = f.read()
@@ -355,9 +354,12 @@ class Extractor():
         for d in data:
             if fname in d["file"]:
                 output = d["command"]
-                return Extractor.process_make_output(output)
+                # The arguments found on the file point to .., since they are generated
+                # when the kernel is compiled. Replace the .. by the codestream kernel source
+                # directory since klp-ccp needs to reach the files
+                return Extractor.process_make_output(output).replace("..", str(cs.get_src_dir()))
 
-        logging.error(f"Couldn't find cmdline for {fname}. Aborting")
+        logging.error("Couldn't find cmdline for %s. Aborting", fname)
         return None
 
     def cmd_args(self, cs, fname, out_dir, fdata, cmd):
@@ -439,9 +441,9 @@ class Extractor():
         # Make can regenerate fixdep for each file being processed per
         # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
         # calls. Make is pretty fast, so there isn't a real slow down here.
-        with self.make_lock:
-            cmd = self.get_cmd_from_json(cs, fname)
-            if not cmd:
+        cmd = self.get_cmd_from_json(cs, fname)
+        if not cmd:
+            with self.make_lock:
                 cmd = Extractor.get_make_cmd(out_dir, cs, fname, odir, sdir)
 
         if not cmd:
