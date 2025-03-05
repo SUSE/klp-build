@@ -135,3 +135,35 @@ def test_valite_conf_mod_file_funcs():
     assert sch["module"] == "sch_qfq"
     assert bts["conf"] == "CONFIG_BT_HCIBTSDIO"
     assert bts["module"] == "btsdio"
+
+
+def test_valite_conf_unsupported_arch():
+    # Make sure we error out in the case of a configuration entry that is not enabled
+    # on a codestream
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+
+    # CONFIG_HID is not enabled on s390x, so setup should fail here
+    LP_DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_HID", "no_check": False}
+    with pytest.raises(RuntimeError, match=rf"{CS}: CONFIG_HID not set on s390x"):
+        setup_args = {
+            "lp_name": lp,
+            "archs": utils.ARCHS,
+            "module": "vmlinux",
+            "file_funcs": [["drivers/hid/hid-core.c", "hid_alloc_report_buf"]],
+            "mod_file_funcs": [],
+            "conf_mod_file_funcs": [],
+            **LP_DEFAULT_DATA
+        }
+        setup(**setup_args)
+
+    # It shoudl succeed when s390x is removed from the setup command
+    setup_args = {
+        "lp_name": lp,
+        "archs": ["x86_64", "ppc64le"],
+        "module": "vmlinux",
+        "file_funcs": [["drivers/hid/hid-core.c", "hid_alloc_report_buf"]],
+        "mod_file_funcs": [],
+        "conf_mod_file_funcs": [],
+        **LP_DEFAULT_DATA
+    }
+    setup(**setup_args)

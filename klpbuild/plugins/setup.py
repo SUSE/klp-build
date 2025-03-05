@@ -142,6 +142,7 @@ def setup_codestreams(lp_name, data):
                          patched_cs=new_patched_cs, cve=data['cve'])
     return codestreams
 
+
 def setup_project_files(lp_name, codestreams, ffuncs, archs):
     utils.get_workdir(lp_name).mkdir(exist_ok=True)
 
@@ -163,7 +164,7 @@ def setup_project_files(lp_name, codestreams, ffuncs, archs):
         for f, fdata in cs.files.items():
 
             mod = fdata["module"]
-            cs.validate_config(fdata["conf"], mod)
+            cs.validate_config(archs, fdata["conf"], mod)
 
             sdir = cs.get_src_dir()
             if not Path(sdir, f).is_file():
