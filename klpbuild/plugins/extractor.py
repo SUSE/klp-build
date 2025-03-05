@@ -3,7 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 import difflib as dl
 import json
 import logging
@@ -158,8 +158,7 @@ class Extractor():
             elif shutil.which("gcc-7"):
                 cc = "gcc-7"
             else:
-                logging.error("Only gcc12 or higher are available, and it's problematic with kernel sources")
-                raise
+                raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
 
             make_args = [
                 "make",
@@ -187,9 +186,8 @@ class Extractor():
                 f.write(str(completed))
                 f.write("\n")
                 f.flush()
-            except subprocess.CalledProcessError as exc:
-                logging.error(f"Failed to run make for {cs.name()} ({cs.kernel}). Check file {str(log_path)} for more details.")
-                raise exc
+            except Exception:
+                raise RuntimeError(f"Failed to run make for {cs.name()} ({cs.kernel}). Check file {str(log_path)} for more details.")
 
             # 15.4 onwards changes the regex a little: -MD -> -MMD
             # 15.6 onwards we don't have -isystem.
@@ -210,9 +208,7 @@ class Extractor():
                 f.flush()
 
             if not result:
-                logging.error(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs.name()}. "
-                              f"Check file {str(log_path)} for more details.")
-                return None
+                raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs.name()}. Check file {str(log_path)} for more details.")
 
             ret = Extractor.process_make_output(result.group(1))
 
@@ -230,11 +226,8 @@ class Extractor():
 
             return ret
 
-        return None
-
-
-    # Generate the list of exported symbols
     def get_symbol_list(self, out_dir):
+        # Generate the list of exported symbols
         exts = []
 
         for ext_file in ["fun_exts", "obj_exts"]:
@@ -359,8 +352,7 @@ class Extractor():
                 # directory since klp-ccp needs to reach the files
                 return Extractor.process_make_output(output).replace("..", str(cs.get_src_dir()))
 
-        logging.error("Couldn't find cmdline for %s. Aborting", fname)
-        return None
+        raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
 
     def cmd_args(self, cs, fname, out_dir, fdata, cmd):
         lp_out = Path(out_dir, cs.lp_out_file(self.lp_name, fname))
@@ -446,9 +438,6 @@ class Extractor():
             with self.make_lock:
                 cmd = Extractor.get_make_cmd(out_dir, cs, fname, odir, sdir)
 
-        if not cmd:
-            raise
-
         args, lenv = self.cmd_args(cs, fname, out_dir, fdata, cmd)
 
         # Detect and set ibt information. It will be used in the TemplateGen
@@ -464,9 +453,8 @@ class Extractor():
             f.flush()
             try:
                 subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
-            except:
-                logging.error(f"Error when processing {cs.name()}:{fname}. Check file {out_log} for details.")
-                raise
+            except Exception as exc:
+                raise RuntimeError(f"Error when processing {cs.name()}:{fname}. Check file {out_log} for details.") from exc
 
         cs.files[fname]["ext_symbols"] = self.get_symbol_list(out_dir)
 
@@ -513,15 +501,14 @@ class Extractor():
         logging.info(f"\nGenerating livepatches for {len(args)} file(s) using {self.workers} workers...")
         logging.info("\t\tCodestream\tFile")
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as executor:
-            results = executor.map(self.process, args)
+        with ThreadPoolExecutor(max_workers=self.workers) as executor:
             try:
-                for result in results:
-                    if result:
-                        logging.error(f"{cs}: {result}")
-            except:
-                executor.shutdown()
-                sys.exit(1)
+                futures = executor.map(self.process, args)
+                for future in futures:
+                    if future:
+                        logging.error(future)
+            except Exception as exc:
+                raise RuntimeError(str(exc)) from exc
 
         # Save the ext_symbols set by execute
         store_codestreams(self.lp_name, working_cs)
