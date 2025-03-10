@@ -244,14 +244,24 @@ class Codestream:
 
         return configs
 
-
-    def validate_config(self, conf, mod):
+    def validate_config(self, archs, conf, mod):
         configs = {}
+        cs_config = self.get_all_configs(conf)
 
         # Validate only the specified architectures, but check if the codestream
         # is supported on that arch (like RT that is currently supported only on
         # x86_64)
-        for arch, conf_entry in self.get_all_configs(conf).items():
+        for arch in archs:
+            # Check if the desired CONFIG entry is set on the codestreams's supported
+            # architectures, by iterating on the specified architectures from the setup command.
+            if arch not in self.archs:
+                continue
+
+            try:
+                conf_entry = cs_config.pop(arch)
+            except KeyError as exc:
+                raise RuntimeError(f"{self.name()}: {conf} not set on {arch}. Aborting") from exc
+
             if conf_entry == "m" and mod == "vmlinux":
                 raise RuntimeError(f"{self.name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
             if conf_entry == "y" and mod != "vmlinux":
