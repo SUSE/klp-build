@@ -347,10 +347,12 @@ class Extractor():
         for d in data:
             if fname in d["file"]:
                 output = d["command"]
-                # The arguments found on the file point to .., since they are generated
-                # when the kernel is compiled. Replace the .. by the codestream kernel source
-                # directory since klp-ccp needs to reach the files
-                return Extractor.process_make_output(output).replace("..", str(cs.get_src_dir()))
+                # The arguments found on the file point to '..', since they are generated
+                # when the kernel is compiled. Replace the first '..' on each file
+                # path by the codestream kernel source directory since klp-ccp needs to
+                # reach the files.
+                cmd = Extractor.process_make_output(output)
+                return cmd.replace(" ..", f" {str(cs.get_src_dir())}").replace("-I..", f"-I{str(cs.get_src_dir())}")
 
         raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
 
