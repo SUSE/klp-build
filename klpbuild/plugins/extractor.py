@@ -447,16 +447,31 @@ class Extractor():
             cs.files[fname]["ibt"] = True
 
         out_log = Path(out_dir, "ccp.out.txt")
-        with open(out_log, "w") as f:
+        with open(out_log, "w+") as f:
             # Write the command line used
             f.write(f"Executing ccp on {odir}\n")
             self.print_env_vars(f, lenv)
             f.write("\n".join(args) + "\n")
             f.flush()
+
+            start_pos = f.tell()
             try:
                 subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
             except Exception as exc:
                 raise RuntimeError(f"Error when processing {cs.name()}:{fname}. Check file {out_log} for details.") from exc
+
+            # Look for optimized function warnings in the output of the command
+            f.seek(start_pos)
+            symbol_pattern = r'warning: optimized function "([^"]+)" in callgraph'
+            for line in f:
+                match = re.search(symbol_pattern, line)
+                if match:
+                    opt_symbol_name = match.group(1)
+                    symbol_name = opt_symbol_name.split(".")[0]
+                    logging.warning("Warning when processing %s:%s: "
+                                    "Symbol %s contains optimized clone: %s",
+                                    cs.name(), fname, symbol_name, opt_symbol_name)
+                    logging.warning(f"Make sure to patch all the callers of %s.", symbol_name)
 
         cs.files[fname]["ext_symbols"] = self.get_symbol_list(out_dir)
 
