@@ -363,7 +363,11 @@ class GitHelper():
         logging.info("")
 
         for key, val in commits.items():
-            logging.info(f"{key}")
+            if key == "upstream":
+                logging.info(f"{key}")
+            else:
+                logging.info(f"{key}: {self.kernel_branches[key]}")
+
             branch_commits = val["commits"]
             if not branch_commits:
                 logging.info("None")
