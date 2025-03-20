@@ -140,8 +140,6 @@ class IBS():
 
     def get_cs_packages(self, cs_list, dest):
         # The packages that we search for are:
-        # kernel-source
-        # kernel-devel
         # kernel-(default|rt)
         # kernel-(default|rt)-devel
         # kernel-(default|rt)-livepatch-devel (for SLE15+)
@@ -149,7 +147,6 @@ class IBS():
         # kernel-default-kgraft-devel (for SLE12)
         cs_data = {
             "kernel-default": r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)",
-            "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
         }
 
         rpms = []
@@ -167,8 +164,6 @@ class IBS():
                         # RT kernels have different package names
                         if pkg == "kernel-default":
                             pkg = "kernel-rt"
-                        elif pkg == "kernel-source":
-                            pkg = "kernel-source-rt"
 
                     if cs.repo != "standard":
                         pkg = f"{pkg}.{cs.repo}"
@@ -189,7 +184,7 @@ class IBS():
                         # Extract the source and kernel-devel in the current
                         # machine arch to make it possible to run klp-build in
                         # different architectures
-                        if "kernel-source" in rpm or "kernel-default-devel" in rpm:
+                        if "kernel-default-devel" in rpm:
                             if arch != ARCH:
                                 continue
 
