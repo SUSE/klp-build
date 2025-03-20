@@ -62,6 +62,16 @@ def cleanup_kernel_trees():
     assert not __get_active_worktrees(kernel_tree)
 
 
+def update_kernel_tree_tags():
+    """
+    Fetch and update the list of tags in the kernel repository.
+    """
+    logging.debug("Updating kernel tree tags..")
+    kernel_tree = get_user_path("kernel_dir")
+    subprocess.check_output(['git', "-C", kernel_tree, 'fetch', '--tags', '--force', '--quiet'],
+                            stderr=subprocess.PIPE)
+
+
 def file_exists_in_tag(kernel_version, file_path):
     """
     Check if a specific file exists in a given kernel version tag.
