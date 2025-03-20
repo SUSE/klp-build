@@ -34,3 +34,21 @@ def init_cs_kernel_tree(kernel_version, outdir):
             "add", outdir, "--checkout", kernel_tree_git_tag
         ], stderr=subprocess.PIPE)
 
+
+def file_exists_in_tag(kernel_version, file_path):
+    """
+    Check if a specific file exists in a given kernel version tag.
+
+    Args:
+        kernel_version (str): Kernel version to check.
+        file_path (str): Path of the file to verify.
+
+    Returns:
+        None (raises an error if the file does not exist).
+    """
+    kernel_tree = get_user_path("kernel_dir")
+    kernel_tree_git_tag = "rpm-" + kernel_version
+
+    subprocess.check_output([
+        'git',  "-C", kernel_tree, 'ls-tree', kernel_tree_git_tag, file_path
+    ], stderr=subprocess.PIPE)
