@@ -223,6 +223,7 @@ class GitHelper():
         # Since the CVE branch can be some patches "behind" the LTSS branch,
         # it's good to have both backports code at hand by the livepatch author
         for bc, mbranch in self.kernel_branches.items():
+            logging.debug("	processing: %s: %s", bc, mbranch)
             commits[bc] = {"commits": []}
 
             try:
