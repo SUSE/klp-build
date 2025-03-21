@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
 import logging
+import re
 import sys
 
 from klpbuild.klplib import utils
@@ -58,6 +59,12 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
         logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
 
     for cs in all_codestreams:
+
+        # Skip filtered code streams
+        if lp_filter and not re.match(lp_filter, cs.name()):
+            logging.debug("	skipping code stream: %s", cs.name())
+            continue
+
         # Skip patched codestreams
         if not no_check:
             if cs.kernel in patched_kernels:
