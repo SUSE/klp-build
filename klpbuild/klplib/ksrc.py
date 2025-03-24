@@ -163,6 +163,7 @@ class GitHelper():
         # Since the CVE branch can be some patches "behind" the LTSS branch,
         # it's good to have both backports code at hand by the livepatch author
         for bc, mbranch in self.kernel_branches.items():
+            logging.debug("	processing: %s: %s", bc, mbranch)
             commits[bc] = {"commits": []}
 
             try:
@@ -303,7 +304,11 @@ class GitHelper():
         logging.info("")
 
         for key, val in commits.items():
-            logging.info(f"{key}")
+            if key == "upstream":
+                logging.info(f"{key}")
+            else:
+                logging.info(f"{key}: {self.kernel_branches[key]}")
+
             branch_commits = val["commits"]
             if not branch_commits:
                 logging.info("None")
