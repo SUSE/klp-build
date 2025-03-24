@@ -75,8 +75,6 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
                 unaffected_cs.append(cs)
                 continue
 
-        cs.set_archs()
-
         if conf and not cs.get_boot_file("config").exists():
             data_missing.append(cs)
             cs_missing.append(cs.name())
