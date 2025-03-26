@@ -4,12 +4,11 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
 import logging
-import re
 import sys
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.supported import get_supported_codestreams
+from klpbuild.klplib.data import download_missing_cs_data
 from klpbuild.klplib.ksrc import GitHelper
 
 PLUGIN_CMD = "scan"
@@ -40,33 +39,23 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
     # against the codestreams informed by the user
     all_codestreams = get_supported_codestreams()
 
+    # list of codestreams that matches the file-funcs argument
+    working_cs = []
+    patched_cs = []
+    unaffected_cs = []
+    conf_not_set = []
+
     if not cve or no_check:
+        logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
+        working_cs = all_codestreams
         commits = {}
         patched_kernels = []
     else:
         commits = gh.get_commits(cve, savedir)
         patched_kernels = gh.get_patched_kernels(all_codestreams, commits, cve)
 
-    # list of codestreams that matches the file-funcs argument
-    working_cs = []
-    patched_cs = []
-    unaffected_cs = []
-    data_missing = []
-    cs_missing = []
-    conf_not_set = []
+        for cs in utils.filter_codestreams(lp_filter, all_codestreams, verbose=True):
 
-    if no_check:
-        logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
-
-    for cs in all_codestreams:
-
-        # Skip filtered code streams
-        if lp_filter and not re.match(lp_filter, cs.name()):
-            logging.debug("	skipping code stream: %s", cs.name())
-            continue
-
-        # Skip patched codestreams
-        if not no_check:
             if cs.kernel in patched_kernels:
                 patched_cs.append(cs.name())
                 continue
@@ -75,32 +64,21 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
                 unaffected_cs.append(cs)
                 continue
 
-        if conf and not cs.get_boot_file("config").exists():
-            data_missing.append(cs)
-            cs_missing.append(cs.name())
-            # recheck later if we can add the missing codestreams
-            continue
+            working_cs.append(cs)
 
-        if conf and not cs.get_all_configs(conf):
-            conf_not_set.append(cs)
-            continue
-
-        working_cs.append(cs)
-
-    # Found missing cs data, downloading and extract
-    if data_missing:
-        logging.info("Download the necessary data from the following codestreams:")
-        logging.info("\t%s\n", " ".join(cs_missing))
-        IBS("", lp_filter).download_cs_data(data_missing)
-        logging.info("Done.")
-
-        for cs in data_missing:
-            # Ok, the downloaded codestream has the configuration set
-            if cs.get_all_configs(conf):
-                working_cs.append(cs)
-            # Nope, the config is missing, so don't add it to working_cs
-            else:
+    # If conf is set, download the data so we can check for codestreams
+    # containing that configuration.
+    if conf:
+        download_missing_cs_data(working_cs)
+        tmp_working_cs = []
+        for cs in working_cs:
+            # TODO: here we could check for affected arch automatically
+            if not cs.get_all_configs(conf):
                 conf_not_set.append(cs)
+            else:
+                tmp_working_cs.append(cs)
+        working_cs = tmp_working_cs
+
 
     if conf_not_set:
         logging.info("Skipping codestreams without %s set:", conf)
@@ -113,10 +91,6 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
     if unaffected_cs:
         logging.info("Skipping unaffected codestreams (missing backports):")
         logging.info("\t%s", utils.classify_codestreams_str(unaffected_cs))
-
-    # working_cs will contain the final dict of codestreams that wast set
-    # by the user, avoid downloading missing codestreams that are not affected
-    working_cs = utils.filter_codestreams(lp_filter, working_cs, verbose=True)
 
     if not working_cs:
         logging.info("All supported codestreams are already patched. Exiting klp-build")
