@@ -133,6 +133,7 @@ def setup_codestreams(lp_name, data):
                                                              data["conf"],
                                                              data["no_check"],
                                                              data["lp_filter"],
+                                                             True,
                                                              utils.get_workdir(lp_name))
     # Add new codestreams to the already existing list, skipping duplicates
     old_patched_cs = get_codestreams_data('patched_cs')

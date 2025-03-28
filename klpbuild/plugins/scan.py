@@ -25,15 +25,21 @@ def register_argparser(subparser):
         required=False,
         help="SLE specific. Helps to check only the codestreams that have this config set."
     )
+    scan.add_argument(
+        "--download",
+        required=False,
+        action="store_true",
+        help="SLE specific. Download missing codestreams data"
+    )
 
 
-def run(cve, conf, lp_filter, no_check):
+def run(cve, conf, lp_filter, no_check, download):
     no_check = False
 
-    return scan(cve, conf, no_check, lp_filter)
+    return scan(cve, conf, no_check, lp_filter, download)
 
 
-def scan(cve, conf, no_check, lp_filter, savedir=None):
+def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     gh = GitHelper(lp_filter)
     # Always get the latest supported.csv file and check the content
     # against the codestreams informed by the user
@@ -66,10 +72,13 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
 
             working_cs.append(cs)
 
-    # If conf is set, download the data so we can check for codestreams
-    # containing that configuration.
-    if conf:
+    # Download also if conf is set, because the codestreams data are needed to
+    # check for the configuration entry of each codestreams.
+    if conf or download:
         download_missing_cs_data(working_cs)
+
+    # If conf is set, drop codestream not containing that conf entry from working_cs
+    if conf:
         tmp_working_cs = []
         for cs in working_cs:
             # TODO: here we could check for affected arch automatically

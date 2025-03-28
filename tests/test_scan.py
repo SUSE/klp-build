@@ -10,7 +10,7 @@ from klpbuild.plugins.scan import scan
 # This CVE is already covered on all codestreams
 def test_scan_all_cs_patched(caplog):
     with pytest.raises(SystemExit):
-        scan("2022-48801", "", False, "")
+        scan("2022-48801", "", False, "", False)
 
     assert "All supported codestreams are already patched" in caplog.text
 
@@ -26,7 +26,7 @@ def test_scan_update_ref_commits(caplog):
     klp-build should be able to detect these false-positives and discard them.
     '''
     with pytest.raises(SystemExit):
-        scan("2024-26620", "", False, "")
+        scan("2024-26620", "", False, "", False)
 
     assert "All supported codestreams are already patched" in caplog.text
     assert "b046ad18ee8d6e0df682b28c0dc45056554c5fda" not in caplog.text
@@ -39,7 +39,7 @@ def test_scan_duplicate_commits(caplog):
     the oldest one.
     '''
     with pytest.raises(SystemExit):
-        scan("2021-47511", "", False, "")
+        scan("2021-47511", "", False, "", False)
 
     # Newest (only appears in the cve-5.3 branch)
     assert "094796a2bf2698dc8604dc319736ed207fd09c93" not in caplog.text
