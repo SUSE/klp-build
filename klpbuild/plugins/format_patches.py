@@ -15,7 +15,7 @@ PLUGIN_CMD = "format-patches"
 
 def register_argparser(subparser):
     fmt = subparser.add_parser(
-        "format-patches", help="SLE specific. Extract patches from kgraft-patches"
+        "format-patches", help="Format patches from kgraft-patches[_testscripts]"
     )
     add_arg_lp_name(fmt)
     fmt.add_argument("-v", "--version", type=int, required=True, help="Version to be added, like vX")
