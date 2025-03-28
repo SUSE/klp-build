@@ -18,7 +18,9 @@ from klpbuild.plugins.scan import scan
 PLUGIN_CMD = "setup"
 
 def register_argparser(subparser):
-    setup = subparser.add_parser(PLUGIN_CMD)
+    setup = subparser.add_parser(
+        PLUGIN_CMD, help="Establish an initial working directory for a given livepatch"
+    )
     add_arg_lp_name(setup)
     add_arg_lp_filter(setup)
     setup.add_argument("--cve", type=str, help="SLE specific. The CVE assigned to this livepatch")
