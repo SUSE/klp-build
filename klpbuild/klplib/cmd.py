@@ -68,7 +68,7 @@ def create_parser() -> argparse.ArgumentParser:
         help="Symbol to be found",
     )
 
-    extract_opts = sub.add_parser("extract")
+    extract_opts = sub.add_parser("extract", help="Extract initial livepatches")
     add_arg_lp_name(extract_opts)
     add_arg_lp_filter(extract_opts)
     extract_opts.add_argument(
