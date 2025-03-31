@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import argparse
+import importlib.metadata
 
 from klpbuild.klplib.utils import ARCHS
 from klpbuild.klplib.plugins import register_plugins_argparser
@@ -39,6 +40,13 @@ def create_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Produce more verbose output"
+    )
+
+    parentparser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s v{importlib.metadata.version('klp-build')}"
     )
 
     register_plugins_argparser(sub)
