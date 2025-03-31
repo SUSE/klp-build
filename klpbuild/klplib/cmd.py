@@ -53,7 +53,7 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         default="",
         required=True,
-        help="SLE specific. Codestream to check the inlined symbol.",
+        help="Codestream to check the inlined symbol.",
     )
     check_inline.add_argument(
         "--file",
@@ -93,34 +93,34 @@ def create_parser() -> argparse.ArgumentParser:
     add_arg_lp_name(patches)
     add_arg_lp_filter(patches)
     patches.add_argument(
-        "--cve", required=True, help="SLE specific. CVE number to search for related backported patches"
+        "--cve", required=True, help="CVE number to search for related backported patches"
     )
 
 
-    cleanup =sub.add_parser("cleanup", help="SLE specific. Remove livepatch packages from IBS")
+    cleanup =sub.add_parser("cleanup", help="Remove livepatch packages from IBS")
     add_arg_lp_name(cleanup)
     add_arg_lp_filter(cleanup)
 
     test = sub.add_parser(
         "prepare-tests",
-        help="SLE specific. Download the built tests and check for LP dependencies",
+        help="Download the built tests and check for LP dependencies",
     )
     add_arg_lp_name(test)
     add_arg_lp_filter(test)
 
     push = sub.add_parser(
-        "push", help="SLE specific. Push livepatch packages to IBS to be built"
+        "push", help="Push livepatch packages to IBS to be built"
     )
     add_arg_lp_name(push)
     add_arg_lp_filter(push)
     push.add_argument("--wait", action="store_true", help="Wait until all codestreams builds are finished")
 
-    status = sub.add_parser("status", help="SLE specific. Check livepatch build status on IBS")
+    status = sub.add_parser("status", help="Check livepatch build status on IBS")
     add_arg_lp_name(status)
     add_arg_lp_filter(status)
     status.add_argument("--wait", action="store_true", help="Wait until all codestreams builds are finished")
 
-    log = sub.add_parser("log", help="SLE specific. Get build log from IBS")
+    log = sub.add_parser("log", help="Get build log from IBS")
     add_arg_lp_name(log)
     add_arg_lp_filter(log, mandatory=True)
     log.add_argument("--arch", type=str, default="x86_64", choices=ARCHS, help="Build architecture")

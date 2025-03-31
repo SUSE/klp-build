@@ -23,12 +23,12 @@ def register_argparser(subparser):
     )
     add_arg_lp_name(setup)
     add_arg_lp_filter(setup)
-    setup.add_argument("--cve", type=str, help="SLE specific. The CVE assigned to this livepatch")
+    setup.add_argument("--cve", type=str, help="The CVE assigned to this livepatch")
     setup.add_argument("--conf", type=str, required=True, help="The kernel CONFIG used to be build the livepatch")
     setup.add_argument(
         "--no-check",
         action="store_true",
-        help="SLE specific. Do not check for already patched codestreams, do the setup for all non filtered codestreams.",
+        help="Do not check for already patched codestreams, do the setup for all non filtered codestreams.",
     )
     setup.add_argument(
         "--file-funcs",
@@ -68,7 +68,7 @@ def register_argparser(subparser):
         default=utils.ARCHS,
         choices=utils.ARCHS,
         nargs="+",
-        help="SLE specific. Supported architectures for this livepatch",
+        help="Supported architectures for this livepatch",
     )
 
 
