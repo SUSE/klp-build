@@ -9,6 +9,7 @@
 klp-build \- the kernel livepatching creation tool
 .SH SYNOPSIS
 .B klp-build
+[-h] [-v] [-V]
 <command> [-h] [-n NAME] [--filter FILTER]
 .SH DESCRIPTION
 .B klp-build
@@ -37,6 +38,11 @@ Example: '15\.3u[0-9]+|15\.6u0'
 .br
 You can also use a negative regex in order to filter out a specific codestream.
 Example: '^(?!12.5u12).*'
+.TP
+.B -V, --version
+show
+.BR klp-build 's
+version number and exit.
 .SH COMMANDS
 .TP
 .B scan
