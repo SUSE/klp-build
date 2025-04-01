@@ -19,12 +19,12 @@ def register_argparser(subparser):
     scan.add_argument(
         "--cve",
         required=True,
-        help="SLE specific. Shows which codestreams are vulnerable to the CVE"
+        help="Shows which codestreams are vulnerable to the CVE"
     )
     scan.add_argument(
         "--conf",
         required=False,
-        help="SLE specific. Helps to check only the codestreams that have this config set."
+        help="Helps to check only the codestreams that have this config set."
     )
 
 
