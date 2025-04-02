@@ -7,6 +7,7 @@ from pathlib import Path, PurePath
 import re
 
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
+from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag
 
 class Codestream:
     __slots__ = ("sle", "sp", "update", "rt", "ktype", "needs_ibt", "is_micro",
@@ -76,14 +77,17 @@ class Codestream:
                 self.rt == cs.rt
 
 
-    def get_src_dir(self, arch=ARCH):
+    def get_src_dir(self, arch=ARCH, init=True):
         # Only -rt codestreams have a suffix for source directory
         ktype = self.ktype.replace("-default", "")
-        return get_datadir(arch)/"usr"/"src"/f"linux-{self.kernel}{ktype}"
+        src_dir = get_datadir(arch)/"usr"/"src"/f"linux-{self.kernel}{ktype}"
+        if init:
+            init_cs_kernel_tree(self.kernel, src_dir)
+        return src_dir
 
 
     def get_obj_dir(self):
-        return Path(f"{self.get_src_dir(ARCH)}-obj", ARCH, self.ktype.replace("-", ""))
+        return Path(f"{self.get_src_dir(ARCH, init=False)}-obj", ARCH, self.ktype.replace("-", ""))
 
 
     def get_ipa_file(self, fname):
@@ -360,6 +364,10 @@ class Codestream:
                 arch_sym[arch] = syms
 
         return arch_sym
+
+
+    def check_file_exists(self, file):
+        file_exists_in_tag(self.kernel, file)
 
 
     def data(self):
