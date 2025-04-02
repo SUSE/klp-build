@@ -48,7 +48,9 @@ class Codestream:
         else:
             assert False, "codestream name should contain either SLE or MICRO!"
 
-        return cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {})
+        ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {})
+        ret.set_archs()
+        return ret
 
 
     @classmethod
