@@ -53,29 +53,6 @@ def create_parser() -> argparse.ArgumentParser:
 
     # NOTE: all the code below should be gone when all the module will be
     # converted into plugins
-    check_inline = sub.add_parser("check-inline")
-    add_arg_lp_name(check_inline)
-    add_arg_lp_filter(check_inline)
-    check_inline.add_argument(
-        "--codestream",
-        type=str,
-        default="",
-        required=True,
-        help="Codestream to check the inlined symbol.",
-    )
-    check_inline.add_argument(
-        "--file",
-        type=str,
-        required=True,
-        help="File to be checked.",
-    )
-    check_inline.add_argument(
-        "--symbol",
-        type=str,
-        required=True,
-        help="Symbol to be found",
-    )
-
     extract_opts = sub.add_parser("extract", help="Extract initial livepatches")
     add_arg_lp_name(extract_opts)
     add_arg_lp_filter(extract_opts)
