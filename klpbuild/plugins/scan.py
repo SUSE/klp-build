@@ -7,6 +7,8 @@ import logging
 import sys
 
 from klpbuild.klplib import utils
+from klpbuild.klplib import patch
+from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
 from klpbuild.klplib.ksrc import get_commits, get_patched_kernels, cs_is_affected
@@ -49,6 +51,7 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     patched_cs = []
     unaffected_cs = []
     conf_not_set = []
+    unsupported = []
 
     if not cve or no_check:
         logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
@@ -76,8 +79,25 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     if conf or download:
         download_missing_cs_data(working_cs)
 
+    # Automated patch analysis phase. Not compatible with --conf.
+    if commits and not conf:
+        logging.info("Initiating patch analysis...\n")
+        logging.info("[*] Analysing modified files...\n")
+        files_report = patch.analyse_files(working_cs, commits)
+        patch.print_files(files_report)
+
+        logging.info("[*] Analysing required CONFIGs...\n")
+        configs_report = patch.analyse_configs(working_cs)
+        patch.print_configs(configs_report)
+        conf_not_set, conf = patch.filter_unset_configs(working_cs)
+
+        logging.info("[*] Analysing affected kernel modules...\n")
+        kmodules_report = patch.analyse_kmodules(working_cs)
+        patch.print_kmodules(kmodules_report)
+        unsupported = patch.filter_unsupported_kmodules(working_cs)
+
     # If conf is set, drop codestream not containing that conf entry from working_cs
-    if conf:
+    elif conf:
         tmp_working_cs = []
         for cs in working_cs:
             # TODO: here we could check for affected arch automatically
@@ -87,6 +107,9 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
                 tmp_working_cs.append(cs)
         working_cs = tmp_working_cs
 
+    if unsupported:
+        logging.info(f"Skipping codestreams with unsupported kernel modules:")
+        logging.info("\t%s", utils.classify_codestreams_str(unsupported))
 
     if conf_not_set:
         logging.info("Skipping codestreams without %s set:", conf)
