@@ -79,3 +79,27 @@ def test_compile_commands_enoent():
     # Now it should fail with hid_core.c that doesn't exists on compile_commands.json
     with pytest.raises(RuntimeError, match=r"Couldn't find cmdline for drivers/hid/hid_core.c on.*compile_commands.json. Aborting"):
         Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+
+
+def test_detect_opt_clone(caplog):
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "15.3u47"
+
+    setup_args = {
+        "lp_name": lp,
+        "lp_filter": cs,
+        "no_check": False,
+        "archs": [utils.ARCH],
+        "cve": None,
+        "conf": "CONFIG_BT",
+        "module": "bluetooth",
+        "file_funcs": [["net/bluetooth/l2cap_sock.c", "l2cap_sock_kill"]],
+        "mod_file_funcs": [],
+        "conf_mod_file_funcs": []
+    }
+    setup(**setup_args)
+
+    with caplog.at_level(logging.WARNING):
+        Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+
+    assert "Symbol l2cap_sock_kill contains optimized clone" in caplog.text
