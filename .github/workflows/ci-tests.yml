@@ -63,7 +63,7 @@ jobs:
         mkdir -p ~/.config/klp-build &&
         cp tests/config ~/.config/klp-build/ &&
         mkdir -p klp/{livepatches,data} &&
-        tox -e tests -- tests/test_{scan,config,kernel_tree,utils,codestream}.py
+        tox -e tests -- tests/test_{ksrc,scan,config,kernel_tree,utils,codestream}.py
 
     - name: Run pylint
       run: tox -e lint -- --fail-under 9.4 --fail-on F

@@ -100,14 +100,19 @@ def diff_commits(base, new, patch, pattern=""):
 
     return diff.returncode
 
-def get_commit_files(commit, regex=None):
+
+def get_commit_files(commit, inside_patch=False, regex=r"patches\.suse\/.+\.patch"):
     """
-    Get the files that have been modified in one specific commit.
+    Get the files that have been modified in one specific commit or
+    within the patch files of the commit.
     Optionally only get those that match the given regular expression.
 
     Args:
         commit (str): The commit to be anylized.
         regex (str): Optional regex.
+        inside_path (bool): True for getting the files modified by the
+        patch file in the commit. False for just getting the files in the
+        commit.
 
     returns:
         List: Return the files that match the regex, if set. Otherwise,
@@ -119,7 +124,21 @@ def get_commit_files(commit, regex=None):
                                    "diff-tree", "--no-commit-id", "--name-only",
                                    commit, "-r"]).decode()
 
-    return re.findall(regex, ret) if regex else ret.splitlines()
+    patches = re.findall(regex, ret) if regex else ret.splitlines()
+    if not inside_patch:
+        return patches
+
+    files = []
+    for p in patches:
+        ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
+                                       "grep", "-Ih", "^+++", commit,
+                                       "--", p]).decode()
+        for l in ret.splitlines():
+            # Remove the first caracters "+++ [a,b]/" in the line. Leftovers
+            # from the patch's diff.
+            files.append(l[6:])
+
+    return sorted(set(files))
 
 
 @__check_kernel_source_tags_are_fetched
@@ -370,7 +389,7 @@ def is_kernel_patched(kernel, suse_commits, cve):
         # Parse commit's hash
         c = line.split("-")[1]
 
-        files = get_commit_files(c, r"patches\.suse\/.+\.patch")
+        files = get_commit_files(c)
         if len(files) == 0:
             continue
 
