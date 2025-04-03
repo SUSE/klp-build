@@ -23,8 +23,7 @@ def register_argparser(subparser):
 
 def run(lp_name, version):
     ver = f"v{version}"
-    # index 1 will be the test file
-    index = 2
+    index = 1
 
     kgr_patches = get_user_path('kgr_patches_dir')
 
@@ -33,23 +32,26 @@ def run(lp_name, version):
     shutil.rmtree(patches_dir, ignore_errors=True)
 
     test_src = utils.get_tests_path(lp_name)
-    subprocess.check_output(
-        [
-            "/usr/bin/git",
-            "-C",
-            str(get_user_path('kgr_patches_tests_dir')),
-            "format-patch",
-            "-1",
-            f"{test_src}",
-            "--cover-letter",
-            "--start-number",
-            "1",
-            "--subject-prefix",
-            f"PATCH {ver}",
-            "--output-directory",
-            f"{patches_dir}",
-        ]
-    )
+    if test_src:
+        logging.info(test_src.name)
+        subprocess.check_output(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(get_user_path('kgr_patches_tests_dir')),
+                "format-patch",
+                "-1",
+                f"{test_src}",
+                "--cover-letter",
+                "--start-number",
+                f"{index}",
+                "--subject-prefix",
+                f"PATCH {ver}",
+                "--output-directory",
+                f"{patches_dir}",
+            ]
+        )
+        index += 1
 
     # Filter only the branches related to this BSC
     for branch in utils.get_lp_branches(lp_name, kgr_patches):
@@ -60,8 +62,7 @@ def run(lp_name, version):
 
         prefix = f"PATCH {ver} {bsc} {bs}"
 
-        subprocess.check_output(
-            [
+        cmd = [
                 "/usr/bin/git",
                 "-C",
                 str(kgr_patches),
@@ -75,6 +76,8 @@ def run(lp_name, version):
                 "--output-directory",
                 f"{patches_dir}",
             ]
-        )
+        if index == 1:
+            cmd.append("--cover-letter")
 
+        subprocess.check_output(cmd)
         index += 1
