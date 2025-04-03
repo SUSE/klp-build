@@ -13,7 +13,6 @@ from klpbuild.klplib.ksrc import GitHelper
 from klpbuild.klplib.utils import get_workdir
 from klpbuild.klplib.plugins import try_run_plugin
 from klpbuild.plugins.extractor import Extractor
-from klpbuild.plugins.inline import Inliner
 
 
 def main():
@@ -43,9 +42,6 @@ def main():
 
     elif args.cmd == "cs-diff":
         Extractor(args.lp_name, args.lp_filter, False, []).cs_diff()
-
-    elif args.cmd == "check-inline":
-        Inliner(args.lp_name, args.codestream).check_inline(args.file, args.symbol)
 
     elif args.cmd == "get-patches":
         GitHelper(args.lp_filter).get_commits(args.cve, get_workdir(args.lp_name))
