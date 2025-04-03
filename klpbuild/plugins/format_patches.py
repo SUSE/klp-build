@@ -27,8 +27,6 @@ def run(lp_name, version):
     index = 2
 
     kgr_patches = get_user_path('kgr_patches_dir')
-    if not kgr_patches:
-        logging.warning("kgr_patches_dir not found, patches will be incomplete")
 
     # Remove dir to avoid leftover patches with different names
     patches_dir = utils.get_workdir(lp_name)/"patches"
