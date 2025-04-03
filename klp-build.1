@@ -153,6 +153,10 @@ Extract patches from kgraft-patches (see the
 Version to be added, like vX.
 .RE
 .TP
+.B cs-diff
+Compare line by line the output livepatch of two codestreams.
+.RE
+.TP
 .B get-patches
 Find and list the kernel versions with a backported fix to the indicated CVE.
 .RS 7
@@ -226,6 +230,12 @@ $
 setup --name bsc1197597 --cve 2022-1048 --mod snd-pcm --conf
 CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream
 snd_pcm_detach_substream --codestreams '15.5' --archs x86_64 ppc64le
+.PP
+Compare two codestreams:
+.IP
+$
+.B klp-build
+cs-diff -n bsc1197597 --filter '15.5u0|15.5u1'
 .PP
 .SH SEE ALSO
 SUSE's kgraft-patches public repository:

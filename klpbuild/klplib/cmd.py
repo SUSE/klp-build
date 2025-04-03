@@ -92,7 +92,9 @@ def create_parser() -> argparse.ArgumentParser:
         "--apply-patches", action="store_true", help="Apply patches found by get-patches subcommand, if they exist"
     )
 
-    diff_opts = sub.add_parser("cs-diff")
+    diff_opts = sub.add_parser(
+            "cs-diff",
+            help="Compare line by line the output livepatch of two codestreams")
     add_arg_lp_name(diff_opts)
     add_arg_lp_filter(diff_opts)
 
