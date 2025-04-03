@@ -493,7 +493,7 @@ def ksrc_is_module_supported(module, kernel):
         mpath = module
         prev = ""
         idx = 1
-        supported = False
+        supported = True
 
         out = ksrc_read_file(kernel, "supported.conf").splitlines()
         if not out:
