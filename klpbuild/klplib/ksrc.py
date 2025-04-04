@@ -475,3 +475,45 @@ def ksrc_read_file(kernel_version, file_path):
                           f"{ksrc_tag}:{file_path}"],
                          capture_output=True, text=True)
     return ret.stdout
+
+
+def ksrc_is_module_supported(module, kernel):
+        """
+        Check if a kernel module is supported on a specific kernel.
+        This is done by reading the 'supported.conf' file.
+
+        Args:
+            module (str): Full path of the module.
+            kernel (sr): Kernel version.
+
+        returns:
+            Return True if supported. False otherwise.
+            """
+
+        mpath = module
+        prev = ""
+        idx = 1
+        supported = False
+
+        out = ksrc_read_file(kernel, "supported.conf").splitlines()
+        if not out:
+            return False
+
+        # Try the following path combinations to see if it matches with
+        # any rule in the supported.conf:
+        #   my/kernel/module/path
+        #   my/kernel/module/*
+        #   my/kernel/*
+        #   my/*
+        while mpath != prev:
+            r = re.compile(rf"^[-+\s].*{mpath}")
+            match = list(filter(r.match, out))
+            if match:
+                supported = match[0][0] != '-'
+                break
+
+            prev = mpath
+            mpath = module.rsplit("/", idx)[0] + r"/\*"
+            idx += 1
+
+        return supported

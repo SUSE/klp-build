@@ -6,7 +6,7 @@
 from pathlib import Path, PurePath
 import re
 
-from klpbuild.klplib.ksrc import ksrc_read_file
+from klpbuild.klplib.ksrc import ksrc_read_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
@@ -240,6 +240,8 @@ class Codestream:
     def get_mod(self, mod):
         return self.modules[mod]
 
+    def is_module_supported(self, mod):
+        return ksrc_is_module_supported(mod, self.kernel)
 
     # Returns the path to the kernel-obj's build dir, used when build testing
     # the generated module
