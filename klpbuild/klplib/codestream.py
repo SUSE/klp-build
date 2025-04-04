@@ -13,10 +13,10 @@ from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag,
 class Codestream:
     __slots__ = ("sle", "sp", "update", "rt", "ktype", "needs_ibt", "is_micro",
                  "project", "patchid", "kernel", "archs", "files", "modules",
-                 "repo")
+                 "repo", "configs")
 
     def __init__(self, sle, sp, update, rt, project, patchid, kernel, archs,
-                 files, modules):
+                 files, modules, configs):
         self.sle = sle
         self.sp = sp
         self.update = update
@@ -30,6 +30,7 @@ class Codestream:
         self.archs = archs
         self.files = files
         self.modules = modules
+        self.configs = configs
         self.repo = self.get_repo()
 
     @classmethod
@@ -50,7 +51,7 @@ class Codestream:
         else:
             assert False, "codestream name should contain either SLE or MICRO!"
 
-        ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {})
+        ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {}, {})
         ret.set_archs()
         return ret
 
@@ -61,14 +62,15 @@ class Codestream:
         if not match:
             raise ValueError("Filter regexp error!")
         return cls(int(match.group(1)), int(match.group(2)),
-                   int(match.group(4)), match.group(3), "", "", "", [], {}, {})
+                   int(match.group(4)), match.group(3), "", "", "", [], {}, {}, {})
 
 
     @classmethod
     def from_data(cls, data):
         return cls(data["sle"], data["sp"], data["update"], data["rt"],
                    data["project"], data["patchid"], data["kernel"],
-                   data["archs"], data["files"], data["modules"])
+                   data["archs"], data["files"], data["modules"],
+                   data["configs"])
 
 
     def __eq__(self, cs):
@@ -405,5 +407,6 @@ class Codestream:
                 "archs" : self.archs,
                 "files" : self.files,
                 "modules" : self.modules,
+                "configs" : self.configs,
                 "repo" : self.repo,
                 }

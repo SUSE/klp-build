@@ -34,7 +34,7 @@ def test_find_obj_path_arch():
         "files": {
             "net/sched/sch_taprio.c": {
                 "module": "sch_taprio",
-                "conf": "",
+                "conf": "CONFIG_NET_SCH_TAPRIO",
                 "symbols": [
                         "taprio_change"
                 ],
@@ -59,7 +59,10 @@ def test_find_obj_path_arch():
         "modules": {
             "sch_taprio": "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko"
         },
-        "repo": "SUSE_SLE-15-SP5_Update"
+        "repo": "SUSE_SLE-15-SP5_Update",
+        "configs": {
+            "CONFIG_NET_SCH_TAPRIO": {"x86_64":"m","ppc64le":"m","s390x":"m"}
+            }
     })
 
     for arch in ARCHS:
