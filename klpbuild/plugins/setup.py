@@ -170,7 +170,8 @@ def setup_project_files(lp_name, codestreams, ffuncs, archs):
             mod = fdata["module"]
             cs.validate_config(fdata["conf"], mod)
 
-            cs.check_file_exists(f)
+            if not cs.check_file_exists(f):
+                raise RuntimeError(f"{cs.name()} ({cs.kernel}): File {f} not found.")
 
             ipa_f = cs.get_ipa_file(f)
             if not ipa_f.is_file():
