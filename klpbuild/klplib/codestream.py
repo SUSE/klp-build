@@ -377,7 +377,7 @@ class Codestream:
 
 
     def check_file_exists(self, file):
-        file_exists_in_tag(self.kernel, file)
+        return file_exists_in_tag(self.kernel, file)
 
 
     def data(self):

@@ -39,7 +39,7 @@ def test_file_funcs_ok():
 
 
 def test_non_existent_file():
-    with pytest.raises(RuntimeError, match=r".*: File drivers/net/tuna.c not found on .*"):
+    with pytest.raises(RuntimeError, match=r".*: File drivers/net/tuna.c not found"):
         lp = "bsc_" + inspect.currentframe().f_code.co_name
 
         setup_args = {
