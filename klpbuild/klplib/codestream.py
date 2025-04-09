@@ -8,7 +8,7 @@ import re
 
 from klpbuild.klplib.ksrc import ksrc_read_file
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
-from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag
+from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
     __slots__ = ("sle", "sp", "update", "rt", "ktype", "needs_ibt", "is_micro",
@@ -390,6 +390,8 @@ class Codestream:
     def check_file_exists(self, file):
         return file_exists_in_tag(self.kernel, file)
 
+    def read_file(self, file):
+        return read_file_in_tag(self.kernel, file)
 
     def data(self):
         return {
