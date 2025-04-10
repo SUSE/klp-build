@@ -16,7 +16,7 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
-
+from klpbuild.klplib.kernel_tree import get_commit_data
 
 class GitHelper():
     def __init__(self, lp_filter):
@@ -45,32 +45,6 @@ class GitHelper():
         }
 
         self.lp_filter = lp_filter
-
-
-    # Currently this function returns the date of the patch and it's subject
-    @staticmethod
-    def get_commit_data(commit, savedir=None):
-        req = requests.get(
-            f"https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={commit}", timeout=15)
-        req.raise_for_status()
-
-        # Save the upstream commit if requested
-        if savedir:
-            with open(Path(savedir, f"{commit}.patch"), "w") as f:
-                f.write(req.text)
-
-        # Search for Subject until a blank line, since commit messages can be
-        # seen in multiple lines.
-        msg = re.search(r"Subject: (.*?)(?:(\n\n))", req.text, re.DOTALL).group(1).replace("\n", "")
-        # Sometimes the MIME-Version string comes right after the commit
-        # message, so we should remove it as well
-        if 'MIME-Version:' in msg:
-            msg = re.sub(r"MIME-Version(.*)", "", msg)
-        dstr = re.search(r"Date: ([\w\s,:]+)", req.text).group(1)
-        d = datetime.strptime(dstr.strip(), "%a, %d %b %Y %H:%M:%S")
-
-        return d, msg
-
 
     def fetch_kernel_branches(self):
         logging.info("Fetching changes from all supported branches...")
@@ -293,7 +267,7 @@ class GitHelper():
         # created/merged.
         ucommits_sort = []
         for c in ucommits:
-            d, msg = GitHelper.get_commit_data(c, upstream_patches_dir)
+            d, msg = get_commit_data(c, upstream_patches_dir)
             ucommits_sort.append((d, c, msg))
 
         ucommits_sort.sort()

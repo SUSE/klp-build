@@ -8,8 +8,30 @@ import os
 import shutil
 import subprocess
 
+from pathlib import Path
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.utils import ARCH
+
+
+# Currently this function returns the date of the patch and its subject
+def get_commit_data(commit, savedir=None):
+
+    kernel_tree = get_user_path("kernel_dir")
+
+    ret = subprocess.check_output(["/usr/bin/git", "-C", kernel_tree,
+                                   "show", commit,
+                                   "--format='%at@%s%n%n%B'"]).decode().splitlines()
+    head = ret[0].split('@')
+    date = head[0]
+    title = head[1]
+    body = ret[1:]
+
+    # Save the upstream commit if requested
+    if savedir:
+        with open(Path(savedir, f"{commit}.patch"), "w") as f:
+            f.write('\n'.join(body))
+
+    return date, title
 
 
 def init_cs_kernel_tree(kernel_version, outdir):
