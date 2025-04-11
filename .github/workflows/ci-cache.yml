@@ -31,7 +31,20 @@ jobs:
         path: build/kernel-source
         key: kernel-source-${{ steps.get-month.outputs.month }}
 
+    - name: Cache kernel
+      id: cache-kernel
+      uses: actions/cache@v4
+      with:
+        path: build/kernel
+        key: kernel-${{ steps.get-month.outputs.month }}
+
     - if: ${{ steps.cache-ksrc.outputs.cache-hit != 'true' }}
       name: Download kernel-source
       continue-on-error: true
       run: git clone https://github.com/SUSE/kernel-source build/kernel-source
+
+    - if: ${{ steps.cache-kernel.outputs.cache-hit != 'true' }}
+      name: Download kernel
+      continue-on-error: true
+      run: git clone https://github.com/SUSE/kernel build/kernel
+
