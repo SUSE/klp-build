@@ -32,25 +32,27 @@ def _sanitize_config(target):
     return config
 
 
-def _find_config(cs, obj_path, deep):
-
+def _find_config(cs, base_dir, relative_obj_path, deep):
     if deep > 10:
         return None, ""
 
-    make_file = Path(obj_path.parent, "Makefile")
+    make_file = Path(base_dir, "Makefile")
 
     lines = _load_makefile(cs, make_file)
 
-    obj_name = PurePath(obj_path).name
+    if not lines and Path(".") != base_dir:
+        relative_obj_path = base_dir.name + "/" + relative_obj_path
+        return _find_config(cs, base_dir.parent, relative_obj_path, deep+1)
+
     for line in lines:
         sep = line.split()
-        if obj_name not in sep:
+        if relative_obj_path not in sep:
             continue
 
         # target found, check if this one with config
         target = sep[0]
         if target.startswith('obj-'):
-            return _sanitize_config(target), str(obj_path.with_suffix(''))
+            return _sanitize_config(target), str((base_dir/relative_obj_path).with_suffix(''))
 
         # target contains another object file rule, so strip it would and try
         # again
@@ -60,7 +62,7 @@ def _find_config(cs, obj_path, deep):
             # print(ve)
             continue
 
-        return _find_config(cs, Path(obj_path.parent, target + '.o'), deep + 1)
+        return _find_config(cs, base_dir, target + '.o', deep + 1)
 
     return None, ""
 
@@ -76,8 +78,8 @@ def find_configs_for_files(cs, file_paths: list):
 
     for path in file_paths:
         path = path.strip()
-        obj_file = path.replace('.c', '.o')
-        config, obj = _find_config(cs, Path(obj_file), 0)
+        obj_file = Path(path.replace('.c', '.o'))
+        config, obj = _find_config(cs, obj_file.parent, obj_file.name, 0)
         if not config:
             missing.append(path)
         elif config == 'y' or config == 'm':
