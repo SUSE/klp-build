@@ -10,6 +10,7 @@ from klpbuild.klplib import utils
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
 from klpbuild.klplib.ksrc import GitHelper
+from klpbuild.klplib.kernel_tree import update_kernel_tree_tags
 
 PLUGIN_CMD = "scan"
 
@@ -44,6 +45,8 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     # Always get the latest supported.csv file and check the content
     # against the codestreams informed by the user
     all_codestreams = get_supported_codestreams()
+
+    update_kernel_tree_tags()
 
     # list of codestreams that matches the file-funcs argument
     working_cs = []

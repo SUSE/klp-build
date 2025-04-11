@@ -11,7 +11,6 @@ from natsort import natsorted
 from klpbuild.klplib import utils
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import get_codestreams_data, set_codestreams_data, store_codestreams
-from klpbuild.klplib.kernel_tree import update_kernel_tree_tags
 from klpbuild.klplib.templ import generate_commit_msg_file
 
 from klpbuild.plugins.scan import scan
@@ -149,7 +148,6 @@ def setup_codestreams(lp_name, data):
 
 def setup_project_files(lp_name, codestreams, ffuncs, archs):
     utils.get_workdir(lp_name).mkdir(exist_ok=True)
-    update_kernel_tree_tags()
 
     archs.sort()
     set_codestreams_data(archs=archs)
