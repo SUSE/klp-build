@@ -35,8 +35,7 @@ setuptools.setup(
         "filelock",
         "pyelftools",
         "zstandard",
-        "python-bugzilla",
-        "importlib"
+        "python-bugzilla"
     ],
     setuptools_git_versioning={
         "enabled": True,
