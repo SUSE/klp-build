@@ -344,7 +344,7 @@ def get_tests_path(lp_name):
         # For more complex tests we support using a directory containing
         # as much files as needed. A `test_script.sh` is still required
         # as an entry point.
-        return PurePath(test_dir_sh).parent
+        return Path(test_dir_sh).parent
 
     logging.warning("No testscript found for %s", lp_name)
     return None
