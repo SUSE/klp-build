@@ -11,6 +11,7 @@ from pathlib import Path
 from pathlib import PurePath
 
 from natsort import natsorted
+from functools import wraps
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
@@ -38,7 +39,29 @@ KERNEL_BRANCHES = {
 }
 
 
-def fetch_kernel_branches():
+__kernel_source_tags_are_fetched = False
+def __check_kernel_source_tags_are_fetched(func):
+    """
+    This decorator checks whether the kernel-source tags are fetched. If not,
+    it fetches them the configuration and then calls the wrapped function.
+
+    Args:
+        func (function): The function to be wrapped.
+
+    Returns:
+        function: The wrapped function.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        global __kernel_source_tags_are_fetched
+        if not __kernel_source_tags_are_fetched:
+            __fetch_kernel_branches()
+            __kernel_source_tags_are_fetched = True
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def __fetch_kernel_branches():
     kern_src = get_user_path('kernel_src_dir')
     logging.info("Fetching changes from all supported branches...")
 
@@ -98,6 +121,8 @@ def get_commit_files(commit, regex=None):
 
     return re.findall(regex, ret) if regex else ret.splitlines()
 
+
+@__check_kernel_source_tags_are_fetched
 def get_commits(cve, savedir=None):
     kern_src = get_user_path('kernel_src_dir', isopt=True)
     if not kern_src:
@@ -113,8 +138,6 @@ def get_commits(cve, savedir=None):
     if not re.match(r"^202[0-9]-[0-9]{4,7}$", cve):
         logging.info("Invalid CVE number '%s', skipping the processing of getting the patches.", cve)
         return {}
-
-    fetch_kernel_branches()
 
     logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
