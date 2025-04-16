@@ -138,9 +138,7 @@ Useful to make sure to include symbols that are optimized in
 different architectures.
 .TP
 .B --apply-patches
-Apply patches found by
-.B get-patches
-command, if they exist.
+Apply patches if they exist.
 .TP
 .BI --codestreams " CODESTREAMS CODESTREAMS"
 Apply diff on two different codestreams.
@@ -157,14 +155,6 @@ Version to be added, like vX.
 .TP
 .B cs-diff
 Compare line by line the output livepatch of two codestreams.
-.RE
-.TP
-.B get-patches
-Find and list the kernel versions with a backported fix to the indicated CVE.
-.RS 7
-.TP
-.BI --cve " CVE"
-CVE number to search for related backported patches.
 .RE
 .TP
 .B cleanup

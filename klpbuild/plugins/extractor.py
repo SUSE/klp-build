@@ -50,7 +50,7 @@ class Extractor():
             self.workers = int(workers)
 
         if self.apply_patches and not patches.exists():
-            raise ValueError("--apply-patches specified without patches. Run get-patches!")
+            raise ValueError("patches do not exist!")
 
         if patches.exists():
             self.quilt_log = open(Path(patches, "quilt.log"), "w")

@@ -9,8 +9,6 @@ import sys
 from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.klplib.ibs import IBS
-from klpbuild.klplib.ksrc import GitHelper
-from klpbuild.klplib.utils import get_workdir
 from klpbuild.klplib.plugins import try_run_plugin
 from klpbuild.plugins.extractor import Extractor
 
@@ -42,9 +40,6 @@ def main():
 
     elif args.cmd == "cs-diff":
         Extractor(args.lp_name, args.lp_filter, False, []).cs_diff()
-
-    elif args.cmd == "get-patches":
-        GitHelper(args.lp_filter).get_commits(args.cve, get_workdir(args.lp_name))
 
     elif args.cmd == "status":
         IBS(args.lp_name, args.lp_filter).status(args.wait)
