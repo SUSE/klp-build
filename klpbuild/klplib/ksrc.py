@@ -19,8 +19,6 @@ from klpbuild.klplib.kernel_tree import get_commit_data
 class GitHelper():
     def __init__(self, lp_filter):
 
-        self.kern_src = get_user_path('kernel_src_dir', isopt=True)
-
         self.kernel_branches = {
             "12.5": "SLE12-SP5",
             "15.3": "SLE15-SP3-LTSS",
@@ -45,11 +43,12 @@ class GitHelper():
         self.lp_filter = lp_filter
 
     def fetch_kernel_branches(self):
+        kern_src = get_user_path('kernel_src_dir')
         logging.info("Fetching changes from all supported branches...")
 
         if not utils.in_test_mode():
             # Mount the command to fetch all branches for supported codestreams
-            subprocess.check_output(["/usr/bin/git", "-C", str(self.kern_src), "fetch",
+            subprocess.check_output(["/usr/bin/git", "-C", str(kern_src), "fetch",
                                      "--quiet", "--atomic", "--force", "--tags", "origin"] +
                                     list(self.kernel_branches.values()))
 
@@ -66,6 +65,7 @@ class GitHelper():
         returns:
             Boolean: True if both commits differ. False otherwise.
         """
+        kern_src = get_user_path('kernel_src_dir')
 
         if base == "":
             return True
@@ -73,7 +73,7 @@ class GitHelper():
         # Compare lines starting with '+' or '-'.
         # This should be enough to ignore sneaky metadata updates on
         # the file and duplicated commits.
-        diff = subprocess.run(["/usr/bin/git", "-C", str(self.kern_src), "diff",
+        diff = subprocess.run(["/usr/bin/git", "-C", kern_src, "diff",
                                "--numstat", pattern, base, new,
                                "--", str(patch)],
                               stdout = subprocess.DEVNULL,
@@ -94,15 +94,17 @@ class GitHelper():
             List: Return the files that match the regex, if set. Otherwise,
             return all the files.
         """
+        kern_src = get_user_path('kernel_src_dir')
 
-        ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src,
+        ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
                                        "diff-tree", "--no-commit-id", "--name-only",
                                        commit, "-r"]).decode()
 
         return re.findall(regex, ret) if regex else ret.splitlines()
 
     def get_commits(self, cve, savedir=None):
-        if not self.kern_src:
+        kern_src = get_user_path('kernel_src_dir', isopt=True)
+        if not kern_src:
             logging.info("kernel_src_dir not found, skip getting SUSE commits")
             return {}
 
@@ -140,7 +142,7 @@ class GitHelper():
 
             try:
                 patch_files = subprocess.check_output(
-                    ["/usr/bin/git", "-C", self.kern_src, "grep", "-l", f"CVE-{cve}", f"remotes/origin/{mbranch}"],
+                    ["/usr/bin/git", "-C", kern_src, "grep", "-l", f"CVE-{cve}", f"remotes/origin/{mbranch}"],
                     stderr=subprocess.STDOUT,
                 ).decode(sys.stdout.encoding)
             except subprocess.CalledProcessError:
@@ -151,7 +153,7 @@ class GitHelper():
                 continue
 
             # Prepare command to extract correct ordering of patches
-            cmd = ["/usr/bin/git", "-C", self.kern_src, "grep", "-o", "-h"]
+            cmd = ["/usr/bin/git", "-C", kern_src, "grep", "-o", "-h"]
             for patch in patch_files.splitlines():
                 _, fname = patch.split(":")
                 cmd.append("-e")
@@ -174,7 +176,7 @@ class GitHelper():
                 idx += 1
 
                 pfile = subprocess.check_output(
-                    ["/usr/bin/git", "-C", self.kern_src, "show", f"remotes/origin/{mbranch}:{patch}"],
+                    ["/usr/bin/git", "-C", kern_src, "show", f"remotes/origin/{mbranch}:{patch}"],
                     stderr=subprocess.STDOUT,
                 ).decode(sys.stdout.encoding)
 
@@ -209,7 +211,7 @@ class GitHelper():
                         [
                             "/usr/bin/git",
                             "-C",
-                            self.kern_src,
+                            kern_src,
                             "log",
                             "--numstat",
                             "--reverse",
@@ -294,6 +296,7 @@ class GitHelper():
         tag_commits = {}
         patched = []
         total_commits = len(suse_commits)
+        kern_src = get_user_path('kernel_src_dir')
 
         # Grab only the first commit, since they would be put together
         # in a release either way. The order of the array is backards, the
@@ -301,7 +304,7 @@ class GitHelper():
         for su in suse_commits:
             tag_commits[su] = []
 
-            tags = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src,
+            tags = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
                                             "tag", f"--contains={su}",
                                             "rpm-*"])
 
@@ -326,7 +329,8 @@ class GitHelper():
     def is_kernel_patched(self, kernel, suse_commits, cve):
         commits = []
 
-        ret = subprocess.check_output(["/usr/bin/git", "-C", self.kern_src, "log",
+        kern_src = get_user_path('kernel_src_dir')
+        ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src, "log",
                                        f"--grep=CVE-{cve}",
                                        f"--tags=*rpm-{kernel}",
                                        "--format='%at-%H-%s'"]).decode().splitlines()
@@ -360,7 +364,8 @@ class GitHelper():
         if not commits:
             return []
 
-        if not self.kern_src:
+        kern_src = get_user_path('kernel_src_dir', isopt=True)
+        if not kern_src:
             logging.info("kernel_src_dir not found, skip getting SUSE commits")
             return []
 
