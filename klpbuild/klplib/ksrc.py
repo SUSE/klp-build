@@ -16,31 +16,31 @@ from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.kernel_tree import get_commit_data
 
+KERNEL_BRANCHES = {
+    "12.5": "SLE12-SP5",
+    "15.3": "SLE15-SP3-LTSS",
+    "15.4": "SLE15-SP4-LTSS",
+    "15.5": "SLE15-SP5-LTSS",
+    "15.6": "SLE15-SP6",
+    "15.6rt": "SLE15-SP6-RT",
+    "6.0": "SUSE-2024",
+    "6.0rt": "SUSE-2024-RT",
+    "cve-5.3": "cve/linux-5.3-LTSS",
+    "cve-5.14": "cve/linux-5.14-LTSS",
+} if not utils.in_test_mode() else {
+    "15.3": "SLE15-SP3-RT-LTSS",
+    "15.4": "SLE15-SP4-RT-LTSS",
+    "15.5": "SLE15-SP5-RT-LTSS",
+    "15.6": "SLE15-SP6",
+    "15.6rt": "SLE15-SP6-RT",
+    "6.0": "SUSE-2024",
+    "6.0rt": "SUSE-2024-RT",
+}
+
 class GitHelper():
     def __init__(self, lp_filter):
-
-        self.kernel_branches = {
-            "12.5": "SLE12-SP5",
-            "15.3": "SLE15-SP3-LTSS",
-            "15.4": "SLE15-SP4-LTSS",
-            "15.5": "SLE15-SP5-LTSS",
-            "15.6": "SLE15-SP6",
-            "15.6rt": "SLE15-SP6-RT",
-            "6.0": "SUSE-2024",
-            "6.0rt": "SUSE-2024-RT",
-            "cve-5.3": "cve/linux-5.3-LTSS",
-            "cve-5.14": "cve/linux-5.14-LTSS",
-        } if not utils.in_test_mode() else {
-            "15.3": "SLE15-SP3-RT-LTSS",
-            "15.4": "SLE15-SP4-RT-LTSS",
-            "15.5": "SLE15-SP5-RT-LTSS",
-            "15.6": "SLE15-SP6",
-            "15.6rt": "SLE15-SP6-RT",
-            "6.0": "SUSE-2024",
-            "6.0rt": "SUSE-2024-RT",
-        }
-
         self.lp_filter = lp_filter
+
 
     def fetch_kernel_branches(self):
         kern_src = get_user_path('kernel_src_dir')
@@ -50,7 +50,7 @@ class GitHelper():
             # Mount the command to fetch all branches for supported codestreams
             subprocess.check_output(["/usr/bin/git", "-C", str(kern_src), "fetch",
                                      "--quiet", "--atomic", "--force", "--tags", "origin"] +
-                                    list(self.kernel_branches.values()))
+                                    list(KERNEL_BRANCHES.values()))
 
 
     def diff_commits(self, base, new, patch, pattern=""):
@@ -136,7 +136,7 @@ class GitHelper():
         # different versions of the same backport done in the CVE branches.
         # Since the CVE branch can be some patches "behind" the LTSS branch,
         # it's good to have both backports code at hand by the livepatch author
-        for bc, mbranch in self.kernel_branches.items():
+        for bc, mbranch in KERNEL_BRANCHES.items():
             logging.debug("	processing: %s: %s", bc, mbranch)
             commits[bc] = {"commits": []}
 
@@ -281,7 +281,7 @@ class GitHelper():
             if key == "upstream":
                 logging.info(f"{key}")
             else:
-                logging.info(f"{key}: {self.kernel_branches[key]}")
+                logging.info(f"{key}: {KERNEL_BRANCHES[key]}")
 
             branch_commits = val["commits"]
             if not branch_commits:
@@ -377,7 +377,7 @@ class GitHelper():
 
         kernels = []
 
-        for bc, _ in self.kernel_branches.items():
+        for bc, _ in KERNEL_BRANCHES.items():
             suse_commits = commits[bc]["commits"]
             if not suse_commits:
                 continue
