@@ -38,9 +38,6 @@ KERNEL_BRANCHES = {
 }
 
 class GitHelper():
-    def __init__(self, lp_filter):
-        self.lp_filter = lp_filter
-
 
     def fetch_kernel_branches(self):
         kern_src = get_user_path('kernel_src_dir')
