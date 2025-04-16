@@ -8,12 +8,45 @@ import os
 import shutil
 import subprocess
 
-from pathlib import Path
+from functools import wraps
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.utils import ARCH
+from pathlib import Path
 
+
+__kernel_tags_are_fetched = False
+def __check_kernel_tags_are_fetched(func):
+    """
+    This decorator checks whether the kernel tags are fetched. If not, it
+    fetches them the configuration and then calls the wrapped function.
+
+    Args:
+        func (function): The function to be wrapped.
+
+    Returns:
+        function: The wrapped function.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        global __kernel_tags_are_fetched
+        if not __kernel_tags_are_fetched:
+            __fetch_kernel_tree_tags()
+            __kernel_tags_are_fetched = True
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def __fetch_kernel_tree_tags():
+    """
+    Fetch and update the list of tags in the kernel repository.
+    """
+    logging.debug("Updating kernel tree tags..")
+    kernel_tree = get_user_path("kernel_dir")
+    subprocess.check_output(['git', "-C", kernel_tree, 'fetch', '--tags', '--force', '--quiet'],
+                            stderr=subprocess.PIPE)
 
 # Currently this function returns the date of the patch and its subject
+@__check_kernel_tags_are_fetched
 def get_commit_data(commit, savedir=None):
 
     kernel_tree = get_user_path("kernel_dir")
@@ -33,7 +66,7 @@ def get_commit_data(commit, savedir=None):
 
     return date, title
 
-
+@__check_kernel_tags_are_fetched
 def init_cs_kernel_tree(kernel_version, outdir):
     """
     Initialize a kernel source worktree for a specific kernel version.
@@ -84,16 +117,7 @@ def cleanup_kernel_trees():
     assert not __get_active_worktrees(kernel_tree)
 
 
-def update_kernel_tree_tags():
-    """
-    Fetch and update the list of tags in the kernel repository.
-    """
-    logging.debug("Updating kernel tree tags..")
-    kernel_tree = get_user_path("kernel_dir")
-    subprocess.check_output(['git', "-C", kernel_tree, 'fetch', '--tags', '--force', '--quiet'],
-                            stderr=subprocess.PIPE)
-
-
+@__check_kernel_tags_are_fetched
 def file_exists_in_tag(kernel_version, file_path):
     """
     Check if a specific file exists in a given kernel version tag.

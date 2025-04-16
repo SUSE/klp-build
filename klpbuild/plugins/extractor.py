@@ -24,12 +24,10 @@ from klpbuild.klplib import utils
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
 from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.templ import TemplateGen
-from klpbuild.klplib.kernel_tree import update_kernel_tree_tags
 
 
 class Extractor():
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
-        update_kernel_tree_tags()
 
         self.lp_name = lp_name
         self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
