@@ -13,8 +13,6 @@ from klpbuild.klplib.ksrc import GitHelper
 from klpbuild.klplib.utils import get_workdir
 from klpbuild.klplib.plugins import try_run_plugin
 from klpbuild.plugins.extractor import Extractor
-from klpbuild.plugins.inline import Inliner
-from klpbuild.plugins.setup import Setup
 
 
 def main():
@@ -23,8 +21,8 @@ def main():
     logging_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=logging_level, format="%(message)s")
 
-    if hasattr(args, 'name'):
-        load_codestreams(args.name)
+    if hasattr(args, 'lp_name'):
+        load_codestreams(args.lp_name)
 
     try:
         try_run_plugin(args.cmd, args)
@@ -39,44 +37,29 @@ def main():
 
     # NOTE: all the code below should be gone when all the modules will be
     # converted into plugins
-    if args.cmd == "setup":
-        setup = Setup(args.name)
-        ffuncs = Setup.setup_file_funcs(args.conf, args.module, args.file_funcs,
-                                        args.mod_file_funcs, args.conf_mod_file_funcs)
-        codestreams = setup.setup_codestreams(
-            {"cve": args.cve, "conf": args.conf, "lp_filter": args.lp_filter,
-                "no_check": args.no_check})
-        setup.setup_project_files(codestreams, ffuncs, args.archs)
-
-    elif args.cmd == "extract":
-        Extractor(args.name, args.lp_filter, args.apply_patches, args.avoid_ext).run()
+    if args.cmd == "extract":
+        Extractor(args.lp_name, args.lp_filter, args.apply_patches, args.avoid_ext).run()
 
     elif args.cmd == "cs-diff":
-        Extractor(args.name, args.lp_filter, False, []).cs_diff()
-
-    elif args.cmd == "check-inline":
-        Inliner(args.name, args.codestream).check_inline(args.file, args.symbol)
+        Extractor(args.lp_name, args.lp_filter, False, []).cs_diff()
 
     elif args.cmd == "get-patches":
-        GitHelper(args.lp_filter).get_commits(args.cve, get_workdir(args.name))
-
-    elif args.cmd == "format-patches":
-        GitHelper(args.lp_filter).format_patches(args.name, args.version)
+        GitHelper(args.lp_filter).get_commits(args.cve, get_workdir(args.lp_name))
 
     elif args.cmd == "status":
-        IBS(args.name, args.lp_filter).status(args.wait)
+        IBS(args.lp_name, args.lp_filter).status(args.wait)
 
     elif args.cmd == "push":
-        IBS(args.name, args.lp_filter).push(args.wait)
+        IBS(args.lp_name, args.lp_filter).push(args.wait)
 
     elif args.cmd == "log":
-        IBS(args.name, args.lp_filter).log(args.arch)
+        IBS(args.lp_name, args.lp_filter).log(args.arch)
 
     elif args.cmd == "cleanup":
-        IBS(args.name, args.lp_filter).cleanup()
+        IBS(args.lp_name, args.lp_filter).cleanup()
 
     elif args.cmd == "prepare-tests":
-        IBS(args.name, args.lp_filter).prepare_tests()
+        IBS(args.lp_name, args.lp_filter).prepare_tests()
 
 
 if __name__ == "__main__":

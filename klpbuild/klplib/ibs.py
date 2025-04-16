@@ -23,8 +23,7 @@ from lxml.objectify import SubElement
 from natsort import natsorted
 from osctiny import Osc
 
-from klpbuild.klplib.codestream import Codestream
-from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict, get_codestreams_items
+from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict
 from klpbuild.klplib.config import get_user_path, get_user_settings
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path, classify_codestreams_str
 
@@ -141,8 +140,6 @@ class IBS():
 
     def get_cs_packages(self, cs_list, dest):
         # The packages that we search for are:
-        # kernel-source
-        # kernel-devel
         # kernel-(default|rt)
         # kernel-(default|rt)-devel
         # kernel-(default|rt)-livepatch-devel (for SLE15+)
@@ -150,7 +147,6 @@ class IBS():
         # kernel-default-kgraft-devel (for SLE12)
         cs_data = {
             "kernel-default": r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)",
-            "kernel-source": r"(kernel-(source|devel)(\-rt)?\-?[\d\.\-]+.noarch.rpm)",
         }
 
         rpms = []
@@ -168,8 +164,6 @@ class IBS():
                         # RT kernels have different package names
                         if pkg == "kernel-default":
                             pkg = "kernel-rt"
-                        elif pkg == "kernel-source":
-                            pkg = "kernel-source-rt"
 
                     if cs.repo != "standard":
                         pkg = f"{pkg}.{cs.repo}"
@@ -190,7 +184,7 @@ class IBS():
                         # Extract the source and kernel-devel in the current
                         # machine arch to make it possible to run klp-build in
                         # different architectures
-                        if "kernel-source" in rpm or "kernel-default-devel" in rpm:
+                        if "kernel-default-devel" in rpm:
                             if arch != ARCH:
                                 continue
 
@@ -215,6 +209,7 @@ class IBS():
             for arch in cs.archs:
                 # Extract modules and vmlinux files that are compressed
                 mod_path = cs.get_mod_path(arch)
+                logging.info("extracting %s:%s in %s", arch, cs.name(), str(mod_path))
                 for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d -k")]:
                     cmd = rf'find {mod_path} -name "*.{fext}" -exec {ecmd} --quiet {{}} \;'
                     subprocess.check_output(cmd, shell=True)
@@ -225,6 +220,7 @@ class IBS():
                     f_path = cs.get_boot_file(f"{f}.gz", arch)
                     # ppc64le doesn't gzips vmlinux
                     if f_path.exists():
+                        logging.info("extracting %s:%s:%s", arch, cs.name(), f)
                         subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
 
             # Use the SLE .config

@@ -5,7 +5,6 @@
 
 import logging
 import re
-import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -17,7 +16,7 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
-
+from klpbuild.klplib.kernel_tree import get_commit_data
 
 class GitHelper():
     def __init__(self, lp_filter):
@@ -46,91 +45,6 @@ class GitHelper():
         }
 
         self.lp_filter = lp_filter
-
-    def format_patches(self, lp_name, version):
-        ver = f"v{version}"
-        # index 1 will be the test file
-        index = 2
-
-        kgr_patches = get_user_path('kgr_patches_dir')
-        if not kgr_patches:
-            logging.warning("kgr_patches_dir not found, patches will be incomplete")
-
-        # Remove dir to avoid leftover patches with different names
-        patches_dir = utils.get_workdir(lp_name)/"patches"
-        shutil.rmtree(patches_dir, ignore_errors=True)
-
-        test_src = utils.get_tests_path(lp_name)
-        subprocess.check_output(
-            [
-                "/usr/bin/git",
-                "-C",
-                str(get_user_path('kgr_patches_tests_dir')),
-                "format-patch",
-                "-1",
-                f"{test_src}",
-                "--cover-letter",
-                "--start-number",
-                "1",
-                "--subject-prefix",
-                f"PATCH {ver}",
-                "--output-directory",
-                f"{patches_dir}",
-            ]
-        )
-
-        # Filter only the branches related to this BSC
-        for branch in utils.get_lp_branches(lp_name, kgr_patches):
-            logging.info(branch)
-            bname = branch.replace(lp_name + "_", "")
-            bs = " ".join(bname.split("_"))
-            bsc = lp_name.replace("bsc", "bsc#")
-
-            prefix = f"PATCH {ver} {bsc} {bs}"
-
-            subprocess.check_output(
-                [
-                    "/usr/bin/git",
-                    "-C",
-                    str(kgr_patches),
-                    "format-patch",
-                    "-1",
-                    branch,
-                    "--start-number",
-                    f"{index}",
-                    "--subject-prefix",
-                    f"{prefix}",
-                    "--output-directory",
-                    f"{patches_dir}",
-                ]
-            )
-
-            index += 1
-
-    # Currently this function returns the date of the patch and it's subject
-    @staticmethod
-    def get_commit_data(commit, savedir=None):
-        req = requests.get(
-            f"https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/patch/?id={commit}", timeout=15)
-        req.raise_for_status()
-
-        # Save the upstream commit if requested
-        if savedir:
-            with open(Path(savedir, f"{commit}.patch"), "w") as f:
-                f.write(req.text)
-
-        # Search for Subject until a blank line, since commit messages can be
-        # seen in multiple lines.
-        msg = re.search(r"Subject: (.*?)(?:(\n\n))", req.text, re.DOTALL).group(1).replace("\n", "")
-        # Sometimes the MIME-Version string comes right after the commit
-        # message, so we should remove it as well
-        if 'MIME-Version:' in msg:
-            msg = re.sub(r"MIME-Version(.*)", "", msg)
-        dstr = re.search(r"Date: ([\w\s,:]+)", req.text).group(1)
-        d = datetime.strptime(dstr.strip(), "%a, %d %b %Y %H:%M:%S")
-
-        return d, msg
-
 
     def fetch_kernel_branches(self):
         logging.info("Fetching changes from all supported branches...")
@@ -223,6 +137,7 @@ class GitHelper():
         # Since the CVE branch can be some patches "behind" the LTSS branch,
         # it's good to have both backports code at hand by the livepatch author
         for bc, mbranch in self.kernel_branches.items():
+            logging.debug("	processing: %s: %s", bc, mbranch)
             commits[bc] = {"commits": []}
 
             try:
@@ -352,7 +267,7 @@ class GitHelper():
         # created/merged.
         ucommits_sort = []
         for c in ucommits:
-            d, msg = GitHelper.get_commit_data(c, upstream_patches_dir)
+            d, msg = get_commit_data(c, upstream_patches_dir)
             ucommits_sort.append((d, c, msg))
 
         ucommits_sort.sort()
@@ -363,7 +278,11 @@ class GitHelper():
         logging.info("")
 
         for key, val in commits.items():
-            logging.info(f"{key}")
+            if key == "upstream":
+                logging.info(f"{key}")
+            else:
+                logging.info(f"{key}: {self.kernel_branches[key]}")
+
             branch_commits = val["commits"]
             if not branch_commits:
                 logging.info("None")

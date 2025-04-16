@@ -7,9 +7,10 @@ import logging
 import sys
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.supported import get_supported_codestreams
+from klpbuild.klplib.data import download_missing_cs_data
 from klpbuild.klplib.ksrc import GitHelper
+from klpbuild.klplib.kernel_tree import update_kernel_tree_tags
 
 PLUGIN_CMD = "scan"
 
@@ -18,48 +19,52 @@ def register_argparser(subparser):
     scan.add_argument(
         "--cve",
         required=True,
-        help="SLE specific. Shows which codestreams are vulnerable to the CVE"
+        help="Shows which codestreams are vulnerable to the CVE"
     )
     scan.add_argument(
         "--conf",
         required=False,
-        help="SLE specific. Helps to check only the codestreams that have this config set."
+        help="Helps to check only the codestreams that have this config set."
+    )
+    scan.add_argument(
+        "--download",
+        required=False,
+        action="store_true",
+        help="SLE specific. Download missing codestreams data"
     )
 
 
-def run(cve, conf, lp_filter, no_check):
+def run(cve, conf, lp_filter, no_check, download):
     no_check = False
 
-    return scan(cve, conf, no_check, lp_filter)
+    return scan(cve, conf, no_check, lp_filter, download)
 
 
-def scan(cve, conf, no_check, lp_filter, savedir=None):
+def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     gh = GitHelper(lp_filter)
     # Always get the latest supported.csv file and check the content
     # against the codestreams informed by the user
     all_codestreams = get_supported_codestreams()
 
+    update_kernel_tree_tags()
+
+    # list of codestreams that matches the file-funcs argument
+    working_cs = []
+    patched_cs = []
+    unaffected_cs = []
+    conf_not_set = []
+
     if not cve or no_check:
+        logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
+        working_cs = utils.filter_codestreams(lp_filter, all_codestreams)
         commits = {}
         patched_kernels = []
     else:
         commits = gh.get_commits(cve, savedir)
         patched_kernels = gh.get_patched_kernels(all_codestreams, commits, cve)
 
-    # list of codestreams that matches the file-funcs argument
-    working_cs = []
-    patched_cs = []
-    unaffected_cs = []
-    data_missing = []
-    cs_missing = []
-    conf_not_set = []
+        for cs in utils.filter_codestreams(lp_filter, all_codestreams, verbose=True):
 
-    if no_check:
-        logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
-
-    for cs in all_codestreams:
-        # Skip patched codestreams
-        if not no_check:
             if cs.kernel in patched_kernels:
                 patched_cs.append(cs.name())
                 continue
@@ -68,34 +73,24 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
                 unaffected_cs.append(cs)
                 continue
 
-        cs.set_archs()
+            working_cs.append(cs)
 
-        if conf and not cs.get_boot_file("config").exists():
-            data_missing.append(cs)
-            cs_missing.append(cs.name())
-            # recheck later if we can add the missing codestreams
-            continue
+    # Download also if conf is set, because the codestreams data are needed to
+    # check for the configuration entry of each codestreams.
+    if conf or download:
+        download_missing_cs_data(working_cs)
 
-        if conf and not cs.get_all_configs(conf):
-            conf_not_set.append(cs)
-            continue
-
-        working_cs.append(cs)
-
-    # Found missing cs data, downloading and extract
-    if data_missing:
-        logging.info("Download the necessary data from the following codestreams:")
-        logging.info("\t%s\n", " ".join(cs_missing))
-        IBS("", lp_filter).download_cs_data(data_missing)
-        logging.info("Done.")
-
-        for cs in data_missing:
-            # Ok, the downloaded codestream has the configuration set
-            if cs.get_all_configs(conf):
-                working_cs.append(cs)
-            # Nope, the config is missing, so don't add it to working_cs
-            else:
+    # If conf is set, drop codestream not containing that conf entry from working_cs
+    if conf:
+        tmp_working_cs = []
+        for cs in working_cs:
+            # TODO: here we could check for affected arch automatically
+            if not cs.get_all_configs(conf):
                 conf_not_set.append(cs)
+            else:
+                tmp_working_cs.append(cs)
+        working_cs = tmp_working_cs
+
 
     if conf_not_set:
         logging.info("Skipping codestreams without %s set:", conf)
@@ -108,10 +103,6 @@ def scan(cve, conf, no_check, lp_filter, savedir=None):
     if unaffected_cs:
         logging.info("Skipping unaffected codestreams (missing backports):")
         logging.info("\t%s", utils.classify_codestreams_str(unaffected_cs))
-
-    # working_cs will contain the final dict of codestreams that wast set
-    # by the user, avoid downloading missing codestreams that are not affected
-    working_cs = utils.filter_codestreams(lp_filter, working_cs, verbose=True)
 
     if not working_cs:
         logging.info("All supported codestreams are already patched. Exiting klp-build")

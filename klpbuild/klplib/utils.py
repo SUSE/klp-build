@@ -327,13 +327,13 @@ def get_tests_path(lp_name):
     Args:
         lp_name (str): The live patch name to search for the test script.
 
-    Raises:
-        RuntimeError: If no test script is found.
-
     Returns:
-        Path: The path to the test script or directory containing it.
+        Path: The path to the test script or directory containing it, or None
+              if it doesn't exist.
     """
-    kgr_path = get_user_path('kgr_patches_tests_dir')
+    kgr_path = get_user_path('kgr_patches_tests_dir', isopt=True)
+    if not kgr_path:
+        return None
 
     test_sh = kgr_path/(lp_name+"_test_script.sh")
     if test_sh.is_file():
@@ -344,9 +344,10 @@ def get_tests_path(lp_name):
         # For more complex tests we support using a directory containing
         # as much files as needed. A `test_script.sh` is still required
         # as an entry point.
-        return PurePath(test_dir_sh).parent
+        return Path(test_dir_sh).parent
 
-    raise RuntimeError(f"Couldn't find {test_sh} or {test_dir_sh}")
+    logging.warning("No testscript found for %s", lp_name)
+    return None
 
 def in_test_mode():
     return os.getenv("TEST_MODE", 'n') == 'y'

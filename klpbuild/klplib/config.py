@@ -76,6 +76,7 @@ def get_user_path(entry, isdir=True, isopt=False):
     """
     if entry not in _config['Paths']:
         if isopt:
+            logging.debug('%s config entry not set', entry)
             return Path("")
         raise ValueError(f"config: '{entry}' entry not found")
 
