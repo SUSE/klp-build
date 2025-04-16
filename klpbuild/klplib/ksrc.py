@@ -7,11 +7,9 @@ import logging
 import re
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 from pathlib import PurePath
 
-import requests
 from natsort import natsorted
 
 from klpbuild.klplib import utils
