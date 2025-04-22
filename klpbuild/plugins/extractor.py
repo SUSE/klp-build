@@ -29,7 +29,6 @@ from klpbuild.klplib.kernel_tree import update_kernel_tree_tags
 
 class Extractor():
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
-        update_kernel_tree_tags()
 
         self.lp_name = lp_name
         self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
@@ -113,6 +112,7 @@ class Extractor():
         self.env["KCP_READELF"] = "readelf"
         self.env["KCP_RENAME_PREFIX"] = "klp"
 
+        update_kernel_tree_tags()
 
     def __del__(self):
         if self.sdir_lock:
