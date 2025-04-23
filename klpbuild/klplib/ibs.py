@@ -290,18 +290,18 @@ class IBS():
 
         shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
 
-    def prepare_tests(self):
+    def prepare_tests(self, lp_name, lp_filter):
         # Download all built rpms
-        self.download()
+        self.download_built_rpms(lp_name)
 
-        test_src = get_tests_path(self.lp_name)
+        test_src = get_tests_path(lp_name)
         run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
 
         logging.info(f"Validating the downloaded RPMs...")
 
         for arch in ARCHS:
-            tests_path = get_workdir(self.lp_name)/"tests"/arch
-            test_arch_path = Path(tests_path, self.lp_name)
+            tests_path = get_workdir(lp_name)/"tests"/arch
+            test_arch_path = Path(tests_path, lp_name)
 
             # Remove previously created directory and archive
             shutil.rmtree(test_arch_path, ignore_errors=True)
@@ -315,11 +315,11 @@ class IBS():
 
             logging.info(f"Checking {arch} symbols...")
             build_cs = []
-            for cs in filter_codestreams(self.lp_filter, get_codestreams_dict()):
+            for cs in filter_codestreams(lp_filter, get_codestreams_dict()):
                 if arch not in cs.archs:
                     continue
 
-                rpm_dir = Path(cs.get_ccp_dir(self.lp_name), arch, "rpm")
+                rpm_dir = Path(cs.get_ccp_dir(lp_name), arch, "rpm")
                 if not rpm_dir.exists():
                     logging.info(f"{cs.name()}/{arch}: rpm dir not found. Skipping.")
                     continue
@@ -343,7 +343,7 @@ class IBS():
             logging.info("Done.")
 
             # Prepare the config and test files used by kgr-test
-            test_dst = Path(test_arch_path, f"repro/{self.lp_name}")
+            test_dst = Path(test_arch_path, f"repro/{lp_name}")
             if test_src.is_file():
                 shutil.copy(test_src, f"{test_dst}_test_script.sh")
                 config = f"{test_dst}_config.in"
@@ -358,7 +358,7 @@ class IBS():
 
             logging.info(f"Creating {arch} tar file...")
             subprocess.run(
-                ["tar", "-cJf", f"{self.lp_name}.tar.xz", f"{self.lp_name}"],
+                ["tar", "-cJf", f"{lp_name}.tar.xz", f"{lp_name}"],
                 cwd=tests_path,
                 stdout=sys.stdout,
                 stderr=subprocess.PIPE,
@@ -375,7 +375,7 @@ class IBS():
         except KeyError:
             pass
 
-    def download(self):
+    def download_built_rpms(self, lp_name):
         rpms = []
         i = 1
         for result in self.get_projects():
@@ -404,7 +404,7 @@ class IBS():
                         continue
 
                     # Create a directory for each arch supported
-                    dest = Path(cs.get_ccp_dir(self.lp_name), str(arch), "rpm")
+                    dest = Path(cs.get_ccp_dir(lp_name), str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
                     rpms.append((i, cs, prj, "standard", arch, "klp", rpm, dest))
@@ -590,26 +590,26 @@ class IBS():
 
         logging.info(f"({i}/{self.total}) {cs.name()} done")
 
-    def log(self, arch):
-        cs_list = filter_codestreams(self.lp_filter, get_codestreams_dict())
+    def log(self, lp_filter, arch):
+        cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
 
         if not cs_list:
-            logging.error("log: No codestreams found for filter %s", self.lp_filter)
+            logging.error("log: No codestreams found for filter %s", lp_filter)
             sys.exit(1)
 
         if len(cs_list) > 1:
             cs_names = [cs.name() for cs in cs_list]
             logging.error("Filter '%s' returned %d entries (%s), while expecting just one. Aborting. ",
-                          self.lp_filter, len(cs_list), " ".join(cs_names))
+                          lp_filter, len(cs_list), " ".join(cs_names))
             sys.exit(1)
 
         logging.info(self.osc.build.get_log(cs_to_project(cs_list[0], self.prj_prefix), "standard", arch, "klp"))
 
-    def push(self, wait=False):
-        cs_list = filter_codestreams(self.lp_filter, get_codestreams_dict())
+    def push(self, lp_name, lp_filter, wait=False):
+        cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
 
         if not cs_list:
-            logging.error(f"push: No codestreams found for {self.lp_name}")
+            logging.error(f"push: No codestreams found for {lp_name}")
             sys.exit(1)
 
         logging.info("Pushing %d codestreams: %s", len(cs_list),
