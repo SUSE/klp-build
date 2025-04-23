@@ -6,7 +6,8 @@
 import logging
 
 from klpbuild.klplib.utils import classify_codestreams_str
-from klpbuild.klplib.ibs import IBS
+from klpbuild.klplib.ibs import download_cs_rpms
+
 
 def download_missing_cs_data(codestreams):
     cs_to_download = __get_cs_missing_data(codestreams)
@@ -16,7 +17,7 @@ def download_missing_cs_data(codestreams):
 def download_cs_data(codestreams):
     logging.info("Download the necessary data from the following codestreams: %s",
                  classify_codestreams_str(codestreams))
-    IBS().download_cs_data(codestreams)
+    download_cs_rpms(codestreams)
     logging.info("Done.")
 
 
