@@ -58,9 +58,7 @@ def delete_built_rpms(cs, lp_name):
 
 
 class IBS():
-    def __init__(self, lp_name, lp_filter):
-        self.lp_filter = lp_filter
-
+    def __init__(self, lp_name):
         self.osc = Osc(url="https://api.suse.de")
         self.prj_prefix = f"home:{self.osc.username}:{lp_name}-klp"
 
@@ -71,7 +69,7 @@ class IBS():
         logging.getLogger("osctiny").setLevel(logging.WARNING)
 
     # The projects has different format: 12_5u5 instead of 12.5u5
-    def get_projects(self):
+    def get_projects(self, lp_filter):
         prjs = []
         projects = self.osc.search.project(f"starts-with(@name, '{self.prj_prefix}')")
 
@@ -79,17 +77,17 @@ class IBS():
             prj_name = prj.get("name")
             cs = convert_prj_to_cs(prj_name, self.prj_prefix)
 
-            if self.lp_filter and not re.match(self.lp_filter, cs):
+            if lp_filter and not re.match(lp_filter, cs):
                 continue
 
             prjs.append(prj)
 
         return prjs
 
-    def get_project_names(self):
+    def get_project_names(self, lp_filter):
         names = []
         i = 1
-        for result in self.get_projects():
+        for result in self.get_projects(lp_filter):
             names.append((i, result.get("name")))
             i += 1
 
@@ -299,7 +297,7 @@ class IBS():
 
     def prepare_tests(self, lp_name, lp_filter):
         # Download all built rpms
-        self.download_built_rpms(lp_name)
+        self.download_built_rpms(lp_name, lp_filter)
 
         test_src = get_tests_path(lp_name)
         run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
@@ -374,10 +372,10 @@ class IBS():
 
             logging.info("Done.")
 
-    def download_built_rpms(self, lp_name):
+    def download_built_rpms(self, lp_name, lp_filter):
         rpms = []
         i = 1
-        for result in self.get_projects():
+        for result in self.get_projects(lp_filter):
             prj = result.get("name")
             cs_name = convert_prj_to_cs(prj, self.prj_prefix)
 
@@ -415,11 +413,11 @@ class IBS():
 
         logging.info(f"Download finished.")
 
-    def status(self, wait=False):
+    def status(self, lp_filter, wait=False):
         finished_prj = []
         while True:
             prjs = {}
-            for _, prj in self.get_project_names():
+            for _, prj in self.get_project_names(lp_filter):
                 if prj in finished_prj:
                     continue
 
@@ -465,8 +463,8 @@ class IBS():
             time.sleep(30)
             logging.info("")
 
-    def cleanup(self):
-        prjs = self.get_project_names()
+    def cleanup(self, lp_filter):
+        prjs = self.get_project_names(lp_filter)
 
         self.total = len(prjs)
         if self.total == 0:
