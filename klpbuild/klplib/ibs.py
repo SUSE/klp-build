@@ -61,11 +61,10 @@ class IBS():
     def __init__(self, lp_name, lp_filter):
         self.osc = Osc(url="https://api.suse.de")
 
-        self.lp_name = lp_name
         self.lp_filter = lp_filter
 
         self.ibs_user = self.osc.username
-        self.prj_prefix = f"home:{self.ibs_user}:{self.lp_name}-klp"
+        self.prj_prefix = f"home:{self.ibs_user}:{lp_name}-klp"
 
         # Total number of work items
         self.total = 0
@@ -499,9 +498,9 @@ class IBS():
 
         return prj
 
-    def create_lp_package(self, i, cs):
+    def create_lp_package(self, lp_name, i, cs):
         kgr_path = get_user_path('kgr_patches_dir')
-        branch = get_cs_branch(cs, self.lp_name, kgr_path)
+        branch = get_cs_branch(cs, lp_name, kgr_path)
         if not branch:
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
@@ -525,11 +524,11 @@ class IBS():
             raise RuntimeError("") from e
 
         # Remove previously created directories
-        prj_path = Path(cs.get_ccp_dir(self.lp_name), "checkout")
+        prj_path = Path(cs.get_ccp_dir(lp_name), "checkout")
         if prj_path.exists():
             shutil.rmtree(prj_path)
 
-        code_path = Path(cs.get_ccp_dir(self.lp_name), "code")
+        code_path = Path(cs.get_ccp_dir(lp_name), "code")
         if code_path.exists():
             shutil.rmtree(code_path)
 
@@ -567,8 +566,8 @@ class IBS():
         # Otherwise only warn the caller about this fact.
         # This scenario can occur in case of LPing function that is already
         # part of different LP in which case we modify the existing one.
-        if self.lp_name not in os.listdir(code_path):
-            logging.warning(f"Warning: Directory {self.lp_name} not found on branch {branch}")
+        if lp_name not in os.listdir(code_path):
+            logging.warning(f"Warning: Directory {lp_name} not found on branch {branch}")
 
         # Fix RELEASE version
         with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
@@ -621,7 +620,7 @@ class IBS():
         i = 1
         # More threads makes OBS to return error 500
         for cs in cs_list:
-            self.create_lp_package(i, cs)
+            self.create_lp_package(lp_name, i, cs)
             i += 1
 
         if wait:
