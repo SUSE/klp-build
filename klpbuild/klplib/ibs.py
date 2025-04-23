@@ -59,12 +59,10 @@ def delete_built_rpms(cs, lp_name):
 
 class IBS():
     def __init__(self, lp_name, lp_filter):
-        self.osc = Osc(url="https://api.suse.de")
-
         self.lp_filter = lp_filter
 
-        self.ibs_user = self.osc.username
-        self.prj_prefix = f"home:{self.ibs_user}:{lp_name}-klp"
+        self.osc = Osc(url="https://api.suse.de")
+        self.prj_prefix = f"home:{self.osc.username}:{lp_name}-klp"
 
         # Total number of work items
         self.total = 0
@@ -498,7 +496,7 @@ class IBS():
 
         return prj
 
-    def create_lp_package(self, lp_name, i, cs):
+    def create_lp_package(self, osc, lp_name, i, cs):
         kgr_path = get_user_path('kgr_patches_dir')
         branch = get_cs_branch(cs, lp_name, kgr_path)
         if not branch:
@@ -513,11 +511,11 @@ class IBS():
         prj_desc = f"Development of livepatches for {cs.name()}"
 
         try:
-            self.osc.projects.set_meta(
-                prj, metafile=meta, title="", bugowner=self.ibs_user, maintainer=self.ibs_user, description=prj_desc
+            osc.projects.set_meta(
+                prj, metafile=meta, title="", bugowner=osc.username, maintainer=osc.username, description=prj_desc
             )
 
-            self.osc.packages.set_meta(prj, "klp", title="", description="Test livepatch")
+            osc.packages.set_meta(prj, "klp", title="", description="Test livepatch")
 
         except Exception as e:
             logging.error(e, e.response.content)
@@ -532,7 +530,7 @@ class IBS():
         if code_path.exists():
             shutil.rmtree(code_path)
 
-        self.osc.packages.checkout(prj, "klp", prj_path)
+        osc.packages.checkout(prj, "klp", prj_path)
 
         base_branch = get_kgraft_branch(cs.name())
 
@@ -585,8 +583,8 @@ class IBS():
             if ".osc" in str(fname):
                 continue
             with open(fname, "rb") as fdata:
-                self.osc.packages.push_file(prj, "klp", fname.name, fdata.read())
-        self.osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
+                osc.packages.push_file(prj, "klp", fname.name, fdata.read())
+        osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
         shutil.rmtree(prj_path)
 
         logging.info(f"({i}/{self.total}) {cs.name()} done")
@@ -616,11 +614,13 @@ class IBS():
         logging.info("Pushing %d codestreams: %s", len(cs_list),
                      classify_codestreams_str(cs_list))
 
+        osc = Osc(url="https://api.suse.de")
+
         self.total = len(cs_list)
         i = 1
         # More threads makes OBS to return error 500
         for cs in cs_list:
-            self.create_lp_package(lp_name, i, cs)
+            self.create_lp_package(osc, lp_name, i, cs)
             i += 1
 
         if wait:
