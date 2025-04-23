@@ -57,11 +57,12 @@ def delete_built_rpms(cs, lp_name):
         pass
 
 
-class IBS():
-    def __init__(self, lp_name):
-        self.osc = Osc(url="https://api.suse.de")
-        self.prj_prefix = f"home:{self.osc.username}:{lp_name}-klp"
+def prj_prefix(lp_name, osc):
+    return f"home:{osc.username}:{lp_name}-klp"
 
+
+class IBS():
+    def __init__(self):
         # Total number of work items
         self.total = 0
 
@@ -69,13 +70,15 @@ class IBS():
         logging.getLogger("osctiny").setLevel(logging.WARNING)
 
     # The projects has different format: 12_5u5 instead of 12.5u5
-    def get_projects(self, lp_filter):
+    def get_projects(self, osc, lp_name, lp_filter):
         prjs = []
-        projects = self.osc.search.project(f"starts-with(@name, '{self.prj_prefix}')")
+        prefix = prj_prefix(lp_name, osc)
+
+        projects = osc.search.project(f"starts-with(@name, '{prefix}')")
 
         for prj in projects.findall("project"):
             prj_name = prj.get("name")
-            cs = convert_prj_to_cs(prj_name, self.prj_prefix)
+            cs = convert_prj_to_cs(prj_name, prefix)
 
             if lp_filter and not re.match(lp_filter, cs):
                 continue
@@ -84,18 +87,18 @@ class IBS():
 
         return prjs
 
-    def get_project_names(self, lp_filter):
+    def get_project_names(self, osc, lp_name, lp_filter):
         names = []
         i = 1
-        for result in self.get_projects(lp_filter):
+        for result in self.get_projects(osc, lp_name, lp_filter):
             names.append((i, result.get("name")))
             i += 1
 
         return natsorted(names, key=itemgetter(1))
 
-    def delete_project(self, i, prj, verbose=True):
+    def delete_project(self, osc, i, prj, verbose=True):
         try:
-            ret = self.osc.projects.delete(prj, force=True)
+            ret = osc.projects.delete(prj, force=True)
             if type(ret) is not bool:
                 logging.error(etree.tostring(ret))
                 raise ValueError(prj)
@@ -107,9 +110,9 @@ class IBS():
         if verbose:
             logging.info(f"({i}/{self.total}) {prj} deleted")
 
-    def delete_projects(self, prjs, verbose=True):
+    def delete_projects(self, osc, prjs, verbose=True):
         for i, prj in prjs:
-            self.delete_project(i, prj, verbose)
+            self.delete_project(osc, i, prj, verbose)
 
     def extract_rpms(self, args):
         i, cs, arch, rpm, dest = args
@@ -164,6 +167,8 @@ class IBS():
         rpms = []
         i = 1
 
+        osc = Osc(url="https://api.suse.de")
+
         logging.info("Getting list of files...")
         for cs in cs_list:
             for arch in cs.archs:
@@ -180,7 +185,7 @@ class IBS():
                     if cs.repo != "standard":
                         pkg = f"{pkg}.{cs.repo}"
 
-                    ret = self.osc.build.get_binary_list(cs.project, cs.repo, arch, pkg)
+                    ret = osc.build.get_binary_list(cs.project, cs.repo, arch, pkg)
                     for file in re.findall(regex, str(etree.tostring(ret))):
                         # FIXME: adjust the regex to only deal with strings
                         if isinstance(file, str):
@@ -200,7 +205,7 @@ class IBS():
                             if arch != ARCH:
                                 continue
 
-                        rpms.append((i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
+                        rpms.append((osc, i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
                         i += 1
 
         return rpms
@@ -252,10 +257,10 @@ class IBS():
         logging.info("Finished extract vmlinux and modules...")
 
     def download_binary_rpms(self, args):
-        i, cs, prj, repo, arch, pkg, rpm, dest = args
+        osc, i, cs, prj, repo, arch, pkg, rpm, dest = args
 
         try:
-            self.osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
+            osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
             logging.info(f"({i}/{self.total}) {cs.name()} {rpm}: ok")
         except OSError as e:
             if e.errno == errno.EEXIST:
@@ -375,15 +380,17 @@ class IBS():
     def download_built_rpms(self, lp_name, lp_filter):
         rpms = []
         i = 1
-        for result in self.get_projects(lp_filter):
+        osc = Osc(url="https://api.suse.de")
+
+        for result in self.get_projects(osc, lp_name, lp_filter):
             prj = result.get("name")
-            cs_name = convert_prj_to_cs(prj, self.prj_prefix)
+            cs_name = convert_prj_to_cs(prj, prj_prefix(lp_name, osc))
 
             # Get the codestream from the dict
             cs = get_codestream_by_name(cs_name)
             if not cs:
                 logging.info(f"Codestream {cs_name} is stale. Deleting it.")
-                self.delete_project(0, prj, False)
+                self.delete_project(osc, 0, prj, False)
                 continue
 
             # Remove previously downloaded rpms
@@ -391,7 +398,7 @@ class IBS():
 
             archs = result.xpath("repository/arch")
             for arch in archs:
-                ret = self.osc.build.get_binary_list(prj, "standard", arch, "klp")
+                ret = osc.build.get_binary_list(prj, "standard", arch, "klp")
                 rpm_name = f"{arch}.rpm"
                 for rpm in ret.xpath("binary/@filename"):
                     if not rpm.endswith(rpm_name):
@@ -404,7 +411,7 @@ class IBS():
                     dest = Path(cs.get_ccp_dir(lp_name), str(arch), "rpm")
                     dest.mkdir(exist_ok=True, parents=True)
 
-                    rpms.append((i, cs, prj, "standard", arch, "klp", rpm, dest))
+                    rpms.append((osc, i, cs, prj, "standard", arch, "klp", rpm, dest))
                     i += 1
 
         logging.info(f"Downloading {len(rpms)} packages...")
@@ -413,17 +420,20 @@ class IBS():
 
         logging.info(f"Download finished.")
 
-    def status(self, lp_filter, wait=False):
+    def status(self, lp_name, lp_filter, wait=False):
         finished_prj = []
+
+        osc = Osc(url="https://api.suse.de")
+
         while True:
             prjs = {}
-            for _, prj in self.get_project_names(lp_filter):
+            for _, prj in self.get_project_names(osc, lp_name, lp_filter):
                 if prj in finished_prj:
                     continue
 
                 prjs[prj] = {}
 
-                for res in self.osc.build.get(prj).findall("result"):
+                for res in osc.build.get(prj).findall("result"):
                     if not res.xpath("status/@code"):
                         continue
                     code = res.xpath("status/@code")[0]
@@ -463,8 +473,9 @@ class IBS():
             time.sleep(30)
             logging.info("")
 
-    def cleanup(self, lp_filter):
-        prjs = self.get_project_names(lp_filter)
+    def cleanup(self, lp_name, lp_filter):
+        osc = Osc(url="https://api.suse.de")
+        prjs = self.get_project_names(osc, lp_name, lp_filter)
 
         self.total = len(prjs)
         if self.total == 0:
@@ -473,7 +484,7 @@ class IBS():
 
         logging.info(f"Deleting {self.total} projects...")
 
-        self.delete_projects(prjs, True)
+        self.delete_projects(osc, prjs, True)
 
     def create_prj_meta(self, cs):
         prj = fromstring(
@@ -502,8 +513,8 @@ class IBS():
             return
 
         # If the project exists, drop it first
-        prj = cs_to_project(cs, self.prj_prefix)
-        self.delete_project(i, prj, verbose=False)
+        prj = cs_to_project(cs, prj_prefix(lp_name, osc))
+        self.delete_project(osc, i, prj, verbose=False)
 
         meta = self.create_prj_meta(cs)
         prj_desc = f"Development of livepatches for {cs.name()}"
@@ -587,7 +598,7 @@ class IBS():
 
         logging.info(f"({i}/{self.total}) {cs.name()} done")
 
-    def log(self, lp_filter, arch):
+    def log(self, lp_name, lp_filter, arch):
         cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
 
         if not cs_list:
@@ -600,7 +611,10 @@ class IBS():
                           lp_filter, len(cs_list), " ".join(cs_names))
             sys.exit(1)
 
-        logging.info(self.osc.build.get_log(cs_to_project(cs_list[0], self.prj_prefix), "standard", arch, "klp"))
+        osc = Osc(url="https://api.suse.de")
+        prefix = prj_prefix(lp_name, osc)
+
+        logging.info(osc.build.get_log(cs_to_project(cs_list[0], prefix), "standard", arch, "klp"))
 
     def push(self, lp_name, lp_filter, wait=False):
         cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
@@ -625,8 +639,8 @@ class IBS():
             # Give some time for IBS to start building the last pushed
             # codestreams
             time.sleep(30)
-            self.status(wait)
+            self.status(lp_name, lp_filter, wait)
 
             # One more status after everything finished, since we remove
             # finished builds on each iteration
-            self.status(False)
+            self.status(lp_name, lp_filter, False)
