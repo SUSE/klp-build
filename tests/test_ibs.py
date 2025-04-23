@@ -17,4 +17,4 @@ def test_list_of_packages():
     # Check if the package gathering mechanism works
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     codestreams = setup_codestreams(lp, DEFAULT_DATA)
-    assert len(IBS(lp).get_cs_packages(codestreams, Path("random"))) > 0
+    assert len(IBS().get_cs_packages(codestreams, Path("random"))) > 0

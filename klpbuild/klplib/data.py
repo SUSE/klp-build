@@ -16,7 +16,7 @@ def download_missing_cs_data(codestreams):
 def download_cs_data(codestreams):
     logging.info("Download the necessary data from the following codestreams: %s",
                  classify_codestreams_str(codestreams))
-    IBS("").download_cs_data(codestreams)
+    IBS().download_cs_data(codestreams)
     logging.info("Done.")
 
 
