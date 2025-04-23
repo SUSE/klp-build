@@ -36,6 +36,18 @@ def cs_to_project(cs, prefix):
     return prefix + "-" + cs.name().replace(".", "_")
 
 
+def do_work(func, args):
+    if len(args) == 0:
+        return
+
+    workers = int(get_user_settings("workers"))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        results = executor.map(func, args)
+        for result in results:
+            if result:
+                logging.error(result)
+
+
 class IBS():
     def __init__(self, lp_name, lp_filter):
         self.osc = Osc(url="https://api.suse.de")
@@ -51,17 +63,6 @@ class IBS():
 
         # Skip osctiny INFO messages
         logging.getLogger("osctiny").setLevel(logging.WARNING)
-
-    def do_work(self, func, args):
-        if len(args) == 0:
-            return
-
-        workers = int(get_user_settings("workers"))
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            results = executor.map(func, args)
-            for result in results:
-                if result:
-                    logging.error(result)
 
     # The projects has different format: 12_5u5 instead of 12.5u5
     def get_projects(self):
@@ -208,7 +209,7 @@ class IBS():
 
         logging.info("Downloading %s rpms...", len(rpms))
         self.total = len(rpms)
-        self.do_work(self.download_and_extract, rpms)
+        do_work(self.download_and_extract, rpms)
 
         # Create a list of paths pointing to lib/modules for each downloaded
         # codestream
@@ -412,7 +413,7 @@ class IBS():
 
         logging.info(f"Downloading {len(rpms)} packages...")
         self.total = len(rpms)
-        self.do_work(self.download_binary_rpms, rpms)
+        do_work(self.download_binary_rpms, rpms)
 
         logging.info(f"Download finished.")
 
