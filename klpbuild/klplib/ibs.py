@@ -6,6 +6,7 @@
 import concurrent.futures
 import errno
 import importlib
+from itertools import repeat
 import logging
 import os
 import re
@@ -42,7 +43,7 @@ def do_work(func, args):
 
     workers = int(get_user_settings("workers"))
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        results = executor.map(func, args)
+        results = executor.map(func, args, repeat(len(args)))
         for result in results:
             if result:
                 logging.error(result)
@@ -201,6 +202,248 @@ def validate_livepatch_module(cs, arch, rpm_dir, rpm):
     shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
 
 
+def download_binary_rpms(args, total):
+    osc, i, cs, prj, repo, arch, pkg, rpm, dest = args
+
+    try:
+        osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
+        logging.info("(%d/%d) %s %s: ok", i, total, cs.name(), rpm)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            logging.info("(%d/%d) %s %s: already downloaded. skipping", i, total, cs.name(), rpm)
+        else:
+            raise RuntimeError(f"download error on {prj}: {rpm}") from e
+
+
+def download_and_extract(args, total):
+    i, cs, _, _, arch, _, rpm, dest = args
+
+    # Try to download and extract at least twice if any problems arise
+    tries = 2
+    while tries > 0:
+        download_binary_rpms(args, total)
+        try:
+            extract_rpms((i, cs, arch, rpm, dest), total)
+            # All good, stop the loop
+            break
+        except Exception as e:
+            # There was an issue when extracting the RPMs, probably because it's broken
+            # Remove the downloaded RPMs and try again
+            tries = tries - 1
+            logging.info("Problem to extract %s. Downloading it again", rpm)
+            Path(dest, rpm).unlink()
+
+    if tries == 0:
+        raise RuntimeError(f"Failed to extract {rpm}. Aborting")
+
+
+def delete_project(osc, i, total, prj, verbose=True):
+    try:
+        ret = osc.projects.delete(prj, force=True)
+        if not isinstance(ret, bool):
+            logging.error(etree.tostring(ret))
+            raise ValueError(prj)
+    except requests.exceptions.HTTPError as e:
+        # project not found, no problem
+        if e.response.status_code == 404:
+            pass
+
+    if verbose:
+        logging.info("(%d/%d) %s deleted", i, total, prj)
+
+
+def delete_projects(osc, prjs, verbose=True):
+    total = len(prjs)
+    for i, prj in prjs:
+        delete_project(osc, i, total, prj, verbose)
+
+
+def extract_rpms(args, total):
+    i, cs, arch, rpm, dest = args
+
+    # We don't need to extract the -extra packages for non x86_64 archs.
+    # These packages are only needed to be uploaded to the kgr-test
+    # repos, since they aren't published, but we need them for testing.
+    if arch != "x86_64" and "-extra" in rpm:
+        return
+
+    path_dest = get_datadir(arch)
+    path_dest.mkdir(exist_ok=True, parents=True)
+
+    rpm_file = Path(dest, rpm)
+    cmd = f"rpm2cpio {rpm_file} | cpio --quiet -uidm"
+    subprocess.check_output(cmd, shell=True, stderr=None, cwd=path_dest)
+
+    logging.info("(%d/%d) extracted %s %s: ok", i, total, cs.name(), rpm)
+
+
+def download_built_rpms(lp_name, lp_filter):
+    rpms = []
+    i = 1
+    osc = Osc(url="https://api.suse.de")
+
+    for result in get_projects(osc, lp_name, lp_filter):
+        prj = result.get("name")
+        cs_name = convert_prj_to_cs(prj, prj_prefix(lp_name, osc))
+
+        # Get the codestream from the dict
+        cs = get_codestream_by_name(cs_name)
+        if not cs:
+            logging.info("Codestream %s is stale. Deleting it.", cs_name)
+            delete_project(osc, 0, 0, prj, False)
+            continue
+
+        # Remove previously downloaded rpms
+        delete_built_rpms(cs, lp_name)
+
+        archs = result.xpath("repository/arch")
+        for arch in archs:
+            ret = osc.build.get_binary_list(prj, "standard", arch, "klp")
+            rpm_name = f"{arch}.rpm"
+            for rpm in ret.xpath("binary/@filename"):
+                if not rpm.endswith(rpm_name):
+                    continue
+
+                if "preempt" in rpm:
+                    continue
+
+                # Create a directory for each arch supported
+                dest = Path(cs.get_ccp_dir(lp_name), str(arch), "rpm")
+                dest.mkdir(exist_ok=True, parents=True)
+
+                rpms.append((osc, i, cs, prj, "standard", arch, "klp", rpm, dest))
+                i += 1
+
+    logging.info("Downloading %d packages...", len(rpms))
+    do_work(download_binary_rpms, rpms)
+
+    logging.info("Download finished.")
+
+
+def download_cs_rpms(cs_list):
+    dest = get_datadir()/"kernel-rpms"
+    dest.mkdir(exist_ok=True, parents=True)
+
+    rpms = get_cs_packages(cs_list, dest)
+
+    logging.info("Downloading %s rpms...", len(rpms))
+    do_work(download_and_extract, rpms)
+
+    # Create a list of paths pointing to lib/modules for each downloaded
+    # codestream
+    for cs in cs_list:
+        for arch in cs.archs:
+            # Extract modules and vmlinux files that are compressed
+            mod_path = cs.get_mod_path(arch)
+            logging.info("extracting %s:%s in %s", arch, cs.name(), str(mod_path))
+            for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d -k")]:
+                cmd = rf'find {mod_path} -name "*.{fext}" -exec {ecmd} --quiet {{}} \;'
+                subprocess.check_output(cmd, shell=True)
+
+            # Extract gzipped files per arch
+            files = ["vmlinux", "symvers"]
+            for f in files:
+                f_path = cs.get_boot_file(f"{f}.gz", arch)
+                # ppc64le doesn't gzips vmlinux
+                if f_path.exists():
+                    logging.info("extracting %s:%s:%s", arch, cs.name(), f)
+                    subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
+
+        # Use the SLE .config
+        shutil.copy(cs.get_boot_file("config"), Path(cs.get_obj_dir(), ".config"))
+
+        # Recreate the build link to enable us to test the generated LP
+        mod_path = cs.get_kernel_build_path(ARCH)
+        mod_path.unlink()
+        os.symlink(cs.get_obj_dir(), mod_path)
+
+    # Create symlink from lib to usr/lib so we can use virtme on the
+    # extracted kernels
+    usr_lib = get_datadir()/ARCH/"usr"/"lib"
+    if not usr_lib.exists():
+        usr_lib.symlink_to(get_datadir()/ARCH/"lib")
+
+    logging.info("Finished extract vmlinux and modules...")
+
+
+def prepare_tests(lp_name, lp_filter):
+    # Download all built rpms
+    download_built_rpms(lp_name, lp_filter)
+
+    test_src = get_tests_path(lp_name)
+    run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
+
+    logging.info("Validating the downloaded RPMs...")
+
+    for arch in ARCHS:
+        tests_path = get_workdir(lp_name)/"tests"/arch
+        test_arch_path = Path(tests_path, lp_name)
+
+        # Remove previously created directory and archive
+        shutil.rmtree(test_arch_path, ignore_errors=True)
+        shutil.rmtree(f"{str(test_arch_path)}.tar.xz", ignore_errors=True)
+
+        test_arch_path.mkdir(exist_ok=True, parents=True)
+        shutil.copy(run_test, test_arch_path)
+
+        for d in ["built", "repro", "tests.out"]:
+            Path(test_arch_path, d).mkdir(exist_ok=True)
+
+        logging.info("Checking %s symbols...", arch)
+        build_cs = []
+        for cs in filter_codestreams(lp_filter, get_codestreams_dict()):
+            if arch not in cs.archs:
+                continue
+
+            rpm_dir = Path(cs.get_ccp_dir(lp_name), arch, "rpm")
+            if not rpm_dir.exists():
+                logging.info("%s/%s: rpm dir not found. Skipping.", cs.name(), arch)
+                continue
+
+            # TODO: there will be only one rpm, format it directly
+            rpm = os.listdir(rpm_dir)
+            if len(rpm) > 1:
+                raise RuntimeError(f"ERROR: {cs.name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
+
+            for rpm in os.listdir(rpm_dir):
+                # Check for dependencies
+                validate_livepatch_module(cs, arch, rpm_dir, rpm)
+
+                shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, "built"))
+
+            if cs.rt and arch != "x86_64":
+                continue
+
+            build_cs.append(cs.name_full())
+
+        logging.info("Done.")
+
+        # Prepare the config and test files used by kgr-test
+        test_dst = Path(test_arch_path, f"repro/{lp_name}")
+        if test_src.is_file():
+            shutil.copy(test_src, f"{test_dst}_test_script.sh")
+            config = f"{test_dst}_config.in"
+        else:
+            # Alternatively, we create test_dst as a directory containing
+            # at least a test_script.sh and a config.in
+            shutil.copytree(test_src, test_dst)
+            config = Path(test_dst, "config.in")
+
+        with open(config, "w") as f:
+            f.write("\n".join(natsorted(build_cs)))
+
+        logging.info("Creating %s tar file...", arch)
+        subprocess.run(
+            ["tar", "-cJf", f"{lp_name}.tar.xz", f"{lp_name}"],
+            cwd=tests_path,
+            stdout=sys.stdout,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+
+        logging.info("Done.")
+
+
 def log(lp_name, lp_filter, arch):
     cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
 
@@ -274,380 +517,139 @@ def status(lp_name, lp_filter, wait=False):
         logging.info("")
 
 
-class IBS():
-    def __init__(self):
-        # Total number of work items
-        self.total = 0
+def cleanup(lp_name, lp_filter):
+    osc = Osc(url="https://api.suse.de")
+    prjs = get_project_names(osc, lp_name, lp_filter)
 
-        # Skip osctiny INFO messages
-        logging.getLogger("osctiny").setLevel(logging.WARNING)
+    total = len(prjs)
+    if total == 0:
+        logging.info("No projects found.")
+        return
 
-    def delete_project(self, osc, i, prj, verbose=True):
-        try:
-            ret = osc.projects.delete(prj, force=True)
-            if not isinstance(ret, bool):
-                logging.error(etree.tostring(ret))
-                raise ValueError(prj)
-        except requests.exceptions.HTTPError as e:
-            # project not found, no problem
-            if e.response.status_code == 404:
-                pass
+    logging.info("Deleting %d projects...", total)
 
-        if verbose:
-            logging.info(f"({i}/{self.total}) {prj} deleted")
+    delete_projects(osc, prjs, True)
 
-    def delete_projects(self, osc, prjs, verbose=True):
-        for i, prj in prjs:
-            self.delete_project(osc, i, prj, verbose)
 
-    def extract_rpms(self, args):
-        i, cs, arch, rpm, dest = args
+def create_lp_package(osc, lp_name, i, total, cs):
+    kgr_path = get_user_path('kgr_patches_dir')
+    branch = get_cs_branch(cs, lp_name, kgr_path)
+    if not branch:
+        logging.info("Could not find git branch for %s. Skipping.", cs.name())
+        return
 
-        # We don't need to extract the -extra packages for non x86_64 archs.
-        # These packages are only needed to be uploaded to the kgr-test
-        # repos, since they aren't published, but we need them for testing.
-        if arch != "x86_64" and "-extra" in rpm:
-            return
+    # If the project exists, drop it first
+    prj = cs_to_project(cs, prj_prefix(lp_name, osc))
+    delete_project(osc, 0, 0, prj, verbose=False)
 
-        path_dest = get_datadir(arch)
-        path_dest.mkdir(exist_ok=True, parents=True)
+    meta = create_prj_meta(cs)
+    prj_desc = f"Development of livepatches for {cs.name()}"
 
-        rpm_file = Path(dest, rpm)
-        cmd = f"rpm2cpio {rpm_file} | cpio --quiet -uidm"
-        subprocess.check_output(cmd, shell=True, stderr=None, cwd=path_dest)
-
-        logging.info(f"({i}/{self.total}) extracted {cs.name()} {rpm}: ok")
-
-    def download_and_extract(self, args):
-        i, cs, _, _, arch, _, rpm, dest = args
-
-        # Try to download and extract at least twice if any problems arise
-        tries = 2
-        while tries > 0:
-            self.download_binary_rpms(args)
-            try:
-                self.extract_rpms((i, cs, arch, rpm, dest))
-                # All good, stop the loop
-                break
-            except Exception as e:
-                # There was an issue when extracting the RPMs, probably because it's broken
-                # Remove the downloaded RPMs and try again
-                tries = tries - 1
-                logging.info(f"Problem to extract {rpm}. Downloading it again")
-                Path(dest, rpm).unlink()
-
-        if tries == 0:
-            raise RuntimeError(f"Failed to extract {rpm}. Aborting")
-
-    def download_cs_data(self, cs_list):
-        dest = get_datadir()/"kernel-rpms"
-        dest.mkdir(exist_ok=True, parents=True)
-
-        rpms = get_cs_packages(cs_list, dest)
-
-        logging.info("Downloading %s rpms...", len(rpms))
-        self.total = len(rpms)
-        do_work(self.download_and_extract, rpms)
-
-        # Create a list of paths pointing to lib/modules for each downloaded
-        # codestream
-        for cs in cs_list:
-            for arch in cs.archs:
-                # Extract modules and vmlinux files that are compressed
-                mod_path = cs.get_mod_path(arch)
-                logging.info("extracting %s:%s in %s", arch, cs.name(), str(mod_path))
-                for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d -k")]:
-                    cmd = rf'find {mod_path} -name "*.{fext}" -exec {ecmd} --quiet {{}} \;'
-                    subprocess.check_output(cmd, shell=True)
-
-                # Extract gzipped files per arch
-                files = ["vmlinux", "symvers"]
-                for f in files:
-                    f_path = cs.get_boot_file(f"{f}.gz", arch)
-                    # ppc64le doesn't gzips vmlinux
-                    if f_path.exists():
-                        logging.info("extracting %s:%s:%s", arch, cs.name(), f)
-                        subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
-
-            # Use the SLE .config
-            shutil.copy(cs.get_boot_file("config"), Path(cs.get_obj_dir(), ".config"))
-
-            # Recreate the build link to enable us to test the generated LP
-            mod_path = cs.get_kernel_build_path(ARCH)
-            mod_path.unlink()
-            os.symlink(cs.get_obj_dir(), mod_path)
-
-        # Create symlink from lib to usr/lib so we can use virtme on the
-        # extracted kernels
-        usr_lib = get_datadir()/ARCH/"usr"/"lib"
-        if not usr_lib.exists():
-            usr_lib.symlink_to(get_datadir()/ARCH/"lib")
-
-        logging.info("Finished extract vmlinux and modules...")
-
-    def download_binary_rpms(self, args):
-        osc, i, cs, prj, repo, arch, pkg, rpm, dest = args
-
-        try:
-            osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
-            logging.info(f"({i}/{self.total}) {cs.name()} {rpm}: ok")
-        except OSError as e:
-            if e.errno == errno.EEXIST:
-                logging.info(f"({i}/{self.total}) {cs.name()} {rpm}: already downloaded. skipping.")
-            else:
-                raise RuntimeError(f"download error on {prj}: {rpm}") from e
-
-    def prepare_tests(self, lp_name, lp_filter):
-        # Download all built rpms
-        self.download_built_rpms(lp_name, lp_filter)
-
-        test_src = get_tests_path(lp_name)
-        run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
-
-        logging.info(f"Validating the downloaded RPMs...")
-
-        for arch in ARCHS:
-            tests_path = get_workdir(lp_name)/"tests"/arch
-            test_arch_path = Path(tests_path, lp_name)
-
-            # Remove previously created directory and archive
-            shutil.rmtree(test_arch_path, ignore_errors=True)
-            shutil.rmtree(f"{str(test_arch_path)}.tar.xz", ignore_errors=True)
-
-            test_arch_path.mkdir(exist_ok=True, parents=True)
-            shutil.copy(run_test, test_arch_path)
-
-            for d in ["built", "repro", "tests.out"]:
-                Path(test_arch_path, d).mkdir(exist_ok=True)
-
-            logging.info(f"Checking {arch} symbols...")
-            build_cs = []
-            for cs in filter_codestreams(lp_filter, get_codestreams_dict()):
-                if arch not in cs.archs:
-                    continue
-
-                rpm_dir = Path(cs.get_ccp_dir(lp_name), arch, "rpm")
-                if not rpm_dir.exists():
-                    logging.info(f"{cs.name()}/{arch}: rpm dir not found. Skipping.")
-                    continue
-
-                # TODO: there will be only one rpm, format it directly
-                rpm = os.listdir(rpm_dir)
-                if len(rpm) > 1:
-                    raise RuntimeError(f"ERROR: {cs.name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
-
-                for rpm in os.listdir(rpm_dir):
-                    # Check for dependencies
-                    validate_livepatch_module(cs, arch, rpm_dir, rpm)
-
-                    shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, "built"))
-
-                if cs.rt and arch != "x86_64":
-                    continue
-
-                build_cs.append(cs.name_full())
-
-            logging.info("Done.")
-
-            # Prepare the config and test files used by kgr-test
-            test_dst = Path(test_arch_path, f"repro/{lp_name}")
-            if test_src.is_file():
-                shutil.copy(test_src, f"{test_dst}_test_script.sh")
-                config = f"{test_dst}_config.in"
-            else:
-                # Alternatively, we create test_dst as a directory containing
-                # at least a test_script.sh and a config.in
-                shutil.copytree(test_src, test_dst)
-                config = Path(test_dst, "config.in")
-
-            with open(config, "w") as f:
-                f.write("\n".join(natsorted(build_cs)))
-
-            logging.info(f"Creating {arch} tar file...")
-            subprocess.run(
-                ["tar", "-cJf", f"{lp_name}.tar.xz", f"{lp_name}"],
-                cwd=tests_path,
-                stdout=sys.stdout,
-                stderr=subprocess.PIPE,
-                check=True,
-            )
-
-            logging.info("Done.")
-
-    def download_built_rpms(self, lp_name, lp_filter):
-        rpms = []
-        i = 1
-        osc = Osc(url="https://api.suse.de")
-
-        for result in get_projects(osc, lp_name, lp_filter):
-            prj = result.get("name")
-            cs_name = convert_prj_to_cs(prj, prj_prefix(lp_name, osc))
-
-            # Get the codestream from the dict
-            cs = get_codestream_by_name(cs_name)
-            if not cs:
-                logging.info(f"Codestream {cs_name} is stale. Deleting it.")
-                self.delete_project(osc, 0, prj, False)
-                continue
-
-            # Remove previously downloaded rpms
-            delete_built_rpms(cs, lp_name)
-
-            archs = result.xpath("repository/arch")
-            for arch in archs:
-                ret = osc.build.get_binary_list(prj, "standard", arch, "klp")
-                rpm_name = f"{arch}.rpm"
-                for rpm in ret.xpath("binary/@filename"):
-                    if not rpm.endswith(rpm_name):
-                        continue
-
-                    if "preempt" in rpm:
-                        continue
-
-                    # Create a directory for each arch supported
-                    dest = Path(cs.get_ccp_dir(lp_name), str(arch), "rpm")
-                    dest.mkdir(exist_ok=True, parents=True)
-
-                    rpms.append((osc, i, cs, prj, "standard", arch, "klp", rpm, dest))
-                    i += 1
-
-        logging.info(f"Downloading {len(rpms)} packages...")
-        self.total = len(rpms)
-        do_work(self.download_binary_rpms, rpms)
-
-        logging.info(f"Download finished.")
-
-    def cleanup(self, lp_name, lp_filter):
-        osc = Osc(url="https://api.suse.de")
-        prjs = get_project_names(osc, lp_name, lp_filter)
-
-        self.total = len(prjs)
-        if self.total == 0:
-            logging.info("No projects found.")
-            return
-
-        logging.info(f"Deleting {self.total} projects...")
-
-        self.delete_projects(osc, prjs, True)
-
-    def create_lp_package(self, osc, lp_name, i, cs):
-        kgr_path = get_user_path('kgr_patches_dir')
-        branch = get_cs_branch(cs, lp_name, kgr_path)
-        if not branch:
-            logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
-            return
-
-        # If the project exists, drop it first
-        prj = cs_to_project(cs, prj_prefix(lp_name, osc))
-        self.delete_project(osc, 0, prj, verbose=False)
-
-        meta = create_prj_meta(cs)
-        prj_desc = f"Development of livepatches for {cs.name()}"
-
-        try:
-            osc.projects.set_meta(
-                prj, metafile=meta, title="", bugowner=osc.username, maintainer=osc.username, description=prj_desc
-            )
-
-            osc.packages.set_meta(prj, "klp", title="", description="Test livepatch")
-
-        except Exception as e:
-            logging.error(e, e.response.content)
-            raise RuntimeError("") from e
-
-        # Remove previously created directories
-        prj_path = Path(cs.get_ccp_dir(lp_name), "checkout")
-        if prj_path.exists():
-            shutil.rmtree(prj_path)
-
-        code_path = Path(cs.get_ccp_dir(lp_name), "code")
-        if code_path.exists():
-            shutil.rmtree(code_path)
-
-        osc.packages.checkout(prj, "klp", prj_path)
-
-        base_branch = get_kgraft_branch(cs.name())
-
-        logging.info("(%s/%s) pushing %s using branches %s/%s...",
-                     i, self.total, cs.name(), str(base_branch), str(branch))
-
-        # Clone the repo and checkout to the codestream branch. The branch should be based on master to avoid rebasing
-        # conflicts
-        subprocess.check_output(
-            ["/usr/bin/git", "clone", "--branch", branch, str(kgr_path), str(code_path)],
-            stderr=subprocess.STDOUT,
+    try:
+        osc.projects.set_meta(
+            prj, metafile=meta, title="", bugowner=osc.username, maintainer=osc.username, description=prj_desc
         )
 
-        # Add remote with all codestreams, because the clone above will set the remote origin
-        # to the local directory, so it can't find the remote codestreams
-        subprocess.check_output(["/usr/bin/git", "remote", "add", "kgr",
-                                "gitlab@gitlab.suse.de:kernel/kgraft-patches.git"],
-                                stderr=subprocess.STDOUT, cwd=code_path)
+        osc.packages.set_meta(prj, "klp", title="", description="Test livepatch")
 
-        # Fetch all remote codestreams so we can rebase in the next step
-        subprocess.check_output(["/usr/bin/git", "fetch", "kgr",  str(base_branch)],
-                                stderr=subprocess.STDOUT, cwd=code_path)
+    except Exception as e:
+        logging.error(e, e.response.content)
+        raise RuntimeError("") from e
 
-        # Get the new bsc commit on top of the codestream branch (should be the last commit on the specific branch)
-        subprocess.check_output(
-            ["/usr/bin/git", "rebase", f"kgr/{base_branch}"],
-            stderr=subprocess.STDOUT, cwd=code_path
-        )
-
-        # Check if the directory related to this bsc exists.
-        # Otherwise only warn the caller about this fact.
-        # This scenario can occur in case of LPing function that is already
-        # part of different LP in which case we modify the existing one.
-        if lp_name not in os.listdir(code_path):
-            logging.warning(f"Warning: Directory {lp_name} not found on branch {branch}")
-
-        # Fix RELEASE version
-        with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
-            ver = cs.name_full().replace("EMBARGO", "")
-            f.write(f"RELEASE={ver}")
-
-        subprocess.check_output(
-            ["bash", "./scripts/tar-up.sh", "-d", str(prj_path)], stderr=subprocess.STDOUT, cwd=code_path
-        )
-        shutil.rmtree(code_path)
-
-        # Add all files to the project, commit the changes and delete the directory.
-        for fname in prj_path.iterdir():
-            # Do not push .osc directory
-            if ".osc" in str(fname):
-                continue
-            with open(fname, "rb") as fdata:
-                osc.packages.push_file(prj, "klp", fname.name, fdata.read())
-        osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
+    # Remove previously created directories
+    prj_path = Path(cs.get_ccp_dir(lp_name), "checkout")
+    if prj_path.exists():
         shutil.rmtree(prj_path)
 
-        logging.info(f"({i}/{self.total}) {cs.name()} done")
+    code_path = Path(cs.get_ccp_dir(lp_name), "code")
+    if code_path.exists():
+        shutil.rmtree(code_path)
 
-    def push(self, lp_name, lp_filter, wait=False):
-        cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
+    osc.packages.checkout(prj, "klp", prj_path)
 
-        if not cs_list:
-            logging.error(f"push: No codestreams found for {lp_name}")
-            sys.exit(1)
+    base_branch = get_kgraft_branch(cs.name())
 
-        logging.info("Pushing %d codestreams: %s", len(cs_list),
-                     classify_codestreams_str(cs_list))
+    logging.info("(%s/%s) pushing %s using branches %s/%s...",
+                 i, total, cs.name(), str(base_branch), str(branch))
 
-        osc = Osc(url="https://api.suse.de")
+    # Clone the repo and checkout to the codestream branch. The branch should be based on master to avoid rebasing
+    # conflicts
+    subprocess.check_output(
+        ["/usr/bin/git", "clone", "--branch", branch, str(kgr_path), str(code_path)],
+        stderr=subprocess.STDOUT,
+    )
 
-        self.total = len(cs_list)
-        i = 1
-        # More threads makes OBS to return error 500
-        for cs in cs_list:
-            self.create_lp_package(osc, lp_name, i, cs)
-            i += 1
+    # Add remote with all codestreams, because the clone above will set the remote origin
+    # to the local directory, so it can't find the remote codestreams
+    subprocess.check_output(["/usr/bin/git", "remote", "add", "kgr",
+                            "gitlab@gitlab.suse.de:kernel/kgraft-patches.git"],
+                            stderr=subprocess.STDOUT, cwd=code_path)
 
-        if wait:
-            # Give some time for IBS to start building the last pushed
-            # codestreams
-            time.sleep(30)
-            status(lp_name, lp_filter, wait)
+    # Fetch all remote codestreams so we can rebase in the next step
+    subprocess.check_output(["/usr/bin/git", "fetch", "kgr",  str(base_branch)],
+                            stderr=subprocess.STDOUT, cwd=code_path)
 
-            # One more status after everything finished, since we remove
-            # finished builds on each iteration
-            status(lp_name, lp_filter, False)
+    # Get the new bsc commit on top of the codestream branch (should be the last commit on the specific branch)
+    subprocess.check_output(
+        ["/usr/bin/git", "rebase", f"kgr/{base_branch}"],
+        stderr=subprocess.STDOUT, cwd=code_path
+    )
+
+    # Check if the directory related to this bsc exists.
+    # Otherwise only warn the caller about this fact.
+    # This scenario can occur in case of LPing function that is already
+    # part of different LP in which case we modify the existing one.
+    if lp_name not in os.listdir(code_path):
+        logging.warning("Warning: Directory %s not found on branch %s", lp_name, branch)
+
+    # Fix RELEASE version
+    with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
+        ver = cs.name_full().replace("EMBARGO", "")
+        f.write(f"RELEASE={ver}")
+
+    subprocess.check_output(
+        ["bash", "./scripts/tar-up.sh", "-d", str(prj_path)], stderr=subprocess.STDOUT, cwd=code_path
+    )
+    shutil.rmtree(code_path)
+
+    # Add all files to the project, commit the changes and delete the directory.
+    for fname in prj_path.iterdir():
+        # Do not push .osc directory
+        if ".osc" in str(fname):
+            continue
+        with open(fname, "rb") as fdata:
+            osc.packages.push_file(prj, "klp", fname.name, fdata.read())
+    osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
+    shutil.rmtree(prj_path)
+
+    logging.info("(%d/%d) %s done", i, total, cs.name())
+
+
+def push(lp_name, lp_filter, wait=False):
+    cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
+
+    if not cs_list:
+        logging.error("push: No codestreams found for %s", lp_name)
+        sys.exit(1)
+
+    logging.info("Pushing %d codestreams: %s", len(cs_list),
+                 classify_codestreams_str(cs_list))
+
+    osc = Osc(url="https://api.suse.de")
+
+    total = len(cs_list)
+    i = 1
+    # More threads makes OBS to return error 500
+    for cs in cs_list:
+        create_lp_package(osc, lp_name, i, total, cs)
+        i += 1
+
+    if wait:
+        # Give some time for IBS to start building the last pushed
+        # codestreams
+        time.sleep(30)
+        status(lp_name, lp_filter, wait)
+
+        # One more status after everything finished, since we remove
+        # finished builds on each iteration
+        status(lp_name, lp_filter, False)
