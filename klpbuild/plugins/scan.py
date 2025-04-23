@@ -9,7 +9,7 @@ import sys
 from klpbuild.klplib import utils
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
-from klpbuild.klplib.ksrc import GitHelper
+from klpbuild.klplib.ksrc import get_commits, get_patched_kernels, cs_is_affected
 
 PLUGIN_CMD = "scan"
 
@@ -40,7 +40,6 @@ def run(cve, conf, lp_filter, no_check, download):
 
 
 def scan(cve, conf, no_check, lp_filter, download, savedir=None):
-    gh = GitHelper(lp_filter)
     # Always get the latest supported.csv file and check the content
     # against the codestreams informed by the user
     all_codestreams = get_supported_codestreams()
@@ -57,8 +56,8 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
         commits = {}
         patched_kernels = []
     else:
-        commits = gh.get_commits(cve, savedir)
-        patched_kernels = gh.get_patched_kernels(all_codestreams, commits, cve)
+        commits = get_commits(cve, savedir)
+        patched_kernels = get_patched_kernels(all_codestreams, commits, cve)
 
         for cs in utils.filter_codestreams(lp_filter, all_codestreams, verbose=True):
 
@@ -66,7 +65,7 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
                 patched_cs.append(cs.name())
                 continue
 
-            if not GitHelper.cs_is_affected(cs, cve, commits):
+            if not cs_is_affected(cs, cve, commits):
                 unaffected_cs.append(cs)
                 continue
 
