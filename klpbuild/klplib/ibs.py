@@ -61,6 +61,219 @@ def prj_prefix(lp_name, osc):
     return f"home:{osc.username}:{lp_name}-klp"
 
 
+# The projects has different format: 12_5u5 instead of 12.5u5
+def get_projects(osc, lp_name, lp_filter):
+    prjs = []
+    prefix = prj_prefix(lp_name, osc)
+
+    projects = osc.search.project(f"starts-with(@name, '{prefix}')")
+
+    for prj in projects.findall("project"):
+        prj_name = prj.get("name")
+        cs = convert_prj_to_cs(prj_name, prefix)
+
+        if lp_filter and not re.match(lp_filter, cs):
+            continue
+
+        prjs.append(prj)
+
+    return prjs
+
+
+def get_project_names(osc, lp_name, lp_filter):
+    names = []
+    i = 1
+    for result in get_projects(osc, lp_name, lp_filter):
+        names.append((i, result.get("name")))
+        i += 1
+
+    return natsorted(names, key=itemgetter(1))
+
+
+def create_prj_meta(cs):
+    prj = fromstring(
+        "<project name=''><title></title><description></description>"
+        "<build><enable/></build><publish><disable/></publish>"
+        "<debuginfo><disable/></debuginfo>"
+        '<repository name="standard">'
+        f"<path project=\"{cs.project}\" repository=\"{cs.repo}\"/>"
+        "</repository>"
+        "</project>"
+    )
+
+    repo = prj.find("repository")
+
+    for arch in cs.archs:
+        ar = SubElement(repo, "arch")
+        ar._setText(arch)
+
+    return prj
+
+
+def get_cs_packages(cs_list, dest):
+    # The packages that we search for are:
+    # kernel-(default|rt)
+    # kernel-(default|rt)-devel
+    # kernel-(default|rt)-livepatch-devel (for SLE15+)
+    # kernel-default-kgraft (for SLE12)
+    # kernel-default-kgraft-devel (for SLE12)
+    cs_data = {
+        "kernel-default": r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)",
+    }
+
+    rpms = []
+    i = 1
+
+    osc = Osc(url="https://api.suse.de")
+
+    logging.info("Getting list of files...")
+    for cs in cs_list:
+        for arch in cs.archs:
+            for pkg, regex in cs_data.items():
+                if cs.is_micro:
+                    # For MICRO, we use the patchid to find the list of binaries
+                    pkg = cs.patchid
+
+                elif cs.rt:
+                    # RT kernels have different package names
+                    if pkg == "kernel-default":
+                        pkg = "kernel-rt"
+
+                if cs.repo != "standard":
+                    pkg = f"{pkg}.{cs.repo}"
+
+                ret = osc.build.get_binary_list(cs.project, cs.repo, arch, pkg)
+                for file in re.findall(regex, str(etree.tostring(ret))):
+                    # FIXME: adjust the regex to only deal with strings
+                    if isinstance(file, str):
+                        rpm = file
+                    else:
+                        rpm = file[0]
+
+                    # Download all packages for the HOST arch
+                    # For the others only download kernel-default
+                    if arch != ARCH and not re.search(r"kernel-default-\d", rpm):
+                        continue
+
+                    # Extract the source and kernel-devel in the current
+                    # machine arch to make it possible to run klp-build in
+                    # different architectures
+                    if "kernel-default-devel" in rpm:
+                        if arch != ARCH:
+                            continue
+
+                    rpms.append((osc, i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
+                    i += 1
+
+    return rpms
+
+
+def find_missing_symbols(cs, arch, lp_mod_path):
+    vmlinux_path = cs.get_boot_file("vmlinux", arch)
+    vmlinux_syms = get_all_symbols_from_object(vmlinux_path, True)
+
+    # Get list of UNDEFINED symbols from the livepatch module
+    lp_und_symbols = get_all_symbols_from_object(lp_mod_path, False)
+
+    missing_syms = []
+    # Find all UNDEFINED symbols that exists in the livepatch module that
+    # aren't defined in the vmlinux
+    for sym in lp_und_symbols:
+        if sym not in vmlinux_syms:
+            missing_syms.append(sym)
+
+    return missing_syms
+
+
+def validate_livepatch_module(cs, arch, rpm_dir, rpm):
+    fdest = Path(rpm_dir, rpm)
+    # Extract the livepatch module for later inspection
+    subprocess.check_output(f"rpm2cpio {fdest} | cpio --quiet -uidm",
+                            shell=True, cwd=rpm_dir)
+
+    # There should be only one .ko file extracted
+    lp_mod_path = sorted(rpm_dir.glob("**/*.ko"))[0]
+
+    funcs = find_missing_symbols(cs, arch, lp_mod_path)
+    if funcs:
+        logging.warning('%s:%s Undefined functions: %s', cs.name(), arch, " ".join(funcs))
+
+    shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
+
+
+def log(lp_name, lp_filter, arch):
+    cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
+
+    if not cs_list:
+        logging.error("log: No codestreams found for filter %s", lp_filter)
+        sys.exit(1)
+
+    if len(cs_list) > 1:
+        cs_names = [cs.name() for cs in cs_list]
+        logging.error("Filter '%s' returned %d entries (%s), while expecting just one. Aborting. ",
+                      lp_filter, len(cs_list), " ".join(cs_names))
+        sys.exit(1)
+
+    osc = Osc(url="https://api.suse.de")
+    prefix = prj_prefix(lp_name, osc)
+
+    logging.info(osc.build.get_log(cs_to_project(cs_list[0], prefix), "standard", arch, "klp"))
+
+
+def status(lp_name, lp_filter, wait=False):
+    finished_prj = []
+
+    osc = Osc(url="https://api.suse.de")
+
+    while True:
+        prjs = {}
+        for _, prj in get_project_names(osc, lp_name, lp_filter):
+            if prj in finished_prj:
+                continue
+
+            prjs[prj] = {}
+
+            for res in osc.build.get(prj).findall("result"):
+                if not res.xpath("status/@code"):
+                    continue
+                code = res.xpath("status/@code")[0]
+                prjs[prj][res.get("arch")] = code
+
+        logging.info("%d codestreams to finish", len(prjs))
+
+        for prj, archs in prjs.items():
+            st = []
+            finished = False
+            # Save the status of all architecture build, and set to fail if
+            # an error happens in any of the supported architectures
+            for k, v in archs.items():
+                st.append(f"{k}: {v}")
+                if v in ["unresolvable", "failed"]:
+                    finished = True
+
+            # Only set finished is all architectures supported by the
+            # codestreams built without issues
+            if not finished:
+                states = set(archs.values())
+                if len(states) == 1 and states.pop() in ["succeeded", "excluded"]:
+                    finished = True
+
+            if finished:
+                finished_prj.append(prj)
+
+            logging.info("%s\t%s", prj, "\t".join(st))
+
+        for p in finished_prj:
+            prjs.pop(p, None)
+
+        if not wait or not prjs:
+            break
+
+        # Wait 30 seconds before getting status again
+        time.sleep(30)
+        logging.info("")
+
+
 class IBS():
     def __init__(self):
         # Total number of work items
@@ -69,37 +282,10 @@ class IBS():
         # Skip osctiny INFO messages
         logging.getLogger("osctiny").setLevel(logging.WARNING)
 
-    # The projects has different format: 12_5u5 instead of 12.5u5
-    def get_projects(self, osc, lp_name, lp_filter):
-        prjs = []
-        prefix = prj_prefix(lp_name, osc)
-
-        projects = osc.search.project(f"starts-with(@name, '{prefix}')")
-
-        for prj in projects.findall("project"):
-            prj_name = prj.get("name")
-            cs = convert_prj_to_cs(prj_name, prefix)
-
-            if lp_filter and not re.match(lp_filter, cs):
-                continue
-
-            prjs.append(prj)
-
-        return prjs
-
-    def get_project_names(self, osc, lp_name, lp_filter):
-        names = []
-        i = 1
-        for result in self.get_projects(osc, lp_name, lp_filter):
-            names.append((i, result.get("name")))
-            i += 1
-
-        return natsorted(names, key=itemgetter(1))
-
     def delete_project(self, osc, i, prj, verbose=True):
         try:
             ret = osc.projects.delete(prj, force=True)
-            if type(ret) is not bool:
+            if not isinstance(ret, bool):
                 logging.error(etree.tostring(ret))
                 raise ValueError(prj)
         except requests.exceptions.HTTPError as e:
@@ -153,68 +339,11 @@ class IBS():
         if tries == 0:
             raise RuntimeError(f"Failed to extract {rpm}. Aborting")
 
-    def get_cs_packages(self, cs_list, dest):
-        # The packages that we search for are:
-        # kernel-(default|rt)
-        # kernel-(default|rt)-devel
-        # kernel-(default|rt)-livepatch-devel (for SLE15+)
-        # kernel-default-kgraft (for SLE12)
-        # kernel-default-kgraft-devel (for SLE12)
-        cs_data = {
-            "kernel-default": r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)",
-        }
-
-        rpms = []
-        i = 1
-
-        osc = Osc(url="https://api.suse.de")
-
-        logging.info("Getting list of files...")
-        for cs in cs_list:
-            for arch in cs.archs:
-                for pkg, regex in cs_data.items():
-                    if cs.is_micro:
-                        # For MICRO, we use the patchid to find the list of binaries
-                        pkg = cs.patchid
-
-                    elif cs.rt:
-                        # RT kernels have different package names
-                        if pkg == "kernel-default":
-                            pkg = "kernel-rt"
-
-                    if cs.repo != "standard":
-                        pkg = f"{pkg}.{cs.repo}"
-
-                    ret = osc.build.get_binary_list(cs.project, cs.repo, arch, pkg)
-                    for file in re.findall(regex, str(etree.tostring(ret))):
-                        # FIXME: adjust the regex to only deal with strings
-                        if isinstance(file, str):
-                            rpm = file
-                        else:
-                            rpm = file[0]
-
-                        # Download all packages for the HOST arch
-                        # For the others only download kernel-default
-                        if arch != ARCH and not re.search(r"kernel-default-\d", rpm):
-                            continue
-
-                        # Extract the source and kernel-devel in the current
-                        # machine arch to make it possible to run klp-build in
-                        # different architectures
-                        if "kernel-default-devel" in rpm:
-                            if arch != ARCH:
-                                continue
-
-                        rpms.append((osc, i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
-                        i += 1
-
-        return rpms
-
     def download_cs_data(self, cs_list):
         dest = get_datadir()/"kernel-rpms"
         dest.mkdir(exist_ok=True, parents=True)
 
-        rpms = self.get_cs_packages(cs_list, dest)
+        rpms = get_cs_packages(cs_list, dest)
 
         logging.info("Downloading %s rpms...", len(rpms))
         self.total = len(rpms)
@@ -268,38 +397,6 @@ class IBS():
             else:
                 raise RuntimeError(f"download error on {prj}: {rpm}") from e
 
-    def find_missing_symbols(self, cs, arch, lp_mod_path):
-        vmlinux_path = cs.get_boot_file("vmlinux", arch)
-        vmlinux_syms = get_all_symbols_from_object(vmlinux_path, True)
-
-        # Get list of UNDEFINED symbols from the livepatch module
-        lp_und_symbols = get_all_symbols_from_object(lp_mod_path, False)
-
-        missing_syms = []
-        # Find all UNDEFINED symbols that exists in the livepatch module that
-        # aren't defined in the vmlinux
-        for sym in lp_und_symbols:
-            if sym not in vmlinux_syms:
-                missing_syms.append(sym)
-
-        return missing_syms
-
-    def validate_livepatch_module(self, cs, arch, rpm_dir, rpm):
-        fdest = Path(rpm_dir, rpm)
-        # Extract the livepatch module for later inspection
-        subprocess.check_output(f"rpm2cpio {fdest} | cpio --quiet -uidm",
-                                shell=True, cwd=rpm_dir)
-
-        # There should be only one .ko file extracted
-        lp_mod_path = sorted(rpm_dir.glob("**/*.ko"))[0]
-        elffile = get_elf_object(lp_mod_path)
-
-        funcs = self.find_missing_symbols(cs, arch, lp_mod_path)
-        if funcs:
-            logging.warning(f'{cs.name()}:{arch} Undefined functions: {" ".join(funcs)}')
-
-        shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
-
     def prepare_tests(self, lp_name, lp_filter):
         # Download all built rpms
         self.download_built_rpms(lp_name, lp_filter)
@@ -341,7 +438,7 @@ class IBS():
 
                 for rpm in os.listdir(rpm_dir):
                     # Check for dependencies
-                    self.validate_livepatch_module(cs, arch, rpm_dir, rpm)
+                    validate_livepatch_module(cs, arch, rpm_dir, rpm)
 
                     shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, "built"))
 
@@ -382,7 +479,7 @@ class IBS():
         i = 1
         osc = Osc(url="https://api.suse.de")
 
-        for result in self.get_projects(osc, lp_name, lp_filter):
+        for result in get_projects(osc, lp_name, lp_filter):
             prj = result.get("name")
             cs_name = convert_prj_to_cs(prj, prj_prefix(lp_name, osc))
 
@@ -420,62 +517,9 @@ class IBS():
 
         logging.info(f"Download finished.")
 
-    def status(self, lp_name, lp_filter, wait=False):
-        finished_prj = []
-
-        osc = Osc(url="https://api.suse.de")
-
-        while True:
-            prjs = {}
-            for _, prj in self.get_project_names(osc, lp_name, lp_filter):
-                if prj in finished_prj:
-                    continue
-
-                prjs[prj] = {}
-
-                for res in osc.build.get(prj).findall("result"):
-                    if not res.xpath("status/@code"):
-                        continue
-                    code = res.xpath("status/@code")[0]
-                    prjs[prj][res.get("arch")] = code
-
-            print(f"{len(prjs)} codestreams to finish")
-
-            for prj, archs in prjs.items():
-                st = []
-                finished = False
-                # Save the status of all architecture build, and set to fail if
-                # an error happens in any of the supported architectures
-                for k, v in archs.items():
-                    st.append(f"{k}: {v}")
-                    if v in ["unresolvable", "failed"]:
-                        finished = True
-
-                # Only set finished is all architectures supported by the
-                # codestreams built without issues
-                if not finished:
-                    states = set(archs.values())
-                    if len(states) == 1 and states.pop() in ["succeeded", "excluded"]:
-                        finished = True
-
-                if finished:
-                    finished_prj.append(prj)
-
-                logging.info("{}\t{}".format(prj, "\t".join(st)))
-
-            for p in finished_prj:
-                prjs.pop(p, None)
-
-            if not wait or not prjs:
-                break
-
-            # Wait 30 seconds before getting status again
-            time.sleep(30)
-            logging.info("")
-
     def cleanup(self, lp_name, lp_filter):
         osc = Osc(url="https://api.suse.de")
-        prjs = self.get_project_names(osc, lp_name, lp_filter)
+        prjs = get_project_names(osc, lp_name, lp_filter)
 
         self.total = len(prjs)
         if self.total == 0:
@@ -486,25 +530,6 @@ class IBS():
 
         self.delete_projects(osc, prjs, True)
 
-    def create_prj_meta(self, cs):
-        prj = fromstring(
-            "<project name=''><title></title><description></description>"
-            "<build><enable/></build><publish><disable/></publish>"
-            "<debuginfo><disable/></debuginfo>"
-            '<repository name="standard">'
-            f"<path project=\"{cs.project}\" repository=\"{cs.repo}\"/>"
-            "</repository>"
-            "</project>"
-        )
-
-        repo = prj.find("repository")
-
-        for arch in cs.archs:
-            ar = SubElement(repo, "arch")
-            ar._setText(arch)
-
-        return prj
-
     def create_lp_package(self, osc, lp_name, i, cs):
         kgr_path = get_user_path('kgr_patches_dir')
         branch = get_cs_branch(cs, lp_name, kgr_path)
@@ -514,9 +539,9 @@ class IBS():
 
         # If the project exists, drop it first
         prj = cs_to_project(cs, prj_prefix(lp_name, osc))
-        self.delete_project(osc, i, prj, verbose=False)
+        self.delete_project(osc, 0, prj, verbose=False)
 
-        meta = self.create_prj_meta(cs)
+        meta = create_prj_meta(cs)
         prj_desc = f"Development of livepatches for {cs.name()}"
 
         try:
@@ -598,24 +623,6 @@ class IBS():
 
         logging.info(f"({i}/{self.total}) {cs.name()} done")
 
-    def log(self, lp_name, lp_filter, arch):
-        cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
-
-        if not cs_list:
-            logging.error("log: No codestreams found for filter %s", lp_filter)
-            sys.exit(1)
-
-        if len(cs_list) > 1:
-            cs_names = [cs.name() for cs in cs_list]
-            logging.error("Filter '%s' returned %d entries (%s), while expecting just one. Aborting. ",
-                          lp_filter, len(cs_list), " ".join(cs_names))
-            sys.exit(1)
-
-        osc = Osc(url="https://api.suse.de")
-        prefix = prj_prefix(lp_name, osc)
-
-        logging.info(osc.build.get_log(cs_to_project(cs_list[0], prefix), "standard", arch, "klp"))
-
     def push(self, lp_name, lp_filter, wait=False):
         cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
 
@@ -639,8 +646,8 @@ class IBS():
             # Give some time for IBS to start building the last pushed
             # codestreams
             time.sleep(30)
-            self.status(lp_name, lp_filter, wait)
+            status(lp_name, lp_filter, wait)
 
             # One more status after everything finished, since we remove
             # finished builds on each iteration
-            self.status(lp_name, lp_filter, False)
+            status(lp_name, lp_filter, False)
