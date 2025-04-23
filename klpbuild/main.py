@@ -42,19 +42,19 @@ def main():
         Extractor(args.lp_name, args.lp_filter, False, []).cs_diff()
 
     elif args.cmd == "status":
-        IBS(args.lp_name, args.lp_filter).status(args.wait)
+        IBS(args.lp_name).status(args.wait)
 
     elif args.cmd == "push":
-        IBS(args.lp_name, args.lp_filter).push(args.lp_name, args.lp_filter, args.wait)
+        IBS(args.lp_name).push(args.lp_name, args.lp_filter, args.wait)
 
     elif args.cmd == "log":
-        IBS(args.lp_name, args.lp_filter).log(args.lp_filter, args.arch)
+        IBS(args.lp_name).log(args.lp_filter, args.arch)
 
     elif args.cmd == "cleanup":
-        IBS(args.lp_name, args.lp_filter).cleanup()
+        IBS(args.lp_name).cleanup(args.lp_filter)
 
     elif args.cmd == "prepare-tests":
-        IBS(args.lp_name, args.lp_filter).prepare_tests(args.lp_name, args.lp_filter)
+        IBS(args.lp_name).prepare_tests(args.lp_name, args.lp_filter)
 
 
 if __name__ == "__main__":
