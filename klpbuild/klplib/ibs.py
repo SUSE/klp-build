@@ -28,6 +28,14 @@ from klpbuild.klplib.config import get_user_path, get_user_settings
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path, classify_codestreams_str
 
 
+def convert_prj_to_cs(prj, prefix):
+    return prj.replace(f"{prefix}-", "").replace("_", ".")
+
+
+def cs_to_project(cs, prefix):
+    return prefix + "-" + cs.name().replace(".", "_")
+
+
 class IBS():
     def __init__(self, lp_name, lp_filter):
         self.osc = Osc(url="https://api.suse.de")
@@ -62,7 +70,7 @@ class IBS():
 
         for prj in projects.findall("project"):
             prj_name = prj.get("name")
-            cs = self.convert_prj_to_cs(prj_name)
+            cs = convert_prj_to_cs(prj_name, self.prj_prefix)
 
             if self.lp_filter and not re.match(self.lp_filter, cs):
                 continue
@@ -250,9 +258,6 @@ class IBS():
             else:
                 raise RuntimeError(f"download error on {prj}: {rpm}") from e
 
-    def convert_prj_to_cs(self, prj):
-        return prj.replace(f"{self.prj_prefix}-", "").replace("_", ".")
-
     def find_missing_symbols(self, cs, arch, lp_mod_path):
         vmlinux_path = cs.get_boot_file("vmlinux", arch)
         vmlinux_syms = get_all_symbols_from_object(vmlinux_path, True)
@@ -375,7 +380,7 @@ class IBS():
         i = 1
         for result in self.get_projects():
             prj = result.get("name")
-            cs_name = self.convert_prj_to_cs(prj)
+            cs_name = convert_prj_to_cs(prj, self.prj_prefix)
 
             # Get the codestream from the dict
             cs = get_codestream_by_name(cs_name)
@@ -473,9 +478,6 @@ class IBS():
 
         self.delete_projects(prjs, True)
 
-    def cs_to_project(self, cs):
-        return self.prj_prefix + "-" + cs.name().replace(".", "_")
-
     def create_prj_meta(self, cs):
         prj = fromstring(
             "<project name=''><title></title><description></description>"
@@ -502,9 +504,8 @@ class IBS():
             logging.info(f"Could not find git branch for {cs.name()}. Skipping.")
             return
 
-
         # If the project exists, drop it first
-        prj = self.cs_to_project(cs)
+        prj = cs_to_project(cs, self.prj_prefix)
         self.delete_project(i, prj, verbose=False)
 
         meta = self.create_prj_meta(cs)
@@ -602,7 +603,7 @@ class IBS():
                           self.lp_filter, len(cs_list), " ".join(cs_names))
             sys.exit(1)
 
-        logging.info(self.osc.build.get_log(self.cs_to_project(cs_list[0]), "standard", arch, "klp"))
+        logging.info(self.osc.build.get_log(cs_to_project(cs_list[0], self.prj_prefix), "standard", arch, "klp"))
 
     def push(self, wait=False):
         cs_list = filter_codestreams(self.lp_filter, get_codestreams_dict())
