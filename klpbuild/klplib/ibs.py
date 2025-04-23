@@ -48,6 +48,15 @@ def do_work(func, args):
                 logging.error(result)
 
 
+# We can try delete a project that was removed, so don't bother with errors
+def delete_built_rpms(cs, lp_name):
+    try:
+        for arch in cs.archs:
+            shutil.rmtree(Path(cs.get_ccp_dir(lp_name), arch, "rpm"), ignore_errors=True)
+    except KeyError:
+        pass
+
+
 class IBS():
     def __init__(self, lp_name, lp_filter):
         self.osc = Osc(url="https://api.suse.de")
@@ -368,14 +377,6 @@ class IBS():
 
             logging.info("Done.")
 
-    # We can try delete a project that was removed, so don't bother with errors
-    def delete_rpms(self, cs):
-        try:
-            for arch in cs.archs:
-                shutil.rmtree(Path(cs.get_ccp_dir(self.lp_name), arch, "rpm"), ignore_errors=True)
-        except KeyError:
-            pass
-
     def download_built_rpms(self, lp_name):
         rpms = []
         i = 1
@@ -391,7 +392,7 @@ class IBS():
                 continue
 
             # Remove previously downloaded rpms
-            self.delete_rpms(cs)
+            delete_built_rpms(cs, lp_name)
 
             archs = result.xpath("repository/arch")
             for arch in archs:
