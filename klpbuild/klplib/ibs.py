@@ -33,7 +33,7 @@ def convert_prj_to_cs(prj, prefix):
     return prj.replace(f"{prefix}-", "").replace("_", ".")
 
 
-def cs_to_project(cs, prefix):
+def convert_cs_to_prj(cs, prefix):
     return prefix + "-" + cs.name().replace(".", "_")
 
 
@@ -460,7 +460,7 @@ def log(lp_name, lp_filter, arch):
     osc = Osc(url="https://api.suse.de")
     prefix = prj_prefix(lp_name, osc)
 
-    logging.info(osc.build.get_log(cs_to_project(cs_list[0], prefix), "standard", arch, "klp"))
+    logging.info(osc.build.get_log(convert_cs_to_prj(cs_list[0], prefix), "standard", arch, "klp"))
 
 
 def status(lp_name, lp_filter, wait=False):
@@ -539,7 +539,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
         return
 
     # If the project exists, drop it first
-    prj = cs_to_project(cs, prj_prefix(lp_name, osc))
+    prj = convert_cs_to_prj(cs, prj_prefix(lp_name, osc))
     delete_project(osc, 0, 0, prj, verbose=False)
 
     meta = create_prj_meta(cs)
