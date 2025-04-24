@@ -6,6 +6,7 @@
 from pathlib import Path, PurePath
 import re
 
+from klpbuild.klplib.ksrc import ksrc_read_file
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag
 
@@ -92,6 +93,16 @@ class Codestream:
 
     def get_ipa_file(self, fname):
         return Path(self.get_obj_dir(), f"{fname}.000i.ipa-clones")
+
+    def get_config_content(self, arch=ARCH):
+        """
+        Returns the content of the config from the kernel-source git directory.
+        This content sligthly differs from the config file shipped with the
+        rpms, but this difference should not affect the entries that
+        enable/disable portion of the source.
+        """
+        file = f"config/{arch}/rt" if self.rt else f"config/{arch}/default"
+        return ksrc_read_file(self.kernel, file)
 
     def get_boot_file(self, file, arch=ARCH):
         assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
@@ -242,11 +253,11 @@ class Codestream:
         configs = {}
 
         for arch in self.archs:
-            kconf = self.get_boot_file("config", arch)
-            with open(kconf) as f:
-                match = re.search(rf"{conf}=([ym])", f.read())
-                if match:
-                    configs[arch] = match.group(1)
+            kconf = self.get_config_content(arch)
+
+            match = re.search(rf"{conf}=([ym])", kconf)
+            if match:
+                configs[arch] = match.group(1)
 
         return configs
 
