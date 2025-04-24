@@ -441,3 +441,12 @@ def cs_is_affected(cs, cve, commits):
 
     return len(commits[cs.name_cs()]["commits"]) > 0
 
+
+def ksrc_read_file(kernel_version, file_path):
+    ksrc_dir = get_user_path("kernel_src_dir")
+    ksrc_tag = "rpm-" + kernel_version
+
+    ret = subprocess.run(["git", "-C", ksrc_dir, "show",
+                          f"{ksrc_tag}:{file_path}"],
+                         capture_output=True, text=True)
+    return ret.stdout
