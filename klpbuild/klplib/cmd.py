@@ -93,11 +93,6 @@ def create_parser() -> argparse.ArgumentParser:
     add_arg_lp_filter(push)
     push.add_argument("--wait", action="store_true", help="Wait until all codestreams builds are finished")
 
-    status = sub.add_parser("status", help="Check livepatch build status on IBS")
-    add_arg_lp_name(status)
-    add_arg_lp_filter(status)
-    status.add_argument("--wait", action="store_true", help="Wait until all codestreams builds are finished")
-
     log = sub.add_parser("log", help="Get build log from IBS")
     add_arg_lp_name(log)
     add_arg_lp_filter(log, mandatory=True)

@@ -28,6 +28,7 @@ from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestr
 from klpbuild.klplib.config import get_user_path, get_user_settings
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path, classify_codestreams_str
 
+logging.getLogger("osctiny").setLevel(logging.WARNING)
 
 def convert_prj_to_cs(prj, prefix):
     return prj.replace(f"{prefix}-", "").replace("_", ".")
