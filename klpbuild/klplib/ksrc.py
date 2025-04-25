@@ -232,6 +232,8 @@ def get_commits(cve, savedir=None):
                         "-C",
                         kern_src,
                         "log",
+                        "--full-history",
+                        "--remove-empty",
                         "--numstat",
                         "--reverse",
                         "--no-merges",
@@ -257,6 +259,10 @@ def get_commits(cve, savedir=None):
 
                 # Skip the Update commits, that only change the References tag
                 if "Update" in hash_entry and "patches.suse" in hash_entry:
+                    continue
+
+                # Skip any merge commit that git's --no-merge failed to filter out
+                if "Merge branch" in hash_entry:
                     continue
 
                 # Skip commits that change one single line. Most likely just a

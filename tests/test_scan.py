@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza
 
 import pytest
+import re
 
 from klpbuild.plugins.scan import scan
 
@@ -45,3 +46,16 @@ def test_scan_duplicate_commits(caplog):
     assert "094796a2bf2698dc8604dc319736ed207fd09c93" not in caplog.text
     # Oldest
     assert "69603451953a96fe87621abc34b771c41be859be" in caplog.text
+
+def test_scan_merge_commits(caplog):
+    '''
+    The CVE has a related merge commit. klp-build should skip it
+    and only show the commits introducing the patches.
+    '''
+    scan("2024-35905", "", False, "", False)
+
+    assert "6959d874bc4db32ad6baa18779a145204576b5b8" not in caplog.text
+    rt= ("6.0rt: SUSE-2024-RT\n.*"
+        "72c76c85224ee4c8e51c77d6c407401f6935508d\n.*"
+        "5fa3c1186f44343ae6130db7f10c5284da78b461\n")
+    assert re.search(rt, caplog.text)
