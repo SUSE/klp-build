@@ -427,25 +427,6 @@ def prepare_tests(lp_name, lp_filter):
         logging.info("Done.")
 
 
-def log(lp_name, lp_filter, arch):
-    cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
-
-    if not cs_list:
-        logging.error("log: No codestreams found for filter %s", lp_filter)
-        sys.exit(1)
-
-    if len(cs_list) > 1:
-        cs_names = [cs.name() for cs in cs_list]
-        logging.error("Filter '%s' returned %d entries (%s), while expecting just one. Aborting. ",
-                      lp_filter, len(cs_list), " ".join(cs_names))
-        sys.exit(1)
-
-    osc = Osc(url="https://api.suse.de")
-    prefix = prj_prefix(lp_name, osc)
-
-    logging.info(osc.build.get_log(convert_cs_to_prj(cs_list[0], prefix), "standard", arch, "klp"))
-
-
 def cleanup(lp_name, lp_filter):
     osc = Osc(url="https://api.suse.de")
     prjs = get_project_names(osc, lp_name, lp_filter)

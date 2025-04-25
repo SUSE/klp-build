@@ -6,7 +6,6 @@
 import argparse
 import importlib.metadata
 
-from klpbuild.klplib.utils import ARCHS
 from klpbuild.klplib.plugins import register_plugins_argparser
 
 def add_arg_lp_name(parentparser, mandatory=True):
@@ -85,10 +84,5 @@ def create_parser() -> argparse.ArgumentParser:
     )
     add_arg_lp_name(test)
     add_arg_lp_filter(test)
-
-    log = sub.add_parser("log", help="Get build log from IBS")
-    add_arg_lp_name(log)
-    add_arg_lp_filter(log, mandatory=True)
-    log.add_argument("--arch", type=str, default="x86_64", choices=ARCHS, help="Build architecture")
 
     return parentparser
