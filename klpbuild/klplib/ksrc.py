@@ -145,6 +145,36 @@ def get_commit_files(commit, inside_patch=False, regex=r"patches\.suse\/.+\.patc
     return sorted(set(files))
 
 
+def get_branch_patches(cve, mbranch):
+    kern_src = get_user_path('kernel_src_dir')
+
+    try:
+        patch_files = subprocess.check_output(
+            ["/usr/bin/git", "-C", kern_src, "grep", "-l", f"CVE-{cve}", f"remotes/origin/{mbranch}"],
+            stderr=subprocess.STDOUT,
+        ).decode(sys.stdout.encoding)
+    except subprocess.CalledProcessError:
+        # If we don't find any commits, add a note about it
+        return []
+
+    # Prepare command to extract correct ordering of patches
+    cmd = ["/usr/bin/git", "-C", kern_src, "grep", "-o", "-h"]
+    for patch in patch_files.splitlines():
+        _, fname = patch.split(":")
+        cmd.append("-e")
+        cmd.append(fname)
+    cmd += [f"remotes/origin/{mbranch}:series.conf"]
+
+    # Now execute the command
+    try:
+        patch_files = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+    except subprocess.CalledProcessError:
+        patch_files = ""
+
+    # The command above returns a list of strings in the format
+    #   branch:file/path
+    return patch_files.splitlines()
+
 @__check_kernel_source_tags_are_fetched
 def get_commits(cve, savedir=None):
     kern_src = get_user_path('kernel_src_dir', isopt=True)
@@ -182,36 +212,8 @@ def get_commits(cve, savedir=None):
         logging.debug("	processing: %s: %s", bc, mbranch)
         commits[bc] = {"commits": []}
 
-        try:
-            patch_files = subprocess.check_output(
-                ["/usr/bin/git", "-C", kern_src, "grep", "-l", f"CVE-{cve}", f"remotes/origin/{mbranch}"],
-                stderr=subprocess.STDOUT,
-            ).decode(sys.stdout.encoding)
-        except subprocess.CalledProcessError:
-            patch_files = ""
-
-        # If we don't find any commits, add a note about it
-        if not patch_files:
-            continue
-
-        # Prepare command to extract correct ordering of patches
-        cmd = ["/usr/bin/git", "-C", kern_src, "grep", "-o", "-h"]
-        for patch in patch_files.splitlines():
-            _, fname = patch.split(":")
-            cmd.append("-e")
-            cmd.append(fname)
-        cmd += [f"remotes/origin/{mbranch}:series.conf"]
-
-        # Now execute the command
-        try:
-            patch_files = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
-        except subprocess.CalledProcessError:
-            patch_files = ""
-
-        # The command above returns a list of strings in the format
-        #   branch:file/path
         idx = 0
-        for patch in patch_files.splitlines():
+        for patch in get_branch_patches(cve, mbranch):
             if patch.strip().startswith("#"):
                 continue
 
