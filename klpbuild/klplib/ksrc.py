@@ -219,10 +219,7 @@ def get_commits(cve, savedir=None):
 
             idx += 1
 
-            pfile = subprocess.check_output(
-                ["/usr/bin/git", "-C", kern_src, "show", f"remotes/origin/{mbranch}:{patch}"],
-                stderr=subprocess.STDOUT,
-            ).decode(sys.stdout.encoding)
+            pfile = ksrc_read_branch_file(mbranch, patch)
 
             # removing the patches.suse dir from the filepath
             basename = PurePath(patch).name.replace(".patch", "")
@@ -473,12 +470,19 @@ def cs_is_affected(cs, cve, commits):
     return len(commits[cs.name_cs()]["commits"]) > 0
 
 
-def ksrc_read_file(kernel_version, file_path):
+def ksrc_read_rpm_file(kernel_version, file_path):
+    return __read_file("rpm-" + kernel_version, file_path)
+
+
+def ksrc_read_branch_file(branch, file_path):
+    return __read_file("remotes/origin/" + branch, file_path)
+
+
+def __read_file(ref, file_path):
     ksrc_dir = get_user_path("kernel_src_dir")
-    ksrc_tag = "rpm-" + kernel_version
 
     ret = subprocess.run(["git", "-C", ksrc_dir, "show",
-                          f"{ksrc_tag}:{file_path}"],
+                          f"{ref}:{file_path}"],
                          capture_output=True, text=True)
     return ret.stdout
 
@@ -501,7 +505,7 @@ def ksrc_is_module_supported(module, kernel):
         idx = 1
         supported = True
 
-        out = ksrc_read_file(kernel, "supported.conf").splitlines()
+        out = ksrc_read_rpm_file(kernel, "supported.conf").splitlines()
         if not out:
             return False
 

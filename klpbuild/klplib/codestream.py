@@ -6,7 +6,7 @@
 from pathlib import Path, PurePath
 import re
 
-from klpbuild.klplib.ksrc import ksrc_read_file, ksrc_is_module_supported
+from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
@@ -104,7 +104,7 @@ class Codestream:
         enable/disable portion of the source.
         """
         file = f"config/{arch}/rt" if self.rt else f"config/{arch}/default"
-        return ksrc_read_file(self.kernel, file)
+        return ksrc_read_rpm_file(self.kernel, file)
 
     def get_boot_file(self, file, arch=ARCH):
         assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
