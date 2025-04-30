@@ -145,6 +145,16 @@ def get_commit_files(commit, inside_patch=False, regex=r"patches\.suse\/.+\.patc
     return sorted(set(files))
 
 
+def store_patch(pfile, patch, savedir, savedir_idx, bc):
+    # removing the patches.suse dir from the filepath
+    basename = PurePath(patch).name.replace(".patch", "")
+    branch_path = Path(savedir)/"fixes"/bc
+    branch_path.mkdir(exist_ok=True, parents=True)
+    # Save the patch for later review from the livepatch developer
+    with open(Path(branch_path, f"{savedir_idx:02d}-{basename}.patch"), "w") as f:
+        f.write(pfile)
+
+
 def get_branch_patches(cve, mbranch):
     kern_src = get_user_path('kernel_src_dir')
 
@@ -174,6 +184,74 @@ def get_branch_patches(cve, mbranch):
     # The command above returns a list of strings in the format
     #   branch:file/path
     return patch_files.splitlines()
+
+
+def get_branch_commits(mbranch, patch):
+
+    kern_src = get_user_path('kernel_src_dir')
+
+    # Now get all commits related to that file on that branch,
+    # including the "Refresh" ones.
+    try:
+        phashes = subprocess.check_output(
+            [
+                "/usr/bin/git",
+                "-C",
+                kern_src,
+                "log",
+                "--full-history",
+                "--remove-empty",
+                "--numstat",
+                "--reverse",
+                "--no-merges",
+                "--pretty=oneline",
+                f"remotes/origin/{mbranch}",
+                "--",
+                patch,
+            ],
+            stderr=subprocess.STDOUT,
+        ).decode("ISO-8859-1")
+    except subprocess.CalledProcessError:
+        return []
+
+    iphashes = iter(phashes.splitlines())
+    base = ""
+    commits = []
+    for hash_entry in iphashes:
+        stats = next(iphashes)
+
+        # Skip the Update commits, that only change the References tag
+        if "Update" in hash_entry and "patches.suse" in hash_entry:
+            continue
+
+        # Skip any merge commit that git's --no-merge failed to filter out
+        if "Merge branch" in hash_entry:
+            continue
+
+        # Skip commits that change one single line. Most likely just a
+        # reference update.
+        if stats.split()[0] == "1":
+            continue
+
+        hash_commit = hash_entry.split(" ")[0]
+
+        # Sometimes we can have a commit that touches two files. In
+        # these cases we can have duplicated hash commits, since git
+        # history for each individual file will show the same hash.
+        # Skip if the same hash already exists.
+        if hash_commit in commits:
+            continue
+
+        diff = diff_commits(base, hash_commit, patch, r"-G'^\+|^-'")
+        # Skip commit if the file's content is the same as the previous one.
+        if not diff:
+            continue
+
+        base = hash_commit
+        commits.append(hash_commit)
+
+    return commits
+
 
 @__check_kernel_source_tags_are_fetched
 def get_commits(cve, savedir=None):
@@ -220,16 +298,11 @@ def get_commits(cve, savedir=None):
             idx += 1
 
             pfile = ksrc_read_branch_file(mbranch, patch)
-
-            # removing the patches.suse dir from the filepath
-            basename = PurePath(patch).name.replace(".patch", "")
+            if not pfile:
+                continue
 
             if savedir:
-                branch_path = Path(savedir)/"fixes"/bc
-                branch_path.mkdir(exist_ok=True, parents=True)
-                # Save the patch for later review from the livepatch developer
-                with open(Path(branch_path, f"{idx:02d}-{basename}.patch"), "w") as f:
-                    f.write(pfile)
+                store_patch(pfile, patch, savedir, idx, bc)
 
             # Get the upstream commit and save it. The Git-commit can be
             # missing from the patch if the commit is not backporting the
@@ -245,69 +318,11 @@ def get_commits(cve, savedir=None):
             if ups and ups not in ucommits:
                 ucommits.append(ups)
 
-            # Now get all commits related to that file on that branch,
-            # including the "Refresh" ones.
-            try:
-                phashes = subprocess.check_output(
-                    [
-                        "/usr/bin/git",
-                        "-C",
-                        kern_src,
-                        "log",
-                        "--full-history",
-                        "--remove-empty",
-                        "--numstat",
-                        "--reverse",
-                        "--no-merges",
-                        "--pretty=oneline",
-                        f"remotes/origin/{mbranch}",
-                        "--",
-                        patch,
-                    ],
-                    stderr=subprocess.STDOUT,
-                ).decode("ISO-8859-1")
-            except subprocess.CalledProcessError:
-                logging.warn(
-                    f"File {fname} doesn't exists {mbranch}. It could "
-                    " be removed, so the branch is not affected by the issue."
-                )
-                commits[bc]["commits"] = ["Not affected"]
-                continue
-
-            iphashes = iter(phashes.splitlines())
-            base = ""
-            for hash_entry in iphashes:
-                stats = next(iphashes)
-
-                # Skip the Update commits, that only change the References tag
-                if "Update" in hash_entry and "patches.suse" in hash_entry:
-                    continue
-
-                # Skip any merge commit that git's --no-merge failed to filter out
-                if "Merge branch" in hash_entry:
-                    continue
-
-                # Skip commits that change one single line. Most likely just a
-                # reference update.
-                if stats.split()[0] == "1":
-                    continue
-
-                hash_commit = hash_entry.split(" ")[0]
-
-                # Sometimes we can have a commit that touches two files. In
-                # these cases we can have duplicated hash commits, since git
-                # history for each individual file will show the same hash.
-                # Skip if the same hash already exists.
-                if hash_commit in commits[bc]["commits"]:
-                    continue
-
-                diff = diff_commits(base, hash_commit, patch, r"-G'^\+|^-'")
-                # Skip commit if the file's content is the same as the previous one.
-                if not diff:
-                    continue
-
-                base = hash_commit
-                commits[bc]["commits"].append(hash_commit)
+            c = get_branch_commits(mbranch, patch)
+            if c:
+                commits[bc]["commits"] = list(set(c + commits[bc]["commits"]))
+            else:
+                commits[bc]["commits"] = ["Not Affected"]
 
     # Grab each commits subject and date for each commit. The commit dates
     # will be used to sort the patches in the order they were
