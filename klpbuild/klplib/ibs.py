@@ -420,6 +420,10 @@ def prepare_tests(lp_name, lp_filter):
         logging.info("Done.")
 
         # Prepare the config and test files used by kgr-test
+        if not test_src:
+            logging.warning("No testcase found, so no tar file is being created.")
+            continue
+
         test_dst = Path(test_arch_path, f"repro/{lp_name}")
         if test_src.is_file():
             shutil.copy(test_src, f"{test_dst}_test_script.sh")
