@@ -164,8 +164,8 @@ def get_branch_patches(cve, mbranch):
             stderr=subprocess.STDOUT,
         ).decode(sys.stdout.encoding)
     except subprocess.CalledProcessError:
-        # If we don't find any commits, add a note about it
-        return []
+        # If we don't find any commits for RT branchs, try with the non-RT variant.
+        return [] if "RT" not in mbranch else get_branch_patches(cve, mbranch.replace("-RT", ""))
 
     # Prepare command to extract correct ordering of patches
     cmd = ["/usr/bin/git", "-C", kern_src, "grep", "-o", "-h"]
