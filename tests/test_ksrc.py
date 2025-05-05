@@ -3,7 +3,8 @@
 # Copyright (C) 2021-2025 SUSE
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
-from klpbuild.klplib.ksrc import get_commit_files, ksrc_is_module_supported, get_branch_patches
+from klpbuild.klplib.ksrc import (get_commit_files, ksrc_is_module_supported,
+                                  get_branch_patches, get_branch_commits)
 
 def test_get_commit_files():
     expected = ["include/net/dst_ops.h",
@@ -37,3 +38,16 @@ def test_get_rt_patches():
             ]
     patches = get_branch_patches("2024-35905", "SUSE-2024-RT")
     assert patches and expected == patches
+
+def test_get_merge_commits():
+    '''
+    The CVE has a related merge commit. klp-build should skip it
+    and only show the commits introducing the patches.
+    '''
+
+    expected = ["5fa3c1186f44343ae6130db7f10c5284da78b461"]
+    patch = "patches.suse/bpf-Protect-against-int-overflow-for-stack-access-si.patch"
+    commits = get_branch_commits("SUSE-2024-RT", patch)
+    assert commits and expected == commits
+    assert "6959d874bc4db32ad6baa18779a145204576b5b8" not in commits
+
