@@ -3,7 +3,7 @@
 # Copyright (C) 2021-2025 SUSE
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
-from klpbuild.klplib.ksrc import get_commit_files, ksrc_is_module_supported
+from klpbuild.klplib.ksrc import get_commit_files, ksrc_is_module_supported, get_branch_patches
 
 def test_get_commit_files():
     expected = ["include/net/dst_ops.h",
@@ -29,3 +29,11 @@ def test_is_module_supported():
     mod = "drivers/net/wireless/mac80211_hwsim"
     # Expected: "  drivers/net/wireless/mac80211_hwsim"
     assert ksrc_is_module_supported(mod, "5.14.21-150400.24.144")
+
+def test_get_rt_patches():
+    expected = [
+            "patches.suse/bpf-Check-bloom-filter-map-value-size.patch",
+            "patches.suse/bpf-Protect-against-int-overflow-for-stack-access-si.patch"
+            ]
+    patches = get_branch_patches("2024-35905", "SUSE-2024-RT")
+    assert patches and expected == patches
