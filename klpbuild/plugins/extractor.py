@@ -382,6 +382,7 @@ class Extractor():
             "-mindirect-branch-cs-prefix",
             "-mharden-sls=all",
             "-fmin-function-alignment=16",
+            "-Wno-dangling-pointer",
         ]:
             cmd = cmd.replace(opt, "")
 
