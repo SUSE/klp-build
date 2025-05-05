@@ -138,6 +138,17 @@ def file_exists_in_tag(kernel_version, file_path):
     return len(ret)
 
 
+def read_file_in_tag(kernel_version, file_path):
+
+    kernel_tree = get_user_path("kernel_dir")
+    kernel_tree_git_tag = "rpm-" + kernel_version
+
+    ret = subprocess.run(["git", "-C", kernel_tree, "show",
+                          f"{kernel_tree_git_tag}:{file_path}"],
+                         capture_output=True, text=True)
+    return ret.stdout
+
+
 def __get_active_worktrees(kernel_tree):
     data_dir = str(get_user_path("data_dir"))
     worktrees_output = subprocess.run(["git", "-C", kernel_tree, "worktree", "list"], capture_output=True, text=True)
