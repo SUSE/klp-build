@@ -5,7 +5,6 @@
 
 import copy
 import logging
-from pathlib import Path
 from natsort import natsorted
 
 from klpbuild.klplib import utils
