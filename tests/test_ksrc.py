@@ -50,4 +50,3 @@ def test_get_merge_commits():
     commits = get_branch_commits("SUSE-2024-RT", patch)
     assert commits and expected == commits
     assert "6959d874bc4db32ad6baa18779a145204576b5b8" not in commits
-

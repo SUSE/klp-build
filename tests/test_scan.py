@@ -4,7 +4,6 @@
 # Author: Marcos Paulo de Souza
 
 import pytest
-import re
 
 from klpbuild.plugins.scan import scan
 
