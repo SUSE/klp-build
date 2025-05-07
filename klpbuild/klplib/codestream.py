@@ -6,16 +6,17 @@
 from pathlib import Path, PurePath
 import re
 
+from klpbuild.klplib.ksrc import ksrc_read_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
-from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag
+from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
     __slots__ = ("sle", "sp", "update", "rt", "ktype", "needs_ibt", "is_micro",
                  "project", "patchid", "kernel", "archs", "files", "modules",
-                 "repo")
+                 "repo", "configs")
 
     def __init__(self, sle, sp, update, rt, project, patchid, kernel, archs,
-                 files, modules):
+                 files, modules, configs):
         self.sle = sle
         self.sp = sp
         self.update = update
@@ -29,6 +30,7 @@ class Codestream:
         self.archs = archs
         self.files = files
         self.modules = modules
+        self.configs = configs
         self.repo = self.get_repo()
 
     @classmethod
@@ -49,7 +51,7 @@ class Codestream:
         else:
             assert False, "codestream name should contain either SLE or MICRO!"
 
-        ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {})
+        ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {}, {})
         ret.set_archs()
         return ret
 
@@ -60,14 +62,15 @@ class Codestream:
         if not match:
             raise ValueError("Filter regexp error!")
         return cls(int(match.group(1)), int(match.group(2)),
-                   int(match.group(4)), match.group(3), "", "", "", [], {}, {})
+                   int(match.group(4)), match.group(3), "", "", "", [], {}, {}, {})
 
 
     @classmethod
     def from_data(cls, data):
         return cls(data["sle"], data["sp"], data["update"], data["rt"],
                    data["project"], data["patchid"], data["kernel"],
-                   data["archs"], data["files"], data["modules"])
+                   data["archs"], data["files"], data["modules"],
+                   data["configs"])
 
 
     def __eq__(self, cs):
@@ -92,6 +95,16 @@ class Codestream:
 
     def get_ipa_file(self, fname):
         return Path(self.get_obj_dir(), f"{fname}.000i.ipa-clones")
+
+    def get_config_content(self, arch=ARCH):
+        """
+        Returns the content of the config from the kernel-source git directory.
+        This content sligthly differs from the config file shipped with the
+        rpms, but this difference should not affect the entries that
+        enable/disable portion of the source.
+        """
+        file = f"config/{arch}/rt" if self.rt else f"config/{arch}/default"
+        return ksrc_read_file(self.kernel, file)
 
     def get_boot_file(self, file, arch=ARCH):
         assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
@@ -227,6 +240,8 @@ class Codestream:
     def get_mod(self, mod):
         return self.modules[mod]
 
+    def is_module_supported(self, mod):
+        return ksrc_is_module_supported(mod, self.kernel)
 
     # Returns the path to the kernel-obj's build dir, used when build testing
     # the generated module
@@ -242,11 +257,11 @@ class Codestream:
         configs = {}
 
         for arch in self.archs:
-            kconf = self.get_boot_file("config", arch)
-            with open(kconf) as f:
-                match = re.search(rf"{conf}=([ym])", f.read())
-                if match:
-                    configs[arch] = match.group(1)
+            kconf = self.get_config_content(arch)
+
+            match = re.search(rf"{conf}=([ym])", kconf)
+            if match:
+                configs[arch] = match.group(1)
 
         return configs
 
@@ -379,6 +394,8 @@ class Codestream:
     def check_file_exists(self, file):
         return file_exists_in_tag(self.kernel, file)
 
+    def read_file(self, file):
+        return read_file_in_tag(self.kernel, file)
 
     def data(self):
         return {
@@ -392,5 +409,6 @@ class Codestream:
                 "archs" : self.archs,
                 "files" : self.files,
                 "modules" : self.modules,
+                "configs" : self.configs,
                 "repo" : self.repo,
                 }

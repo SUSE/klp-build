@@ -66,7 +66,7 @@ def create_parser() -> argparse.ArgumentParser:
         "different architectures",
     )
     extract_opts.add_argument(
-        "--apply-patches", action="store_true", help="Apply patches found by get-patches subcommand, if they exist"
+        "--apply-patches", action="store_true", help="Apply patches if they exist"
     )
 
     diff_opts = sub.add_parser(
@@ -74,15 +74,6 @@ def create_parser() -> argparse.ArgumentParser:
             help="Compare line by line the output livepatch of two codestreams")
     add_arg_lp_name(diff_opts)
     add_arg_lp_filter(diff_opts)
-
-
-    patches = sub.add_parser("get-patches")
-    add_arg_lp_name(patches)
-    add_arg_lp_filter(patches)
-    patches.add_argument(
-        "--cve", required=True, help="CVE number to search for related backported patches"
-    )
-
 
     cleanup =sub.add_parser("cleanup", help="Remove livepatch packages from IBS")
     add_arg_lp_name(cleanup)
