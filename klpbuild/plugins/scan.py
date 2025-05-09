@@ -8,7 +8,6 @@ import sys
 
 from klpbuild.klplib import utils
 from klpbuild.klplib import patch
-from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
 from klpbuild.klplib.ksrc import get_commits, get_patched_kernels, cs_is_affected
