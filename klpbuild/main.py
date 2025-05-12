@@ -37,9 +37,6 @@ def main():
     if args.cmd == "extract":
         Extractor(args.lp_name, args.lp_filter, args.apply_patches, args.avoid_ext).run()
 
-    elif args.cmd == "cs-diff":
-        Extractor(args.lp_name, args.lp_filter, False, []).cs_diff()
-
 
 if __name__ == "__main__":
     main()
