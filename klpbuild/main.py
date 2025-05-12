@@ -8,7 +8,6 @@ import sys
 
 from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestreams_data import load_codestreams
-from klpbuild.klplib.ibs import cleanup
 from klpbuild.klplib.plugins import try_run_plugin
 from klpbuild.plugins.extractor import Extractor
 
@@ -40,9 +39,6 @@ def main():
 
     elif args.cmd == "cs-diff":
         Extractor(args.lp_name, args.lp_filter, False, []).cs_diff()
-
-    elif args.cmd == "cleanup":
-        cleanup(args.lp_name, args.lp_filter)
 
 
 if __name__ == "__main__":

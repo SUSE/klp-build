@@ -74,8 +74,4 @@ def create_parser() -> argparse.ArgumentParser:
     add_arg_lp_name(diff_opts)
     add_arg_lp_filter(diff_opts)
 
-    cleanup =sub.add_parser("cleanup", help="Remove livepatch packages from IBS")
-    add_arg_lp_name(cleanup)
-    add_arg_lp_filter(cleanup)
-
     return parentparser

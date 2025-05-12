@@ -297,17 +297,3 @@ def download_cs_rpms(cs_list):
         usr_lib.symlink_to(get_datadir()/ARCH/"lib")
 
     logging.info("Finished extract vmlinux and modules...")
-
-
-def cleanup(lp_name, lp_filter):
-    osc = Osc(url="https://api.suse.de")
-    prjs = get_project_names(osc, lp_name, lp_filter)
-
-    total = len(prjs)
-    if total == 0:
-        logging.info("No projects found.")
-        return
-
-    logging.info("Deleting %d projects...", total)
-
-    delete_projects(osc, prjs, True)
