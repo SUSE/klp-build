@@ -78,11 +78,4 @@ def create_parser() -> argparse.ArgumentParser:
     add_arg_lp_name(cleanup)
     add_arg_lp_filter(cleanup)
 
-    test = sub.add_parser(
-        "prepare-tests",
-        help="Download the built tests and check for LP dependencies",
-    )
-    add_arg_lp_name(test)
-    add_arg_lp_filter(test)
-
     return parentparser
