@@ -6,7 +6,7 @@
 import inspect
 from pathlib import Path
 
-from klpbuild.klplib.ibs import IBS
+from klpbuild.klplib.ibs import get_cs_packages
 from klpbuild.plugins.setup import setup_codestreams
 
 CS = "15.6u0"
@@ -17,4 +17,4 @@ def test_list_of_packages():
     # Check if the package gathering mechanism works
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     codestreams = setup_codestreams(lp, DEFAULT_DATA)
-    assert len(IBS(lp, CS).get_cs_packages(codestreams, Path("random"))) > 0
+    assert len(get_cs_packages(codestreams, Path("random"))) > 0
