@@ -5,7 +5,7 @@ import inspect
 import logging
 import pytest
 
-from klpbuild.plugins.setup import setup, setup_file_funcs, setup_project_files, setup_codestreams
+from klpbuild.plugins.setup import setup, setup_file_funcs
 from tests.utils import get_codestreams_file
 from klpbuild.klplib import utils
 
