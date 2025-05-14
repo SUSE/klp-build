@@ -217,7 +217,7 @@ def download_binary_rpms(args, total):
 
 
 def download_and_extract(args, total):
-    i, cs, _, _, arch, _, rpm, dest = args
+    _, i, cs, _, _, arch, _, rpm, dest = args
 
     # Try to download and extract at least twice if any problems arise
     tries = 2
