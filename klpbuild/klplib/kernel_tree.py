@@ -9,9 +9,9 @@ import shutil
 import subprocess
 
 from functools import wraps
+from pathlib import Path
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.utils import ARCH
-from pathlib import Path
 
 
 __kernel_tags_are_fetched = False

@@ -5,8 +5,8 @@
 
 import logging
 import re
-import requests
 from pathlib import Path
+import requests
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestream import Codestream
@@ -22,7 +22,7 @@ def get_supported_codestreams():
         list[Codestream]: A list of supported codestreams.
     """
     supported_codestreams = []
-    lines = __download_supported_file() if not utils.in_test_mode() else __load_supported_file();
+    lines = __download_supported_file() if not utils.in_test_mode() else __load_supported_file()
 
     for line in lines:
         # remove the last two columns, which are dates of the line
@@ -74,4 +74,3 @@ def __download_supported_file():
 
     # Skip file header and empty lines
     return [line.decode('utf-8').strip() for line in req.iter_lines() if line][1:]
-
