@@ -162,6 +162,7 @@ class Extractor():
             make_args = [
                 "make",
                 "-sn",
+                "--ignore-errors",
                 f"CC={cc}",
                 f"KLP_CS={cs.name()}",
                 f"HOSTCC={cc}",
