@@ -129,8 +129,7 @@ class Extractor():
 
         # Remove the compiler name used to compile the object. TODO: resolve
         # when clang is used, or other cross-compilers.
-        if output.startswith("gcc "):
-            output = output[4:]
+        output = re.sub(r'^gcc(-\d+)?\s+', '', output)
 
         # also remove double quotes from macros like -D"KBUILD....=.."
         return re.sub(r'-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
