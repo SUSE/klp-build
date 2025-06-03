@@ -7,10 +7,7 @@
 
 import re
 
-from pathlib import Path, PurePath
-from os import chdir
-from argparse import ArgumentParser
-from os.path import expanduser
+from pathlib import Path
 
 def _load_makefile(cs, make_file: str) -> list:
 
@@ -58,8 +55,7 @@ def _find_config(cs, base_dir, relative_obj_path, deep):
         # again
         try:
             target, _ = target.rsplit('-', 1)
-        except ValueError as ve:
-            # print(ve)
+        except ValueError:
             continue
 
         return _find_config(cs, base_dir, target + '.o', deep + 1)
@@ -69,7 +65,7 @@ def _find_config(cs, base_dir, relative_obj_path, deep):
 
 def find_configs_for_files(cs, file_paths: list):
 
-    configs = dict()
+    configs = {}
     build_ins = []
     missing = []
 
@@ -89,4 +85,3 @@ def find_configs_for_files(cs, file_paths: list):
         # else there is garbage like 'subst', 'vds' for wrongly parsed input
 
     return configs, build_ins, missing
-

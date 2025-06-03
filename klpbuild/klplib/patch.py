@@ -4,13 +4,12 @@
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
 import logging
-import os
 
 from collections import defaultdict
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.file2config import find_configs_for_files
-from klpbuild.klplib.ksrc import get_commit_files, ksrc_is_module_supported
+from klpbuild.klplib.ksrc import get_commit_files
 
 
 def analyse_files(cs_list, sle_commits):

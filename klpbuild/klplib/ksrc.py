@@ -141,6 +141,114 @@ def get_commit_files(commit, inside_patch=False, regex=r"patches\.suse\/.+\.patc
     return sorted(set(files))
 
 
+def store_patch(pfile, patch, savedir, savedir_idx, bc):
+    # removing the patches.suse dir from the filepath
+    basename = PurePath(patch).name.replace(".patch", "")
+    branch_path = Path(savedir)/"fixes"/bc
+    branch_path.mkdir(exist_ok=True, parents=True)
+    # Save the patch for later review from the livepatch developer
+    with open(Path(branch_path, f"{savedir_idx:02d}-{basename}.patch"), "w") as f:
+        f.write(pfile)
+
+
+def get_branch_patches(cve, mbranch):
+    kern_src = get_user_path('kernel_src_dir')
+
+    try:
+        patch_files = subprocess.check_output(
+            ["/usr/bin/git", "-C", kern_src, "grep", "-l", f"CVE-{cve}", f"remotes/origin/{mbranch}"],
+            stderr=subprocess.STDOUT,
+        ).decode(sys.stdout.encoding)
+    except subprocess.CalledProcessError:
+        # If we don't find any commits for RT branchs, try with the non-RT variant.
+        return [] if "RT" not in mbranch else get_branch_patches(cve, mbranch.replace("-RT", ""))
+
+    # Prepare command to extract correct ordering of patches
+    cmd = ["/usr/bin/git", "-C", kern_src, "grep", "-o", "-h"]
+    for patch in patch_files.splitlines():
+        _, fname = patch.split(":")
+        cmd.append("-e")
+        cmd.append(fname)
+    cmd += [f"remotes/origin/{mbranch}:series.conf"]
+
+    # Now execute the command
+    try:
+        patch_files = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+    except subprocess.CalledProcessError:
+        patch_files = ""
+
+    # The command above returns a list of strings in the format
+    #   branch:file/path
+    return patch_files.splitlines()
+
+
+def get_branch_commits(mbranch, patch):
+
+    kern_src = get_user_path('kernel_src_dir')
+
+    # Now get all commits related to that file on that branch,
+    # including the "Refresh" ones.
+    try:
+        phashes = subprocess.check_output(
+            [
+                "/usr/bin/git",
+                "-C",
+                kern_src,
+                "log",
+                "--full-history",
+                "--remove-empty",
+                "--numstat",
+                "--reverse",
+                "--no-merges",
+                "--pretty=oneline",
+                f"remotes/origin/{mbranch}",
+                "--",
+                patch,
+            ],
+            stderr=subprocess.STDOUT,
+        ).decode("ISO-8859-1")
+    except subprocess.CalledProcessError:
+        return []
+
+    iphashes = iter(phashes.splitlines())
+    base = ""
+    commits = []
+    for hash_entry in iphashes:
+        stats = next(iphashes)
+
+        # Skip the Update commits, that only change the References tag
+        if "Update" in hash_entry and "patches.suse" in hash_entry:
+            continue
+
+        # Skip any merge commit that git's --no-merge failed to filter out
+        if "Merge branch" in hash_entry:
+            continue
+
+        # Skip commits that change one single line. Most likely just a
+        # reference update.
+        if stats.split()[0] == "1":
+            continue
+
+        hash_commit = hash_entry.split(" ")[0]
+
+        # Sometimes we can have a commit that touches two files. In
+        # these cases we can have duplicated hash commits, since git
+        # history for each individual file will show the same hash.
+        # Skip if the same hash already exists.
+        if hash_commit in commits:
+            continue
+
+        diff = diff_commits(base, hash_commit, patch, r"-G'^\+|^-'")
+        # Skip commit if the file's content is the same as the previous one.
+        if not diff:
+            continue
+
+        base = hash_commit
+        commits.append(hash_commit)
+
+    return commits
+
+
 @__check_kernel_source_tags_are_fetched
 def get_commits(cve, savedir=None):
     kern_src = get_user_path('kernel_src_dir', isopt=True)
@@ -178,55 +286,19 @@ def get_commits(cve, savedir=None):
         logging.debug("	processing: %s: %s", bc, mbranch)
         commits[bc] = {"commits": []}
 
-        try:
-            patch_files = subprocess.check_output(
-                ["/usr/bin/git", "-C", kern_src, "grep", "-l", f"CVE-{cve}", f"remotes/origin/{mbranch}"],
-                stderr=subprocess.STDOUT,
-            ).decode(sys.stdout.encoding)
-        except subprocess.CalledProcessError:
-            patch_files = ""
-
-        # If we don't find any commits, add a note about it
-        if not patch_files:
-            continue
-
-        # Prepare command to extract correct ordering of patches
-        cmd = ["/usr/bin/git", "-C", kern_src, "grep", "-o", "-h"]
-        for patch in patch_files.splitlines():
-            _, fname = patch.split(":")
-            cmd.append("-e")
-            cmd.append(fname)
-        cmd += [f"remotes/origin/{mbranch}:series.conf"]
-
-        # Now execute the command
-        try:
-            patch_files = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
-        except subprocess.CalledProcessError:
-            patch_files = ""
-
-        # The command above returns a list of strings in the format
-        #   branch:file/path
         idx = 0
-        for patch in patch_files.splitlines():
+        for patch in get_branch_patches(cve, mbranch):
             if patch.strip().startswith("#"):
                 continue
 
             idx += 1
 
-            pfile = subprocess.check_output(
-                ["/usr/bin/git", "-C", kern_src, "show", f"remotes/origin/{mbranch}:{patch}"],
-                stderr=subprocess.STDOUT,
-            ).decode(sys.stdout.encoding)
-
-            # removing the patches.suse dir from the filepath
-            basename = PurePath(patch).name.replace(".patch", "")
+            pfile = ksrc_read_branch_file(mbranch, patch)
+            if not pfile:
+                continue
 
             if savedir:
-                branch_path = Path(savedir)/"fixes"/bc
-                branch_path.mkdir(exist_ok=True, parents=True)
-                # Save the patch for later review from the livepatch developer
-                with open(Path(branch_path, f"{idx:02d}-{basename}.patch"), "w") as f:
-                    f.write(pfile)
+                store_patch(pfile, patch, savedir, idx, bc)
 
             # Get the upstream commit and save it. The Git-commit can be
             # missing from the patch if the commit is not backporting the
@@ -242,69 +314,11 @@ def get_commits(cve, savedir=None):
             if ups and ups not in ucommits:
                 ucommits.append(ups)
 
-            # Now get all commits related to that file on that branch,
-            # including the "Refresh" ones.
-            try:
-                phashes = subprocess.check_output(
-                    [
-                        "/usr/bin/git",
-                        "-C",
-                        kern_src,
-                        "log",
-                        "--full-history",
-                        "--remove-empty",
-                        "--numstat",
-                        "--reverse",
-                        "--no-merges",
-                        "--pretty=oneline",
-                        f"remotes/origin/{mbranch}",
-                        "--",
-                        patch,
-                    ],
-                    stderr=subprocess.STDOUT,
-                ).decode("ISO-8859-1")
-            except subprocess.CalledProcessError:
-                logging.warn(
-                    f"File {fname} doesn't exists {mbranch}. It could "
-                    " be removed, so the branch is not affected by the issue."
-                )
-                commits[bc]["commits"] = ["Not affected"]
-                continue
-
-            iphashes = iter(phashes.splitlines())
-            base = ""
-            for hash_entry in iphashes:
-                stats = next(iphashes)
-
-                # Skip the Update commits, that only change the References tag
-                if "Update" in hash_entry and "patches.suse" in hash_entry:
-                    continue
-
-                # Skip any merge commit that git's --no-merge failed to filter out
-                if "Merge branch" in hash_entry:
-                    continue
-
-                # Skip commits that change one single line. Most likely just a
-                # reference update.
-                if stats.split()[0] == "1":
-                    continue
-
-                hash_commit = hash_entry.split(" ")[0]
-
-                # Sometimes we can have a commit that touches two files. In
-                # these cases we can have duplicated hash commits, since git
-                # history for each individual file will show the same hash.
-                # Skip if the same hash already exists.
-                if hash_commit in commits[bc]["commits"]:
-                    continue
-
-                diff = diff_commits(base, hash_commit, patch, r"-G'^\+|^-'")
-                # Skip commit if the file's content is the same as the previous one.
-                if not diff:
-                    continue
-
-                base = hash_commit
-                commits[bc]["commits"].append(hash_commit)
+            c = get_branch_commits(mbranch, patch)
+            if c:
+                commits[bc]["commits"] = list(set(c + commits[bc]["commits"]))
+            else:
+                commits[bc]["commits"] = ["Not Affected"]
 
     # Grab each commits subject and date for each commit. The commit dates
     # will be used to sort the patches in the order they were
@@ -467,53 +481,60 @@ def cs_is_affected(cs, cve, commits):
     return len(commits[cs.name_cs()]["commits"]) > 0
 
 
-def ksrc_read_file(kernel_version, file_path):
+def ksrc_read_rpm_file(kernel_version, file_path):
+    return __read_file("rpm-" + kernel_version, file_path)
+
+
+def ksrc_read_branch_file(branch, file_path):
+    return __read_file("remotes/origin/" + branch, file_path)
+
+
+def __read_file(ref, file_path):
     ksrc_dir = get_user_path("kernel_src_dir")
-    ksrc_tag = "rpm-" + kernel_version
 
     ret = subprocess.run(["git", "-C", ksrc_dir, "show",
-                          f"{ksrc_tag}:{file_path}"],
+                          f"{ref}:{file_path}"],
                          capture_output=True, text=True)
     return ret.stdout
 
 
 def ksrc_is_module_supported(module, kernel):
+    """
+    Check if a kernel module is supported on a specific kernel.
+    This is done by reading the 'supported.conf' file.
+
+    Args:
+        module (str): Full path of the module.
+        kernel (sr): Kernel version.
+
+    returns:
+        Return True if supported. False otherwise.
         """
-        Check if a kernel module is supported on a specific kernel.
-        This is done by reading the 'supported.conf' file.
 
-        Args:
-            module (str): Full path of the module.
-            kernel (sr): Kernel version.
+    mpath = module
+    prev = ""
+    idx = 1
+    supported = True
 
-        returns:
-            Return True if supported. False otherwise.
-            """
+    out = ksrc_read_rpm_file(kernel, "supported.conf").splitlines()
+    if not out:
+        return False
 
-        mpath = module
-        prev = ""
-        idx = 1
-        supported = True
+    # Try the following path combinations to see if it matches with
+    # any rule in the supported.conf:
+    #   my/kernel/module/path
+    #   my/kernel/module/*
+    #   my/kernel/*
+    #   my/*
+    while mpath != prev:
+        r = re.compile(rf"^[-+\s].*{mpath}")
+        match = list(filter(r.match, out))
+        if match:
+            supported = match[0][0] != '-'
+            break
 
-        out = ksrc_read_file(kernel, "supported.conf").splitlines()
-        if not out:
-            return False
+        prev = mpath
+        mpath = module.rsplit("/", idx)[0] + r"/\*"
+        idx += 1
 
-        # Try the following path combinations to see if it matches with
-        # any rule in the supported.conf:
-        #   my/kernel/module/path
-        #   my/kernel/module/*
-        #   my/kernel/*
-        #   my/*
-        while mpath != prev:
-            r = re.compile(rf"^[-+\s].*{mpath}")
-            match = list(filter(r.match, out))
-            if match:
-                supported = match[0][0] != '-'
-                break
-
-            prev = mpath
-            mpath = module.rsplit("/", idx)[0] + r"/\*"
-            idx += 1
-
-        return supported
+    return supported
