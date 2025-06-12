@@ -8,7 +8,6 @@ import sys
 
 from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestreams_data import load_codestreams
-from klpbuild.klplib.ibs import push, log, cleanup, prepare_tests
 from klpbuild.klplib.plugins import try_run_plugin
 from klpbuild.plugins.extractor import Extractor
 
@@ -37,21 +36,6 @@ def main():
     # converted into plugins
     if args.cmd == "extract":
         Extractor(args.lp_name, args.lp_filter, args.apply_patches, args.avoid_ext).run()
-
-    elif args.cmd == "cs-diff":
-        Extractor(args.lp_name, args.lp_filter, False, []).cs_diff()
-
-    elif args.cmd == "push":
-        push(args.lp_name, args.lp_filter, args.wait)
-
-    elif args.cmd == "log":
-        log(args.lp_name, args.lp_filter, args.arch)
-
-    elif args.cmd == "cleanup":
-        cleanup(args.lp_name, args.lp_filter)
-
-    elif args.cmd == "prepare-tests":
-        prepare_tests(args.lp_name, args.lp_filter)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,6 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from concurrent.futures import ThreadPoolExecutor
-import difflib as dl
 import json
 import logging
 import os
@@ -24,6 +23,46 @@ from klpbuild.klplib import utils
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
 from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.templ import TemplateGen
+
+
+def get_cs_code(lp_name, working_cs):
+    cs_files = {}
+
+    # Mount the cs_files dict
+    for cs in working_cs:
+        cs_files.setdefault(cs.name(), [])
+
+        for fpath in cs.get_lp_dir(lp_name).iterdir():
+            fname = fpath.name
+            with open(fpath.absolute(), "r+") as fi:
+                src = fi.read()
+
+                src = re.sub(r'#include ".+kconfig\.h"\n', "", src)
+                # Since 15.4 klp-ccp includes a compiler-version.h header
+                src = re.sub(r'#include ".+compiler\-version\.h"\n', "", src)
+                # Since RT variants, there is now an definition for auto_type
+                src = src.replace(r"#define __auto_type int\n", "")
+                # We have problems with externalized symbols on macros. Ignore
+                # codestream names specified on paths that are placed on the
+                # expanded macros
+                src = re.sub(f"{utils.get_datadir(utils.ARCH)}.+{fname}", "", src)
+                # We can have more details that can differ for long expanded
+                # macros, like the patterns bellow
+                src = re.sub(r"\.lineno = \d+,", "", src)
+
+                # Remove any mentions to klpr_trace, since it's currently
+                # buggy in klp-ccp
+                src = re.sub(r".+klpr_trace.+", "", src)
+
+                # Reduce the noise from klp-ccp when expanding macros
+                src = re.sub(r"__compiletime_assert_\d+", "__compiletime_assert", src)
+
+                # Remove empty lines
+                src = "".join([s for s in src.strip().splitlines(True) if s.strip()])
+
+                cs_files[cs.name()].append((fname, src))
+
+    return cs_files
 
 
 class Extractor():
@@ -576,77 +615,12 @@ class Extractor():
             logging.warning("Symbols not found:")
             logging.warning(json.dumps(missing_syms, indent=4))
 
-    def get_cs_code(self, working_cs):
-        cs_files = {}
-
-        # Mount the cs_files dict
-        for cs in working_cs:
-            cs_files.setdefault(cs.name(), [])
-
-            for fpath in cs.get_lp_dir(self.lp_name).iterdir():
-                fname = fpath.name
-                with open(fpath.absolute(), "r+") as fi:
-                    src = fi.read()
-
-                    src = re.sub(r'#include ".+kconfig\.h"\n', "", src)
-                    # Since 15.4 klp-ccp includes a compiler-version.h header
-                    src = re.sub(r'#include ".+compiler\-version\.h"\n', "", src)
-                    # Since RT variants, there is now an definition for auto_type
-                    src = src.replace(r"#define __auto_type int\n", "")
-                    # We have problems with externalized symbols on macros. Ignore
-                    # codestream names specified on paths that are placed on the
-                    # expanded macros
-                    src = re.sub(f"{utils.get_datadir(utils.ARCH)}.+{fname}", "", src)
-                    # We can have more details that can differ for long expanded
-                    # macros, like the patterns bellow
-                    src = re.sub(r"\.lineno = \d+,", "", src)
-
-                    # Remove any mentions to klpr_trace, since it's currently
-                    # buggy in klp-ccp
-                    src = re.sub(r".+klpr_trace.+", "", src)
-
-                    # Reduce the noise from klp-ccp when expanding macros
-                    src = re.sub(r"__compiletime_assert_\d+", "__compiletime_assert", src)
-
-                    # Remove empty lines
-                    src = "".join([s for s in src.strip().splitlines(True) if s.strip()])
-
-                    cs_files[cs.name()].append((fname, src))
-
-        return cs_files
-
-    def cs_diff(self):
-        """
-        To compare two codestreams the filter should result in exactly two codestreams
-        """
-        cs_args = utils.filter_codestreams(self.lp_filter, get_codestreams_dict(), verbose=True)
-        if len(cs_args) != 2:
-            logging.error("The filter specified found %d while it should point to only 2.", len(cs_args))
-            sys.exit(1)
-
-        assert len(cs_args) == 2
-
-        cs_code = self.get_cs_code(cs_args)
-
-        cs1 = cs_args[0].name()
-        cs2 = cs_args[1].name()
-
-        f1 = cs_code.get(cs1)
-        f2 = cs_code.get(cs2)
-
-        assert len(f1) == len(f2)
-
-        for _, (v1, v2) in enumerate(zip(f1, f2)):
-            for line in dl.unified_diff(v1[1].splitlines(), v2[1].splitlines(), fromfile=f"{cs1} {v1[0]}",
-                                        tofile=f"{cs2} {v1[0]}"):
-                print(line)
-
     # Get the code for each codestream, removing boilerplate code
     def group_equal_files(self, working_cs):
         cs_equal = []
         processed = []
 
-        cs_files = self.get_cs_code(working_cs)
+        cs_files = get_cs_code(self.lp_name, working_cs)
         toprocess = list(cs_files.keys())
         while len(toprocess):
             current_cs_list = []

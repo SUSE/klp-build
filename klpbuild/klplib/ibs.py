@@ -5,30 +5,25 @@
 
 import concurrent.futures
 import errno
-import importlib
 from itertools import repeat
 import logging
 import os
 import re
 import shutil
 import subprocess
-import sys
-import time
 from operator import itemgetter
 from pathlib import Path
 
 import requests
 from lxml import etree
-from lxml.objectify import fromstring
-from lxml.objectify import SubElement
 from natsort import natsorted
 from osctiny import Osc
 
-from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict
-from klpbuild.klplib.config import get_user_path, get_user_settings
-from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir, get_elf_object, get_cs_branch, get_kgraft_branch, filter_codestreams, get_workdir,  get_tests_path, classify_codestreams_str
+from klpbuild.klplib.config import get_user_settings
+from klpbuild.klplib.utils import ARCH, get_all_symbols_from_object, get_datadir
 
 logging.getLogger("osctiny").setLevel(logging.WARNING)
+
 
 def convert_prj_to_cs(prj, prefix):
     return prj.replace(f"{prefix}-", "").replace("_", ".")
@@ -90,26 +85,6 @@ def get_project_names(osc, lp_name, lp_filter):
         i += 1
 
     return natsorted(names, key=itemgetter(1))
-
-
-def create_prj_meta(cs):
-    prj = fromstring(
-        "<project name=''><title></title><description></description>"
-        "<build><enable/></build><publish><disable/></publish>"
-        "<debuginfo><disable/></debuginfo>"
-        '<repository name="standard">'
-        f"<path project=\"{cs.project}\" repository=\"{cs.repo}\"/>"
-        "</repository>"
-        "</project>"
-    )
-
-    repo = prj.find("repository")
-
-    for arch in cs.archs:
-        ar = SubElement(repo, "arch")
-        ar._setText(arch)
-
-    return prj
 
 
 def get_cs_packages(cs_list, dest):
@@ -278,49 +253,6 @@ def extract_rpms(args, total):
     logging.info("(%d/%d) extracted %s %s: ok", i, total, cs.name(), rpm)
 
 
-def download_built_rpms(lp_name, lp_filter):
-    rpms = []
-    i = 1
-    osc = Osc(url="https://api.suse.de")
-
-    for result in get_projects(osc, lp_name, lp_filter):
-        prj = result.get("name")
-        cs_name = convert_prj_to_cs(prj, prj_prefix(lp_name, osc))
-
-        # Get the codestream from the dict
-        cs = get_codestream_by_name(cs_name)
-        if not cs:
-            logging.info("Codestream %s is stale. Deleting it.", cs_name)
-            delete_project(osc, 0, 0, prj, False)
-            continue
-
-        # Remove previously downloaded rpms
-        delete_built_rpms(cs, lp_name)
-
-        archs = result.xpath("repository/arch")
-        for arch in archs:
-            ret = osc.build.get_binary_list(prj, "standard", arch, "klp")
-            rpm_name = f"{arch}.rpm"
-            for rpm in ret.xpath("binary/@filename"):
-                if not rpm.endswith(rpm_name):
-                    continue
-
-                if "preempt" in rpm:
-                    continue
-
-                # Create a directory for each arch supported
-                dest = Path(cs.get_ccp_dir(lp_name), str(arch), "rpm")
-                dest.mkdir(exist_ok=True, parents=True)
-
-                rpms.append((osc, i, cs, prj, "standard", arch, "klp", rpm, dest))
-                i += 1
-
-    logging.info("Downloading %d packages...", len(rpms))
-    do_work(download_binary_rpms, rpms)
-
-    logging.info("Download finished.")
-
-
 def download_cs_rpms(cs_list):
     dest = get_datadir()/"kernel-rpms"
     dest.mkdir(exist_ok=True, parents=True)
@@ -365,296 +297,3 @@ def download_cs_rpms(cs_list):
         usr_lib.symlink_to(get_datadir()/ARCH/"lib")
 
     logging.info("Finished extract vmlinux and modules...")
-
-
-def prepare_tests(lp_name, lp_filter):
-    # Download all built rpms
-    download_built_rpms(lp_name, lp_filter)
-
-    test_src = get_tests_path(lp_name)
-    run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
-
-    logging.info("Validating the downloaded RPMs...")
-
-    for arch in ARCHS:
-        tests_path = get_workdir(lp_name)/"tests"/arch
-        test_arch_path = Path(tests_path, lp_name)
-
-        # Remove previously created directory and archive
-        shutil.rmtree(test_arch_path, ignore_errors=True)
-        shutil.rmtree(f"{str(test_arch_path)}.tar.xz", ignore_errors=True)
-
-        test_arch_path.mkdir(exist_ok=True, parents=True)
-        shutil.copy(run_test, test_arch_path)
-
-        for d in ["built", "repro", "tests.out"]:
-            Path(test_arch_path, d).mkdir(exist_ok=True)
-
-        logging.info("Checking %s symbols...", arch)
-        build_cs = []
-        for cs in filter_codestreams(lp_filter, get_codestreams_dict()):
-            if arch not in cs.archs:
-                continue
-
-            rpm_dir = Path(cs.get_ccp_dir(lp_name), arch, "rpm")
-            if not rpm_dir.exists():
-                logging.info("%s/%s: rpm dir not found. Skipping.", cs.name(), arch)
-                continue
-
-            # TODO: there will be only one rpm, format it directly
-            rpm = os.listdir(rpm_dir)
-            if len(rpm) > 1:
-                raise RuntimeError(f"ERROR: {cs.name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
-
-            for rpm in os.listdir(rpm_dir):
-                # Check for dependencies
-                validate_livepatch_module(cs, arch, rpm_dir, rpm)
-
-                shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, "built"))
-
-            if cs.rt and arch != "x86_64":
-                continue
-
-            build_cs.append(cs.name_full())
-
-        logging.info("Done.")
-
-        # Prepare the config and test files used by kgr-test
-        if not test_src:
-            logging.warning("No testcase found, so no tar file is being created.")
-            continue
-
-        test_dst = Path(test_arch_path, f"repro/{lp_name}")
-        if test_src.is_file():
-            shutil.copy(test_src, f"{test_dst}_test_script.sh")
-            config = f"{test_dst}_config.in"
-        else:
-            # Alternatively, we create test_dst as a directory containing
-            # at least a test_script.sh and a config.in
-            shutil.copytree(test_src, test_dst)
-            config = Path(test_dst, "config.in")
-
-        with open(config, "w") as f:
-            f.write("\n".join(natsorted(build_cs)))
-
-        logging.info("Creating %s tar file...", arch)
-        subprocess.run(
-            ["tar", "-cJf", f"{lp_name}.tar.xz", f"{lp_name}"],
-            cwd=tests_path,
-            stdout=sys.stdout,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-
-        logging.info("Done.")
-
-
-def log(lp_name, lp_filter, arch):
-    cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
-
-    if not cs_list:
-        logging.error("log: No codestreams found for filter %s", lp_filter)
-        sys.exit(1)
-
-    if len(cs_list) > 1:
-        cs_names = [cs.name() for cs in cs_list]
-        logging.error("Filter '%s' returned %d entries (%s), while expecting just one. Aborting. ",
-                      lp_filter, len(cs_list), " ".join(cs_names))
-        sys.exit(1)
-
-    osc = Osc(url="https://api.suse.de")
-    prefix = prj_prefix(lp_name, osc)
-
-    logging.info(osc.build.get_log(convert_cs_to_prj(cs_list[0], prefix), "standard", arch, "klp"))
-
-
-def status(lp_name, lp_filter, wait=False):
-    finished_prj = []
-
-    osc = Osc(url="https://api.suse.de")
-
-    while True:
-        prjs = {}
-        for _, prj in get_project_names(osc, lp_name, lp_filter):
-            if prj in finished_prj:
-                continue
-
-            prjs[prj] = {}
-
-            for res in osc.build.get(prj).findall("result"):
-                if not res.xpath("status/@code"):
-                    continue
-                code = res.xpath("status/@code")[0]
-                prjs[prj][res.get("arch")] = code
-
-        logging.info("%d codestreams to finish", len(prjs))
-
-        for prj, archs in prjs.items():
-            st = []
-            finished = False
-            # Save the status of all architecture build, and set to fail if
-            # an error happens in any of the supported architectures
-            for k, v in archs.items():
-                st.append(f"{k}: {v}")
-                if v in ["unresolvable", "failed"]:
-                    finished = True
-
-            # Only set finished is all architectures supported by the
-            # codestreams built without issues
-            if not finished:
-                states = set(archs.values())
-                if len(states) == 1 and states.pop() in ["succeeded", "excluded"]:
-                    finished = True
-
-            if finished:
-                finished_prj.append(prj)
-
-            logging.info("%s\t%s", prj, "\t".join(st))
-
-        for p in finished_prj:
-            prjs.pop(p, None)
-
-        if not wait or not prjs:
-            break
-
-        # Wait 30 seconds before getting status again
-        time.sleep(30)
-        logging.info("")
-
-
-def cleanup(lp_name, lp_filter):
-    osc = Osc(url="https://api.suse.de")
-    prjs = get_project_names(osc, lp_name, lp_filter)
-
-    total = len(prjs)
-    if total == 0:
-        logging.info("No projects found.")
-        return
-
-    logging.info("Deleting %d projects...", total)
-
-    delete_projects(osc, prjs, True)
-
-
-def create_lp_package(osc, lp_name, i, total, cs):
-    kgr_path = get_user_path('kgr_patches_dir')
-    branch = get_cs_branch(cs, lp_name, kgr_path)
-    if not branch:
-        logging.info("Could not find git branch for %s. Skipping.", cs.name())
-        return
-
-    # If the project exists, drop it first
-    prj = convert_cs_to_prj(cs, prj_prefix(lp_name, osc))
-    delete_project(osc, 0, 0, prj, verbose=False)
-
-    meta = create_prj_meta(cs)
-    prj_desc = f"Development of livepatches for {cs.name()}"
-
-    try:
-        osc.projects.set_meta(
-            prj, metafile=meta, title="", bugowner=osc.username, maintainer=osc.username, description=prj_desc
-        )
-
-        osc.packages.set_meta(prj, "klp", title="", description="Test livepatch")
-
-    except Exception as e:
-        logging.error(e, e.response.content)
-        raise RuntimeError("") from e
-
-    # Remove previously created directories
-    prj_path = Path(cs.get_ccp_dir(lp_name), "checkout")
-    if prj_path.exists():
-        shutil.rmtree(prj_path)
-
-    code_path = Path(cs.get_ccp_dir(lp_name), "code")
-    if code_path.exists():
-        shutil.rmtree(code_path)
-
-    osc.packages.checkout(prj, "klp", prj_path)
-
-    base_branch = get_kgraft_branch(cs.name())
-
-    logging.info("(%s/%s) pushing %s using branches %s/%s...",
-                 i, total, cs.name(), str(base_branch), str(branch))
-
-    # Clone the repo and checkout to the codestream branch. The branch should be based on master to avoid rebasing
-    # conflicts
-    subprocess.check_output(
-        ["/usr/bin/git", "clone", "--branch", branch, str(kgr_path), str(code_path)],
-        stderr=subprocess.STDOUT,
-    )
-
-    # Add remote with all codestreams, because the clone above will set the remote origin
-    # to the local directory, so it can't find the remote codestreams
-    subprocess.check_output(["/usr/bin/git", "remote", "add", "kgr",
-                            "gitlab@gitlab.suse.de:kernel/kgraft-patches.git"],
-                            stderr=subprocess.STDOUT, cwd=code_path)
-
-    # Fetch all remote codestreams so we can rebase in the next step
-    subprocess.check_output(["/usr/bin/git", "fetch", "kgr",  str(base_branch)],
-                            stderr=subprocess.STDOUT, cwd=code_path)
-
-    # Get the new bsc commit on top of the codestream branch (should be the last commit on the specific branch)
-    subprocess.check_output(
-        ["/usr/bin/git", "rebase", f"kgr/{base_branch}"],
-        stderr=subprocess.STDOUT, cwd=code_path
-    )
-
-    # Check if the directory related to this bsc exists.
-    # Otherwise only warn the caller about this fact.
-    # This scenario can occur in case of LPing function that is already
-    # part of different LP in which case we modify the existing one.
-    if lp_name not in os.listdir(code_path):
-        logging.warning("Warning: Directory %s not found on branch %s", lp_name, branch)
-
-    # Fix RELEASE version
-    with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
-        ver = cs.name_full().replace("EMBARGO", "")
-        f.write(f"RELEASE={ver}")
-
-    subprocess.check_output(
-        ["bash", "./scripts/tar-up.sh", "-d", str(prj_path)], stderr=subprocess.STDOUT, cwd=code_path
-    )
-    shutil.rmtree(code_path)
-
-    # Add all files to the project, commit the changes and delete the directory.
-    for fname in prj_path.iterdir():
-        # Do not push .osc directory
-        if ".osc" in str(fname):
-            continue
-        with open(fname, "rb") as fdata:
-            osc.packages.push_file(prj, "klp", fname.name, fdata.read())
-    osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
-    shutil.rmtree(prj_path)
-
-    logging.info("(%d/%d) %s done", i, total, cs.name())
-
-
-def push(lp_name, lp_filter, wait=False):
-    cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
-
-    if not cs_list:
-        logging.error("push: No codestreams found for %s", lp_name)
-        sys.exit(1)
-
-    logging.info("Pushing %d codestreams: %s", len(cs_list),
-                 classify_codestreams_str(cs_list))
-
-    osc = Osc(url="https://api.suse.de")
-
-    total = len(cs_list)
-    i = 1
-    # More threads makes OBS to return error 500
-    for cs in cs_list:
-        create_lp_package(osc, lp_name, i, total, cs)
-        i += 1
-
-    if wait:
-        # Give some time for IBS to start building the last pushed
-        # codestreams
-        time.sleep(30)
-        status(lp_name, lp_filter, wait)
-
-        # One more status after everything finished, since we remove
-        # finished builds on each iteration
-        status(lp_name, lp_filter, False)
