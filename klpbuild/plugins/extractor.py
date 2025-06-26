@@ -492,7 +492,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
 
 
 class Extractor():
-    def __init__(self, lp_name, apply_patches):
+    def __init__(self, lp_name):
 
         self.lp_name = lp_name
         self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
@@ -500,18 +500,6 @@ class Extractor():
 
         if not utils.get_workdir(lp_name).exists():
             raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
-
-        patches = get_patches_dir(lp_name)
-        self.apply_patches = apply_patches
-
-        if self.apply_patches and not patches.exists():
-            raise ValueError("patches do not exist!")
-
-        if patches.exists():
-            self.quilt_log = open(Path(patches, "quilt.log"), "w")
-            self.quilt_log.truncate()
-        else:
-            self.quilt_log = open("/dev/null", "w")
 
     def __del__(self):
         if self.sdir_lock:
@@ -591,8 +579,18 @@ class Extractor():
             f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
             f.truncate()
 
-    def run(self, lp_filter, avoid_ext):
+    def run(self, lp_filter, apply_patches, avoid_ext):
         logging.info(f"Work directory: %s", utils.get_workdir(self.lp_name))
+
+        patches = get_patches_dir(self.lp_name)
+        if apply_patches and not patches.exists():
+            raise ValueError("patches do not exist!")
+
+        if patches.exists():
+            quilt_log = open(Path(patches, "quilt.log"), "w")
+            quilt_log.truncate()
+        else:
+            quilt_log = open("/dev/null", "w")
 
         working_cs = utils.filter_codestreams(lp_filter, get_codestreams_dict(), verbose=True)
 
@@ -608,11 +606,11 @@ class Extractor():
         for cs in working_cs:
             # remove any previously generated files and leftover patches
             shutil.rmtree(cs.get_ccp_dir(self.lp_name), ignore_errors=True)
-            remove_patches(cs, self.quilt_log)
+            remove_patches(cs, quilt_log)
 
             # Apply patches before the LPs were created
-            if self.apply_patches:
-                apply_all_patches(self.lp_name, cs, self.quilt_log)
+            if apply_patches:
+                apply_all_patches(self.lp_name, cs, quilt_log)
 
             for fname, fdata in cs.files.items():
                 args.append((i, make_lock, fname, cs, fdata))
@@ -654,8 +652,8 @@ class Extractor():
         # externalized symbols of this file
         for cs in working_cs:
             # Cleanup patches after the LPs were created if they were applied
-            if self.apply_patches:
-                remove_patches(cs, self.quilt_log)
+            if apply_patches:
+                remove_patches(cs, quilt_log)
 
             # Map all symbols related to each obj, to make it check the symbols
             # only once per object
