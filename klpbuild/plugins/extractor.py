@@ -389,6 +389,107 @@ def apply_all_patches(lp_name, cs, fil):
         raise RuntimeError(f"{cs.name()}({cs.kernel}): Failed to apply patches. Aborting")
 
 
+def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
+    lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
+
+    funcs = ",".join(fdata["symbols"])
+
+    ccp_args = [str(shutil.which("klp-ccp")), "-P", "suse.KlpPolicy",
+                "--compiler=x86_64-gcc-9.1.0", "-i", f"{funcs}", "-o",
+                f"{str(lp_out)}", "--"]
+
+    # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
+    # 15.4u0 options
+    # -fno-allow-store-data-races and -Wno-zero-length-bounds
+    # 15.4u1 options
+    # -mindirect-branch-cs-prefix appear in 15.4u1
+    # more options to be removed
+    # -mharden-sls=all
+    # 15.6 options
+    # -fmin-function-alignment=16
+    for opt in [
+        "-flive-patching=inline-clone",
+        "-fdump-ipa-clones",
+        "-fno-allow-store-data-races",
+        "-Wno-zero-length-bounds",
+        "-mindirect-branch-cs-prefix",
+        "-mharden-sls=all",
+        "-fmin-function-alignment=16",
+        "-Wno-dangling-pointer",
+    ]:
+        cmd = cmd.replace(opt, "")
+
+    if cs.is_micro or (cs.sle >= 15 and cs.sp >= 4):
+        cmd += " -D__has_attribute(x)=0"
+
+    ccp_args.extend(cmd.split(" "))
+
+    ccp_args = list(filter(None, ccp_args))
+
+    # Needed, otherwise threads would interfere with each other
+    env = os.environ.copy()
+
+    env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt else "0"
+    env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
+    env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
+    env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.ARCH)/cs.get_mod(fdata["module"]))
+    env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
+    env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
+    env["KCP_WORK_DIR"] = str(out_dir)
+    env["KCP_READELF"] = "readelf"
+    env["KCP_RENAME_PREFIX"] = "klp"
+
+    # List of symbols that are currently not resolvable for klp-ccp
+    avoid_syms = [
+        "__xadd_wrong_size",
+        "__bad_copy_from",
+        "__bad_copy_to",
+        "rcu_irq_enter_disabled",
+        "rcu_irq_enter_irqson",
+        "rcu_irq_exit_irqson",
+        "verbose",
+        "__write_overflow",
+        "__read_overflow",
+        "__read_overflow2",
+        "__real_strnlen",
+        "__real_strlcpy",
+        "twaddle",
+        "set_geometry",
+        "valid_floppy_drive_params",
+        "__real_memchr_inv",
+        "__real_kmemdup",
+        "lockdep_rtnl_is_held",
+        "lockdep_rht_mutex_is_held",
+        "debug_lockdep_rcu_enabled",
+        "lockdep_rcu_suspicious",
+        "rcu_read_lock_bh_held",
+        "lock_acquire",
+        "preempt_count_add",
+        "rcu_read_lock_any_held",
+        "preempt_count_sub",
+        "lock_release",
+        "trace_hardirqs_off",
+        "trace_hardirqs_on",
+        "debug_smp_processor_id",
+        "lock_is_held_type",
+        "mutex_lock_nested",
+        "rcu_read_lock_held",
+        "__bad_unaligned_access_size",
+        "__builtin_alloca",
+        "tls_validate_xmit_skb_sw",
+    ]
+    # The backlist tells the klp-ccp to always copy the symbol code,
+    # instead of externalizing. This helps in cases where different archs
+    # have different inline decisions, optimizing and sometimes removing the
+    # symbols.
+    if avoid_ext:
+        avoid_syms.extend(avoid_ext)
+
+    env["KCP_EXT_BLACKLIST"] = ",".join(avoid_syms)
+
+    return ccp_args, env
+
+
 class Extractor():
     def __init__(self, lp_name, apply_patches, avoid_ext):
 
@@ -415,113 +516,10 @@ class Extractor():
         self.total = 0
         self.make_lock = Lock()
 
-        self.env = os.environ
-
-        # List of symbols that are currently not resolvable for klp-ccp
-        avoid_syms = [
-            "__xadd_wrong_size",
-            "__bad_copy_from",
-            "__bad_copy_to",
-            "rcu_irq_enter_disabled",
-            "rcu_irq_enter_irqson",
-            "rcu_irq_exit_irqson",
-            "verbose",
-            "__write_overflow",
-            "__read_overflow",
-            "__read_overflow2",
-            "__real_strnlen",
-            "__real_strlcpy",
-            "twaddle",
-            "set_geometry",
-            "valid_floppy_drive_params",
-            "__real_memchr_inv",
-            "__real_kmemdup",
-            "lockdep_rtnl_is_held",
-            "lockdep_rht_mutex_is_held",
-            "debug_lockdep_rcu_enabled",
-            "lockdep_rcu_suspicious",
-            "rcu_read_lock_bh_held",
-            "lock_acquire",
-            "preempt_count_add",
-            "rcu_read_lock_any_held",
-            "preempt_count_sub",
-            "lock_release",
-            "trace_hardirqs_off",
-            "trace_hardirqs_on",
-            "debug_smp_processor_id",
-            "lock_is_held_type",
-            "mutex_lock_nested",
-            "rcu_read_lock_held",
-            "__bad_unaligned_access_size",
-            "__builtin_alloca",
-            "tls_validate_xmit_skb_sw",
-        ]
-        # The backlist tells the klp-ccp to always copy the symbol code,
-        # instead of externalizing. This helps in cases where different archs
-        # have different inline decisions, optimizing and sometimes removing the
-        # symbols.
-        if avoid_ext:
-            avoid_syms.extend(avoid_ext)
-
-        self.env["KCP_EXT_BLACKLIST"] = ",".join(avoid_syms)
-        self.env["KCP_READELF"] = "readelf"
-        self.env["KCP_RENAME_PREFIX"] = "klp"
-
-
     def __del__(self):
         if self.sdir_lock:
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
-
-    def cmd_args(self, cs, fname, out_dir, fdata, cmd):
-        lp_out = Path(out_dir, cs.lp_out_file(self.lp_name, fname))
-
-        funcs = ",".join(fdata["symbols"])
-
-        ccp_args = [str(shutil.which("klp-ccp")), "-P", "suse.KlpPolicy",
-                    "--compiler=x86_64-gcc-9.1.0", "-i", f"{funcs}", "-o",
-                    f"{str(lp_out)}", "--"]
-
-        # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
-        # 15.4u0 options
-        # -fno-allow-store-data-races and -Wno-zero-length-bounds
-        # 15.4u1 options
-        # -mindirect-branch-cs-prefix appear in 15.4u1
-        # more options to be removed
-        # -mharden-sls=all
-        # 15.6 options
-        # -fmin-function-alignment=16
-        for opt in [
-            "-flive-patching=inline-clone",
-            "-fdump-ipa-clones",
-            "-fno-allow-store-data-races",
-            "-Wno-zero-length-bounds",
-            "-mindirect-branch-cs-prefix",
-            "-mharden-sls=all",
-            "-fmin-function-alignment=16",
-            "-Wno-dangling-pointer",
-        ]:
-            cmd = cmd.replace(opt, "")
-
-        if cs.is_micro or (cs.sle >= 15 and cs.sp >= 4):
-            cmd += " -D__has_attribute(x)=0"
-
-        ccp_args.extend(cmd.split(" "))
-
-        ccp_args = list(filter(None, ccp_args))
-
-        # Needed, otherwise threads would interfere with each other
-        env = self.env.copy()
-
-        env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt else "0"
-        env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
-        env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
-        env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.ARCH)/cs.get_mod(fdata["module"]))
-        env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
-        env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
-        env["KCP_WORK_DIR"] = str(out_dir)
-
-        return ccp_args, env
 
     def process(self, args):
         i, fname, cs, fdata = args
@@ -549,7 +547,7 @@ class Extractor():
             with self.make_lock:
                 cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
-        args, lenv = self.cmd_args(cs, fname, out_dir, fdata, cmd)
+        args, lenv = cmd_args(self.lp_name, cs, fname, out_dir, fdata, cmd, self.avoid_ext)
 
         # Detect and set ibt information. It will be used in the TemplateGen
         if '-fcf-protection' in cmd or cs.needs_ibt:
