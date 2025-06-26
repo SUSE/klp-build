@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from concurrent.futures import ThreadPoolExecutor
+import itertools
 import json
 import logging
 import os
@@ -491,7 +492,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
 
 
 class Extractor():
-    def __init__(self, lp_name, apply_patches, avoid_ext):
+    def __init__(self, lp_name, apply_patches):
 
         self.lp_name = lp_name
         self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
@@ -502,7 +503,6 @@ class Extractor():
 
         patches = get_patches_dir(lp_name)
         self.apply_patches = apply_patches
-        self.avoid_ext = avoid_ext
 
         if self.apply_patches and not patches.exists():
             raise ValueError("patches do not exist!")
@@ -521,7 +521,7 @@ class Extractor():
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
 
-    def process(self, args):
+    def process(self, args, avoid_ext):
         i, fname, cs, fdata = args
 
         sdir = cs.get_src_dir()
@@ -547,7 +547,7 @@ class Extractor():
             with self.make_lock:
                 cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
-        args, lenv = cmd_args(self.lp_name, cs, fname, out_dir, fdata, cmd, self.avoid_ext)
+        args, lenv = cmd_args(self.lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
 
         # Detect and set ibt information. It will be used in the TemplateGen
         if '-fcf-protection' in cmd or cs.needs_ibt:
@@ -594,7 +594,7 @@ class Extractor():
             f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
             f.truncate()
 
-    def run(self, lp_filter):
+    def run(self, lp_filter, avoid_ext):
         logging.info(f"Work directory: %s", utils.get_workdir(self.lp_name))
 
         working_cs = utils.filter_codestreams(lp_filter, get_codestreams_dict(), verbose=True)
@@ -628,7 +628,7 @@ class Extractor():
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             try:
-                futures = executor.map(self.process, args)
+                futures = executor.map(self.process, args, itertools.repeat(avoid_ext))
                 for future in futures:
                     if future:
                         logging.error(future)
