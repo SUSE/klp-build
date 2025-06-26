@@ -491,6 +491,80 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     return ccp_args, env
 
 
+def process(lp_name, total, args, avoid_ext):
+    i, make_lock, fname, cs, fdata = args
+
+    sdir = cs.get_src_dir()
+    odir = cs.get_obj_dir()
+
+    # The header text has two tabs
+    cs_info = cs.name().ljust(15, " ")
+    idx = f"({i}/{total})".rjust(15, " ")
+
+    logging.info("%s %s %s", idx, cs_info, fname)
+
+    out_dir = cs.get_ccp_work_dir(lp_name, fname)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # create symlink to the respective codestream file
+    os.symlink(Path(sdir, fname), Path(out_dir, Path(fname).name))
+
+    # Make can regenerate fixdep for each file being processed per
+    # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
+    # calls. Make is pretty fast, so there isn't a real slow down here.
+    cmd = get_cmd_from_json(cs, fname)
+    if not cmd:
+        with make_lock:
+            cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
+
+    args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
+
+    # Detect and set ibt information. It will be used in the TemplateGen
+    if '-fcf-protection' in cmd or cs.needs_ibt:
+        cs.files[fname]["ibt"] = True
+
+    out_log = Path(out_dir, "ccp.out.txt")
+    with open(out_log, "w+") as f:
+        # Write the command line used
+        f.write(f"Executing ccp on {odir}\n")
+        print_env_vars(f, lenv)
+        f.write("\n".join(args) + "\n")
+        f.flush()
+
+        start_pos = f.tell()
+        try:
+            subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
+        except Exception as exc:
+            raise RuntimeError(f"Error when processing {cs.name()}:{fname}. Check file {out_log} for details.") from exc
+
+        # Look for optimized function warnings in the output of the command
+        f.seek(start_pos)
+        symbol_pattern = r'warning: optimized function "([^"]+)" in callgraph'
+        for line in f:
+            match = re.search(symbol_pattern, line)
+            if match:
+                opt_symbol_name = match.group(1)
+                symbol_name = opt_symbol_name.split(".")[0]
+                logging.warning("Warning when processing %s:%s: "
+                                "Symbol %s contains optimized clone: %s",
+                                cs.name(), fname, symbol_name, opt_symbol_name)
+                logging.warning("Make sure to patch all the callers of %s.", symbol_name)
+
+    cs.files[fname]["ext_symbols"] = get_symbol_list(out_dir)
+
+    lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
+
+    # Remove the local path prefix of the klp-ccp generated comments
+    # Open the file, read, seek to the beginning, write the new data, and
+    # then truncate (which will use the current position in file as the
+    # size)
+    with open(str(lp_out), "r+") as f:
+        file_buf = f.read()
+        f.seek(0)
+        f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
+        f.truncate()
+
+
 class Extractor():
     def __init__(self, lp_name):
 
@@ -505,79 +579,6 @@ class Extractor():
         if self.sdir_lock:
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
-
-    def process(self, total, args, avoid_ext):
-        i, make_lock, fname, cs, fdata = args
-
-        sdir = cs.get_src_dir()
-        odir = cs.get_obj_dir()
-
-        # The header text has two tabs
-        cs_info = cs.name().ljust(15, " ")
-        idx = f"({i}/{total})".rjust(15, " ")
-
-        logging.info(f"{idx} {cs_info} {fname}")
-
-        out_dir = cs.get_ccp_work_dir(self.lp_name, fname)
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        # create symlink to the respective codestream file
-        os.symlink(Path(sdir, fname), Path(out_dir, Path(fname).name))
-
-        # Make can regenerate fixdep for each file being processed per
-        # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
-        # calls. Make is pretty fast, so there isn't a real slow down here.
-        cmd = get_cmd_from_json(cs, fname)
-        if not cmd:
-            with make_lock:
-                cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
-
-        args, lenv = cmd_args(self.lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
-
-        # Detect and set ibt information. It will be used in the TemplateGen
-        if '-fcf-protection' in cmd or cs.needs_ibt:
-            cs.files[fname]["ibt"] = True
-
-        out_log = Path(out_dir, "ccp.out.txt")
-        with open(out_log, "w+") as f:
-            # Write the command line used
-            f.write(f"Executing ccp on {odir}\n")
-            print_env_vars(f, lenv)
-            f.write("\n".join(args) + "\n")
-            f.flush()
-
-            start_pos = f.tell()
-            try:
-                subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
-            except Exception as exc:
-                raise RuntimeError(f"Error when processing {cs.name()}:{fname}. Check file {out_log} for details.") from exc
-
-            # Look for optimized function warnings in the output of the command
-            f.seek(start_pos)
-            symbol_pattern = r'warning: optimized function "([^"]+)" in callgraph'
-            for line in f:
-                match = re.search(symbol_pattern, line)
-                if match:
-                    opt_symbol_name = match.group(1)
-                    symbol_name = opt_symbol_name.split(".")[0]
-                    logging.warning("Warning when processing %s:%s: "
-                                    "Symbol %s contains optimized clone: %s",
-                                    cs.name(), fname, symbol_name, opt_symbol_name)
-                    logging.warning(f"Make sure to patch all the callers of %s.", symbol_name)
-
-        cs.files[fname]["ext_symbols"] = get_symbol_list(out_dir)
-
-        lp_out = Path(out_dir, cs.lp_out_file(self.lp_name, fname))
-
-        # Remove the local path prefix of the klp-ccp generated comments
-        # Open the file, read, seek to the beginning, write the new data, and
-        # then truncate (which will use the current position in file as the
-        # size)
-        with open(str(lp_out), "r+") as f:
-            file_buf = f.read()
-            f.seek(0)
-            f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
-            f.truncate()
 
     def run(self, lp_filter, apply_patches, avoid_ext):
         logging.info(f"Work directory: %s", utils.get_workdir(self.lp_name))
@@ -623,8 +624,8 @@ class Extractor():
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             try:
-                futures = executor.map(self.process, repeat(len(args)),
-                                       args, repeat(avoid_ext))
+                futures = executor.map(process, repeat(self.lp_name),
+                                       repeat(len(args)), args, repeat(avoid_ext))
                 for future in futures:
                     if future:
                         logging.error(future)
