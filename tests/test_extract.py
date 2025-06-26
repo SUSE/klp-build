@@ -34,7 +34,7 @@ def test_detect_file_without_ftrace_support(caplog):
     setup(**setup_args)
 
     with caplog.at_level(logging.WARNING):
-        Extractor(lp_name=lp, apply_patches=False).run(lp_filter=cs, avoid_ext=[])
+        Extractor(lp_name=lp).run(lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     assert "lib/seq_buf.o is not compiled with livepatch support (-pg flag)" in caplog.text
 
@@ -78,7 +78,7 @@ def test_compile_commands_enoent():
 
     # Now it should fail with hid_core.c that doesn't exists on compile_commands.json
     with pytest.raises(RuntimeError, match=r"Couldn't find cmdline for drivers/hid/hid_core.c on.*compile_commands.json. Aborting"):
-        Extractor(lp_name=lp, apply_patches=False).run(lp_filter=cs, avoid_ext=[])
+        Extractor(lp_name=lp).run(lp_filter=cs, apply_patches=False, avoid_ext=[])
 
 
 def test_detect_opt_clone(caplog):
@@ -100,6 +100,6 @@ def test_detect_opt_clone(caplog):
     setup(**setup_args)
 
     with caplog.at_level(logging.WARNING):
-        Extractor(lp_name=lp, apply_patches=False).run(lp_filter=cs, avoid_ext=[])
+        Extractor(lp_name=lp).run(lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     assert "Symbol l2cap_sock_kill contains optimized clone" in caplog.text

@@ -35,7 +35,7 @@ def main():
     # NOTE: all the code below should be gone when all the modules will be
     # converted into plugins
     if args.cmd == "extract":
-        Extractor(args.lp_name, args.apply_patches).run(args.lp_filter, args.avoid_ext)
+        Extractor(args.lp_name).run(args.lp_filter, args.apply_patches, args.avoid_ext)
 
 
 if __name__ == "__main__":
