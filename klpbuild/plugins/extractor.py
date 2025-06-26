@@ -332,12 +332,6 @@ class Extractor():
         self.apply_patches = apply_patches
         self.avoid_ext = avoid_ext
 
-        workers = get_user_settings('workers', True)
-        if workers == "":
-            self.workers = 4
-        else:
-            self.workers = int(workers)
-
         if self.apply_patches and not patches.exists():
             raise ValueError("patches do not exist!")
 
@@ -627,12 +621,13 @@ class Extractor():
                 args.append((i, fname, cs, fdata))
                 i += 1
 
+        workers = int(get_user_settings("workers"))
         logging.info("Extracting code using ccp")
         self.total = len(args)
-        logging.info(f"\nGenerating livepatches for {len(args)} file(s) using {self.workers} workers...")
+        logging.info("\nGenerating livepatches for %d file(s) using %d workers...", len(args), workers)
         logging.info("\t\tCodestream\tFile")
 
-        with ThreadPoolExecutor(max_workers=self.workers) as executor:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
             try:
                 futures = executor.map(self.process, args)
                 for future in futures:
