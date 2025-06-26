@@ -566,24 +566,23 @@ def process(lp_name, total, args, avoid_ext):
 
 
 class Extractor():
-    def __init__(self, lp_name):
+    def __init__(self):
 
-        self.lp_name = lp_name
         self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
         self.sdir_lock.acquire()
-
-        if not utils.get_workdir(lp_name).exists():
-            raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
     def __del__(self):
         if self.sdir_lock:
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
 
-    def run(self, lp_filter, apply_patches, avoid_ext):
-        logging.info(f"Work directory: %s", utils.get_workdir(self.lp_name))
+    def run(self, lp_name, lp_filter, apply_patches, avoid_ext):
+        if not utils.get_workdir(lp_name).exists():
+            raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
-        patches = get_patches_dir(self.lp_name)
+        logging.info("Work directory: %s", utils.get_workdir(lp_name))
+
+        patches = get_patches_dir(lp_name)
         if apply_patches and not patches.exists():
             raise ValueError("patches do not exist!")
 
@@ -606,12 +605,12 @@ class Extractor():
         make_lock = Lock()
         for cs in working_cs:
             # remove any previously generated files and leftover patches
-            shutil.rmtree(cs.get_ccp_dir(self.lp_name), ignore_errors=True)
+            shutil.rmtree(cs.get_ccp_dir(lp_name), ignore_errors=True)
             remove_patches(cs, quilt_log)
 
             # Apply patches before the LPs were created
             if apply_patches:
-                apply_all_patches(self.lp_name, cs, quilt_log)
+                apply_all_patches(lp_name, cs, quilt_log)
 
             for fname, fdata in cs.files.items():
                 args.append((i, make_lock, fname, cs, fdata))
@@ -633,9 +632,9 @@ class Extractor():
                 raise RuntimeError(str(exc)) from exc
 
         # Save the ext_symbols set by execute
-        store_codestreams(self.lp_name, working_cs)
+        store_codestreams(lp_name, working_cs)
 
-        tem = TemplateGen(self.lp_name)
+        tem = TemplateGen(lp_name)
 
         # TODO: change the templates so we generate a similar code than we
         # already do for SUSE livepatches
@@ -643,7 +642,7 @@ class Extractor():
         for cs in working_cs:
             tem.generate_livepatches(cs)
 
-        group_equal_files(self.lp_name, working_cs)
+        group_equal_files(lp_name, working_cs)
 
         logging.info("Checking the externalized symbols in other architectures...")
 
@@ -674,7 +673,7 @@ class Extractor():
                         missing_syms[arch][obj][cs.name()].extend(arch_syms)
 
         if missing_syms:
-            with open(utils.get_workdir(self.lp_name)/"missing_syms", "w") as f:
+            with open(utils.get_workdir(lp_name)/"missing_syms", "w") as f:
                 f.write(json.dumps(missing_syms, indent=4))
 
             logging.warning("Symbols not found:")
