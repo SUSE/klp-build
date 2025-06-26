@@ -21,9 +21,38 @@ from filelock import FileLock
 from natsort import natsorted
 
 from klpbuild.klplib import utils
+from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
 from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.templ import TemplateGen
+
+PLUGIN_CMD = "extract"
+
+
+def register_argparser(subparser):
+    extract_opts = subparser.add_parser(
+        PLUGIN_CMD, help="Extract initial livepatches"
+    )
+
+    add_arg_lp_name(extract_opts)
+    add_arg_lp_filter(extract_opts)
+
+    extract_opts.add_argument(
+        "--avoid-ext",
+        nargs="+",
+        type=str,
+        default=[],
+        help="Functions to be copied into the LP instead of externalizing. "
+        "Useful to make sure to include symbols that are optimized in "
+        "different architectures",
+    )
+    extract_opts.add_argument(
+        "--apply-patches", action="store_true", help="Apply patches if they exist"
+    )
+
+
+def run(lp_name, lp_filter, apply_patches, avoid_ext):
+    return extract(lp_name, lp_filter, apply_patches, avoid_ext)
 
 
 def get_cs_code(lp_name, working_cs):
@@ -565,116 +594,112 @@ def process(lp_name, total, args, avoid_ext):
         f.truncate()
 
 
-class Extractor():
-    def __init__(self):
+def extract(lp_name, lp_filter, apply_patches, avoid_ext):
+    sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
 
-        self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
-        self.sdir_lock.acquire()
+    with sdir_lock:
+        start_extract(lp_name, lp_filter, apply_patches, avoid_ext)
 
-    def __del__(self):
-        if self.sdir_lock:
-            self.sdir_lock.release()
-            os.remove(self.sdir_lock.lock_file)
 
-    def run(self, lp_name, lp_filter, apply_patches, avoid_ext):
-        if not utils.get_workdir(lp_name).exists():
-            raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
+def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
+    if not utils.get_workdir(lp_name).exists():
+        raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
-        logging.info("Work directory: %s", utils.get_workdir(lp_name))
+    logging.info("Work directory: %s", utils.get_workdir(lp_name))
 
-        patches = get_patches_dir(lp_name)
-        if apply_patches and not patches.exists():
-            raise ValueError("patches do not exist!")
+    patches = get_patches_dir(lp_name)
+    if apply_patches and not patches.exists():
+        raise ValueError("patches do not exist!")
 
-        if patches.exists():
-            quilt_log = open(Path(patches, "quilt.log"), "w")
-            quilt_log.truncate()
-        else:
-            quilt_log = open("/dev/null", "w")
+    if patches.exists():
+        quilt_log = open(Path(patches, "quilt.log"), "w")
+        quilt_log.truncate()
+    else:
+        quilt_log = open("/dev/null", "w")
 
-        working_cs = utils.filter_codestreams(lp_filter, get_codestreams_dict(), verbose=True)
+    working_cs = utils.filter_codestreams(lp_filter, get_codestreams_dict(), verbose=True)
 
-        if len(working_cs) == 0:
-            logging.error("No codestreams found")
-            sys.exit(1)
+    if len(working_cs) == 0:
+        logging.error("No codestreams found")
+        sys.exit(1)
 
-        # Make it perform better by spawning a process function per
-        # cs/file/funcs tuple, instead of spawning a thread per codestream
-        args = []
-        i = 1
-        make_lock = Lock()
-        for cs in working_cs:
-            # remove any previously generated files and leftover patches
-            shutil.rmtree(cs.get_ccp_dir(lp_name), ignore_errors=True)
+    # Make it perform better by spawning a process function per
+    # cs/file/funcs tuple, instead of spawning a thread per codestream
+    args = []
+    i = 1
+    make_lock = Lock()
+    for cs in working_cs:
+        # remove any previously generated files and leftover patches
+        shutil.rmtree(cs.get_ccp_dir(lp_name), ignore_errors=True)
+        remove_patches(cs, quilt_log)
+
+        # Apply patches before the LPs were created
+        if apply_patches:
+            apply_all_patches(lp_name, cs, quilt_log)
+
+        for fname, fdata in cs.files.items():
+            args.append((i, make_lock, fname, cs, fdata))
+            i += 1
+
+    workers = int(get_user_settings("workers"))
+    logging.info("Extracting code using ccp")
+    logging.info("\nGenerating livepatches for %d file(s) using %d workers...", len(args), workers)
+    logging.info("\t\tCodestream\tFile")
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        try:
+            futures = executor.map(process, repeat(lp_name), repeat(len(args)),
+                                   args, repeat(avoid_ext))
+            for future in futures:
+                if future:
+                    logging.error(future)
+        except Exception as exc:
+            raise RuntimeError(str(exc)) from exc
+
+    # Save the ext_symbols set by execute
+    store_codestreams(lp_name, working_cs)
+
+    tem = TemplateGen(lp_name)
+
+    # TODO: change the templates so we generate a similar code than we
+    # already do for SUSE livepatches
+    # Create the livepatches per codestream
+    for cs in working_cs:
+        tem.generate_livepatches(cs)
+
+    group_equal_files(lp_name, working_cs)
+
+    logging.info("Checking the externalized symbols in other architectures...")
+
+    missing_syms = OrderedDict()
+
+    # Iterate over each codestream, getting each file processed, and all
+    # externalized symbols of this file
+    for cs in working_cs:
+        # Cleanup patches after the LPs were created if they were applied
+        if apply_patches:
             remove_patches(cs, quilt_log)
 
-            # Apply patches before the LPs were created
-            if apply_patches:
-                apply_all_patches(lp_name, cs, quilt_log)
+        # Map all symbols related to each obj, to make it check the symbols
+        # only once per object
+        obj_syms = {}
+        for f, fdata in cs.files.items():
+            for obj, syms in fdata["ext_symbols"].items():
+                obj_syms.setdefault(obj, [])
+                obj_syms[obj].extend(syms)
 
-            for fname, fdata in cs.files.items():
-                args.append((i, make_lock, fname, cs, fdata))
-                i += 1
+        for obj, syms in obj_syms.items():
+            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True)
+            if missing:
+                for arch, arch_syms in missing.items():
+                    missing_syms.setdefault(arch, {})
+                    missing_syms[arch].setdefault(obj, {})
+                    missing_syms[arch][obj].setdefault(cs.name(), [])
+                    missing_syms[arch][obj][cs.name()].extend(arch_syms)
 
-        workers = int(get_user_settings("workers"))
-        logging.info("Extracting code using ccp")
-        logging.info("\nGenerating livepatches for %d file(s) using %d workers...", len(args), workers)
-        logging.info("\t\tCodestream\tFile")
+    if missing_syms:
+        with open(utils.get_workdir(lp_name)/"missing_syms", "w") as f:
+            f.write(json.dumps(missing_syms, indent=4))
 
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            try:
-                futures = executor.map(process, repeat(self.lp_name),
-                                       repeat(len(args)), args, repeat(avoid_ext))
-                for future in futures:
-                    if future:
-                        logging.error(future)
-            except Exception as exc:
-                raise RuntimeError(str(exc)) from exc
-
-        # Save the ext_symbols set by execute
-        store_codestreams(lp_name, working_cs)
-
-        tem = TemplateGen(lp_name)
-
-        # TODO: change the templates so we generate a similar code than we
-        # already do for SUSE livepatches
-        # Create the livepatches per codestream
-        for cs in working_cs:
-            tem.generate_livepatches(cs)
-
-        group_equal_files(lp_name, working_cs)
-
-        logging.info("Checking the externalized symbols in other architectures...")
-
-        missing_syms = OrderedDict()
-
-        # Iterate over each codestream, getting each file processed, and all
-        # externalized symbols of this file
-        for cs in working_cs:
-            # Cleanup patches after the LPs were created if they were applied
-            if apply_patches:
-                remove_patches(cs, quilt_log)
-
-            # Map all symbols related to each obj, to make it check the symbols
-            # only once per object
-            obj_syms = {}
-            for f, fdata in cs.files.items():
-                for obj, syms in fdata["ext_symbols"].items():
-                    obj_syms.setdefault(obj, [])
-                    obj_syms[obj].extend(syms)
-
-            for obj, syms in obj_syms.items():
-                missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True)
-                if missing:
-                    for arch, arch_syms in missing.items():
-                        missing_syms.setdefault(arch, {})
-                        missing_syms[arch].setdefault(obj, {})
-                        missing_syms[arch][obj].setdefault(cs.name(), [])
-                        missing_syms[arch][obj][cs.name()].extend(arch_syms)
-
-        if missing_syms:
-            with open(utils.get_workdir(lp_name)/"missing_syms", "w") as f:
-                f.write(json.dumps(missing_syms, indent=4))
-
-            logging.warning("Symbols not found:")
-            logging.warning(json.dumps(missing_syms, indent=4))
+        logging.warning("Symbols not found:")
+        logging.warning(json.dumps(missing_syms, indent=4))
