@@ -319,7 +319,7 @@ def group_equal_files(lp_name, working_cs):
 
 
 class Extractor():
-    def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
+    def __init__(self, lp_name, apply_patches, avoid_ext):
 
         self.lp_name = lp_name
         self.sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
@@ -329,7 +329,6 @@ class Extractor():
             raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
         patches = get_patches_dir(lp_name)
-        self.lp_filter = lp_filter
         self.apply_patches = apply_patches
         self.avoid_ext = avoid_ext
 
@@ -602,10 +601,10 @@ class Extractor():
             f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
             f.truncate()
 
-    def run(self):
+    def run(self, lp_filter):
         logging.info(f"Work directory: %s", utils.get_workdir(self.lp_name))
 
-        working_cs = utils.filter_codestreams(self.lp_filter, get_codestreams_dict(), verbose=True)
+        working_cs = utils.filter_codestreams(lp_filter, get_codestreams_dict(), verbose=True)
 
         if len(working_cs) == 0:
             logging.error("No codestreams found")
