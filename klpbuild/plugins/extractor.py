@@ -174,6 +174,74 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         return ret
 
 
+def get_symbol_list(out_dir):
+    # Generate the list of exported symbols
+    exts = []
+
+    for ext_file in ["fun_exts", "obj_exts"]:
+        ext_path = Path(out_dir, ext_file)
+        if not ext_path.exists():
+            continue
+
+        with open(ext_path) as f:
+            for l in f:
+                l = l.strip()
+                if not l.startswith("KALLSYMS") and not l.startswith("KLP_CONVERT"):
+                    continue
+
+                _, sym, var, mod = l.split(" ")
+                # Module names should not use dashes
+                mod = mod.replace("-", "_")
+                if not utils.is_mod(mod):
+                    mod = "vmlinux"
+
+                exts.append((sym, var, mod))
+
+    exts.sort(key=lambda tup: tup[0])
+
+    # store the externalized symbols and module used in this codestream file
+    symbols = {}
+    for ext in exts:
+        sym, mod = ext[0], ext[2]
+        symbols.setdefault(mod, [])
+        symbols[mod].append(sym)
+
+    return symbols
+
+
+def get_cmd_from_json(cs, fname):
+    cc_file = cs.get_obj_dir()/"compile_commands.json"
+
+    # Older codestreams doens't support compile_commands.json, so use make for them
+    if not cc_file.exists():
+        return None
+
+    with open(cc_file) as f:
+        buf = f.read()
+    data = json.loads(buf)
+    for d in data:
+        if fname in d["file"]:
+            output = d["command"]
+            # The arguments found on the file point to '..', since they are generated
+            # when the kernel is compiled. Replace the first '..' on each file
+            # path by the codestream kernel source directory since klp-ccp needs to
+            # reach the files.
+            cmd = process_make_output(output)
+            return cmd.replace(" ..", f" {str(cs.get_src_dir())}").replace("-I..", f"-I{str(cs.get_src_dir())}")
+
+    raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
+
+
+def print_env_vars(fhandle, env):
+    fhandle.write("Env vars:\n")
+
+    for k, v in env.items():
+        if not k.startswith("KCP"):
+            continue
+
+        fhandle.write(f"{k}={v}\n")
+
+
 class Extractor():
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
 
@@ -265,41 +333,6 @@ class Extractor():
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
 
-    def get_symbol_list(self, out_dir):
-        # Generate the list of exported symbols
-        exts = []
-
-        for ext_file in ["fun_exts", "obj_exts"]:
-            ext_path = Path(out_dir, ext_file)
-            if not ext_path.exists():
-                continue
-
-            with open(ext_path) as f:
-                for l in f:
-                    l = l.strip()
-                    if not l.startswith("KALLSYMS") and not l.startswith("KLP_CONVERT"):
-                        continue
-
-                    _, sym, var, mod = l.split(" ")
-                    # Module names should not use dashes
-                    mod = mod.replace("-", "_")
-                    if not utils.is_mod(mod):
-                        mod = "vmlinux"
-
-                    exts.append((sym, var, mod))
-
-        exts.sort(key=lambda tup: tup[0])
-
-        # store the externalized symbols and module used in this codestream file
-        symbols = {}
-        for ext in exts:
-            sym, mod = ext[0], ext[2]
-            symbols.setdefault(mod, [])
-            symbols[mod].append(sym)
-
-        return symbols
-
-
     def get_patches_dir(self):
         return utils.get_workdir(self.lp_name)/"fixes"
 
@@ -373,28 +406,6 @@ class Extractor():
         if not patched:
             raise RuntimeError(f"{cs.name()}({cs.kernel}): Failed to apply patches. Aborting")
 
-    def get_cmd_from_json(self, cs, fname):
-        cc_file = cs.get_obj_dir()/"compile_commands.json"
-
-        # Older codestreams doens't support compile_commands.json, so use make for them
-        if not cc_file.exists():
-            return None
-
-        with open(cc_file) as f:
-            buf = f.read()
-        data = json.loads(buf)
-        for d in data:
-            if fname in d["file"]:
-                output = d["command"]
-                # The arguments found on the file point to '..', since they are generated
-                # when the kernel is compiled. Replace the first '..' on each file
-                # path by the codestream kernel source directory since klp-ccp needs to
-                # reach the files.
-                cmd = process_make_output(output)
-                return cmd.replace(" ..", f" {str(cs.get_src_dir())}").replace("-I..", f"-I{str(cs.get_src_dir())}")
-
-        raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
-
     def cmd_args(self, cs, fname, out_dir, fdata, cmd):
         lp_out = Path(out_dir, cs.lp_out_file(self.lp_name, fname))
 
@@ -445,15 +456,6 @@ class Extractor():
 
         return ccp_args, env
 
-    def print_env_vars(self, fhandle, env):
-        fhandle.write("Env vars:\n")
-
-        for k, v in env.items():
-            if not k.startswith("KCP"):
-                continue
-
-            fhandle.write(f"{k}={v}\n")
-
     def process(self, args):
         i, fname, cs, fdata = args
 
@@ -475,7 +477,7 @@ class Extractor():
         # Make can regenerate fixdep for each file being processed per
         # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
         # calls. Make is pretty fast, so there isn't a real slow down here.
-        cmd = self.get_cmd_from_json(cs, fname)
+        cmd = get_cmd_from_json(cs, fname)
         if not cmd:
             with self.make_lock:
                 cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
@@ -490,7 +492,7 @@ class Extractor():
         with open(out_log, "w+") as f:
             # Write the command line used
             f.write(f"Executing ccp on {odir}\n")
-            self.print_env_vars(f, lenv)
+            print_env_vars(f, lenv)
             f.write("\n".join(args) + "\n")
             f.flush()
 
@@ -513,7 +515,7 @@ class Extractor():
                                     cs.name(), fname, symbol_name, opt_symbol_name)
                     logging.warning(f"Make sure to patch all the callers of %s.", symbol_name)
 
-        cs.files[fname]["ext_symbols"] = self.get_symbol_list(out_dir)
+        cs.files[fname]["ext_symbols"] = get_symbol_list(out_dir)
 
         lp_out = Path(out_dir, cs.lp_out_file(self.lp_name, fname))
 
