@@ -65,6 +65,115 @@ def get_cs_code(lp_name, working_cs):
     return cs_files
 
 
+def unquote_output(matchobj):
+    return matchobj.group(0).replace('"', "")
+
+
+def process_make_output(output):
+    # some strings  have single quotes around double quotes, so remove the
+    # outer quotes
+    output = output.replace("'", "")
+
+    # Remove the compiler name used to compile the object. TODO: resolve
+    # when clang is used, or other cross-compilers.
+    output = re.sub(r'^gcc(-\d+)?\s+', '', output)
+
+    # also remove double quotes from macros like -D"KBUILD....=.."
+    return re.sub(r'-D"KBUILD_([\w\#\_\=\(\)])+"', unquote_output, output)
+
+
+def get_make_cmd(out_dir, cs, filename, odir, sdir):
+    filename = PurePath(filename)
+    file_ = str(filename.with_suffix(".o"))
+
+    log_path = Path(out_dir, "make.out.txt")
+    with open(log_path, "w") as f:
+        # Corner case for lib directory, that fails with the conventional
+        # way of grabbing the gcc args used to compile the file. If then
+        # need to ask the make to show the commands for all files inside the
+        # directory. Later process_make_output will take care of picking
+        # what is interesting for klp-build
+        if filename.parent == PurePath("arch/x86/lib") or filename.parent == PurePath("drivers/block/aoe"):
+            file_ = str(filename.parent) + "/"
+
+        gcc_ver = int(subprocess.check_output(["gcc", "-dumpversion"]).decode().strip())
+        # gcc12 and higher have a problem with kernel and xrealloc implementation
+        if gcc_ver < 12:
+            cc = "gcc"
+        # if gcc12 or higher is the default compiler, check if gcc7 is available
+        elif shutil.which("gcc-7"):
+            cc = "gcc-7"
+        else:
+            raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
+
+        make_args = [
+            "make",
+            "-sn",
+            "--ignore-errors",
+            f"CC={cc}",
+            f"KLP_CS={cs.name()}",
+            f"HOSTCC={cc}",
+            "WERROR=0",
+            "CFLAGS_REMOVE_objtool=-Werror",
+            file_,
+        ]
+
+        f.write(f"Executing make on {odir}\n")
+        f.write(" ".join(make_args))
+        f.write("\n")
+        f.flush()
+
+        ofname = "." + filename.name.replace(".c", ".o.d")
+        ofname = Path(filename.parent, ofname)
+
+        try:
+            completed = subprocess.check_output(make_args, cwd=odir,
+                                                stderr=f).decode().strip()
+            f.write("Full output of the make command:\n")
+            f.write(str(completed))
+            f.write("\n")
+            f.flush()
+        except Exception as exc:
+            raise RuntimeError(f"Failed to run make for {cs.name()} ({cs.kernel}). Check file {str(log_path)} for more details.") from exc
+
+        # 15.4 onwards changes the regex a little: -MD -> -MMD
+        # 15.6 onwards we don't have -isystem.
+        #      Also, it's more difficult to eliminate the objtool command
+        #      line, so try to search until the fixdep script
+        for regex in [
+                rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});",
+                rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+.*-c -o {file_} {sdir}/{filename})\s+;.*fixdep"
+                ]:
+            f.write(f"Searching for the pattern: {regex}\n")
+            f.flush()
+
+            result = re.search(regex, str(completed).strip())
+            if result:
+                break
+
+            f.write("Not found\n")
+            f.flush()
+
+        if not result:
+            raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs.name()}. Check file {str(log_path)} for more details.")
+
+        ret = process_make_output(result.group(1))
+
+        # WORKAROUND: tomoyo security module uses a generated file that is
+        # not part of kernel-source. For this reason, add a new option for
+        # the backend process to ignore the inclusion of the missing file
+        if "tomoyo" in file_:
+            ret += " -DCONFIG_SECURITY_TOMOYO_INSECURE_BUILTIN_SETTING"
+
+        # save the cmdline
+        f.write(ret)
+
+        if " -pg " not in ret:
+            logging.warning("%s:%s is not compiled with livepatch support (-pg flag)", cs.name(), file_)
+
+        return ret
+
+
 class Extractor():
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
 
@@ -155,115 +264,6 @@ class Extractor():
         if self.sdir_lock:
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
-
-    @staticmethod
-    def unquote_output(matchobj):
-        return matchobj.group(0).replace('"', "")
-
-    @staticmethod
-    def process_make_output(output):
-        # some strings  have single quotes around double quotes, so remove the
-        # outer quotes
-        output = output.replace("'", "")
-
-        # Remove the compiler name used to compile the object. TODO: resolve
-        # when clang is used, or other cross-compilers.
-        output = re.sub(r'^gcc(-\d+)?\s+', '', output)
-
-        # also remove double quotes from macros like -D"KBUILD....=.."
-        return re.sub(r'-D"KBUILD_([\w\#\_\=\(\)])+"', Extractor.unquote_output, output)
-
-    @staticmethod
-    def get_make_cmd(out_dir, cs, filename, odir, sdir):
-        filename = PurePath(filename)
-        file_ = str(filename.with_suffix(".o"))
-
-        log_path = Path(out_dir, "make.out.txt")
-        with open(log_path, "w") as f:
-            # Corner case for lib directory, that fails with the conventional
-            # way of grabbing the gcc args used to compile the file. If then
-            # need to ask the make to show the commands for all files inside the
-            # directory. Later process_make_output will take care of picking
-            # what is interesting for klp-build
-            if filename.parent == PurePath("arch/x86/lib") or filename.parent == PurePath("drivers/block/aoe"):
-                file_ = str(filename.parent) + "/"
-
-            gcc_ver = int(subprocess.check_output(["gcc", "-dumpversion"]).decode().strip())
-            # gcc12 and higher have a problem with kernel and xrealloc implementation
-            if gcc_ver < 12:
-                cc = "gcc"
-            # if gcc12 or higher is the default compiler, check if gcc7 is available
-            elif shutil.which("gcc-7"):
-                cc = "gcc-7"
-            else:
-                raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
-
-            make_args = [
-                "make",
-                "-sn",
-                "--ignore-errors",
-                f"CC={cc}",
-                f"KLP_CS={cs.name()}",
-                f"HOSTCC={cc}",
-                "WERROR=0",
-                "CFLAGS_REMOVE_objtool=-Werror",
-                file_,
-            ]
-
-            f.write(f"Executing make on {odir}\n")
-            f.write(" ".join(make_args))
-            f.write("\n")
-            f.flush()
-
-            ofname = "." + filename.name.replace(".c", ".o.d")
-            ofname = Path(filename.parent, ofname)
-
-            try:
-                completed = subprocess.check_output(make_args, cwd=odir,
-                                                    stderr=f).decode().strip()
-                f.write("Full output of the make command:\n")
-                f.write(str(completed))
-                f.write("\n")
-                f.flush()
-            except Exception:
-                raise RuntimeError(f"Failed to run make for {cs.name()} ({cs.kernel}). Check file {str(log_path)} for more details.")
-
-            # 15.4 onwards changes the regex a little: -MD -> -MMD
-            # 15.6 onwards we don't have -isystem.
-            #      Also, it's more difficult to eliminate the objtool command
-            #      line, so try to search until the fixdep script
-            for regex in [
-                    rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});",
-                    rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+.*-c -o {file_} {sdir}/{filename})\s+;.*fixdep"
-                    ]:
-                f.write(f"Searching for the pattern: {regex}\n")
-                f.flush()
-
-                result = re.search(regex, str(completed).strip())
-                if result:
-                    break
-
-                f.write("Not found\n")
-                f.flush()
-
-            if not result:
-                raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs.name()}. Check file {str(log_path)} for more details.")
-
-            ret = Extractor.process_make_output(result.group(1))
-
-            # WORKAROUND: tomoyo security module uses a generated file that is
-            # not part of kernel-source. For this reason, add a new option for
-            # the backend process to ignore the inclusion of the missing file
-            if "tomoyo" in file_:
-                ret += " -DCONFIG_SECURITY_TOMOYO_INSECURE_BUILTIN_SETTING"
-
-            # save the cmdline
-            f.write(ret)
-
-            if " -pg " not in ret:
-                logging.warning(f"{cs.name()}:{file_} is not compiled with livepatch support (-pg flag)")
-
-            return ret
 
     def get_symbol_list(self, out_dir):
         # Generate the list of exported symbols
@@ -390,7 +390,7 @@ class Extractor():
                 # when the kernel is compiled. Replace the first '..' on each file
                 # path by the codestream kernel source directory since klp-ccp needs to
                 # reach the files.
-                cmd = Extractor.process_make_output(output)
+                cmd = process_make_output(output)
                 return cmd.replace(" ..", f" {str(cs.get_src_dir())}").replace("-I..", f"-I{str(cs.get_src_dir())}")
 
         raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
@@ -478,7 +478,7 @@ class Extractor():
         cmd = self.get_cmd_from_json(cs, fname)
         if not cmd:
             with self.make_lock:
-                cmd = Extractor.get_make_cmd(out_dir, cs, fname, odir, sdir)
+                cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
         args, lenv = self.cmd_args(cs, fname, out_dir, fdata, cmd)
 
