@@ -513,15 +513,13 @@ class Extractor():
         else:
             self.quilt_log = open("/dev/null", "w")
 
-        self.make_lock = Lock()
-
     def __del__(self):
         if self.sdir_lock:
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
 
     def process(self, total, args, avoid_ext):
-        i, fname, cs, fdata = args
+        i, make_lock, fname, cs, fdata = args
 
         sdir = cs.get_src_dir()
         odir = cs.get_obj_dir()
@@ -543,7 +541,7 @@ class Extractor():
         # calls. Make is pretty fast, so there isn't a real slow down here.
         cmd = get_cmd_from_json(cs, fname)
         if not cmd:
-            with self.make_lock:
+            with make_lock:
                 cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
         args, lenv = cmd_args(self.lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
@@ -606,6 +604,7 @@ class Extractor():
         # cs/file/funcs tuple, instead of spawning a thread per codestream
         args = []
         i = 1
+        make_lock = Lock()
         for cs in working_cs:
             # remove any previously generated files and leftover patches
             shutil.rmtree(cs.get_ccp_dir(self.lp_name), ignore_errors=True)
@@ -616,7 +615,7 @@ class Extractor():
                 apply_all_patches(self.lp_name, cs, self.quilt_log)
 
             for fname, fdata in cs.files.items():
-                args.append((i, fname, cs, fdata))
+                args.append((i, make_lock, fname, cs, fdata))
                 i += 1
 
         workers = int(get_user_settings("workers"))
