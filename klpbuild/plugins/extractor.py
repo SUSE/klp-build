@@ -242,6 +242,82 @@ def print_env_vars(fhandle, env):
         fhandle.write(f"{k}={v}\n")
 
 
+def get_patches_dir(lp_name):
+    return utils.get_workdir(lp_name)/"fixes"
+
+
+# Get the code for each codestream, removing boilerplate code
+def group_equal_files(lp_name, working_cs):
+    cs_equal = []
+    processed = []
+
+    cs_files = get_cs_code(lp_name, working_cs)
+    toprocess = list(cs_files.keys())
+    while len(toprocess):
+        current_cs_list = []
+
+        # Get an element, and check if it wasn't associated with a previous
+        # codestream
+        cs = toprocess.pop(0)
+        if cs in processed:
+            continue
+
+        # last element, it's different from all other codestreams, so add it
+        # to the cs_equal alone.
+        if not toprocess:
+            cs_equal.append([cs])
+            break
+
+        # start a new list with the current element to compare with others
+        current_cs_list.append(cs)
+        data_cs = cs_files[cs]
+        len_data = len(data_cs)
+
+        # Compare the file names, and file content between codestrams,
+        # trying to find ones that have the same files and contents
+        for cs_proc in toprocess:
+            data_proc = cs_files[cs_proc]
+
+            if len_data != len(data_proc):
+                continue
+
+            ok = True
+            for i in range(len_data):
+                file, src = data_cs[i]
+                file_proc, src_proc = data_proc[i]
+
+                if file != file_proc or src != src_proc:
+                    ok = False
+                    break
+
+            # cs is equal to cs_proc, with the same number of files, same
+            # file names, and the files have the same content. So we don't
+            # need to process cs_proc later in the process
+            if ok:
+                processed.append(cs_proc)
+                current_cs_list.append(cs_proc)
+
+        # Append the current list of equal codestreams to a global list to
+        # be grouped later
+        cs_equal.append(natsorted(current_cs_list))
+
+    # cs_equal will contain a list of lists with codestreams that share the
+    # same code
+    groups = []
+    for cs_list in cs_equal:
+        groups.append(utils.classify_codestreams_str(cs_list))
+
+    # Sort between all groups of codestreams
+    groups = natsorted(groups)
+
+    with open(utils.get_workdir(lp_name)/"ccp"/"groups", "w") as f:
+        f.write("\n".join(groups))
+
+    logging.info("\nGrouping codestreams that share the same content and files:")
+    for group in groups:
+        logging.info("\t%s", group)
+
+
 class Extractor():
     def __init__(self, lp_name, lp_filter, apply_patches, avoid_ext):
 
@@ -252,7 +328,7 @@ class Extractor():
         if not utils.get_workdir(lp_name).exists():
             raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
-        patches = self.get_patches_dir()
+        patches = get_patches_dir(lp_name)
         self.lp_filter = lp_filter
         self.apply_patches = apply_patches
         self.avoid_ext = avoid_ext
@@ -333,9 +409,6 @@ class Extractor():
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
 
-    def get_patches_dir(self):
-        return utils.get_workdir(self.lp_name)/"fixes"
-
     def remove_patches(self, cs, fil):
         sdir = cs.get_src_dir()
         # Check if there were patches applied previously
@@ -369,7 +442,7 @@ class Extractor():
         patch_dirs = []
 
         for d in dirs:
-            patch_dirs.append(Path(self.get_patches_dir(), d))
+            patch_dirs.append(Path(get_patches_dir(self.lp_name), d))
 
         patched = False
         sdir = cs.get_src_dir()
@@ -580,7 +653,7 @@ class Extractor():
         for cs in working_cs:
             tem.generate_livepatches(cs)
 
-        self.group_equal_files(working_cs)
+        group_equal_files(self.lp_name, working_cs)
 
         logging.info("Checking the externalized symbols in other architectures...")
 
@@ -616,74 +689,3 @@ class Extractor():
 
             logging.warning("Symbols not found:")
             logging.warning(json.dumps(missing_syms, indent=4))
-
-    # Get the code for each codestream, removing boilerplate code
-    def group_equal_files(self, working_cs):
-        cs_equal = []
-        processed = []
-
-        cs_files = get_cs_code(self.lp_name, working_cs)
-        toprocess = list(cs_files.keys())
-        while len(toprocess):
-            current_cs_list = []
-
-            # Get an element, and check if it wasn't associated with a previous
-            # codestream
-            cs = toprocess.pop(0)
-            if cs in processed:
-                continue
-
-            # last element, it's different from all other codestreams, so add it
-            # to the cs_equal alone.
-            if not toprocess:
-                cs_equal.append([cs])
-                break
-
-            # start a new list with the current element to compare with others
-            current_cs_list.append(cs)
-            data_cs = cs_files[cs]
-            len_data = len(data_cs)
-
-            # Compare the file names, and file content between codestrams,
-            # trying to find ones that have the same files and contents
-            for cs_proc in toprocess:
-                data_proc = cs_files[cs_proc]
-
-                if len_data != len(data_proc):
-                    continue
-
-                ok = True
-                for i in range(len_data):
-                    file, src = data_cs[i]
-                    file_proc, src_proc = data_proc[i]
-
-                    if file != file_proc or src != src_proc:
-                        ok = False
-                        break
-
-                # cs is equal to cs_proc, with the same number of files, same
-                # file names, and the files have the same content. So we don't
-                # need to process cs_proc later in the process
-                if ok:
-                    processed.append(cs_proc)
-                    current_cs_list.append(cs_proc)
-
-            # Append the current list of equal codestreams to a global list to
-            # be grouped later
-            cs_equal.append(natsorted(current_cs_list))
-
-        # cs_equal will contain a list of lists with codestreams that share the
-        # same code
-        groups = []
-        for cs_list in cs_equal:
-            groups.append(utils.classify_codestreams_str(cs_list))
-
-        # Sort between all groups of codestreams
-        groups = natsorted(groups)
-
-        with open(utils.get_workdir(self.lp_name)/"ccp"/"groups", "w") as f:
-            f.write("\n".join(groups))
-
-        logging.info("\nGrouping codestreams that share the same content and files:")
-        for group in groups:
-            logging.info("\t%s", group)
