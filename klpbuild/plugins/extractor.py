@@ -4,7 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from concurrent.futures import ThreadPoolExecutor
-import itertools
+from itertools import repeat
 import json
 import logging
 import os
@@ -513,7 +513,6 @@ class Extractor():
         else:
             self.quilt_log = open("/dev/null", "w")
 
-        self.total = 0
         self.make_lock = Lock()
 
     def __del__(self):
@@ -521,7 +520,7 @@ class Extractor():
             self.sdir_lock.release()
             os.remove(self.sdir_lock.lock_file)
 
-    def process(self, args, avoid_ext):
+    def process(self, total, args, avoid_ext):
         i, fname, cs, fdata = args
 
         sdir = cs.get_src_dir()
@@ -529,7 +528,7 @@ class Extractor():
 
         # The header text has two tabs
         cs_info = cs.name().ljust(15, " ")
-        idx = f"({i}/{self.total})".rjust(15, " ")
+        idx = f"({i}/{total})".rjust(15, " ")
 
         logging.info(f"{idx} {cs_info} {fname}")
 
@@ -622,13 +621,13 @@ class Extractor():
 
         workers = int(get_user_settings("workers"))
         logging.info("Extracting code using ccp")
-        self.total = len(args)
         logging.info("\nGenerating livepatches for %d file(s) using %d workers...", len(args), workers)
         logging.info("\t\tCodestream\tFile")
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             try:
-                futures = executor.map(self.process, args, itertools.repeat(avoid_ext))
+                futures = executor.map(self.process, repeat(len(args)),
+                                       args, repeat(avoid_ext))
                 for future in futures:
                     if future:
                         logging.error(future)
