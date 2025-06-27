@@ -6,7 +6,7 @@
 import inspect
 
 from klpbuild.klplib import utils
-from klpbuild.plugins.extractor import Extractor
+from klpbuild.plugins.extract import extract
 from klpbuild.plugins.setup import setup
 from tests.utils import get_file_content
 
@@ -29,7 +29,7 @@ def test_templ_with_externalized_vars():
     }
     setup(**setup_args)
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+    extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     # As we passed vmlinux as module, we don't have the module notifier and
     # LP_MODULE, linux/module.h is not included
@@ -72,7 +72,7 @@ def test_templ_without_externalized_vars():
     }
     setup(**setup_args)
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+    extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     # As we passed vmlinux as module, we don't have the module notifier and
     # LP_MODULE, linux/module.h is not included
@@ -121,7 +121,7 @@ def test_check_header_file_included():
     setup(**setup_args)
 
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+    extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     # test the livepatch_ prefix file
     assert "Upstream commit:" in get_file_content(lp, cs)
@@ -163,7 +163,7 @@ def test_templ_cve_specified():
     }
     setup(**setup_args)
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+    extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     # With CVE speficied, we should have it in the final file
     assert "CVE-1234-5678" in get_file_content(lp, cs)
@@ -200,7 +200,7 @@ def test_templ_exts_mod_name():
     }
     setup(**setup_args)
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+    extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     # The module name should be nvme_tcp instead of nvme-tcp
     assert '{ "nvme_tcp_try_send", (void *)&klpe_nvme_tcp_try_send, "nvme_tcp" },' in get_file_content(lp, cs)
@@ -240,7 +240,7 @@ def test_templ_micro_is_ibt():
     setup(**setup_args)
 
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+    extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     src = get_file_content(lp, cs)
     # Requires the include since it's a codestream that uses IBT and has externalized symbols
@@ -273,7 +273,7 @@ def test_templ_ibt_without_externalized_vars():
     }
     setup(**setup_args)
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+    extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     # As we passed vmlinux as module, we don't have the module notifier and
     # LP_MODULE, linux/module.h is not included
@@ -320,7 +320,7 @@ def test_templ_kbuild_has_contents():
     }
     setup(**setup_args)
 
-    Extractor(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[]).run()
+    extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
     kbuild_data = get_file_content(lp, cs, "Kbuild.inc")
     assert "CFLAGS_livepatch_bsc_test_templ_kbuild_has_contents.o += -Werror" in kbuild_data

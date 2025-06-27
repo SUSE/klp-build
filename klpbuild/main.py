@@ -9,7 +9,6 @@ import sys
 from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.klplib.plugins import try_run_plugin
-from klpbuild.plugins.extractor import Extractor
 
 
 def main():
@@ -21,21 +20,7 @@ def main():
     if hasattr(args, 'lp_name'):
         load_codestreams(args.lp_name)
 
-    try:
-        try_run_plugin(args.cmd, args)
-        return
-    except (AssertionError, ModuleNotFoundError) as e:
-        # TODO: this should be removed as soon as all the modules are converted
-        # into plugins
-        if isinstance(e, AssertionError) and not "is not a plugin!" in str(e):
-                raise
-
-        logging.debug("Plugin %s cannot be loaded dinamically!", args.cmd)
-
-    # NOTE: all the code below should be gone when all the modules will be
-    # converted into plugins
-    if args.cmd == "extract":
-        Extractor(args.lp_name, args.lp_filter, args.apply_patches, args.avoid_ext).run()
+    try_run_plugin(args.cmd, args)
 
 
 if __name__ == "__main__":
