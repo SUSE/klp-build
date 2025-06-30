@@ -48,6 +48,8 @@ class Codestream:
         # MICRO-6-0_Update_2
         elif "MICRO" in cs:
             sle, sp, u = cs.replace("MICRO-", "").replace("-RT", "").replace("_Update_", "-").split("-")
+            if rt and int(u) >= 5:
+                kernel = kernel + "-rt"
         else:
             assert False, "codestream name should contain either SLE or MICRO!"
 
@@ -82,8 +84,8 @@ class Codestream:
 
     def get_src_dir(self, arch=ARCH, init=True):
         # Only -rt codestreams have a suffix for source directory
-        ktype = self.ktype.replace("-default", "")
-        src_dir = get_datadir(arch)/"usr"/"src"/f"linux-{self.kernel}{ktype}"
+        name = self.kname() if self.rt else self.kernel
+        src_dir = get_datadir(arch)/"usr"/"src"/f"linux-{name}"
         if init:
             init_cs_kernel_tree(self.kernel, src_dir)
         return src_dir
@@ -149,7 +151,7 @@ class Codestream:
 
 
     def kname(self):
-        return self.kernel + self.ktype
+        return self.kernel + ("" if "-rt" in self.kernel else self.ktype)
 
 
     def name(self):
