@@ -348,16 +348,23 @@ def group_equal_files(lp_name, working_cs):
         logging.info("\t%s", group)
 
 
-def remove_patches(cs, fil):
+def quilt_log_path(lp_name, apply_patches):
+    if apply_patches:
+        return get_patches_dir(lp_name)/"quilt.log"
+
+    return "/dev/null"
+
+
+def remove_patches(lp_name, cs, apply_patches):
     sdir = cs.get_src_dir()
     # Check if there were patches applied previously
     patches_dir = Path(sdir, "patches")
     if not patches_dir.exists():
         return
 
-    fil.write(f"\nRemoving patches from {cs.name()}({cs.kernel})\n")
-    fil.flush()
-    err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=fil, stdout=fil, check=False)
+    with open(quilt_log_path(lp_name, apply_patches), "a") as f:
+        f.write(f"\nRemoving patches from {cs.name()}({cs.kernel})\n")
+        err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=f, stdout=f, check=False)
 
     if err.returncode not in [0, 2]:
         raise RuntimeError(f"{cs.name()}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
@@ -366,7 +373,7 @@ def remove_patches(cs, fil):
     shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
 
 
-def apply_all_patches(lp_name, cs, fil):
+def apply_all_patches(lp_name, cs, apply_patches):
     dirs = []
 
     if cs.rt:
@@ -386,34 +393,36 @@ def apply_all_patches(lp_name, cs, fil):
 
     patched = False
     sdir = cs.get_src_dir()
-    for pdir in patch_dirs:
-        if not pdir.exists():
-            fil.write(f"\nPatches dir {pdir} doesnt exists\n")
-            continue
 
-        fil.write(f"\nApplying patches on {cs.name()}({cs.kernel}) from {pdir}\n")
-        fil.flush()
-
-        for patch in sorted(pdir.iterdir(), reverse=True):
-            if not str(patch).endswith(".patch"):
+    with open(quilt_log_path(lp_name, apply_patches), "a") as f:
+        for pdir in patch_dirs:
+            if not pdir.exists():
+                f.write(f"\nPatches dir {pdir} doesnt exists\n")
                 continue
 
-            err = subprocess.run(["quilt", "import", str(patch)], cwd=sdir, stderr=fil, stdout=fil, check=False)
+            f.write(f"\nApplying patches on {cs.name()}({cs.kernel}) from {pdir}\n")
+            for patch in sorted(pdir.iterdir(), reverse=True):
+                if not str(patch).endswith(".patch"):
+                    continue
+
+                err = subprocess.run(["quilt", "import", str(patch)], cwd=sdir,
+                                     stderr=f, stdout=f, check=False)
+                if err.returncode != 0:
+                    f.write("\nFailed to import patches, remove applied and try again\n")
+                    f.flush()
+                    remove_patches(lp_name, cs, apply_patches)
+
+            err = subprocess.run(["quilt", "push", "-a"], cwd=sdir,
+                                 stderr=f, stdout=f, check=False)
             if err.returncode != 0:
-                fil.write("\nFailed to import patches, remove applied and try again\n")
-                remove_patches(cs, fil)
+                f.write("\nFailed to apply patches, remove applied and try again\n")
+                f.flush()
+                remove_patches(lp_name, cs, apply_patches)
+                continue
 
-        err = subprocess.run(["quilt", "push", "-a"], cwd=sdir, stderr=fil, stdout=fil, check=False)
-        if err.returncode != 0:
-            fil.write("\nFailed to apply patches, remove applied and try again\n")
-            remove_patches(cs, fil)
-
-            continue
-
-        patched = True
-        fil.flush()
-        # Stop the loop in the first dir that we find patches.
-        break
+            patched = True
+            # Stop the loop in the first dir that we find patches.
+            break
 
     if not patched:
         raise RuntimeError(f"{cs.name()}({cs.kernel}): Failed to apply patches. Aborting")
@@ -607,15 +616,10 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
 
     logging.info("Work directory: %s", utils.get_workdir(lp_name))
 
-    patches = get_patches_dir(lp_name)
-    if apply_patches and not patches.exists():
-        raise ValueError("patches do not exist!")
-
-    if patches.exists():
-        quilt_log = open(Path(patches, "quilt.log"), "w")
-        quilt_log.truncate()
-    else:
-        quilt_log = open("/dev/null", "w")
+    # Clean any previous logs
+    if apply_patches:
+        with open(quilt_log_path(lp_name, apply_patches), "w") as f:
+            f.truncate()
 
     working_cs = utils.filter_codestreams(lp_filter, get_codestreams_dict(), verbose=True)
 
@@ -631,11 +635,11 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
     for cs in working_cs:
         # remove any previously generated files and leftover patches
         shutil.rmtree(cs.get_ccp_dir(lp_name), ignore_errors=True)
-        remove_patches(cs, quilt_log)
+        remove_patches(lp_name, cs, apply_patches)
 
         # Apply patches before the LPs were created
         if apply_patches:
-            apply_all_patches(lp_name, cs, quilt_log)
+            apply_all_patches(lp_name, cs, apply_patches)
 
         for fname, fdata in cs.files.items():
             args.append((i, make_lock, fname, cs, fdata))
@@ -678,7 +682,7 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
     for cs in working_cs:
         # Cleanup patches after the LPs were created if they were applied
         if apply_patches:
-            remove_patches(cs, quilt_log)
+            remove_patches(lp_name, cs, apply_patches)
 
         # Map all symbols related to each obj, to make it check the symbols
         # only once per object
