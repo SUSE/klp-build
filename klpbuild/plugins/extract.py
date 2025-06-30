@@ -283,7 +283,7 @@ def group_equal_files(lp_name, working_cs):
 
     cs_files = get_cs_code(lp_name, working_cs)
     toprocess = list(cs_files.keys())
-    while len(toprocess):
+    while len(toprocess) > 0:
         current_cs_list = []
 
         # Get an element, and check if it wasn't associated with a previous
