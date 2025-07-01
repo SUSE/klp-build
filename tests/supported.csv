@@ -1,8 +1,10 @@
 Update ID,Maintenance Project,Kernel version,Supported until,LTSS until
 MICRO-6-0-RT_Update_2,SUSE:ALP:Source:Standard:Core:1.0:Build/patchinfo.20240906153916876714.90520734224245,6.4.0-10.1,only LTSS supported,
 MICRO-6-0-RT_Update_3,SUSE:ALP:Source:Standard:Core:1.0:Build/patchinfo.20241017135808025064.90520734224245,6.4.0-11.1,only LTSS supported,
+MICRO-6-0-RT_Update_5,SUSE:SLFO:Kernel:1.0:Build/patchinfo.20250214125327899694.90520734224245,6.4.0-25.1,only LTSS supported,
 MICRO-6-0_Update_2,SUSE:ALP:Source:Standard:Core:1.0:Build/patchinfo.20240905161518457739.90520734224245,6.4.0-19.1,only LTSS supported,
 MICRO-6-0_Update_3,SUSE:ALP:Source:Standard:Core:1.0:Build/patchinfo.20241015104416836583.269002615871826,6.4.0-20.1,only LTSS supported,
+MICRO-6-0_Update_5,SUSE:SLFO:Kernel:1.0:Build/patchinfo.20250309130943729455.90520734224245,6.4.0-25.1,only LTSS supported,
 SLE15-SP3_Update_41,SUSE:Maintenance:32513,5.3.18-150300.59.150.1,only LTSS supported,2025-03-14
 SLE15-SP3_Update_42,SUSE:Maintenance:32895,5.3.18-150300.59.153.2,only LTSS supported,2025-04-13
 SLE15-SP3_Update_43,SUSE:Maintenance:33221,5.3.18-150300.59.158.1,only LTSS supported,2025-06-03
