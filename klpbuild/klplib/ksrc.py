@@ -69,11 +69,18 @@ def __fetch_kernel_branches():
     kern_src = get_user_path('kernel_src_dir')
     logging.info("Fetching changes from all supported branches...")
 
-    if not utils.in_test_mode():
-        # Mount the command to fetch all branches for supported codestreams
-        subprocess.check_output(["/usr/bin/git", "-C", str(kern_src), "fetch",
-                                 "--quiet", "--atomic", "--force", "--tags", "origin"] +
-                                list(KERNEL_BRANCHES.values()))
+    if utils.in_test_mode():
+        return
+
+    # Mount the command to fetch all branches for supported codestreams
+    ret = subprocess.run(["/usr/bin/git", "-C", str(kern_src), "fetch",
+                          "--quiet", "--atomic", "--force", "--tags", "origin"] +
+                         list(KERNEL_BRANCHES.values()),
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE,
+                         text=True)
+    if ret.returncode:
+        logging.info("Fetch failed\n%s", ret.stderr)
 
 
 def diff_commits(base, new, patch, pattern=""):
