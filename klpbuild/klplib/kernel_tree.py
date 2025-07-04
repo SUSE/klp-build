@@ -42,8 +42,12 @@ def __fetch_kernel_tree_tags():
     """
     logging.debug("Updating kernel tree tags..")
     kernel_tree = get_user_path("kernel_dir")
-    subprocess.check_output(['git', "-C", kernel_tree, 'fetch', '--tags', '--force', '--quiet'],
-                            stderr=subprocess.PIPE)
+    ret = subprocess.run(['git', "-C", kernel_tree, 'fetch', '--tags', '--force', '--quiet'],
+                         stderr=subprocess.PIPE,
+                         stdout=subprocess.PIPE,
+                         text=True)
+    if ret.returncode:
+        logging.info("Failed to update kernel tree tags\n%s", ret.stderr)
 
 # Currently this function returns the date of the patch and its subject
 @__check_kernel_tags_are_fetched
