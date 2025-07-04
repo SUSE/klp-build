@@ -52,12 +52,13 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     conf_not_set = []
     unsupported = []
 
-    if not cve or no_check:
+    if no_check:
         logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
         working_cs = utils.filter_codestreams(lp_filter, all_codestreams)
         commits = {}
         patched_kernels = []
     else:
+        assert cve
         commits = get_commits(cve, savedir)
         patched_kernels = get_patched_kernels(all_codestreams, commits, cve)
 

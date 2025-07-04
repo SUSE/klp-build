@@ -22,7 +22,7 @@ def register_argparser(subparser):
     )
     add_arg_lp_name(setup)
     add_arg_lp_filter(setup)
-    setup.add_argument("--cve", type=str, help="The CVE assigned to this livepatch")
+    setup.add_argument("--cve", type=str, required=True, help="The CVE assigned to this livepatch")
     setup.add_argument("--conf", type=str, required=True, help="The kernel CONFIG used to be build the livepatch")
     setup.add_argument(
         "--no-check",
