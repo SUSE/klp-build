@@ -322,7 +322,7 @@ def get_commits(cve, savedir=None):
             if c:
                 commits[bc]["commits"] = list(set(c + commits[bc]["commits"]))
             else:
-                commits[bc]["commits"] = ["Not Affected"]
+                commits[bc]["commits"] = []
 
     # Grab each commits subject and date for each commit. The commit dates
     # will be used to sort the patches in the order they were
@@ -408,16 +408,23 @@ def is_kernel_patched(kernel, suse_commits, cve):
         c = line.split("-")[1]
 
         files = get_commit_files(c)
-        if len(files) == 0:
+        nfiles = len(files)
+        if nfiles == 0:
             continue
 
         # Match 1:1 with the commits found in SLE branch
         for s in suse_commits:
-            diff = diff_commits(s, c, files)
-            if not diff:
-                # Found same commit
-                commits.append(c)
-                break
+            if nfiles <= 500:
+                diff = diff_commits(s, c, files)
+                if not diff:
+                    # Found same commit
+                    commits.append(c)
+                    break
+            else:
+                # Do not diff commits with too many files.
+                if nfiles == len(get_commit_files(s)):
+                    commits.append(c)
+                    break
 
     # "patched kernels" are those which contain all commits.
     return len(suse_commits) == len(commits), commits
