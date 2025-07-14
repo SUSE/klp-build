@@ -30,6 +30,11 @@ def analyse_files(cs_list, sle_commits):
 
     for cs in cs_list:
         for c in sle_commits[cs.name_cs()]["commits"]:
+            # Skip the commit if it touches more than two patches.
+            if  len(get_commit_files(c)) > 2:
+                logging.warn("Skipping commit %s: Too many files\n", c)
+                continue
+
             files = get_commit_files(c, inside_patch=True)
             fconfigs, _, missing = find_configs_for_files(cs, files)
 
