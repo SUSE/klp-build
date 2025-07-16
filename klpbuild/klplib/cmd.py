@@ -50,22 +50,4 @@ def create_parser() -> argparse.ArgumentParser:
 
     register_plugins_argparser(sub)
 
-    # NOTE: all the code below should be gone when all the module will be
-    # converted into plugins
-    extract_opts = sub.add_parser("extract", help="Extract initial livepatches")
-    add_arg_lp_name(extract_opts)
-    add_arg_lp_filter(extract_opts)
-    extract_opts.add_argument(
-        "--avoid-ext",
-        nargs="+",
-        type=str,
-        default=[],
-        help="Functions to be copied into the LP instead of externalizing. "
-        "Useful to make sure to include symbols that are optimized in "
-        "different architectures",
-    )
-    extract_opts.add_argument(
-        "--apply-patches", action="store_true", help="Apply patches if they exist"
-    )
-
     return parentparser

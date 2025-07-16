@@ -10,7 +10,7 @@ import sys
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import get_codestreams_dict
 from klpbuild.klplib.utils import filter_codestreams
-from klpbuild.plugins.extractor import get_cs_code
+from klpbuild.plugins.extract import get_cs_code
 
 PLUGIN_CMD = "cs-diff"
 
