@@ -19,7 +19,7 @@ class CodestreamData:
     archs: list[str]
     patched_kernels: list[str]
     patched_cs: list[str]
-    commits: dict[str, str]
+    upstream: list[str]
 
 
 _cs_data = CodestreamData("", [], [], [], {})
@@ -44,7 +44,7 @@ def load_codestreams(lp_name):
                                           archs=jfile["archs"],
                                           patched_kernels=jfile["patched_kernels"],
                                           patched_cs=jfile["patched_cs"],
-                                          commits=jfile["commits"])
+                                          upstream=jfile["upstream"])
 
             json_cs = jfile["codestreams"]
             for cs in natsorted(json_cs.keys()):
@@ -69,7 +69,7 @@ def store_codestreams(lp_name, working_cs):
         cs_data[key] = cs.data()
 
     data = {"archs": _cs_data.archs,
-            "commits": _cs_data.commits,
+            "upstream": _cs_data.upstream,
             "cve": _cs_data.cve,
             "patched_cs": _cs_data.patched_cs,
             "patched_kernels": _cs_data.patched_kernels,

@@ -79,46 +79,11 @@ ${get_protos(proto_syms)}
 """
 
 TEMPL_SUSE_HEADER = """\
-<%
-def get_commits(cmts, cs):
-    if not cmts.get(cs, ''):
-        return ' *  Not affected'
-
-    ret = []
-    for commit, msg in cmts[cs].items():
-        if not msg:
-            ret.append(' *  Not affected')
-        else:
-            for m in msg:
-                ret.append(f' *  {m}')
-
-    return "\\n".join(ret)
-%>\
 /*
  * ${fname}
  *
  * Fix for CVE-${cve}, bsc#${lp_num}
  *
-% if include_header:
- *  Upstream commit:
-${get_commits(commits, 'upstream')}
- *
- *  SLE12-SP5 commit:
-${get_commits(commits, '12.5')}
- *
- *  SLE15-SP3 commit:
-${get_commits(commits, 'cve-5.3')}
- *
- *  SLE15-SP4 and -SP5 commit:
-${get_commits(commits, '15.4')}
- *
- *  SLE15-SP6 commit:
-${get_commits(commits, '15.6')}
- *
- *  SLE MICRO-6-0 commit:
-${get_commits(commits, '6.0')}
- *
-% endif
  *  Copyright (c) ${year} SUSE
  *  Author: ${ user } <${ email }>
  *
@@ -513,7 +478,7 @@ class TemplateGen():
         user, email = get_mail()
         tvars = {
             "check_enabled": self.check_enabled,
-            "commits": get_codestreams_data('commits'),
+            "upstream": get_codestreams_data('upstream'),
             "config": "CONFIG_CHANGE_ME",
             "cve": cve,
             "email": email,
@@ -598,9 +563,7 @@ def create_kbuild(lp_name, cs):
 
 
 def generate_commit_msg_file(lp_name):
-    cmts = get_codestreams_data('commits').get("upstream", {})
-    if cmts:
-        cmts = cmts["commits"]
+    cmts = get_codestreams_data('upstream')
     cve = get_codestreams_data('cve')
     if not cve:
         cve = "XXXX-XXXX"

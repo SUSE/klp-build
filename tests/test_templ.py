@@ -123,18 +123,6 @@ def test_check_header_file_included():
 
     extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
-    # test the livepatch_ prefix file
-    assert "Upstream commit:" in get_file_content(lp, cs)
-
-    # Check for all supported codestreams
-    for item in ["SLE12-SP5", "SLE15-SP3", "SLE15-SP4 and -SP5",
-                 "SLE15-SP6", "SLE MICRO-6-0"]:
-        assert item in get_file_content(lp, cs)
-
-    # Check the other two files
-    assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_kernel_events_core.c")
-    assert "Upstream commit:" not in get_file_content(lp, cs, f"{lp}_net_ipv6_rpl.c")
-
     # Check that for file kernel/events/core.c there are externalized symbols, so the prototype
     # of init/cleanup are created on header
     # As net/ipv6/rpl.c there are no externalized symbols we expect that it's prototype isn't

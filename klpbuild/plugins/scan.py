@@ -10,7 +10,7 @@ from klpbuild.klplib import utils
 from klpbuild.klplib import patch
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
-from klpbuild.klplib.ksrc import get_commits, get_patched_kernels, cs_is_affected
+from klpbuild.klplib.ksrc import get_patches, get_patched_kernels, cs_is_affected
 
 PLUGIN_CMD = "scan"
 
@@ -51,16 +51,19 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     unaffected_cs = []
     conf_not_set = []
     unsupported = []
+    upstream = []
 
     if no_check:
         logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
         working_cs = utils.filter_codestreams(lp_filter, all_codestreams)
-        commits = {}
+        patches = {}
         patched_kernels = []
     else:
         assert cve
-        commits = get_commits(cve, savedir)
-        patched_kernels = get_patched_kernels(all_codestreams, commits, cve)
+        patches = get_patches(cve, savedir)
+        patched_kernels = get_patched_kernels(all_codestreams, patches, cve)
+
+        upstream = patches.get("upstream")
 
         for cs in utils.filter_codestreams(lp_filter, all_codestreams, verbose=True):
 
@@ -68,7 +71,7 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
                 patched_cs.append(cs.name())
                 continue
 
-            if not cs_is_affected(cs, cve, commits):
+            if not cs_is_affected(cs, cve, patches):
                 unaffected_cs.append(cs)
                 continue
 
@@ -80,10 +83,11 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
         download_missing_cs_data(working_cs)
 
     # Automated patch analysis phase. Not compatible with --conf.
-    if commits and not conf:
+
+    if patches and not conf:
         logging.info("Initiating patch analysis...\n")
         logging.info("[*] Analysing modified files...\n")
-        files_report = patch.analyse_files(working_cs, commits)
+        files_report = patch.analyse_files(working_cs, patches)
         patch.print_files(files_report)
 
         logging.info("[*] Analysing required CONFIGs...\n")
@@ -95,7 +99,6 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
         kmodules_report = patch.analyse_kmodules(working_cs)
         patch.print_kmodules(kmodules_report)
         unsupported = patch.filter_unsupported_kmodules(working_cs)
-
     # If conf is set, drop codestream not containing that conf entry from working_cs
     elif conf:
         tmp_working_cs = []
@@ -130,4 +133,4 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     logging.info("All affected codestreams:")
     logging.info("\t%s", utils.classify_codestreams_str(working_cs))
 
-    return commits, patched_cs, patched_kernels, working_cs
+    return upstream, patched_cs, patched_kernels, working_cs
