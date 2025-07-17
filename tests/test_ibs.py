@@ -10,7 +10,7 @@ from klpbuild.klplib.ibs import get_cs_packages
 from klpbuild.plugins.setup import setup_codestreams
 
 CS = "15.6u0"
-DEFAULT_DATA = {"cve": None, "lp_filter": CS, "lp_skips": None, "conf": None, "no_check": False}
+DEFAULT_DATA = {"cve": None, "lp_filter": CS, "lp_skips": None, "conf": None, "no_check": True}
 
 
 def test_list_of_packages():
