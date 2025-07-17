@@ -22,7 +22,7 @@ def test_detect_file_without_ftrace_support(caplog):
     setup_args = {
         "lp_name" : lp,
         "lp_filter": cs,
-        "no_check": False,
+        "no_check": True,
         "archs" : [utils.ARCH],
         "cve": None,
         "conf": "CONFIG_SMP",
@@ -51,7 +51,7 @@ def test_compile_commands_enoent():
     setup_args = {
         "lp_name": lp,
         "lp_filter": cs,
-        "no_check": False,
+        "no_check": True,
         "archs": [utils.ARCH],
         "cve": None,
         "conf": "CONFIG_HID",
@@ -88,7 +88,7 @@ def test_detect_opt_clone(caplog):
     setup_args = {
         "lp_name": lp,
         "lp_filter": cs,
-        "no_check": False,
+        "no_check": True,
         "archs": [utils.ARCH],
         "cve": None,
         "conf": "CONFIG_BT",
