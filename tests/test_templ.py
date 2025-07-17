@@ -18,7 +18,7 @@ def test_templ_with_externalized_vars():
     setup_args = {
         "lp_name" : lp,
         "lp_filter": cs,
-        "no_check": False,
+        "no_check": True,
         "archs" : utils.ARCHS,
         "cve": None,
         "conf": "CONFIG_PROC_FS",
@@ -61,7 +61,7 @@ def test_templ_without_externalized_vars():
     setup_args = {
         "lp_name" : lp,
         "lp_filter": cs,
-        "no_check": False,
+        "no_check": True,
         "archs" : [utils.ARCH],
         "cve": None,
         "conf": "CONFIG_IPV6",
@@ -108,7 +108,7 @@ def test_check_header_file_included():
     setup_args = {
         "lp_name" : lp,
         "lp_filter": cs,
-        "no_check": False,
+        "no_check": True,
         "archs" : utils.ARCHS,
         "cve": None,
         "conf": "CONFIG_IPV6",
@@ -262,7 +262,7 @@ def test_templ_ibt_without_externalized_vars():
     setup_args = {
         "lp_name" : lp,
         "lp_filter": cs,
-        "no_check": False,
+        "no_check": True,
         "archs" : utils.ARCHS,
         "cve": None,
         "conf": "CONFIG_IPV6",
