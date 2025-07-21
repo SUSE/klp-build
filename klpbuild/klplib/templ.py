@@ -399,10 +399,6 @@ ${get_patched(cs_files, check_enabled)}
 
 class TemplateGen():
     def __init__(self, lp_name):
-
-        # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
-        # is not enabled on all architectures
-        self.check_enabled = get_codestreams_data('archs') != ARCHS
         self.lp_name = lp_name
 
     @staticmethod
@@ -411,7 +407,7 @@ class TemplateGen():
         return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
 
     def __generate_patched_conf(self, cs):
-        render_vars = {"cs_files": cs.files, "check_enabled": self.check_enabled}
+        render_vars = {"cs_files": cs.files, "check_enabled": _is_check_enabled()}
         with open(Path(cs.get_lp_dir(self.lp_name), "patched_funcs.csv"), "w") as f:
             f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
@@ -459,7 +455,7 @@ class TemplateGen():
                     proto_syms = {}
 
                 render_vars.update({
-                    "check_enabled": self.check_enabled,
+                    "check_enabled": _is_check_enabled(),
                     "config": config,
                     "has_cleanup": has_cleanup,
                     "proto_syms": proto_syms,
@@ -477,7 +473,7 @@ class TemplateGen():
             cve = "XXXX-XXXX"
         user, email = get_mail()
         tvars = {
-            "check_enabled": self.check_enabled,
+            "check_enabled": _is_check_enabled(),
             "upstream": get_codestreams_data('upstream'),
             "config": "CONFIG_CHANGE_ME",
             "cve": cve,
@@ -553,6 +549,12 @@ class TemplateGen():
             self.__generate_lp_file(lp_path, cs, None, f"livepatch_{self.lp_name}.c")
 
         create_kbuild(self.lp_name, cs)
+
+
+def _is_check_enabled():
+    # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
+    # is not enabled on all architectures
+    return get_codestreams_data('archs') != ARCHS
 
 
 def create_kbuild(lp_name, cs):
