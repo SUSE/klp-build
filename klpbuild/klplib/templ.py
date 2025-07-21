@@ -397,12 +397,12 @@ ${get_patched(cs_files, check_enabled)}
 """
 
 
-def preproc_slashes(text):
+def __preproc_slashes(text):
     txt = r"<%! BS='\\' %>" + text.replace("\\", "${BS}")
     return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
 
 def __generate_patched_conf(lp_name, cs):
-    render_vars = {"cs_files": cs.files, "check_enabled": _is_check_enabled()}
+    render_vars = {"cs_files": cs.files, "check_enabled": __is_check_enabled()}
     with open(Path(cs.get_lp_dir(lp_name), "patched_funcs.csv"), "w") as f:
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
@@ -450,7 +450,7 @@ def __generate_header_file(lp_name, lp_path, cs):
                 proto_syms = {}
 
             render_vars.update({
-                "check_enabled": _is_check_enabled(),
+                "check_enabled": __is_check_enabled(),
                 "config": config,
                 "has_cleanup": has_cleanup,
                 "proto_syms": proto_syms,
@@ -459,7 +459,7 @@ def __generate_header_file(lp_name, lp_path, cs):
             header_templ = MACRO_PROTO_SYMS + TEMPL_H
 
     with open(Path(lp_path, out_name), "w") as f:
-        lpdir = TemplateLookup(directories=[Path()], preprocessor=preproc_slashes)
+        lpdir = TemplateLookup(directories=[Path()], preprocessor=__preproc_slashes)
         f.write(Template(header_templ, lookup=lpdir).render(**render_vars))
 
 def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
@@ -468,7 +468,7 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
         cve = "XXXX-XXXX"
     user, email = get_mail()
     tvars = {
-        "check_enabled": _is_check_enabled(),
+        "check_enabled": __is_check_enabled(),
         "upstream": get_codestreams_data('upstream'),
         "config": "CONFIG_CHANGE_ME",
         "cve": cve,
@@ -509,7 +509,7 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
             temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
         lp_inc_dir = cs.get_ccp_work_dir(lp_name, src_file)
 
-    lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=preproc_slashes)
+    lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=__preproc_slashes)
     with open(Path(lp_path, out_name), "w") as f:
         f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**tvars))
 
@@ -543,16 +543,16 @@ def generate_livepatches(lp_name, cs):
     if is_multi_files:
         __generate_lp_file(lp_name, lp_path, cs, None, f"livepatch_{lp_name}.c")
 
-    create_kbuild(lp_name, cs)
+    __create_kbuild(lp_name, cs)
 
 
-def _is_check_enabled():
+def __is_check_enabled():
     # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
     # is not enabled on all architectures
     return get_codestreams_data('archs') != ARCHS
 
 
-def create_kbuild(lp_name, cs):
+def __create_kbuild(lp_name, cs):
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
     render_vars = {"bsc": lp_name, "cs": cs, "lpdir": cs.get_lp_dir(lp_name)}
     with open(Path(cs.get_lp_dir(lp_name), "Kbuild.inc"), "w") as f:
