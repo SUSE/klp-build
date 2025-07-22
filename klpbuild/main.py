@@ -12,13 +12,19 @@ from klpbuild.klplib.plugins import try_run_plugin
 
 
 def main():
-    args = create_parser().parse_args(sys.argv[1:])
+    parser = create_parser()
+    args = parser.parse_args(sys.argv[1:])
 
     logging_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=logging_level, format="%(message)s")
 
     if hasattr(args, 'lp_name'):
         load_codestreams(args.lp_name)
+
+    if not args.cmd:
+        print("Missing required command.")
+        parser.print_help()
+        exit(1)
 
     try_run_plugin(args.cmd, args)
 
