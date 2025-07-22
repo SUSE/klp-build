@@ -318,7 +318,7 @@ class Codestream:
 
         mod_path = self.get_mod_path(arch)
         with open(Path(mod_path, "modules.order")) as f:
-            obj_match = re.search(rf"([\w\/\-]+\/{mod}.k?o)", f.read())
+            obj_match = re.search(rf"([\w\/\-]+\/{mod}\.k?o)", f.read())
             if not obj_match:
                 raise RuntimeError(f"{self.name()}-{arch} ({self.kernel}): Module not found: {mod}")
 
