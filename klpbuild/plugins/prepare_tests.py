@@ -123,7 +123,7 @@ def prepare_tests(lp_name, lp_filter):
             if cs.rt and arch != "x86_64":
                 continue
 
-            build_cs.append(cs.name_full())
+            build_cs.append(cs.get_full_product_name())
 
         logging.info("Done.")
 

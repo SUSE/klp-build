@@ -208,20 +208,33 @@ class Codestream:
         fpath = f'work_{str(fname).replace("/", "_")}'
         return self.get_ccp_dir(lp_name)/fpath
 
-    def name_full(self):
-        # Parse 15.2u25 to SLE15-SP2_Update_25
-        # Parse 6.0u2 to MICRO
+
+    def get_base_product_name(self):
+        """
+        Return the base product name based on internal attributes.
+
+        Example:
+            15.6rtu2:       'SLE15-SP6-RT'
+            6u0:            'MICRO-6-0'
+        """
+        rt = "-RT" if self.rt else ""
+
         if self.is_micro:
-            buf = f"MICRO-{self.sle}-{self.sp}"
-        else:
-            buf = f"SLE{self.sle}"
-            if int(self.sp) > 0:
-                buf = f"{buf}-SP{self.sp}"
+            return f"MICRO-{self.sle}-{self.sp}{rt}"
 
-        if self.rt:
-            buf = f"{buf}-RT"
+        return f"SLE{self.sle}-SP{self.sp}{rt}"
 
-        return f"{buf}_Update_{self.update}"
+
+    def get_full_product_name(self):
+        """
+        Return the full product name including the update number.
+
+        Example:
+            15.6rtu2:       'SLE15-SP6-RT_Update_0'
+            6u0:            'MICRO-6-0_Update_0'
+        """
+        product_base_name = self.get_base_product_name()
+        return f"{product_base_name}_Update_{self.update}"
 
 
     # 15.4 onwards we don't have module_mutex, so template generates
