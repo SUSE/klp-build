@@ -66,7 +66,7 @@ def store_codestreams(lp_name, working_cs):
     # Format each codestream for the json
     cs_data = {}
     for key, cs in _codestreams.items():
-        cs_data[key] = cs.data()
+        cs_data[key] = cs.to_data()
 
     data = {"archs": _cs_data.archs,
             "upstream": _cs_data.upstream,
