@@ -139,7 +139,7 @@ class Codestream:
             self.archs = ["x86_64"]
 
         # MICRO 6.0 doest support ppc64le
-        elif "6.0" in self.name():
+        elif "6.0" in self.full_cs_name():
             self.archs = ["x86_64", "s390x"]
 
         # We support all architecture for all other codestreams
@@ -154,11 +154,18 @@ class Codestream:
         return self.kernel + ("" if "-rt" in self.kernel else self.ktype)
 
 
-    def name(self):
-        if self.rt:
-            return f"{self.sle}.{self.sp}rtu{self.update}"
+    def base_cs_name(self):
+        """
+        Return the base codestream name, optionally including 'rt' if it's a
+        real-time kernel.
+        """
+        rt = "rt" if self.rt else ""
+        return f"{self.sle}.{self.sp}{rt}"
 
-        return f"{self.sle}.{self.sp}u{self.update}"
+
+    def full_cs_name(self):
+        """Return the full codestream name including the update number."""
+        return f"{self.base_cs_name()}u{self.update}"
 
 
     def get_ccp_dir(self, lp_name):
@@ -171,7 +178,7 @@ class Codestream:
         Returns:
             Path: The path to the ccp directory of the current codestream.
         """
-        return get_workdir(lp_name)/"ccp"/self.name()
+        return get_workdir(lp_name)/"ccp"/self.full_cs_name()
 
 
     def get_lp_dir(self, lp_name):
@@ -200,12 +207,6 @@ class Codestream:
         """
         fpath = f'work_{str(fname).replace("/", "_")}'
         return self.get_ccp_dir(lp_name)/fpath
-
-
-    def name_cs(self):
-        if self.rt:
-            return f"{self.sle}.{self.sp}rt"
-        return f"{self.sle}.{self.sp}"
 
     def name_full(self):
         # Parse 15.2u25 to SLE15-SP2_Update_25
@@ -283,15 +284,15 @@ class Codestream:
             try:
                 conf_entry = cs_config.pop(arch)
             except KeyError as exc:
-                raise RuntimeError(f"{self.name()}: {conf} not set on {arch}. Aborting") from exc
+                raise RuntimeError(f"{self.full_cs_name()}: {conf} not set on {arch}. Aborting") from exc
 
             if conf_entry == "m" and mod == "vmlinux":
-                raise RuntimeError(f"{self.name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
+                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
             if conf_entry == "y" and mod != "vmlinux":
-                raise RuntimeError(f"{self.name()}:{arch} ({self.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
+                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
 
             configs.setdefault(conf_entry, [])
-            configs[conf_entry].append(f"{self.name()}:{arch}")
+            configs[conf_entry].append(f"{self.full_cs_name()}:{arch}")
 
         # Validate if we have different settings for the same config on
         # different architecures, like having it as builtin on one and as a
@@ -299,7 +300,7 @@ class Codestream:
         if len(configs.keys()) > 1:
             print(configs["y"])
             print(configs["m"])
-            raise RuntimeError(f"{self.name()}: Configuration mismatach between codestreams. Aborting.")
+            raise RuntimeError(f"{self.full_cs_name()}: Configuration mismatach between codestreams. Aborting.")
 
     def find_obj_path(self, arch, mod):
         # Return the path if the modules was previously found for ARCH, or refetch if
@@ -320,7 +321,7 @@ class Codestream:
         with open(Path(mod_path, "modules.order")) as f:
             obj_match = re.search(rf"([\w\/\-]+\/{mod}\.k?o)", f.read())
             if not obj_match:
-                raise RuntimeError(f"{self.name()}-{arch} ({self.kernel}): Module not found: {mod}")
+                raise RuntimeError(f"{self.full_cs_name()}-{arch} ({self.kernel}): Module not found: {mod}")
 
         # modules.order will show the module with suffix .o, so make sure the extension.
         obj_path = mod_path/(PurePath(obj_match.group(1)).with_suffix(".ko"))
@@ -339,7 +340,7 @@ class Codestream:
     # codestream and architecture
     # Return all the symbols not found per arch/obj
     def __check_symbol(self, arch, mod, symbols, cache):
-        name = self.name()
+        name = self.full_cs_name()
 
         cache.setdefault(arch, {})
         cache[arch].setdefault(name, {})
@@ -356,7 +357,7 @@ class Codestream:
                 ret.append(symbol)
 
             elif nsyms > 1:
-                print(f"WARNING: {self.name()}-{arch} ({self.kernel}): symbol {symbol} duplicated on {mod}")
+                print(f"WARNING: {self.full_cs_name()}-{arch} ({self.kernel}): symbol {symbol} duplicated on {mod}")
 
             # If len(syms) == 1 means that we found a unique symbol, which is
             # what we expect, and nothing need to be done.

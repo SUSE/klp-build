@@ -106,13 +106,13 @@ def prepare_tests(lp_name, lp_filter):
 
             rpm_dir = Path(cs.get_ccp_dir(lp_name), arch, "rpm")
             if not rpm_dir.exists():
-                logging.info("%s/%s: rpm dir not found. Skipping.", cs.name(), arch)
+                logging.info("%s/%s: rpm dir not found. Skipping.", cs.full_cs_name(), arch)
                 continue
 
             # TODO: there will be only one rpm, format it directly
             rpm = os.listdir(rpm_dir)
             if len(rpm) > 1:
-                raise RuntimeError(f"ERROR: {cs.name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
+                raise RuntimeError(f"ERROR: {cs.full_cs_name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
 
             for rpm in os.listdir(rpm_dir):
                 # Check for dependencies

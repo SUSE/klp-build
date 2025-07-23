@@ -252,7 +252,7 @@ def get_patched_kernels(codestreams, patches, cve):
     kernels = set()
 
     for cs in codestreams:
-        bc = cs.name().split("u")[0]
+        bc = cs.full_cs_name().split("u")[0]
         suse_patches = patches[bc]
         if not suse_patches:
             continue
@@ -260,7 +260,7 @@ def get_patched_kernels(codestreams, patches, cve):
         # Proceed to analyse each codestream's kernel
         kernel = cs.kernel
 
-        logging.debug(f"\n{cs.name()} ({kernel}):")
+        logging.debug(f"\n{cs.full_cs_name()} ({kernel}):")
         for patch in suse_patches:
             if not ksrc_read_rpm_file(kernel, patch):
                 break
@@ -280,7 +280,7 @@ def cs_is_affected(cs, cve, patches):
     if not cve:
         return True
 
-    return len(patches[cs.name_cs()]) > 0
+    return len(patches[cs.base_cs_name()]) > 0
 
 
 def ksrc_read_rpm_file(kernel_version, file_path):

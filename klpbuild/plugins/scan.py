@@ -68,7 +68,7 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
         for cs in utils.filter_codestreams(lp_filter, all_codestreams, verbose=True):
 
             if cs.kernel in patched_kernels:
-                patched_cs.append(cs.name())
+                patched_cs.append(cs.full_cs_name())
                 continue
 
             if not cs_is_affected(cs, cve, patches):
