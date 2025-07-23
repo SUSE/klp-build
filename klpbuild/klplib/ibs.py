@@ -116,10 +116,10 @@ def get_cs_packages(cs_list, dest):
                     if pkg == "kernel-default":
                         pkg = "kernel-rt"
 
-                if cs.repo != "standard":
-                    pkg = f"{pkg}.{cs.repo}"
+                if cs.get_repo() != "standard":
+                    pkg = f"{pkg}.{cs.get_repo()}"
 
-                ret = osc.build.get_binary_list(cs.project, cs.repo, arch, pkg)
+                ret = osc.build.get_binary_list(cs.project, cs.get_repo(), arch, pkg)
                 for file in re.findall(regex, str(etree.tostring(ret))):
                     # FIXME: adjust the regex to only deal with strings
                     if isinstance(file, str):
@@ -139,7 +139,7 @@ def get_cs_packages(cs_list, dest):
                         if arch != ARCH:
                             continue
 
-                    rpms.append((osc, i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
+                    rpms.append((osc, i, cs, cs.project, cs.get_repo(), arch, pkg, rpm, dest))
                     i += 1
 
     return rpms

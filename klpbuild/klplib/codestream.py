@@ -30,7 +30,6 @@ class Codestream:
         self.files = files
         self.modules = modules
         self.configs = configs
-        self.repo = self.get_repo()
 
     @classmethod
     def from_codestream(cls, cs, proj, patchid, kernel):
@@ -86,7 +85,6 @@ class Codestream:
                 "files" : self.files,
                 "modules" : self.modules,
                 "configs" : self.configs,
-                "repo" : self.repo,
                 }
 
     def __eq__(self, cs):
