@@ -11,7 +11,7 @@ from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_fro
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
-    __slots__ = ("sle", "sp", "update", "rt", "ktype", "needs_ibt", "is_micro",
+    __slots__ = ("sle", "sp", "update", "rt", "ktype", "is_micro",
                  "project", "patchid", "kernel", "archs", "files", "modules",
                  "repo", "configs")
 
@@ -23,7 +23,6 @@ class Codestream:
         self.rt = rt
         self.ktype = "-rt" if rt else "-default"
         self.is_micro = sle == 6
-        self.needs_ibt = self.is_micro or sle > 15 or (sle == 15 and sp >= 6)
         self.project = project
         self.patchid = patchid
         self.kernel = kernel
@@ -239,6 +238,9 @@ class Codestream:
         product_base_name = self.get_base_product_name()
         return f"{product_base_name}_Update_{self.update}"
 
+
+    def needs_ibt(self):
+        return self.is_micro or self.sle > 15 or (self.sle == 15 and self.sp >= 6)
 
     # 15.4 onwards we don't have module_mutex, so template generates
     # different code
