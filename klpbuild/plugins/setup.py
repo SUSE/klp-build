@@ -170,12 +170,12 @@ def setup_project_files(lp_name, codestreams, ffuncs, archs):
             cs.validate_config(archs, fdata["conf"], mod)
 
             if not cs.check_file_exists(f):
-                raise RuntimeError(f"{cs.name()} ({cs.kernel}): File {f} not found.")
+                raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}): File {f} not found.")
 
             ipa_f = cs.get_ipa_file(f)
             if not ipa_f.is_file():
                 ipa_f.touch()
-                logging.warning("%s (%s): File %s not found. Creating an empty file.", cs.name(), cs.kernel, ipa_f)
+                logging.warning("%s (%s): File %s not found. Creating an empty file.", cs.full_cs_name(), cs.kernel, ipa_f)
 
             # If the config was enabled on all supported architectures,
             # there is no point in leaving the conf being set, since the
@@ -187,7 +187,7 @@ def setup_project_files(lp_name, codestreams, ffuncs, archs):
 
             # Validate if the module being livepatched is supported or not
             if utils.check_module_unsupported(utils.ARCH, mod_path):
-                logging.warning("%s (%s}): Module %s is not supported by SLE", cs.name(), cs.kernel, mod)
+                logging.warning("%s (%s}): Module %s is not supported by SLE", cs.full_cs_name(), cs.kernel, mod)
 
             cs.modules[mod] = str(mod_path)
             mod_syms.setdefault(mod, [])
@@ -199,7 +199,7 @@ def setup_project_files(lp_name, codestreams, ffuncs, archs):
             if arch_syms:
                 for arch, syms in arch_syms.items():
                     logging.warning("%s-%s (%s): Symbols %s not found on %s object",
-                                    cs.name(), arch, cs.kernel, ",".join(syms), mod)
+                                    cs.full_cs_name(), arch, cs.kernel, ",".join(syms), mod)
 
     store_codestreams(lp_name, codestreams)
     logging.info("Done. Setup finished.")

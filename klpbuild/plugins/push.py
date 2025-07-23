@@ -50,7 +50,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
     kgr_path = get_user_path('kgr_patches_dir')
     branch = get_cs_branch(cs, lp_name, kgr_path)
     if not branch:
-        logging.info("Could not find git branch for %s. Skipping.", cs.name())
+        logging.info("Could not find git branch for %s. Skipping.", cs.full_cs_name())
         return
 
     # If the project exists, drop it first
@@ -58,7 +58,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
     delete_project(osc, 0, 0, prj, verbose=False)
 
     meta = create_prj_meta(cs)
-    prj_desc = f"Development of livepatches for {cs.name()}"
+    prj_desc = f"Development of livepatches for {cs.full_cs_name()}"
 
     try:
         osc.projects.set_meta(
@@ -82,10 +82,10 @@ def create_lp_package(osc, lp_name, i, total, cs):
 
     osc.packages.checkout(prj, "klp", prj_path)
 
-    base_branch = get_kgraft_branch(cs.name())
+    base_branch = get_kgraft_branch(cs.full_cs_name())
 
     logging.info("(%s/%s) pushing %s using branches %s/%s...",
-                 i, total, cs.name(), str(base_branch), str(branch))
+                 i, total, cs.full_cs_name(), str(base_branch), str(branch))
 
     # Clone the repo and checkout to the codestream branch. The branch should be based on master to avoid rebasing
     # conflicts
@@ -137,7 +137,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
     osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
     shutil.rmtree(prj_path)
 
-    logging.info("(%d/%d) %s done", i, total, cs.name())
+    logging.info("(%d/%d) %s done", i, total, cs.full_cs_name())
 
 
 def push(lp_name, lp_filter, wait=False):

@@ -61,7 +61,7 @@ def store_codestreams(lp_name, working_cs):
     """
     # Update the latest state of the codestreams
     for cs in working_cs:
-        _codestreams[cs.name()] = cs
+        _codestreams[cs.full_cs_name()] = cs
 
     # Format each codestream for the json
     cs_data = {}
