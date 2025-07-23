@@ -84,7 +84,7 @@ class Codestream:
 
     def get_src_dir(self, arch=ARCH, init=True):
         # Only -rt codestreams have a suffix for source directory
-        name = self.kname() if self.rt else self.kernel
+        name = self.get_full_kernel_name() if self.rt else self.kernel
         src_dir = get_datadir(arch)/"usr"/"src"/f"linux-{name}"
         if init:
             init_cs_kernel_tree(self.kernel, src_dir)
@@ -114,7 +114,7 @@ class Codestream:
             return Path(self.get_mod_path(arch), file)
 
         # Strip the suffix from the filename so we can add the kernel version in the middle
-        fname = f"{Path(file).stem}-{self.kname()}{Path(file).suffix}"
+        fname = f"{Path(file).stem}-{self.get_full_kernel_name()}{Path(file).suffix}"
         return get_datadir(arch)/"boot"/fname
 
     def get_repo(self):
@@ -150,8 +150,11 @@ class Codestream:
         self.files = files
 
 
-    def kname(self):
-        return self.kernel + ("" if "-rt" in self.kernel else self.ktype)
+    def get_full_kernel_name(self):
+        """Returns the kernel name with flavor suffix"""
+        # some kernel versions already have the suffix, some other don't
+        ktype = "" if "-rt" in self.kernel else self.ktype
+        return self.kernel + ktype
 
 
     def base_cs_name(self):
@@ -249,7 +252,7 @@ class Codestream:
         else:
             mod_path = Path("lib")
 
-        return get_datadir(arch)/mod_path/"modules"/self.kname()
+        return get_datadir(arch)/mod_path/"modules"/self.get_full_kernel_name()
 
     # A codestream can be patching multiple objects, so get the path related to
     # the module that we are interested
