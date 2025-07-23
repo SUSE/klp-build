@@ -73,6 +73,21 @@ class Codestream:
                    data["archs"], data["files"], data["modules"],
                    data["configs"])
 
+    def to_data(self):
+        return {
+                "sle" : self.sle,
+                "sp" : self.sp,
+                "update" : self.update,
+                "rt" : self.rt,
+                "project" : self.project,
+                "patchid": self.patchid,
+                "kernel" : self.kernel,
+                "archs" : self.archs,
+                "files" : self.files,
+                "modules" : self.modules,
+                "configs" : self.configs,
+                "repo" : self.repo,
+                }
 
     def __eq__(self, cs):
         return self.sle == cs.sle and \
@@ -418,18 +433,3 @@ class Codestream:
     def read_file(self, file):
         return read_file_in_tag(self.kernel, file)
 
-    def data(self):
-        return {
-                "sle" : self.sle,
-                "sp" : self.sp,
-                "update" : self.update,
-                "rt" : self.rt,
-                "project" : self.project,
-                "patchid": self.patchid,
-                "kernel" : self.kernel,
-                "archs" : self.archs,
-                "files" : self.files,
-                "modules" : self.modules,
-                "configs" : self.configs,
-                "repo" : self.repo,
-                }
