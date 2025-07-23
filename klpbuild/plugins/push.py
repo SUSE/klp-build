@@ -119,7 +119,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
 
     # Fix RELEASE version
     with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
-        ver = cs.name_full().replace("EMBARGO", "")
+        ver = cs.get_full_product_name().replace("EMBARGO", "")
         f.write(f"RELEASE={ver}")
 
     subprocess.check_output(
