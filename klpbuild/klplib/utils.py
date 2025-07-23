@@ -40,7 +40,7 @@ def classify_codestreams(cs_list):
     cs_group = {}
     for cs in cs_list:
         if not isinstance(cs, str):
-            cs = cs.name()
+            cs = cs.full_cs_name()
 
         prefix, up = cs.split("u")
         if not cs_group.get(prefix, ""):
@@ -230,7 +230,7 @@ def filter_codestreams(lp_filter, cs_list, verbose=False):
     result = []
     filtered = []
     for cs in full_cs:
-        name = cs.name()
+        name = cs.full_cs_name()
 
         if lp_filter and not re.match(lp_filter, name):
             filtered.append(name)

@@ -34,7 +34,7 @@ def log(lp_name, lp_filter, arch):
         sys.exit(1)
 
     if len(cs_list) > 1:
-        cs_names = [cs.name() for cs in cs_list]
+        cs_names = [cs.full_cs_name() for cs in cs_list]
         logging.error("Filter '%s' returned %d entries (%s), while expecting just one. Aborting. ",
                       lp_filter, len(cs_list), " ".join(cs_names))
         sys.exit(1)

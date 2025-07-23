@@ -29,7 +29,7 @@ def analyse_files(cs_list, sle_patches):
     report = defaultdict(list)
 
     for cs in cs_list:
-            bc = cs.name_cs()
+            bc = cs.base_cs_name()
             patches = sle_patches[bc]
             branch = KERNEL_BRANCHES[bc]
             files = get_patch_files(patches, branch)

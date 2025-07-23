@@ -60,7 +60,7 @@ def get_cs_code(lp_name, working_cs):
 
     # Mount the cs_files dict
     for cs in working_cs:
-        cs_files.setdefault(cs.name(), [])
+        cs_files.setdefault(cs.full_cs_name(), [])
 
         for fpath in cs.get_lp_dir(lp_name).iterdir():
             fname = fpath.name
@@ -90,7 +90,7 @@ def get_cs_code(lp_name, working_cs):
                 # Remove empty lines
                 src = "".join([s for s in src.strip().splitlines(True) if s.strip()])
 
-                cs_files[cs.name()].append((fname, src))
+                cs_files[cs.full_cs_name()].append((fname, src))
 
     return cs_files
 
@@ -141,7 +141,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
             "-sn",
             "--ignore-errors",
             f"CC={cc}",
-            f"KLP_CS={cs.name()}",
+            f"KLP_CS={cs.full_cs_name()}",
             f"HOSTCC={cc}",
             "WERROR=0",
             "CFLAGS_REMOVE_objtool=-Werror",
@@ -164,7 +164,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
             f.write("\n")
             f.flush()
         except Exception as exc:
-            raise RuntimeError(f"Failed to run make for {cs.name()} ({cs.kernel}). Check file {str(log_path)} for more details.") from exc
+            raise RuntimeError(f"Failed to run make for {cs.full_cs_name()} ({cs.kernel}). Check file {str(log_path)} for more details.") from exc
 
         # 15.4 onwards changes the regex a little: -MD -> -MMD
         # 15.6 onwards we don't have -isystem.
@@ -185,7 +185,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
             f.flush()
 
         if not result:
-            raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs.name()}. Check file {str(log_path)} for more details.")
+            raise RuntimeError(f"Failed to get the kernel cmdline for file {str(ofname)} in {cs.full_cs_name()}. Check file {str(log_path)} for more details.")
 
         ret = process_make_output(result.group(1))
 
@@ -199,7 +199,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         f.write(ret)
 
         if " -pg " not in ret:
-            logging.warning("%s:%s is not compiled with livepatch support (-pg flag)", cs.name(), file_)
+            logging.warning("%s:%s is not compiled with livepatch support (-pg flag)", cs.full_cs_name(), file_)
 
         return ret
 
@@ -363,11 +363,11 @@ def remove_patches(lp_name, cs, apply_patches):
         return
 
     with open(quilt_log_path(lp_name, apply_patches), "a") as f:
-        f.write(f"\nRemoving patches from {cs.name()}({cs.kernel})\n")
+        f.write(f"\nRemoving patches from {cs.full_cs_name()}({cs.kernel})\n")
         err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=f, stdout=f, check=False)
 
     if err.returncode not in [0, 2]:
-        raise RuntimeError(f"{cs.name()}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
+        raise RuntimeError(f"{cs.full_cs_name()}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
 
     shutil.rmtree(patches_dir, ignore_errors=True)
     shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
@@ -400,7 +400,7 @@ def apply_all_patches(lp_name, cs, apply_patches):
                 f.write(f"\nPatches dir {pdir} doesnt exists\n")
                 continue
 
-            f.write(f"\nApplying patches on {cs.name()}({cs.kernel}) from {pdir}\n")
+            f.write(f"\nApplying patches on {cs.full_cs_name()}({cs.kernel}) from {pdir}\n")
             for patch in sorted(pdir.iterdir(), reverse=True):
                 if not str(patch).endswith(".patch"):
                     continue
@@ -425,7 +425,7 @@ def apply_all_patches(lp_name, cs, apply_patches):
             break
 
     if not patched:
-        raise RuntimeError(f"{cs.name()}({cs.kernel}): Failed to apply patches. Aborting")
+        raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): Failed to apply patches. Aborting")
 
 
 def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
@@ -536,7 +536,7 @@ def process(lp_name, total, args, avoid_ext):
     odir = cs.get_obj_dir()
 
     # The header text has two tabs
-    cs_info = cs.name().ljust(15, " ")
+    cs_info = cs.full_cs_name().ljust(15, " ")
     idx = f"({i}/{total})".rjust(15, " ")
 
     logging.info("%s %s %s", idx, cs_info, fname)
@@ -573,7 +573,7 @@ def process(lp_name, total, args, avoid_ext):
         try:
             subprocess.run(args, cwd=odir, stdout=f, stderr=f, env=lenv, check=True)
         except Exception as exc:
-            raise RuntimeError(f"Error when processing {cs.name()}:{fname}. Check file {out_log} for details.") from exc
+            raise RuntimeError(f"Error when processing {cs.full_cs_name()}:{fname}. Check file {out_log} for details.") from exc
 
         # Look for optimized function warnings in the output of the command
         f.seek(start_pos)
@@ -585,7 +585,7 @@ def process(lp_name, total, args, avoid_ext):
                 symbol_name = opt_symbol_name.split(".")[0]
                 logging.warning("Warning when processing %s:%s: "
                                 "Symbol %s contains optimized clone: %s",
-                                cs.name(), fname, symbol_name, opt_symbol_name)
+                                cs.full_cs_name(), fname, symbol_name, opt_symbol_name)
                 logging.warning("Make sure to patch all the callers of %s.", symbol_name)
 
     cs.files[fname]["ext_symbols"] = get_symbol_list(out_dir)
@@ -696,8 +696,8 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
                 for arch, arch_syms in missing.items():
                     missing_syms.setdefault(arch, {})
                     missing_syms[arch].setdefault(obj, {})
-                    missing_syms[arch][obj].setdefault(cs.name(), [])
-                    missing_syms[arch][obj][cs.name()].extend(arch_syms)
+                    missing_syms[arch][obj].setdefault(cs.full_cs_name(), [])
+                    missing_syms[arch][obj][cs.full_cs_name()].extend(arch_syms)
 
     if missing_syms:
         with open(utils.get_workdir(lp_name)/"missing_syms", "w") as f:
