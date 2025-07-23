@@ -468,7 +468,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     # Needed, otherwise threads would interfere with each other
     env = os.environ.copy()
 
-    env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt else "0"
+    env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt() else "0"
     env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
     env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
     env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.ARCH)/cs.get_mod(fdata["module"]))
@@ -558,7 +558,7 @@ def process(lp_name, total, args, avoid_ext):
     args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
 
     # Detect and set ibt information. It will be used in the TemplateGen
-    if '-fcf-protection' in cmd or cs.needs_ibt:
+    if '-fcf-protection' in cmd or cs.needs_ibt():
         cs.files[fname]["ibt"] = True
 
     out_log = Path(out_dir, "ccp.out.txt")
