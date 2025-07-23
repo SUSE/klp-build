@@ -15,8 +15,8 @@ class Codestream:
                  "project", "patchid", "kernel", "archs", "files", "modules",
                  "repo", "configs")
 
-    def __init__(self, sle, sp, update, rt, project, patchid, kernel, archs,
-                 files, modules, configs):
+    def __init__(self, sle, sp, update, rt, project="", patchid="", kernel="",
+                 archs=None, files=None, modules=None, configs=None):
         self.sle = sle
         self.sp = sp
         self.update = update
@@ -26,10 +26,10 @@ class Codestream:
         self.project = project
         self.patchid = patchid
         self.kernel = kernel
-        self.archs = archs
-        self.files = files
-        self.modules = modules
-        self.configs = configs
+        self.archs = archs if archs is not None else []
+        self.files = files if files is not None else {}
+        self.modules = modules if modules is not None else {}
+        self.configs = configs if configs is not None else {}
 
     @classmethod
     def from_codestream(cls, cs, proj, patchid, kernel):
@@ -51,7 +51,7 @@ class Codestream:
         else:
             assert False, "codestream name should contain either SLE or MICRO!"
 
-        ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {}, {})
+        ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel)
         ret.set_archs()
         return ret
 
@@ -62,7 +62,7 @@ class Codestream:
         if not match:
             raise ValueError("Filter regexp error!")
         return cls(int(match.group(1)), int(match.group(2)),
-                   int(match.group(4)), match.group(3), "", "", "", [], {}, {}, {})
+                   int(match.group(4)), match.group(3))
 
 
     @classmethod
