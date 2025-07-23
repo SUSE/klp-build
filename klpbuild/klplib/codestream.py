@@ -52,7 +52,7 @@ class Codestream:
             assert False, "codestream name should contain either SLE or MICRO!"
 
         ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel)
-        ret.set_archs()
+        ret.set_default_archs()
         return ret
 
 
@@ -145,13 +145,13 @@ class Codestream:
 
         return f"{repo}_Products_SLERT_Update"
 
-    def set_archs(self):
+    def set_default_archs(self):
         # RT is supported only on x86_64 at the moment
         if self.rt:
             self.archs = ["x86_64"]
 
-        # MICRO 6.0 doest support ppc64le
-        elif "6.0" in self.full_cs_name():
+        # MICRO 6.0 doesn't support ppc64le
+        elif self.is_micro:
             self.archs = ["x86_64", "s390x"]
 
         # We support all architecture for all other codestreams
