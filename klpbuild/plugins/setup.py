@@ -130,7 +130,7 @@ def setup_codestreams(lp_name, data):
 
     # Called at this point because codestreams is populated
     # FIXME: we should check all configs, like when using --conf-mod-file-funcs
-    commits, patched_cs, patched_kernels, codestreams = scan(data["cve"],
+    upstream, patched_cs, patched_kernels, codestreams = scan(data["cve"],
                                                              data["conf"],
                                                              data["no_check"],
                                                              data["lp_filter"],
@@ -140,7 +140,8 @@ def setup_codestreams(lp_name, data):
     old_patched_cs = get_codestreams_data('patched_cs')
     new_patched_cs = natsorted(list(set(old_patched_cs + patched_cs)))
 
-    set_codestreams_data(commits=commits, patched_kernels=patched_kernels,
+    set_codestreams_data(upstream=upstream,
+                         patched_kernels=list(patched_kernels),
                          patched_cs=new_patched_cs, cve=data['cve'])
     return codestreams
 
