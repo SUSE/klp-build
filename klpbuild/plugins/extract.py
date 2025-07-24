@@ -24,7 +24,7 @@ from klpbuild.klplib import utils
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
 from klpbuild.klplib.config import get_user_settings
-from klpbuild.klplib.templ import TemplateGen
+from klpbuild.klplib.templ import generate_livepatches
 
 PLUGIN_CMD = "extract"
 
@@ -663,13 +663,11 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
     # Save the ext_symbols set by execute
     store_codestreams(lp_name, working_cs)
 
-    tem = TemplateGen(lp_name)
-
     # TODO: change the templates so we generate a similar code than we
     # already do for SUSE livepatches
     # Create the livepatches per codestream
     for cs in working_cs:
-        tem.generate_livepatches(cs)
+        generate_livepatches(lp_name, cs)
 
     group_equal_files(lp_name, working_cs)
 
