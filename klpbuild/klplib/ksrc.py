@@ -10,7 +10,6 @@ import sys
 from pathlib import Path
 from pathlib import PurePath
 
-from natsort import natsorted
 from functools import wraps
 
 from klpbuild.klplib import utils

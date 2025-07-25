@@ -17,12 +17,11 @@ from klpbuild.klplib.config import get_user_path
 class CodestreamData:
     cve: str
     archs: list[str]
-    patched_kernels: list[str]
     patched_cs: list[str]
     upstream: list[str]
 
 
-_cs_data = CodestreamData("", [], [], [], {})
+_cs_data = CodestreamData("", [], [], [])
 _codestreams = {}
 
 
@@ -40,11 +39,9 @@ def load_codestreams(lp_name):
     if cs_file.is_file():
         with open(cs_file) as f:
             jfile = json.loads(f.read(), object_pairs_hook=OrderedDict)
-            _cs_data = CodestreamData(cve=jfile["cve"],
-                                          archs=jfile["archs"],
-                                          patched_kernels=jfile["patched_kernels"],
-                                          patched_cs=jfile["patched_cs"],
-                                          upstream=jfile["upstream"])
+            _cs_data = CodestreamData(cve=jfile["cve"], archs=jfile["archs"],
+                                      patched_cs=jfile["patched_cs"],
+                                      upstream=jfile["upstream"])
 
             json_cs = jfile["codestreams"]
             for cs in natsorted(json_cs.keys()):
@@ -72,7 +69,6 @@ def store_codestreams(lp_name, working_cs):
             "upstream": _cs_data.upstream,
             "cve": _cs_data.cve,
             "patched_cs": _cs_data.patched_cs,
-            "patched_kernels": _cs_data.patched_kernels,
             "codestreams": cs_data}
 
     cs_file = __get_cs_file(lp_name)

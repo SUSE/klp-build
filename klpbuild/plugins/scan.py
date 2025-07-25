@@ -136,4 +136,4 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     logging.info("All affected codestreams:")
     logging.info("\t%s", utils.classify_codestreams_str(working_cs))
 
-    return upstream, patched_cs, patched_kernels, working_cs
+    return upstream, patched_cs, working_cs
