@@ -12,7 +12,7 @@ def test_filter():
         ret = {}
 
         for cs in cs_list:
-            ret[cs] = Codestream.from_cs(cs)
+            ret[cs] = Codestream(cs)
 
         return ret
 
@@ -20,7 +20,7 @@ def test_filter():
         ret = []
 
         for cs in cs_list:
-            ret.append(Codestream.from_cs(cs))
+            ret.append(Codestream(cs))
 
         return ret
 
