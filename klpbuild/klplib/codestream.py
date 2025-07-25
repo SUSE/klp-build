@@ -11,9 +11,8 @@ from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_fro
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
-    __slots__ = ("sle", "sp", "update", "rt", "ktype", "is_micro",
-                 "project", "patchid", "kernel", "archs", "files", "modules",
-                 "repo", "configs")
+    __slots__ = ("sle", "sp", "update", "rt", "is_micro", "project", "patchid",
+                 "kernel", "archs", "files", "modules", "repo", "configs")
 
     def __init__(self, sle, sp, update, rt, project="", patchid="", kernel="",
                  archs=None, files=None, modules=None, configs=None):
@@ -21,7 +20,6 @@ class Codestream:
         self.sp = sp
         self.update = update
         self.rt = rt
-        self.ktype = "-rt" if rt else "-default"
         self.is_micro = sle == 6
         self.project = project
         self.patchid = patchid
@@ -104,7 +102,7 @@ class Codestream:
 
 
     def get_obj_dir(self):
-        return Path(f"{self.get_src_dir(ARCH, init=False)}-obj", ARCH, self.ktype.replace("-", ""))
+        return Path(f"{self.get_src_dir(ARCH, init=False)}-obj", ARCH, self.get_kernel_type())
 
 
     def get_ipa_file(self, fname):
@@ -117,7 +115,7 @@ class Codestream:
         rpms, but this difference should not affect the entries that
         enable/disable portion of the source.
         """
-        file = f"config/{arch}/rt" if self.rt else f"config/{arch}/default"
+        file = f"config/{arch}/{self.get_kernel_type()}"
         return ksrc_read_rpm_file(self.kernel, file)
 
     def get_boot_file(self, file, arch=ARCH):
@@ -162,10 +160,16 @@ class Codestream:
         self.files = files
 
 
+    def get_kernel_type(self, suffix=False):
+        dash = "-" if suffix else ""
+        suffix = "rt" if self.rt else "default"
+        return dash + suffix
+
+
     def get_full_kernel_name(self):
         """Returns the kernel name with flavor suffix"""
         # some kernel versions already have the suffix, some other don't
-        ktype = "" if "-rt" in self.kernel else self.ktype
+        ktype = "" if "-rt" in self.kernel else self.get_kernel_type(suffix=True)
         return self.kernel + ktype
 
 
