@@ -11,16 +11,25 @@ from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_fro
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
-    __slots__ = ("sle", "sp", "update", "rt", "is_micro", "project", "patchid",
-                 "kernel", "archs", "files", "modules", "repo", "configs")
+    __slots__ = ("name","sle", "sp", "update", "rt", "is_micro", "project",
+                 "patchid", "kernel", "archs", "files", "modules", "repo",
+                 "configs")
 
-    def __init__(self, sle, sp, update, rt, project="", patchid="", kernel="",
+    def __init__(self, name, project="", patchid="", kernel="",
                  archs=None, files=None, modules=None, configs=None):
-        self.sle = sle
-        self.sp = sp
-        self.update = update
-        self.rt = rt
-        self.is_micro = sle == 6
+
+        self.name = name
+
+        match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", name)
+        if not match:
+            raise ValueError("Name format error")
+
+        self.sle = int(match.group(1))
+        self.sp = int(match.group(2))
+        self.rt = match.group(3)
+        self.update = int(match.group(4))
+
+        self.is_micro = self.sle == 6
         self.project = project
         self.patchid = patchid
         self.kernel = kernel
@@ -34,48 +43,36 @@ class Codestream:
         # Parse SLE15-SP2_Update_25 to 15.2u25
         rt = "rt" if "-RT" in cs else ""
         sp = "0"
-        u = "0"
+        update = "0"
 
         # SLE12-SP5_Update_51
         if "SLE" in cs:
-            sle, _, u = cs.replace("SLE", "").replace("-RT", "").split("_")
+            sle, _, update = cs.replace("SLE", "").replace("-RT", "").split("_")
             if "-SP" in sle:
                 sle, sp = sle.split("-SP")
         # MICRO-6-0_Update_2
         elif "MICRO" in cs:
-            sle, sp, u = cs.replace("MICRO-", "").replace("-RT", "").replace("_Update_", "-").split("-")
-            if rt and int(u) >= 5:
+            sle, sp, update = cs.replace("MICRO-", "").replace("-RT", "").replace("_Update_", "-").split("-")
+            if rt and int(update) >= 5:
                 kernel = kernel + "-rt"
         else:
             assert False, "codestream name should contain either SLE or MICRO!"
 
-        ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel)
+        cs_name = f"{sle}.{sp}{rt}u{update}"
+        ret = cls(cs_name, proj, patchid, kernel)
         ret.set_default_archs()
         return ret
 
 
     @classmethod
-    def from_cs(cls, cs):
-        match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
-        if not match:
-            raise ValueError("Filter regexp error!")
-        return cls(int(match.group(1)), int(match.group(2)),
-                   int(match.group(4)), match.group(3))
-
-
-    @classmethod
     def from_data(cls, data):
-        return cls(data["sle"], data["sp"], data["update"], data["rt"],
-                   data["project"], data["patchid"], data["kernel"],
-                   data["archs"], data["files"], data["modules"],
-                   data["configs"])
+        return cls(data["name"],data["project"], data["patchid"],
+                   data["kernel"], data["archs"], data["files"],
+                   data["modules"], data["configs"])
 
     def to_data(self):
         return {
-                "sle" : self.sle,
-                "sp" : self.sp,
-                "update" : self.update,
-                "rt" : self.rt,
+                "name" : self.name,
                 "project" : self.project,
                 "patchid": self.patchid,
                 "kernel" : self.kernel,
