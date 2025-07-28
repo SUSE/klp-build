@@ -34,7 +34,8 @@ class Codestream:
         self.project = project
         self.patchid = patchid
         self.kernel = kernel
-        self.archs = archs if archs is not None else []
+
+        self.archs = archs if archs is not None else self.__get_default_archs()
         self.files = files if files is not None else {}
         self.modules = modules if modules is not None else {}
         self.configs = configs if configs is not None else {}
@@ -61,7 +62,6 @@ class Codestream:
 
         cs_name = f"{sle}.{sp}{rt}u{update}"
         ret = cls(cs_name, proj, patchid, kernel)
-        ret.set_default_archs()
         return ret
 
 
@@ -141,18 +141,16 @@ class Codestream:
 
         return f"{repo}_Products_SLERT_Update"
 
-    def set_default_archs(self):
+    def __get_default_archs(self):
         # RT is supported only on x86_64 at the moment
         if self.rt:
-            self.archs = ["x86_64"]
-
+            return ["x86_64"]
         # MICRO 6.0 doesn't support ppc64le
         elif self.is_micro:
-            self.archs = ["x86_64", "s390x"]
-
+            return ["x86_64", "s390x"]
         # We support all architecture for all other codestreams
-        else:
-            self.archs = ["x86_64", "s390x", "ppc64le"]
+        return ["x86_64", "s390x", "ppc64le"]
+
 
     def set_files(self, files):
         self.files = files
