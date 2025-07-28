@@ -23,10 +23,11 @@ class Codestream:
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", name)
         if not match:
             raise ValueError("Name format error")
+        assert match.group(3) in (None, "rt")
 
         self.sle = int(match.group(1))
         self.sp = int(match.group(2))
-        self.rt = match.group(3)
+        self.rt = match.group(3) or ""
         self.update = int(match.group(4))
 
         self.is_micro = self.sle == 6
@@ -175,8 +176,7 @@ class Codestream:
         Return the base codestream name, optionally including 'rt' if it's a
         real-time kernel.
         """
-        rt = "rt" if self.rt else ""
-        return f"{self.sle}.{self.sp}{rt}"
+        return f"{self.sle}.{self.sp}{self.rt}"
 
 
     def full_cs_name(self):
