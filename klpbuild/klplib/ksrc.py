@@ -151,11 +151,6 @@ def get_branch_patches(cve, mbranch):
 
 @__check_kernel_source_tags_are_fetched
 def get_patches(cve, savedir=None):
-    # Support CVEs from 2020 up to 2029
-    if not re.match(r"^202[0-9]-[0-9]{4,7}$", cve):
-        logging.info("Invalid CVE number '%s', skipping the processing of getting the patches.", cve)
-        return {}
-
     logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
     # Store all patches from each branch and upstream
