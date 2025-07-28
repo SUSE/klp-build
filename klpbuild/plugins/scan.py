@@ -61,7 +61,7 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     else:
         assert cve
         patches = get_patches(cve, savedir)
-        patched_kernels = get_patched_kernels(all_codestreams, patches, cve)
+        patched_kernels = get_patched_kernels(all_codestreams, patches)
 
         upstream = patches.get("upstream")
 
