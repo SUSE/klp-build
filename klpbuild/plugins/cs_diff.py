@@ -8,7 +8,7 @@ import logging
 import sys
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.codestreams_data import get_codestreams_dict
+from klpbuild.klplib.codestreams_data import get_codestreams_list
 from klpbuild.klplib.utils import filter_codestreams
 from klpbuild.plugins.extract import get_cs_code
 
@@ -28,7 +28,7 @@ def cs_diff(lp_name, lp_filter):
     """
     To compare two codestreams the filter should result in exactly two codestreams
     """
-    cs_args = filter_codestreams(lp_filter, get_codestreams_dict(), verbose=True)
+    cs_args = filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
     if len(cs_args) != 2:
         logging.error("The filter specified found %d while it should point to only 2.", len(cs_args))
         sys.exit(1)

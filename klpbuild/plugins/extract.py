@@ -22,7 +22,7 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_dict
+from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_list
 from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.templ import generate_livepatches
 
@@ -621,7 +621,7 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
         with open(quilt_log_path(lp_name, apply_patches), "w") as f:
             f.truncate()
 
-    working_cs = utils.filter_codestreams(lp_filter, get_codestreams_dict(), verbose=True)
+    working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
 
     if len(working_cs) == 0:
         logging.error("No codestreams found")

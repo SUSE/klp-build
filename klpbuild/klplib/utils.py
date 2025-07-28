@@ -219,10 +219,7 @@ def check_module_unsupported(arch, mod_path):
 
 
 def filter_codestreams(lp_filter, cs_list, verbose=False):
-    if isinstance(cs_list, dict):
-        full_cs = copy.deepcopy(list(cs_list.values()))
-    else:
-        full_cs = copy.deepcopy(cs_list)
+    full_cs = copy.deepcopy(cs_list)
 
     if verbose:
         logging.info("Checking filter...")
