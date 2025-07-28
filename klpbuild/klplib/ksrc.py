@@ -151,16 +151,6 @@ def get_branch_patches(cve, mbranch):
 
 @__check_kernel_source_tags_are_fetched
 def get_patches(cve, savedir=None):
-    kern_src = get_user_path('kernel_src_dir', isopt=True)
-    if not kern_src:
-        logging.info("kernel_src_dir not found, skip getting SUSE commits")
-        return {}
-
-    # ensure that the user informed the commits at least once per 'project'
-    if not cve:
-        logging.info("No CVE informed, skipping the processing of getting the patches.")
-        return {}
-
     # Support CVEs from 2020 up to 2029
     if not re.match(r"^202[0-9]-[0-9]{4,7}$", cve):
         logging.info("Invalid CVE number '%s', skipping the processing of getting the patches.", cve)
@@ -234,17 +224,8 @@ def get_patches(cve, savedir=None):
     return patches
 
 
-def get_patched_kernels(codestreams, patches, cve):
+def get_patched_kernels(codestreams, patches):
     if not patches:
-        return []
-
-    kern_src = get_user_path('kernel_src_dir', isopt=True)
-    if not kern_src:
-        logging.info("kernel_src_dir not found, skip getting SUSE commits")
-        return []
-
-    if not cve:
-        logging.info("No CVE informed, skipping the processing of getting the patched kernels.")
         return []
 
     logging.info("Searching for already patched codestreams...")
