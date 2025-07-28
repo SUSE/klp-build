@@ -40,30 +40,6 @@ class Codestream:
         self.modules = modules if modules is not None else {}
         self.configs = configs if configs is not None else {}
 
-    @classmethod
-    def from_codestream(cls, cs, proj, patchid, kernel):
-        # Parse SLE15-SP2_Update_25 to 15.2u25
-        rt = "rt" if "-RT" in cs else ""
-        sp = "0"
-        update = "0"
-
-        # SLE12-SP5_Update_51
-        if "SLE" in cs:
-            sle, _, update = cs.replace("SLE", "").replace("-RT", "").split("_")
-            if "-SP" in sle:
-                sle, sp = sle.split("-SP")
-        # MICRO-6-0_Update_2
-        elif "MICRO" in cs:
-            sle, sp, update = cs.replace("MICRO-", "").replace("-RT", "").replace("_Update_", "-").split("-")
-            if rt and int(update) >= 5:
-                kernel = kernel + "-rt"
-        else:
-            assert False, "codestream name should contain either SLE or MICRO!"
-
-        cs_name = f"{sle}.{sp}{rt}u{update}"
-        ret = cls(cs_name, proj, patchid, kernel)
-        return ret
-
 
     @classmethod
     def from_data(cls, data):
