@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
 import logging
+import re
 import sys
 
 from klpbuild.klplib import utils
@@ -59,7 +60,9 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
         patches = {}
         patched_kernels = []
     else:
-        assert cve
+        # Support CVEs from 2020 up to 2029
+        assert cve and re.match(r"^202[0-9]-[0-9]{4,7}$", cve)
+
         patches = get_patches(cve, savedir)
         patched_kernels = get_patched_kernels(all_codestreams, patches)
 
