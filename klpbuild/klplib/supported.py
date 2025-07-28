@@ -33,15 +33,38 @@ def get_supported_codestreams():
         kernel = re.sub(r"\.\d+$", "", kernel_full)
 
         # MICRO releases contain project/patchid format
+        patchid = ""
         if "/" in proj:
             proj, patchid = proj.split("/")
-        else:
-            patchid = ""
 
-        supported_codestreams.append(Codestream.from_codestream(full_cs, proj,
-                                                                patchid,
-                                                                kernel))
+        cs = __codestream_from_supported(full_cs, proj, patchid, kernel)
+        supported_codestreams.append(cs)
+
     return supported_codestreams
+
+
+def __codestream_from_supported(cs, proj, patchid, kernel):
+    # Parse SLE15-SP2_Update_25 to 15.2u25
+    rt = "rt" if "-RT" in cs else ""
+    sp = "0"
+    update = "0"
+
+    # SLE12-SP5_Update_51
+    if "SLE" in cs:
+        sle, _, update = cs.replace("SLE", "").replace("-RT", "").split("_")
+        if "-SP" in sle:
+            sle, sp = sle.split("-SP")
+    # MICRO-6-0_Update_2
+    elif "MICRO" in cs:
+        sle, sp, update = cs.replace("MICRO-", "").replace("-RT", "").replace("_Update_", "-").split("-")
+        if rt and int(update) >= 5:
+            kernel = kernel + "-rt"
+    else:
+        assert False, "codestream name should contain either SLE or MICRO!"
+
+    cs_name = f"{sle}.{sp}{rt}u{update}"
+    return Codestream(cs_name, proj, patchid, kernel)
+
 
 def __load_supported_file():
     """
