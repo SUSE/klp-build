@@ -107,14 +107,14 @@ def get_codestream_by_name(name):
     return _codestreams.get(name, None)
 
 
-def get_codestreams_dict():
+def get_codestreams_list():
     """
-    Retrieve the dictionary of all codestreams.
+    Retrieve the list of all codestream.
 
     Returns:
-        dict: A dictionary of all codestreams.
+        list: A list of all codestream.
     """
-    return _codestreams
+    return list(_codestreams.values())
 
 
 def get_codestreams_data(name: str):

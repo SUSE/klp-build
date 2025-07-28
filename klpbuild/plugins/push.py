@@ -14,7 +14,7 @@ import time
 from osctiny import Osc
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.codestreams_data import get_codestreams_dict
+from klpbuild.klplib.codestreams_data import get_codestreams_list
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ibs import convert_cs_to_prj, delete_project, prj_prefix
 from klpbuild.klplib.utils import classify_codestreams_str, filter_codestreams, get_cs_branch, get_kgraft_branch
@@ -141,7 +141,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
 
 
 def push(lp_name, lp_filter, wait=False):
-    cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
+    cs_list = filter_codestreams(lp_filter, get_codestreams_list())
 
     if not cs_list:
         logging.error("push: No codestreams found for %s", lp_name)
