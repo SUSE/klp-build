@@ -117,16 +117,6 @@ def get_codestreams_dict():
     return _codestreams
 
 
-def get_codestreams_items():
-    """
-    Retrieve the items (key-value pairs) of the codestreams dictionary.
-
-    Returns:
-        dict_items: The items of the codestreams dictionary.
-    """
-    return _codestreams.items()
-
-
 def get_codestreams_data(name: str):
     """
     Retrieve the codestream data for a given attribute name.
