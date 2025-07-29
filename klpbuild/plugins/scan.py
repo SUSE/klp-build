@@ -47,12 +47,13 @@ def scan(cve, conf, lp_filter, download, savedir=None):
     upstream = patches.get("upstream", [])
 
     all_codestreams = get_supported_codestreams()
-    patched_kernels = get_patched_kernels(all_codestreams, patches)
+    filtered_codesteams = utils.filter_codestreams(lp_filter, all_codestreams, verbose=True)
+    patched_kernels = get_patched_kernels(filtered_codesteams, patches)
 
     working_cs = []
     patched_cs = []
     unaffected_cs = []
-    for cs in utils.filter_codestreams(lp_filter, all_codestreams, verbose=True):
+    for cs in filtered_codesteams:
 
         if cs.kernel in patched_kernels:
             patched_cs.append(cs.full_cs_name())
@@ -87,6 +88,7 @@ def scan(cve, conf, lp_filter, download, savedir=None):
         kmodules_report = patch.analyse_kmodules(working_cs)
         patch.print_kmodules(kmodules_report)
         unsupported = patch.filter_unsupported_kmodules(working_cs)
+
     # If conf is set, drop codestream not containing that conf entry from working_cs
     elif conf:
         tmp_working_cs = []
