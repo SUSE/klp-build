@@ -10,6 +10,7 @@ from natsort import natsorted
 from klpbuild.klplib import utils
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import get_codestreams_data, set_codestreams_data, store_codestreams
+from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.templ import generate_commit_msg_file
 
 from klpbuild.plugins.scan import scan
@@ -130,10 +131,16 @@ def setup_codestreams(lp_name, data):
 
     # Called at this point because codestreams is populated
     # FIXME: we should check all configs, like when using --conf-mod-file-funcs
-    upstream, patched_cs, codestreams = scan(data["cve"], data["conf"],
-                                             data["no_check"],
-                                             data["lp_filter"], True,
-                                             utils.get_workdir(lp_name))
+    if data["no_check"]:
+        logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
+        upstream = []
+        patched_cs = []
+        all_codestreams = get_supported_codestreams()
+        codestreams = utils.filter_codestreams(data["lp_filter"], all_codestreams)
+    else:
+        upstream, patched_cs, codestreams = scan(data["cve"], data["conf"],
+                                                 data["lp_filter"], True,
+                                                 utils.get_workdir(lp_name))
 
     # Add new codestreams to the already existing list, skipping duplicates
     old_patched_cs = get_codestreams_data('patched_cs')
