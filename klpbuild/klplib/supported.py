@@ -94,7 +94,7 @@ def __download_supported_file():
         list[str]: The list of lines of the supported file, excluding the
         header.
     """
-    logging.info("Downloading codestreams file")
+    logging.debug("Downloading codestreams file")
 
     if SUSE_CERT.exists():
         req = requests.get(SUPPORTED_CS_URL, verify=SUSE_CERT, timeout=15)
