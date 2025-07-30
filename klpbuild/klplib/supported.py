@@ -3,9 +3,10 @@
 # Copyright (C) 2021-2025 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
+from pathlib import Path
+import copy
 import logging
 import re
-from pathlib import Path
 import requests
 
 from klpbuild.klplib import utils
@@ -14,6 +15,8 @@ from klpbuild.klplib.codestream import Codestream
 SUPPORTED_CS_URL = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
 SUSE_CERT = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
 
+__supported_codestreams_cache = []
+
 def get_supported_codestreams():
     """
     Download and parse the list of supported codestreams.
@@ -21,7 +24,13 @@ def get_supported_codestreams():
     Returns:
         list[Codestream]: A list of supported codestreams.
     """
-    supported_codestreams = []
+    global __supported_codestreams_cache
+
+    # Return cached list if present
+    if __supported_codestreams_cache:
+        return copy.deepcopy(__supported_codestreams_cache)
+
+    __supported_codestreams_cache = []
     lines = __download_supported_file() if not utils.in_test_mode() else __load_supported_file()
 
     for line in lines:
@@ -38,9 +47,9 @@ def get_supported_codestreams():
             proj, patchid = proj.split("/")
 
         cs = __codestream_from_supported(full_cs, proj, patchid, kernel)
-        supported_codestreams.append(cs)
+        __supported_codestreams_cache.append(cs)
 
-    return supported_codestreams
+    return copy.deepcopy(__supported_codestreams_cache)
 
 
 def __codestream_from_supported(cs, proj, patchid, kernel):
