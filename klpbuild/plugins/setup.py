@@ -82,10 +82,6 @@ def setup(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
           mod_file_funcs, conf_mod_file_funcs):
     assert isinstance(archs, list)
 
-    lp_path = utils.get_workdir(lp_name)
-    if lp_path.exists() and not lp_path.is_dir():
-        raise ValueError("--name needs to be a directory, or not to exist")
-
     ffuncs = setup_file_funcs(conf, module, file_funcs,
                                     mod_file_funcs, conf_mod_file_funcs)
 
