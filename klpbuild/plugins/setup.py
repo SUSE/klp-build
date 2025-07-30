@@ -10,6 +10,7 @@ from natsort import natsorted
 from klpbuild.klplib import utils
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import get_codestreams_data, set_codestreams_data, store_codestreams
+from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.templ import generate_commit_msg_file
 
 from klpbuild.plugins.scan import scan
@@ -81,10 +82,6 @@ def setup(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
           mod_file_funcs, conf_mod_file_funcs):
     assert isinstance(archs, list)
 
-    lp_path = utils.get_workdir(lp_name)
-    if lp_path.exists() and not lp_path.is_dir():
-        raise ValueError("--name needs to be a directory, or not to exist")
-
     ffuncs = setup_file_funcs(conf, module, file_funcs,
                                     mod_file_funcs, conf_mod_file_funcs)
 
@@ -130,19 +127,23 @@ def setup_codestreams(lp_name, data):
 
     # Called at this point because codestreams is populated
     # FIXME: we should check all configs, like when using --conf-mod-file-funcs
-    upstream, patched_cs, patched_kernels, codestreams = scan(data["cve"],
-                                                             data["conf"],
-                                                             data["no_check"],
-                                                             data["lp_filter"],
-                                                             True,
-                                                             utils.get_workdir(lp_name))
+    if data["no_check"]:
+        logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
+        upstream = []
+        patched_cs = []
+        all_codestreams = get_supported_codestreams()
+        codestreams = utils.filter_codestreams(data["lp_filter"], all_codestreams)
+    else:
+        upstream, patched_cs, codestreams = scan(data["cve"], data["conf"],
+                                                 data["lp_filter"], True,
+                                                 utils.get_workdir(lp_name))
+
     # Add new codestreams to the already existing list, skipping duplicates
     old_patched_cs = get_codestreams_data('patched_cs')
     new_patched_cs = natsorted(list(set(old_patched_cs + patched_cs)))
 
-    set_codestreams_data(upstream=upstream,
-                         patched_kernels=list(patched_kernels),
-                         patched_cs=new_patched_cs, cve=data['cve'])
+    set_codestreams_data(upstream=upstream, patched_cs=new_patched_cs,
+                         cve=data['cve'])
     return codestreams
 
 
@@ -170,12 +171,12 @@ def setup_project_files(lp_name, codestreams, ffuncs, archs):
             cs.validate_config(archs, fdata["conf"], mod)
 
             if not cs.check_file_exists(f):
-                raise RuntimeError(f"{cs.name()} ({cs.kernel}): File {f} not found.")
+                raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}): File {f} not found.")
 
             ipa_f = cs.get_ipa_file(f)
             if not ipa_f.is_file():
                 ipa_f.touch()
-                logging.warning("%s (%s): File %s not found. Creating an empty file.", cs.name(), cs.kernel, ipa_f)
+                logging.warning("%s (%s): File %s not found. Creating an empty file.", cs.full_cs_name(), cs.kernel, ipa_f)
 
             # If the config was enabled on all supported architectures,
             # there is no point in leaving the conf being set, since the
@@ -187,7 +188,7 @@ def setup_project_files(lp_name, codestreams, ffuncs, archs):
 
             # Validate if the module being livepatched is supported or not
             if utils.check_module_unsupported(utils.ARCH, mod_path):
-                logging.warning("%s (%s}): Module %s is not supported by SLE", cs.name(), cs.kernel, mod)
+                logging.warning("%s (%s): Module %s is not supported by SLE", cs.full_cs_name(), cs.kernel, mod)
 
             cs.modules[mod] = str(mod_path)
             mod_syms.setdefault(mod, [])
@@ -199,7 +200,7 @@ def setup_project_files(lp_name, codestreams, ffuncs, archs):
             if arch_syms:
                 for arch, syms in arch_syms.items():
                     logging.warning("%s-%s (%s): Symbols %s not found on %s object",
-                                    cs.name(), arch, cs.kernel, ",".join(syms), mod)
+                                    cs.full_cs_name(), arch, cs.kernel, ",".join(syms), mod)
 
     store_codestreams(lp_name, codestreams)
     logging.info("Done. Setup finished.")

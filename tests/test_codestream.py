@@ -9,9 +9,9 @@ from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.utils import ARCHS
 
 
-def test_wrong_cs_filter():
-    with pytest.raises(ValueError, match=r"Filter regexp error!"):
-        Codestream.from_cs("wrong-filter")
+def test_wrong_cs_name():
+    with pytest.raises(ValueError, match=r"Name format error"):
+        Codestream("wrong-filter")
 
 
 def test_find_obj_path_arch():
@@ -19,10 +19,7 @@ def test_find_obj_path_arch():
     Ensure the returned obj path doesn't contain any architecture info
     """
     cs = Codestream.from_data({
-        "sle": 15,
-        "sp": 5,
-        "update": 15,
-        "rt": "",
+        "name": "15.5u15",
         "project": "SUSE:Maintenance:34200",
         "patchid": "",
         "kernel": "5.14.21-150500.55.68",

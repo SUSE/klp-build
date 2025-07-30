@@ -415,7 +415,7 @@ def __generate_header_file(lp_name, lp_path, cs):
     # We don't need any setups on IBT besides the livepatch_init/cleanup ones
     header_templ = TEMPL_NO_SYMS_H
 
-    if not cs.needs_ibt:
+    if not cs.needs_ibt():
         configs = set()
         config = ""
         has_cleanup = False
