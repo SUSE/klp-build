@@ -192,7 +192,7 @@ def setup_project_files(lp_name, codestreams, ffuncs, archs):
 
             # Validate if the module being livepatched is supported or not
             if utils.check_module_unsupported(utils.ARCH, mod_path):
-                logging.warning("%s (%s}): Module %s is not supported by SLE", cs.full_cs_name(), cs.kernel, mod)
+                logging.warning("%s (%s): Module %s is not supported by SLE", cs.full_cs_name(), cs.kernel, mod)
 
             cs.modules[mod] = str(mod_path)
             mod_syms.setdefault(mod, [])
