@@ -189,7 +189,7 @@ def download_and_extract(args, total):
             extract_rpms((i, cs, arch, rpm, dest), total)
             # All good, stop the loop
             break
-        except Exception as e:
+        except subprocess.CalledProcessError:
             # There was an issue when extracting the RPMs, probably because it's broken
             # Remove the downloaded RPMs and try again
             tries = tries - 1
