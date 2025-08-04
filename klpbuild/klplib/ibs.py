@@ -105,9 +105,8 @@ def get_cs_packages(cs_list, dest):
     logging.info("Getting list of files...")
     for cs in cs_list:
         for arch in cs.archs:
-            pkg_name = cs.get_package_name()
-
-            ret = osc.build.get_binary_list(cs.project, cs.get_repo(), arch, pkg_name)
+            ret = osc.build.get_binary_list(cs.project, cs.get_repo(), arch,
+                                            cs.get_package_name())
             for file in re.findall(pkg_regex, str(etree.tostring(ret))):
                 # FIXME: adjust the regex to only deal with strings
                 if isinstance(file, str):
@@ -127,7 +126,7 @@ def get_cs_packages(cs_list, dest):
                     if arch != ARCH:
                         continue
 
-                rpms.append((osc, i, cs, cs.project, cs.get_repo(), arch, pkg_name, rpm, dest))
+                rpms.append((osc, i, cs, arch, rpm, dest))
                 i += 1
 
     return rpms
@@ -167,20 +166,20 @@ def validate_livepatch_module(cs, arch, rpm_dir, rpm):
 
 
 def download_binary_rpms(args, total):
-    osc, i, cs, prj, repo, arch, pkg, rpm, dest = args
+    osc, i, cs, arch, rpm, dest = args
 
     try:
-        osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
+        osc.build.download_binary(cs.project, cs.get_repo(), arch, cs.get_package_name(), rpm, dest)
         logging.info("(%d/%d) %s %s: ok", i, total, cs.full_cs_name(), rpm)
     except OSError as e:
         if e.errno == errno.EEXIST:
             logging.info("(%d/%d) %s %s: already downloaded. skipping", i, total, cs.full_cs_name(), rpm)
         else:
-            raise RuntimeError(f"download error on {prj}: {rpm}") from e
+            raise RuntimeError(f"download error on {cs.project}: {rpm}") from e
 
 
 def download_and_extract(args, total):
-    _, i, cs, _, _, arch, _, rpm, dest = args
+    _, i, cs, arch, rpm, dest = args
 
     # Try to download and extract at least twice if any problems arise
     tries = 2
