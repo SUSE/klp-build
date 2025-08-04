@@ -226,6 +226,22 @@ class Codestream:
         product_base_name = self.get_base_product_name()
         return f"{product_base_name}_Update_{self.update}"
 
+    def get_package_name(self):
+        """
+        Return the kernel package name related to the codestream
+        """
+        pkg = "kernel-default"
+
+        if self.is_micro:
+            pkg = self.patchid
+
+        elif self.rt:
+            pkg = "kernel-rt"
+
+        if self.get_repo() != "standard":
+            pkg = f"{pkg}.{self.get_repo()}"
+
+        return pkg
 
     def needs_ibt(self):
         return self.is_micro or self.sle > 15 or (self.sle == 15 and self.sp >= 6)
