@@ -94,9 +94,8 @@ def get_cs_packages(cs_list, dest):
     # kernel-(default|rt)-livepatch-devel (for SLE15+)
     # kernel-default-kgraft (for SLE12)
     # kernel-default-kgraft-devel (for SLE12)
-    cs_data = {
-        "kernel-default": r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)",
-    }
+    pkg_regex = \
+        r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)"
 
     rpms = []
     i = 1
@@ -106,31 +105,30 @@ def get_cs_packages(cs_list, dest):
     logging.info("Getting list of files...")
     for cs in cs_list:
         for arch in cs.archs:
-            for _, regex in cs_data.items():
-                pkg_name = cs.get_package_name()
+            pkg_name = cs.get_package_name()
 
-                ret = osc.build.get_binary_list(cs.project, cs.get_repo(), arch, pkg_name)
-                for file in re.findall(regex, str(etree.tostring(ret))):
-                    # FIXME: adjust the regex to only deal with strings
-                    if isinstance(file, str):
-                        rpm = file
-                    else:
-                        rpm = file[0]
+            ret = osc.build.get_binary_list(cs.project, cs.get_repo(), arch, pkg_name)
+            for file in re.findall(pkg_regex, str(etree.tostring(ret))):
+                # FIXME: adjust the regex to only deal with strings
+                if isinstance(file, str):
+                    rpm = file
+                else:
+                    rpm = file[0]
 
-                    # Download all packages for the HOST arch
-                    # For the others only download kernel-default
-                    if arch != ARCH and not re.search(r"kernel-default-\d", rpm):
+                # Download all packages for the HOST arch
+                # For the others only download kernel-default
+                if arch != ARCH and not re.search(r"kernel-default-\d", rpm):
+                    continue
+
+                # Extract the source and kernel-devel in the current
+                # machine arch to make it possible to run klp-build in
+                # different architectures
+                if "kernel-default-devel" in rpm:
+                    if arch != ARCH:
                         continue
 
-                    # Extract the source and kernel-devel in the current
-                    # machine arch to make it possible to run klp-build in
-                    # different architectures
-                    if "kernel-default-devel" in rpm:
-                        if arch != ARCH:
-                            continue
-
-                    rpms.append((osc, i, cs, cs.project, cs.get_repo(), arch, pkg_name, rpm, dest))
-                    i += 1
+                rpms.append((osc, i, cs, cs.project, cs.get_repo(), arch, pkg_name, rpm, dest))
+                i += 1
 
     return rpms
 
