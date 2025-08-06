@@ -9,7 +9,7 @@ import sys
 from osctiny import Osc
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.codestreams_data import get_codestreams_dict
+from klpbuild.klplib.codestreams_data import get_codestreams_list
 from klpbuild.klplib.ibs import convert_cs_to_prj, prj_prefix
 from klpbuild.klplib.utils import ARCHS, filter_codestreams
 
@@ -27,14 +27,14 @@ def register_argparser(subparser):
 
 
 def log(lp_name, lp_filter, arch):
-    cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
+    cs_list = filter_codestreams(lp_filter, get_codestreams_list())
 
     if not cs_list:
         logging.error("log: No codestreams found for filter %s", lp_filter)
         sys.exit(1)
 
     if len(cs_list) > 1:
-        cs_names = [cs.name() for cs in cs_list]
+        cs_names = [cs.full_cs_name() for cs in cs_list]
         logging.error("Filter '%s' returned %d entries (%s), while expecting just one. Aborting. ",
                       lp_filter, len(cs_list), " ".join(cs_names))
         sys.exit(1)

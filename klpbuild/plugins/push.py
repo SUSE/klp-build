@@ -14,7 +14,7 @@ import time
 from osctiny import Osc
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.codestreams_data import get_codestreams_dict
+from klpbuild.klplib.codestreams_data import get_codestreams_list
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ibs import convert_cs_to_prj, delete_project, prj_prefix
 from klpbuild.klplib.utils import classify_codestreams_str, filter_codestreams, get_cs_branch, get_kgraft_branch
@@ -40,7 +40,7 @@ def create_prj_meta(cs):
                "<publish><disable/></publish>" + \
                "<debuginfo><disable/></debuginfo>" + \
                "<repository name=\"standard\">" + \
-               f"<path project=\"{cs.project}\" repository=\"{cs.repo}\"/>" + \
+               f"<path project=\"{cs.project}\" repository=\"{cs.get_repo()}\"/>" + \
                "".join([f"<arch>{arch}</arch>" for arch in cs.archs]) + \
                "</repository>" + \
            "</project>"
@@ -50,7 +50,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
     kgr_path = get_user_path('kgr_patches_dir')
     branch = get_cs_branch(cs, lp_name, kgr_path)
     if not branch:
-        logging.info("Could not find git branch for %s. Skipping.", cs.name())
+        logging.info("Could not find git branch for %s. Skipping.", cs.full_cs_name())
         return
 
     # If the project exists, drop it first
@@ -58,7 +58,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
     delete_project(osc, 0, 0, prj, verbose=False)
 
     meta = create_prj_meta(cs)
-    prj_desc = f"Development of livepatches for {cs.name()}"
+    prj_desc = f"Development of livepatches for {cs.full_cs_name()}"
 
     try:
         osc.projects.set_meta(
@@ -82,10 +82,10 @@ def create_lp_package(osc, lp_name, i, total, cs):
 
     osc.packages.checkout(prj, "klp", prj_path)
 
-    base_branch = get_kgraft_branch(cs.name())
+    base_branch = get_kgraft_branch(cs.full_cs_name())
 
     logging.info("(%s/%s) pushing %s using branches %s/%s...",
-                 i, total, cs.name(), str(base_branch), str(branch))
+                 i, total, cs.full_cs_name(), str(base_branch), str(branch))
 
     # Clone the repo and checkout to the codestream branch. The branch should be based on master to avoid rebasing
     # conflicts
@@ -119,7 +119,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
 
     # Fix RELEASE version
     with open(Path(code_path, "scripts", "release-version.sh"), "w") as f:
-        ver = cs.name_full().replace("EMBARGO", "")
+        ver = cs.get_full_product_name().replace("EMBARGO", "")
         f.write(f"RELEASE={ver}")
 
     subprocess.check_output(
@@ -137,11 +137,11 @@ def create_lp_package(osc, lp_name, i, total, cs):
     osc.packages.cmd(prj, "klp", "commit", comment=f"Dump {branch}")
     shutil.rmtree(prj_path)
 
-    logging.info("(%d/%d) %s done", i, total, cs.name())
+    logging.info("(%d/%d) %s done", i, total, cs.full_cs_name())
 
 
 def push(lp_name, lp_filter, wait=False):
-    cs_list = filter_codestreams(lp_filter, get_codestreams_dict())
+    cs_list = filter_codestreams(lp_filter, get_codestreams_list())
 
     if not cs_list:
         logging.error("push: No codestreams found for %s", lp_name)

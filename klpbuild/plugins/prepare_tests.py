@@ -15,7 +15,7 @@ from natsort import natsorted
 from osctiny import Osc
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_dict
+from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_list
 from klpbuild.klplib.ibs import convert_prj_to_cs, delete_built_rpms, delete_project, do_work, download_binary_rpms, get_projects, prj_prefix, validate_livepatch_module
 from klpbuild.klplib.utils import ARCHS, filter_codestreams, get_tests_path, get_workdir
 
@@ -100,19 +100,19 @@ def prepare_tests(lp_name, lp_filter):
 
         logging.info("Checking %s symbols...", arch)
         build_cs = []
-        for cs in filter_codestreams(lp_filter, get_codestreams_dict()):
+        for cs in filter_codestreams(lp_filter, get_codestreams_list()):
             if arch not in cs.archs:
                 continue
 
             rpm_dir = Path(cs.get_ccp_dir(lp_name), arch, "rpm")
             if not rpm_dir.exists():
-                logging.info("%s/%s: rpm dir not found. Skipping.", cs.name(), arch)
+                logging.info("%s/%s: rpm dir not found. Skipping.", cs.full_cs_name(), arch)
                 continue
 
             # TODO: there will be only one rpm, format it directly
             rpm = os.listdir(rpm_dir)
             if len(rpm) > 1:
-                raise RuntimeError(f"ERROR: {cs.name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
+                raise RuntimeError(f"ERROR: {cs.full_cs_name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
 
             for rpm in os.listdir(rpm_dir):
                 # Check for dependencies
@@ -123,7 +123,7 @@ def prepare_tests(lp_name, lp_filter):
             if cs.rt and arch != "x86_64":
                 continue
 
-            build_cs.append(cs.name_full())
+            build_cs.append(cs.get_full_product_name())
 
         logging.info("Done.")
 

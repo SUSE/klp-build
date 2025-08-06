@@ -11,69 +11,53 @@ from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_fro
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
-    __slots__ = ("sle", "sp", "update", "rt", "ktype", "needs_ibt", "is_micro",
-                 "project", "patchid", "kernel", "archs", "files", "modules",
-                 "repo", "configs")
+    __slots__ = ("name","sle", "sp", "update", "rt", "is_micro", "project",
+                 "patchid", "kernel", "archs", "files", "modules", "repo",
+                 "configs")
 
-    def __init__(self, sle, sp, update, rt, project, patchid, kernel, archs,
-                 files, modules, configs):
-        self.sle = sle
-        self.sp = sp
-        self.update = update
-        self.rt = rt
-        self.ktype = "-rt" if rt else "-default"
-        self.is_micro = sle == 6
-        self.needs_ibt = self.is_micro or sle > 15 or (sle == 15 and sp >= 6)
+    def __init__(self, name, project="", patchid="", kernel="",
+                 archs=None, files=None, modules=None, configs=None):
+
+        self.name = name
+
+        match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", name)
+        if not match:
+            raise ValueError("Name format error")
+        assert match.group(3) in (None, "rt")
+
+        self.sle = int(match.group(1))
+        self.sp = int(match.group(2))
+        self.rt = match.group(3) or ""
+        self.update = int(match.group(4))
+
+        self.is_micro = self.sle == 6
         self.project = project
         self.patchid = patchid
         self.kernel = kernel
-        self.archs = archs
-        self.files = files
-        self.modules = modules
-        self.configs = configs
-        self.repo = self.get_repo()
 
-    @classmethod
-    def from_codestream(cls, cs, proj, patchid, kernel):
-        # Parse SLE15-SP2_Update_25 to 15.2u25
-        rt = "rt" if "-RT" in cs else ""
-        sp = "0"
-        u = "0"
-
-        # SLE12-SP5_Update_51
-        if "SLE" in cs:
-            sle, _, u = cs.replace("SLE", "").replace("-RT", "").split("_")
-            if "-SP" in sle:
-                sle, sp = sle.split("-SP")
-        # MICRO-6-0_Update_2
-        elif "MICRO" in cs:
-            sle, sp, u = cs.replace("MICRO-", "").replace("-RT", "").replace("_Update_", "-").split("-")
-            if rt and int(u) >= 5:
-                kernel = kernel + "-rt"
-        else:
-            assert False, "codestream name should contain either SLE or MICRO!"
-
-        ret = cls(int(sle), int(sp), int(u), rt, proj, patchid, kernel, [], {}, {}, {})
-        ret.set_archs()
-        return ret
-
-
-    @classmethod
-    def from_cs(cls, cs):
-        match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", cs)
-        if not match:
-            raise ValueError("Filter regexp error!")
-        return cls(int(match.group(1)), int(match.group(2)),
-                   int(match.group(4)), match.group(3), "", "", "", [], {}, {}, {})
+        self.archs = archs if archs is not None else self.__get_default_archs()
+        self.files = files if files is not None else {}
+        self.modules = modules if modules is not None else {}
+        self.configs = configs if configs is not None else {}
 
 
     @classmethod
     def from_data(cls, data):
-        return cls(data["sle"], data["sp"], data["update"], data["rt"],
-                   data["project"], data["patchid"], data["kernel"],
-                   data["archs"], data["files"], data["modules"],
-                   data["configs"])
+        return cls(data["name"],data["project"], data["patchid"],
+                   data["kernel"], data["archs"], data["files"],
+                   data["modules"], data["configs"])
 
+    def to_data(self):
+        return {
+                "name" : self.name,
+                "project" : self.project,
+                "patchid": self.patchid,
+                "kernel" : self.kernel,
+                "archs" : self.archs,
+                "files" : self.files,
+                "modules" : self.modules,
+                "configs" : self.configs,
+                }
 
     def __eq__(self, cs):
         return self.sle == cs.sle and \
@@ -84,7 +68,7 @@ class Codestream:
 
     def get_src_dir(self, arch=ARCH, init=True):
         # Only -rt codestreams have a suffix for source directory
-        name = self.kname() if self.rt else self.kernel
+        name = self.get_full_kernel_name() if self.rt else self.kernel
         src_dir = get_datadir(arch)/"usr"/"src"/f"linux-{name}"
         if init:
             init_cs_kernel_tree(self.kernel, src_dir)
@@ -92,7 +76,7 @@ class Codestream:
 
 
     def get_obj_dir(self):
-        return Path(f"{self.get_src_dir(ARCH, init=False)}-obj", ARCH, self.ktype.replace("-", ""))
+        return Path(f"{self.get_src_dir(ARCH, init=False)}-obj", ARCH, self.get_kernel_type())
 
 
     def get_ipa_file(self, fname):
@@ -105,7 +89,7 @@ class Codestream:
         rpms, but this difference should not affect the entries that
         enable/disable portion of the source.
         """
-        file = f"config/{arch}/rt" if self.rt else f"config/{arch}/default"
+        file = f"config/{arch}/{self.get_kernel_type()}"
         return ksrc_read_rpm_file(self.kernel, file)
 
     def get_boot_file(self, file, arch=ARCH):
@@ -114,7 +98,7 @@ class Codestream:
             return Path(self.get_mod_path(arch), file)
 
         # Strip the suffix from the filename so we can add the kernel version in the middle
-        fname = f"{Path(file).stem}-{self.kname()}{Path(file).suffix}"
+        fname = f"{Path(file).stem}-{self.get_full_kernel_name()}{Path(file).suffix}"
         return get_datadir(arch)/"boot"/fname
 
     def get_repo(self):
@@ -133,32 +117,45 @@ class Codestream:
 
         return f"{repo}_Products_SLERT_Update"
 
-    def set_archs(self):
+    def __get_default_archs(self):
         # RT is supported only on x86_64 at the moment
         if self.rt:
-            self.archs = ["x86_64"]
-
-        # MICRO 6.0 doest support ppc64le
-        elif "6.0" in self.name():
-            self.archs = ["x86_64", "s390x"]
-
+            return ["x86_64"]
+        # MICRO 6.0 doesn't support ppc64le
+        elif self.is_micro:
+            return ["x86_64", "s390x"]
         # We support all architecture for all other codestreams
-        else:
-            self.archs = ["x86_64", "s390x", "ppc64le"]
+        return ["x86_64", "s390x", "ppc64le"]
+
 
     def set_files(self, files):
         self.files = files
 
 
-    def kname(self):
-        return self.kernel + ("" if "-rt" in self.kernel else self.ktype)
+    def get_kernel_type(self, suffix=False):
+        dash = "-" if suffix else ""
+        suffix = "rt" if self.rt else "default"
+        return dash + suffix
 
 
-    def name(self):
-        if self.rt:
-            return f"{self.sle}.{self.sp}rtu{self.update}"
+    def get_full_kernel_name(self):
+        """Returns the kernel name with flavor suffix"""
+        # some kernel versions already have the suffix, some other don't
+        ktype = "" if "-rt" in self.kernel else self.get_kernel_type(suffix=True)
+        return self.kernel + ktype
 
-        return f"{self.sle}.{self.sp}u{self.update}"
+
+    def base_cs_name(self):
+        """
+        Return the base codestream name, optionally including 'rt' if it's a
+        real-time kernel.
+        """
+        return f"{self.sle}.{self.sp}{self.rt}"
+
+
+    def full_cs_name(self):
+        """Return the full codestream name including the update number."""
+        return f"{self.base_cs_name()}u{self.update}"
 
 
     def get_ccp_dir(self, lp_name):
@@ -171,7 +168,7 @@ class Codestream:
         Returns:
             Path: The path to the ccp directory of the current codestream.
         """
-        return get_workdir(lp_name)/"ccp"/self.name()
+        return get_workdir(lp_name)/"ccp"/self.full_cs_name()
 
 
     def get_lp_dir(self, lp_name):
@@ -202,26 +199,36 @@ class Codestream:
         return self.get_ccp_dir(lp_name)/fpath
 
 
-    def name_cs(self):
-        if self.rt:
-            return f"{self.sle}.{self.sp}rt"
-        return f"{self.sle}.{self.sp}"
+    def get_base_product_name(self):
+        """
+        Return the base product name based on internal attributes.
 
-    def name_full(self):
-        # Parse 15.2u25 to SLE15-SP2_Update_25
-        # Parse 6.0u2 to MICRO
+        Example:
+            15.6rtu2:       'SLE15-SP6-RT'
+            6u0:            'MICRO-6-0'
+        """
+        rt = "-RT" if self.rt else ""
+
         if self.is_micro:
-            buf = f"MICRO-{self.sle}-{self.sp}"
-        else:
-            buf = f"SLE{self.sle}"
-            if int(self.sp) > 0:
-                buf = f"{buf}-SP{self.sp}"
+            return f"MICRO-{self.sle}-{self.sp}{rt}"
 
-        if self.rt:
-            buf = f"{buf}-RT"
+        return f"SLE{self.sle}-SP{self.sp}{rt}"
 
-        return f"{buf}_Update_{self.update}"
 
+    def get_full_product_name(self):
+        """
+        Return the full product name including the update number.
+
+        Example:
+            15.6rtu2:       'SLE15-SP6-RT_Update_0'
+            6u0:            'MICRO-6-0_Update_0'
+        """
+        product_base_name = self.get_base_product_name()
+        return f"{product_base_name}_Update_{self.update}"
+
+
+    def needs_ibt(self):
+        return self.is_micro or self.sle > 15 or (self.sle == 15 and self.sp >= 6)
 
     # 15.4 onwards we don't have module_mutex, so template generates
     # different code
@@ -235,7 +242,7 @@ class Codestream:
         else:
             mod_path = Path("lib")
 
-        return get_datadir(arch)/mod_path/"modules"/self.kname()
+        return get_datadir(arch)/mod_path/"modules"/self.get_full_kernel_name()
 
     # A codestream can be patching multiple objects, so get the path related to
     # the module that we are interested
@@ -283,15 +290,15 @@ class Codestream:
             try:
                 conf_entry = cs_config.pop(arch)
             except KeyError as exc:
-                raise RuntimeError(f"{self.name()}: {conf} not set on {arch}. Aborting") from exc
+                raise RuntimeError(f"{self.full_cs_name()}: {conf} not set on {arch}. Aborting") from exc
 
             if conf_entry == "m" and mod == "vmlinux":
-                raise RuntimeError(f"{self.name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
+                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
             if conf_entry == "y" and mod != "vmlinux":
-                raise RuntimeError(f"{self.name()}:{arch} ({self.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
+                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
 
             configs.setdefault(conf_entry, [])
-            configs[conf_entry].append(f"{self.name()}:{arch}")
+            configs[conf_entry].append(f"{self.full_cs_name()}:{arch}")
 
         # Validate if we have different settings for the same config on
         # different architecures, like having it as builtin on one and as a
@@ -299,7 +306,7 @@ class Codestream:
         if len(configs.keys()) > 1:
             print(configs["y"])
             print(configs["m"])
-            raise RuntimeError(f"{self.name()}: Configuration mismatach between codestreams. Aborting.")
+            raise RuntimeError(f"{self.full_cs_name()}: Configuration mismatach between codestreams. Aborting.")
 
     def find_obj_path(self, arch, mod):
         # Return the path if the modules was previously found for ARCH, or refetch if
@@ -320,7 +327,7 @@ class Codestream:
         with open(Path(mod_path, "modules.order")) as f:
             obj_match = re.search(rf"([\w\/\-]+\/{mod}\.k?o)", f.read())
             if not obj_match:
-                raise RuntimeError(f"{self.name()}-{arch} ({self.kernel}): Module not found: {mod}")
+                raise RuntimeError(f"{self.full_cs_name()}-{arch} ({self.kernel}): Module not found: {mod}")
 
         # modules.order will show the module with suffix .o, so make sure the extension.
         obj_path = mod_path/(PurePath(obj_match.group(1)).with_suffix(".ko"))
@@ -339,7 +346,7 @@ class Codestream:
     # codestream and architecture
     # Return all the symbols not found per arch/obj
     def __check_symbol(self, arch, mod, symbols, cache):
-        name = self.name()
+        name = self.full_cs_name()
 
         cache.setdefault(arch, {})
         cache[arch].setdefault(name, {})
@@ -356,7 +363,7 @@ class Codestream:
                 ret.append(symbol)
 
             elif nsyms > 1:
-                print(f"WARNING: {self.name()}-{arch} ({self.kernel}): symbol {symbol} duplicated on {mod}")
+                print(f"WARNING: {self.full_cs_name()}-{arch} ({self.kernel}): symbol {symbol} duplicated on {mod}")
 
             # If len(syms) == 1 means that we found a unique symbol, which is
             # what we expect, and nothing need to be done.
@@ -399,18 +406,3 @@ class Codestream:
     def read_file(self, file):
         return read_file_in_tag(self.kernel, file)
 
-    def data(self):
-        return {
-                "sle" : self.sle,
-                "sp" : self.sp,
-                "update" : self.update,
-                "rt" : self.rt,
-                "project" : self.project,
-                "patchid": self.patchid,
-                "kernel" : self.kernel,
-                "archs" : self.archs,
-                "files" : self.files,
-                "modules" : self.modules,
-                "configs" : self.configs,
-                "repo" : self.repo,
-                }

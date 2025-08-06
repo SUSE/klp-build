@@ -30,7 +30,7 @@ def convert_prj_to_cs(prj, prefix):
 
 
 def convert_cs_to_prj(cs, prefix):
-    return prefix + "-" + cs.name().replace(".", "_")
+    return prefix + "-" + cs.full_cs_name().replace(".", "_")
 
 
 def do_work(func, args):
@@ -116,10 +116,10 @@ def get_cs_packages(cs_list, dest):
                     if pkg == "kernel-default":
                         pkg = "kernel-rt"
 
-                if cs.repo != "standard":
-                    pkg = f"{pkg}.{cs.repo}"
+                if cs.get_repo() != "standard":
+                    pkg = f"{pkg}.{cs.get_repo()}"
 
-                ret = osc.build.get_binary_list(cs.project, cs.repo, arch, pkg)
+                ret = osc.build.get_binary_list(cs.project, cs.get_repo(), arch, pkg)
                 for file in re.findall(regex, str(etree.tostring(ret))):
                     # FIXME: adjust the regex to only deal with strings
                     if isinstance(file, str):
@@ -139,7 +139,7 @@ def get_cs_packages(cs_list, dest):
                         if arch != ARCH:
                             continue
 
-                    rpms.append((osc, i, cs, cs.project, cs.repo, arch, pkg, rpm, dest))
+                    rpms.append((osc, i, cs, cs.project, cs.get_repo(), arch, pkg, rpm, dest))
                     i += 1
 
     return rpms
@@ -173,7 +173,7 @@ def validate_livepatch_module(cs, arch, rpm_dir, rpm):
 
     funcs = find_missing_symbols(cs, arch, lp_mod_path)
     if funcs:
-        logging.warning('%s:%s Undefined functions: %s', cs.name(), arch, " ".join(funcs))
+        logging.warning('%s:%s Undefined functions: %s', cs.full_cs_name(), arch, " ".join(funcs))
 
     shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
 
@@ -183,10 +183,10 @@ def download_binary_rpms(args, total):
 
     try:
         osc.build.download_binary(prj, repo, arch, pkg, rpm, dest)
-        logging.info("(%d/%d) %s %s: ok", i, total, cs.name(), rpm)
+        logging.info("(%d/%d) %s %s: ok", i, total, cs.full_cs_name(), rpm)
     except OSError as e:
         if e.errno == errno.EEXIST:
-            logging.info("(%d/%d) %s %s: already downloaded. skipping", i, total, cs.name(), rpm)
+            logging.info("(%d/%d) %s %s: already downloaded. skipping", i, total, cs.full_cs_name(), rpm)
         else:
             raise RuntimeError(f"download error on {prj}: {rpm}") from e
 
@@ -250,7 +250,7 @@ def extract_rpms(args, total):
     cmd = f"rpm2cpio {rpm_file} | cpio --quiet -uidm"
     subprocess.check_output(cmd, shell=True, stderr=None, cwd=path_dest)
 
-    logging.info("(%d/%d) extracted %s %s: ok", i, total, cs.name(), rpm)
+    logging.info("(%d/%d) extracted %s %s: ok", i, total, cs.full_cs_name(), rpm)
 
 
 def download_cs_rpms(cs_list):
@@ -268,7 +268,7 @@ def download_cs_rpms(cs_list):
         for arch in cs.archs:
             # Extract modules and vmlinux files that are compressed
             mod_path = cs.get_mod_path(arch)
-            logging.info("extracting %s:%s in %s", arch, cs.name(), str(mod_path))
+            logging.info("extracting %s:%s in %s", arch, cs.full_cs_name(), str(mod_path))
             for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d -k")]:
                 cmd = rf'find {mod_path} -name "*.{fext}" -exec {ecmd} --quiet {{}} \;'
                 subprocess.check_output(cmd, shell=True)
@@ -279,7 +279,7 @@ def download_cs_rpms(cs_list):
                 f_path = cs.get_boot_file(f"{f}.gz", arch)
                 # ppc64le doesn't gzips vmlinux
                 if f_path.exists():
-                    logging.info("extracting %s:%s:%s", arch, cs.name(), f)
+                    logging.info("extracting %s:%s:%s", arch, cs.full_cs_name(), f)
                     subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
 
         # Use the SLE .config

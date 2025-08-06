@@ -40,7 +40,7 @@ def classify_codestreams(cs_list):
     cs_group = {}
     for cs in cs_list:
         if not isinstance(cs, str):
-            cs = cs.name()
+            cs = cs.full_cs_name()
 
         prefix, up = cs.split("u")
         if not cs_group.get(prefix, ""):
@@ -219,29 +219,24 @@ def check_module_unsupported(arch, mod_path):
 
 
 def filter_codestreams(lp_filter, cs_list, verbose=False):
-    if isinstance(cs_list, dict):
-        full_cs = copy.deepcopy(list(cs_list.values()))
-    else:
-        full_cs = copy.deepcopy(cs_list)
+    if not lp_filter:
+        return cs_list
 
     if verbose:
         logging.info("Checking filter...")
 
     result = []
     filtered = []
-    for cs in full_cs:
-        name = cs.name()
-
-        if lp_filter and not re.match(lp_filter, name):
+    for cs in cs_list:
+        name = cs.full_cs_name()
+        if re.match(lp_filter, name):
+            result.append(cs)
+        else:
             filtered.append(name)
-            continue
 
-        result.append(cs)
-
-    if verbose:
-        if filtered:
-            logging.info("Skipping codestreams:")
-            logging.info("\t%s", classify_codestreams_str(filtered))
+    if verbose and filtered:
+        logging.info("Skipping codestreams:")
+        logging.info("\t%s", classify_codestreams_str(filtered))
 
     return result
 
