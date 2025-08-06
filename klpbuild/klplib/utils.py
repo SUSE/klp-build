@@ -3,21 +3,17 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-import copy
-import gzip
 import io
 import logging
-import lzma
 import os
+from pathlib import Path
 import platform
 import re
 import git
-import zstandard
 
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
-from pathlib import Path, PurePath
 
 from natsort import natsorted
 
@@ -113,18 +109,7 @@ def get_elf_object(obj):
     with open(obj, "rb") as f:
         data = f.read()
 
-    # FIXME: use magic lib instead of checking the file extension
-    if str(obj).endswith(".gz"):
-        io_bytes = io.BytesIO(gzip.decompress(data))
-    elif str(obj).endswith(".zst"):
-        dctx = zstandard.ZstdDecompressor()
-        io_bytes = io.BytesIO(dctx.decompress(data))
-    elif str(obj).endswith(".xz"):
-        io_bytes = io.BytesIO(lzma.decompress(data))
-    else:
-        io_bytes = io.BytesIO(data)
-
-    return ELFFile(io_bytes)
+    return ELFFile(io.BytesIO(data))
 
 
 # Load the ELF object and return all symbols
