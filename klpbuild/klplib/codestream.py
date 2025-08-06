@@ -11,7 +11,7 @@ from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_fro
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
-    __slots__ = ("name","sle", "sp", "update", "rt", "is_micro", "project",
+    __slots__ = ("name", "sle", "sp", "update", "rt", "is_micro", "__project",
                  "patchid", "kernel", "archs", "files", "modules", "repo",
                  "configs")
 
@@ -31,7 +31,7 @@ class Codestream:
         self.update = int(match.group(4))
 
         self.is_micro = self.sle == 6
-        self.project = project
+        self.__project = project
         self.patchid = patchid
         self.kernel = kernel
 
@@ -50,7 +50,7 @@ class Codestream:
     def to_data(self):
         return {
                 "name" : self.name,
-                "project" : self.project,
+                "project": self.__project,
                 "patchid": self.patchid,
                 "kernel" : self.kernel,
                 "archs" : self.archs,
@@ -116,6 +116,15 @@ class Codestream:
             return repo
 
         return f"{repo}_Products_SLERT_Update"
+
+    def get_project_name(self):
+        """
+        Return the project set on the constructor. Assert that a project was
+        set when the Codestream object was created.
+        """
+        assert self.__project
+
+        return self.__project
 
     def __get_default_archs(self):
         # RT is supported only on x86_64 at the moment
@@ -226,6 +235,22 @@ class Codestream:
         product_base_name = self.get_base_product_name()
         return f"{product_base_name}_Update_{self.update}"
 
+    def get_package_name(self):
+        """
+        Return the kernel package name related to the codestream
+        """
+        pkg = "kernel-default"
+
+        if self.is_micro:
+            pkg = self.patchid
+
+        elif self.rt:
+            pkg = "kernel-rt"
+
+        if self.get_repo() != "standard":
+            pkg = f"{pkg}.{self.get_repo()}"
+
+        return pkg
 
     def needs_ibt(self):
         return self.is_micro or self.sle > 15 or (self.sle == 15 and self.sp >= 6)
