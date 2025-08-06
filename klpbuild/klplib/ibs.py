@@ -105,7 +105,8 @@ def get_cs_packages(cs_list, dest):
     logging.info("Getting list of files...")
     for cs in cs_list:
         for arch in cs.archs:
-            ret = osc.build.get_binary_list(cs.project, cs.get_repo(), arch,
+            ret = osc.build.get_binary_list(cs.get_project_name(),
+                                            cs.get_repo(), arch,
                                             cs.get_package_name())
             for file in re.findall(pkg_regex, str(etree.tostring(ret))):
                 # FIXME: adjust the regex to only deal with strings
@@ -169,13 +170,14 @@ def download_binary_rpms(args, total):
     osc, i, cs, arch, rpm, dest = args
 
     try:
-        osc.build.download_binary(cs.project, cs.get_repo(), arch, cs.get_package_name(), rpm, dest)
+        osc.build.download_binary(cs.get_project_name(), cs.get_repo(),
+                                  arch, cs.get_package_name(), rpm, dest)
         logging.info("(%d/%d) %s %s: ok", i, total, cs.full_cs_name(), rpm)
     except OSError as e:
         if e.errno == errno.EEXIST:
             logging.info("(%d/%d) %s %s: already downloaded. skipping", i, total, cs.full_cs_name(), rpm)
         else:
-            raise RuntimeError(f"download error on {cs.project}: {rpm}") from e
+            raise RuntimeError(f"download error on {cs.get_project_name()}: {rpm}") from e
 
 
 def download_and_extract(args, total):

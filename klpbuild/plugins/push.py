@@ -40,7 +40,7 @@ def create_prj_meta(cs):
                "<publish><disable/></publish>" + \
                "<debuginfo><disable/></debuginfo>" + \
                "<repository name=\"standard\">" + \
-               f"<path project=\"{cs.project}\" repository=\"{cs.get_repo()}\"/>" + \
+               f"<path project=\"{cs.get_project_name()}\" repository=\"{cs.get_repo()}\"/>" + \
                "".join([f"<arch>{arch}</arch>" for arch in cs.archs]) + \
                "</repository>" + \
            "</project>"
