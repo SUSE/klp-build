@@ -17,7 +17,7 @@ import tests.utils as tests_utils
 
 def test_detect_file_without_ftrace_support(caplog):
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.6u0"
+    cs = "15.6u8"
 
     setup_args = {
         "lp_name" : lp,
@@ -36,7 +36,7 @@ def test_detect_file_without_ftrace_support(caplog):
     with caplog.at_level(logging.WARNING):
         extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
 
-    assert "lib/seq_buf.o is not compiled with livepatch support (-pg flag)" in caplog.text
+    assert "lib/seq_buf.c is not compiled with livepatch support (-pg flag)" in caplog.text
 
 
 def test_compile_commands_enoent():
