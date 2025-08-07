@@ -49,7 +49,7 @@ def convert_cs_to_prj(cs, prefix):
     return prefix + "-" + cs.full_cs_name().replace(".", "_")
 
 
-def do_work(func, args):
+def do_work(func, args: list[RPMData]):
     if len(args) == 0:
         return
 
@@ -143,7 +143,9 @@ def get_cs_packages(cs_list, dest):
                     if arch != ARCH:
                         continue
 
-                rpms.append((osc, i, cs, arch, rpm, dest))
+                rpms.append(RPMData(i, osc, cs, cs.get_project_name(),
+                                    cs.get_repo(), arch, cs.get_package_name(),
+                                    rpm, dest))
                 i += 1
 
     return rpms
@@ -182,40 +184,39 @@ def validate_livepatch_module(cs, arch, rpm_dir, rpm):
     shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
 
 
-def download_binary_rpms(args, total):
-    osc, i, cs, arch, rpm, dest = args
-
+def download_binary_rpms(data: RPMData, total: int):
     try:
-        osc.build.download_binary(cs.get_project_name(), cs.get_repo(),
-                                  arch, cs.get_package_name(), rpm, dest)
-        logging.info("(%d/%d) %s %s: ok", i, total, cs.full_cs_name(), rpm)
+        data.osc.build.download_binary(data.prj, data.repo,
+                                       data.arch, data.pkg, data.rpm,
+                                       data.dest)
+        logging.info("(%d/%d) %s %s: ok", data.index, total,
+                     data.cs.full_cs_name(), data.rpm)
     except OSError as e:
         if e.errno == errno.EEXIST:
-            logging.info("(%d/%d) %s %s: already downloaded. skipping", i, total, cs.full_cs_name(), rpm)
+            logging.info("(%d/%d) %s %s: already downloaded. skipping",
+                         data.index, total, data.cs.full_cs_name(), data.rpm)
         else:
-            raise RuntimeError(f"download error on {cs.get_project_name()}: {rpm}") from e
+            raise RuntimeError(f"download error on {data.cs.get_project_name()}: {data.rpm}") from e
 
 
-def download_and_extract(args, total):
-    _, i, cs, arch, rpm, dest = args
-
+def download_and_extract(data, total):
     # Try to download and extract at least twice if any problems arise
     tries = 2
     while tries > 0:
-        download_binary_rpms(args, total)
+        download_binary_rpms(data, total)
         try:
-            extract_rpms((i, cs, arch, rpm, dest), total)
+            extract_rpms(data, total)
             # All good, stop the loop
             break
         except subprocess.CalledProcessError:
             # There was an issue when extracting the RPMs, probably because it's broken
             # Remove the downloaded RPMs and try again
             tries = tries - 1
-            logging.info("Problem to extract %s. Downloading it again", rpm)
-            Path(dest, rpm).unlink()
+            logging.info("Problem to extract %s. Downloading it again", data.rpm)
+            Path(data.dest, data.rpm).unlink()
 
     if tries == 0:
-        raise RuntimeError(f"Failed to extract {rpm}. Aborting")
+        raise RuntimeError(f"Failed to extract {data.rpm}. Aborting")
 
 
 def delete_project(osc, i, total, prj, verbose=True):
@@ -239,23 +240,22 @@ def delete_projects(osc, prjs, verbose=True):
         delete_project(osc, i, total, prj, verbose)
 
 
-def extract_rpms(args, total):
-    i, cs, arch, rpm, dest = args
-
+def extract_rpms(data: RPMData, total: int):
     # We don't need to extract the -extra packages for non x86_64 archs.
     # These packages are only needed to be uploaded to the kgr-test
     # repos, since they aren't published, but we need them for testing.
-    if arch != "x86_64" and "-extra" in rpm:
+    if data.arch != "x86_64" and "-extra" in data.rpm:
         return
 
-    path_dest = get_datadir(arch)
+    path_dest = get_datadir(data.arch)
     path_dest.mkdir(exist_ok=True, parents=True)
 
-    rpm_file = Path(dest, rpm)
+    rpm_file = data.dest/data.rpm
     cmd = f"rpm2cpio {rpm_file} | cpio --quiet -uidm"
     subprocess.check_output(cmd, shell=True, stderr=None, cwd=path_dest)
 
-    logging.info("(%d/%d) extracted %s %s: ok", i, total, cs.full_cs_name(), rpm)
+    logging.info("(%d/%d) extracted %s %s: ok", data.index, total,
+                 data.cs.full_cs_name(), data.rpm)
 
 
 def download_cs_rpms(cs_list):
