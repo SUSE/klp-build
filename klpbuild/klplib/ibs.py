@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 import concurrent.futures
+import dataclasses
 import errno
 from itertools import repeat
 import logging
@@ -19,10 +20,25 @@ from lxml import etree
 from natsort import natsorted
 from osctiny import Osc
 
+from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.utils import ARCH, get_all_symbols_from_object, get_datadir
 
 logging.getLogger("osctiny").setLevel(logging.WARNING)
+
+
+# Dataclass for storing rpm related data
+@dataclasses.dataclass
+class RPMData:
+    index: int
+    osc: Osc
+    cs: Codestream
+    prj: str
+    repo: str
+    arch: str
+    pkg: str
+    rpm: str
+    dest: Path
 
 
 def convert_prj_to_cs(prj, prefix):
