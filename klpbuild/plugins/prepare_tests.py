@@ -16,7 +16,7 @@ from osctiny import Osc
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import get_codestream_by_name, get_codestreams_list
-from klpbuild.klplib.ibs import convert_prj_to_cs, delete_built_rpms, delete_project, do_work, download_binary_rpms, get_projects, prj_prefix, validate_livepatch_module
+from klpbuild.klplib.ibs import convert_prj_to_cs, delete_built_rpms, delete_project, do_work, download_binary_rpms, get_projects, prj_prefix, validate_livepatch_module, RPMData
 from klpbuild.klplib.utils import ARCHS, filter_codestreams, get_tests_path, get_workdir
 
 PLUGIN_CMD = "prepare-tests"
@@ -66,7 +66,7 @@ def download_built_rpms(lp_name, lp_filter):
                 dest = cs.get_ccp_dir(lp_name)/str(arch)/"rpm"
                 dest.mkdir(exist_ok=True, parents=True)
 
-                rpms.append((osc, i, cs, prj, "standard", arch, "klp", rpm, dest))
+                rpms.append(RPMData(i, osc, cs, prj, "standard", arch, "klp", rpm, dest))
                 i += 1
 
     logging.info("Downloading %d packages...", len(rpms))

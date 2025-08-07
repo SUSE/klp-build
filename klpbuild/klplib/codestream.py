@@ -11,14 +11,14 @@ from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_fro
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
-    __slots__ = ("name", "sle", "sp", "update", "rt", "is_micro", "__project",
+    __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "__project",
                  "patchid", "kernel", "archs", "files", "modules", "repo",
                  "configs")
 
     def __init__(self, name, project="", patchid="", kernel="",
                  archs=None, files=None, modules=None, configs=None):
 
-        self.name = name
+        self.__name = name
 
         match = re.search(r"(\d+)\.(\d+)(rt)?u(\d+)", name)
         if not match:
@@ -49,7 +49,7 @@ class Codestream:
 
     def to_data(self):
         return {
-                "name" : self.name,
+                "name": self.__name,
                 "project": self.__project,
                 "patchid": self.patchid,
                 "kernel" : self.kernel,

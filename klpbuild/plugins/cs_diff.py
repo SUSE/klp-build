@@ -37,8 +37,8 @@ def cs_diff(lp_name, lp_filter):
 
     cs_code = get_cs_code(lp_name, cs_args)
 
-    cs1 = cs_args[0].name()
-    cs2 = cs_args[1].name()
+    cs1 = cs_args[0].full_cs_name()
+    cs2 = cs_args[1].full_cs_name()
 
     f1 = cs_code.get(cs1)
     f2 = cs_code.get(cs2)

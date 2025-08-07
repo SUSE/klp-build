@@ -198,9 +198,6 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         # save the cmdline
         f.write(ret)
 
-        if " -pg " not in ret:
-            logging.warning("%s:%s is not compiled with livepatch support (-pg flag)", cs.full_cs_name(), file_)
-
         return ret
 
 
@@ -554,6 +551,9 @@ def process(lp_name, total, args, avoid_ext):
     if not cmd:
         with make_lock:
             cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
+
+    if " -pg " not in cmd:
+        logging.warning("%s:%s is not compiled with livepatch support (-pg flag)", cs.full_cs_name(), fname)
 
     args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
 
