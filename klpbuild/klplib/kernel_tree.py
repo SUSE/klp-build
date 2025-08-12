@@ -8,18 +8,19 @@ import os
 import shutil
 import subprocess
 
+from multiprocessing import Lock
 from functools import wraps
 from pathlib import Path
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.utils import ARCH
 
 __kernel_tags_are_fetched = False
-
+__kernel_fetch_lock = Lock()
 
 def __check_kernel_tags_are_fetched(func):
     """
-    This decorator checks whether the kernel tags are fetched. If not, it
-    fetches them the configuration and then calls the wrapped function.
+    This decorator checks whether the kernel tags are fetched in a thread-safe
+    way. If not, it fetches them the configuration and then calls the wrapped function.
 
     Args:
         func (function): The function to be wrapped.
@@ -30,9 +31,12 @@ def __check_kernel_tags_are_fetched(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         global __kernel_tags_are_fetched
-        if not __kernel_tags_are_fetched:
-            __fetch_kernel_tree_tags()
-            __kernel_tags_are_fetched = True
+        global __kernel_fetch_lock
+
+        with __kernel_fetch_lock:
+            if not __kernel_tags_are_fetched:
+                __fetch_kernel_tree_tags()
+                __kernel_tags_are_fetched = True
         return func(*args, **kwargs)
     return wrapper
 
