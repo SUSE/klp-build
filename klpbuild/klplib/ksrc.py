@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 from pathlib import PurePath
-
+from multiprocessing import Lock
 from functools import wraps
 
 from klpbuild.klplib import utils
@@ -43,10 +43,12 @@ KERNEL_BRANCHES = {
 
 
 __kernel_source_tags_are_fetched = False
+__kernel_source_fetch_lock = Lock()
 def __check_kernel_source_tags_are_fetched(func):
     """
-    This decorator checks whether the kernel-source tags are fetched. If not,
-    it fetches them the configuration and then calls the wrapped function.
+    This decorator checks whether the kernel-source tags are fetched in a
+    thread-safe way. If not, it fetches them the configuration and then calls
+    the wrapped function.
 
     Args:
         func (function): The function to be wrapped.
@@ -57,9 +59,12 @@ def __check_kernel_source_tags_are_fetched(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         global __kernel_source_tags_are_fetched
-        if not __kernel_source_tags_are_fetched:
-            __fetch_kernel_branches()
-            __kernel_source_tags_are_fetched = True
+        global __kernel_source_fetch_lock
+
+        with __kernel_source_fetch_lock:
+            if not __kernel_source_tags_are_fetched:
+                __fetch_kernel_branches()
+                __kernel_source_tags_are_fetched = True
         return func(*args, **kwargs)
     return wrapper
 
@@ -207,7 +212,7 @@ def get_patches(cve, savedir=None):
             logging.info(c)
         logging.info("")
 
-    logging.info(f"upstream")
+    logging.info("upsteam")
     for _, c, msg in sorted(upstream):
         fmt = f'{c} ("{msg}")'
         patches["upstream"].append(fmt)
