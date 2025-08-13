@@ -43,8 +43,7 @@ def scan(cve, conf, lp_filter, download, savedir=None):
     # Support CVEs from 2020 up to 2029
     assert cve and re.match(r"^202[0-9]-[0-9]{4,7}$", cve)
 
-    patches = get_patches(cve, savedir)
-    upstream = patches.get("upstream", [])
+    upstream, patches = get_patches(cve, savedir)
 
     all_codestreams = get_supported_codestreams()
     filtered_codesteams = utils.filter_codestreams(lp_filter, all_codestreams, verbose=True)
@@ -123,4 +122,4 @@ def scan(cve, conf, lp_filter, download, savedir=None):
     logging.info("All affected codestreams:")
     logging.info("\t%s", utils.classify_codestreams_str(working_cs))
 
-    return upstream, patched_cs, working_cs
+    return patches, upstream, patched_cs, working_cs

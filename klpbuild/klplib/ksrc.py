@@ -156,9 +156,8 @@ def get_branch_patches(cve, mbranch):
 def get_patches(cve, savedir=None):
     logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
-    # Store all patches from each branch and upstream
+    # Store all patches from each branch
     patches = {}
-    patches["upstream"] = []
     # Temporal list of upstream commits
     upstream = set()
 
@@ -195,14 +194,11 @@ def get_patches(cve, savedir=None):
             if m:
                 c = m.group(1)[:12]
                 d, msg = get_commit_data(c, upstream_patches_dir)
-                upstream.add((d, c, msg))
+                upstream.add((d, c, msg, f'{c} ("{msg}")'))
 
             patches[bc].append(patch)
 
     for key, bc_patches in patches.items():
-        if key == "upstream":
-            continue
-
         logging.info(f"{key}: {KERNEL_BRANCHES[key]}")
 
         if not bc_patches:
@@ -217,7 +213,7 @@ def get_patches(cve, savedir=None):
 
     logging.info("")
 
-    return patches
+    return upslogs, patches
 
 
 def get_patched_kernels(codestreams, patches):
