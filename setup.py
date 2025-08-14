@@ -36,7 +36,8 @@ setuptools.setup(
         "pyelftools",
         "zstandard",
         "python-bugzilla",
-        "tabulate"
+        "tabulate",
+        "termcolor"
     ],
     setuptools_git_versioning={
         "enabled": True,
