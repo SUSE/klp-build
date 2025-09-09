@@ -17,7 +17,7 @@ from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import get_codestreams_list
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ibs import convert_cs_to_prj, delete_project, prj_prefix
-from klpbuild.klplib.utils import classify_codestreams_str, filter_codestreams, get_cs_branch, get_kgraft_branch
+from klpbuild.klplib.utils import classify_codestreams_str, filter_codestreams, get_cs_branch
 from klpbuild.plugins.status import status
 
 PLUGIN_CMD = "push"
@@ -82,10 +82,10 @@ def create_lp_package(osc, lp_name, i, total, cs):
 
     osc.packages.checkout(prj, "klp", prj_path)
 
-    base_branch = get_kgraft_branch(cs.full_cs_name())
+    product_branch = cs.get_full_product_name()
 
     logging.info("(%s/%s) pushing %s using branches %s/%s...",
-                 i, total, cs.full_cs_name(), str(base_branch), str(branch))
+                 i, total, cs.full_cs_name(), product_branch, str(branch))
 
     # Clone the repo and checkout to the codestream branch. The branch should be based on master to avoid rebasing
     # conflicts
@@ -96,17 +96,18 @@ def create_lp_package(osc, lp_name, i, total, cs):
 
     # Add remote with all codestreams, because the clone above will set the remote origin
     # to the local directory, so it can't find the remote codestreams
-    subprocess.check_output(["/usr/bin/git", "remote", "add", "kgr",
-                            "gitlab@gitlab.suse.de:kernel/kgraft-patches.git"],
-                            stderr=subprocess.STDOUT, cwd=code_path)
-
-    # Fetch all remote codestreams so we can rebase in the next step
-    subprocess.check_output(["/usr/bin/git", "fetch", "kgr",  str(base_branch)],
-                            stderr=subprocess.STDOUT, cwd=code_path)
-
-    # Get the new bsc commit on top of the codestream branch (should be the last commit on the specific branch)
     subprocess.check_output(
-        ["/usr/bin/git", "rebase", f"kgr/{base_branch}"],
+        ["/usr/bin/git", "remote", "add", "kgr", "gitlab@gitlab.suse.de:kernel/kgraft-patches.git"],
+        stderr=subprocess.STDOUT, cwd=code_path
+    )
+
+    subprocess.check_output(
+        ["/usr/bin/git", "fetch", "kgr",  f"{product_branch}"],
+        stderr=subprocess.STDOUT, cwd=code_path
+    )
+
+    subprocess.check_output(
+        ["/usr/bin/git", "rebase", f"kgr/{product_branch}"],
         stderr=subprocess.STDOUT, cwd=code_path
     )
 

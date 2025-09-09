@@ -252,28 +252,6 @@ def get_fname(src_name):
     return str(Path(src_name).with_suffix("")).replace("-", "_")
 
 
-def get_kgraft_branch(cs_name):
-    if "6.0" in cs_name:
-        branch = "MICRO-6-0"
-
-        if "rt" in cs_name:
-            branch = branch + "-RT"
-
-        _, update = cs_name.split("u")
-        return f"{branch}_Update_{update}"
-
-    if '12.' in cs_name:
-        return "master-livepatch-sle12"
-
-    if '15.3' in cs_name:
-        return "master-livepatch"
-
-    if "15.4" in cs_name or "15.5" in cs_name:
-        return "master-livepatch-sle15sp4"
-
-    return "master-livepatch-sle15sp6"
-
-
 def get_workdir(lp_name):
     """
     Get the working directory for a given livepatch name.
