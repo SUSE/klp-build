@@ -72,9 +72,8 @@ def __fetch_kernel_branches():
         return
 
     # Mount the command to fetch all branches for supported codestreams
-    ret = subprocess.run(["/usr/bin/git", "-C", str(kern_src), "fetch",
-                          "--quiet", "--atomic", "--force", "--tags", "origin"] +
-                         list(KERNEL_BRANCHES.values()),
+    ret = subprocess.run(["/usr/bin/git", "-C", kern_src, "fetch",
+                          "--quiet", "--atomic", "--force", "--tags"],
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
                          text=True)
