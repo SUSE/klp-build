@@ -588,6 +588,13 @@ def process(lp_name, total, args, avoid_ext):
                                 cs.full_cs_name(), fname, symbol_name, opt_symbol_name)
                 logging.warning("Make sure to patch all the callers of %s.", symbol_name)
 
+    # Look for conflicting/duplicated symbols
+    with open(out_log) as f:
+        msg_pat = r'conflicting definitions for symbol "([\w_]+)" found in ELF'
+        syms = re.findall(msg_pat, f.read())
+        if len(syms) > 0:
+            cs.files[fname]["dup_symbols"] = syms
+
     cs.files[fname]["ext_symbols"] = get_symbol_list(out_dir)
 
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
@@ -671,7 +678,17 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
 
     group_equal_files(lp_name, working_cs)
 
-    logging.info("Checking the externalized symbols in other architectures...")
+    logging.info("\nChecking duplicated symbols...")
+
+    # Check for duplicated symbols spotted by klp-ccp
+    for cs in working_cs:
+        for f, fdata in cs.files.items():
+            if fdata.get("dup_symbols"):
+                logging.warning("%s:%s: Duplicated symbols (check the sympos):",
+                                cs.full_cs_name(), f)
+                logging.warning("\t%s", ", ".join(fdata.get("dup_symbols")))
+
+    logging.info("\nChecking the externalized symbols in other architectures...")
 
     missing_syms = OrderedDict()
 
