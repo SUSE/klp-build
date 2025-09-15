@@ -11,9 +11,9 @@ from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_fro
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
-    __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "__project",
-                 "patchid", "kernel", "archs", "files", "modules", "repo",
-                 "configs")
+    __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "is_slfo",
+                 "__project", "patchid", "kernel", "archs", "files", "modules",
+                 "repo", "configs")
 
     def __init__(self, name, project="", patchid="", kernel="",
                  archs=None, files=None, modules=None, configs=None):
@@ -31,6 +31,8 @@ class Codestream:
         self.update = int(match.group(4))
 
         self.is_micro = self.sle == 6
+        # SLFO codestreams use the PATCHID informatino to find the packages
+        self.is_slfo = self.is_micro or self.sle > 15
         self.__project = project
         self.patchid = patchid
         self.kernel = kernel
@@ -94,7 +96,7 @@ class Codestream:
 
     def get_boot_file(self, file, arch=ARCH):
         assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
-        if self.is_micro:
+        if self.is_slfo:
             return Path(self.get_mod_path(arch), file)
 
         # Strip the suffix from the filename so we can add the kernel version in the middle
@@ -102,7 +104,7 @@ class Codestream:
         return get_datadir(arch)/"boot"/fname
 
     def get_repo(self):
-        if self.update == 0 or self.is_micro:
+        if self.update == 0 or self.is_slfo:
             return "standard"
 
         repo = f"SUSE_SLE-{self.sle}"
@@ -241,7 +243,7 @@ class Codestream:
         """
         pkg = "kernel-default"
 
-        if self.is_micro:
+        if self.is_slfo:
             pkg = self.patchid
 
         elif self.rt:
@@ -253,16 +255,16 @@ class Codestream:
         return pkg
 
     def needs_ibt(self):
-        return self.is_micro or self.sle > 15 or (self.sle == 15 and self.sp >= 6)
+        return self.is_slfo or (self.sle == 15 and self.sp >= 6)
 
     # 15.4 onwards we don't have module_mutex, so template generates
     # different code
     def is_mod_mutex(self):
-        return not self.is_micro and (self.sle < 15 or (self.sle == 15 and self.sp < 4))
+        return not self.is_slfo and (self.sle < 15 or (self.sle == 15 and self.sp < 4))
 
     def get_mod_path(self, arch):
         # Micro already has support for usrmerge
-        if self.is_micro:
+        if self.is_slfo:
             mod_path = Path("usr", "lib")
         else:
             mod_path = Path("lib")

@@ -455,7 +455,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     ]:
         cmd = cmd.replace(opt, "")
 
-    if cs.is_micro or (cs.sle >= 15 and cs.sp >= 4):
+    if cs.is_slfo or (cs.sle >= 15 and cs.sp >= 4):
         cmd += " -D__has_attribute(x)=0"
 
     ccp_args.extend(cmd.split(" "))
