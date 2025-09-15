@@ -5,12 +5,12 @@ import inspect
 import logging
 import pytest
 
-from klpbuild.plugins.setup import setup, setup_file_funcs, setup_project_files, setup_codestreams
+from klpbuild.plugins.setup import setup, setup_file_funcs
 from tests.utils import get_codestreams_file
 from klpbuild.klplib import utils
 
 CS = "15.5u19"
-DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_TUN", "no_check": False}
+DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_TUN", "no_check": True}
 
 
 def test_missing_file_funcs():
@@ -94,7 +94,7 @@ def test_valid_micro_patchid():
     # Make sure that patchid is informed for SLE MICRO
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     micro_cs = "6.0u2"
-    micro_data = {"cve": None, "lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": False}
+    micro_data = {"cve": None, "lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": True}
 
     setup_args = {
         "lp_name" : lp,
@@ -143,7 +143,7 @@ def test_valite_conf_unsupported_arch():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
 
     # CONFIG_HID is not enabled on s390x, so setup should fail here
-    LP_DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_HID", "no_check": False}
+    LP_DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_HID", "no_check": True}
     with pytest.raises(RuntimeError, match=rf"{CS}: CONFIG_HID not set on s390x"):
         setup_args = {
             "lp_name": lp,

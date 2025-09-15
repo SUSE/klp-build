@@ -17,12 +17,11 @@ from klpbuild.klplib.config import get_user_path
 class CodestreamData:
     cve: str
     archs: list[str]
-    patched_kernels: list[str]
     patched_cs: list[str]
-    commits: dict[str, str]
+    upstream: list[str]
 
 
-_cs_data = CodestreamData("", [], [], [], {})
+_cs_data = CodestreamData("", [], [], [])
 _codestreams = {}
 
 
@@ -40,11 +39,9 @@ def load_codestreams(lp_name):
     if cs_file.is_file():
         with open(cs_file) as f:
             jfile = json.loads(f.read(), object_pairs_hook=OrderedDict)
-            _cs_data = CodestreamData(cve=jfile["cve"],
-                                          archs=jfile["archs"],
-                                          patched_kernels=jfile["patched_kernels"],
-                                          patched_cs=jfile["patched_cs"],
-                                          commits=jfile["commits"])
+            _cs_data = CodestreamData(cve=jfile["cve"], archs=jfile["archs"],
+                                      patched_cs=jfile["patched_cs"],
+                                      upstream=jfile["upstream"])
 
             json_cs = jfile["codestreams"]
             for cs in natsorted(json_cs.keys()):
@@ -61,18 +58,17 @@ def store_codestreams(lp_name, working_cs):
     """
     # Update the latest state of the codestreams
     for cs in working_cs:
-        _codestreams[cs.name()] = cs
+        _codestreams[cs.full_cs_name()] = cs
 
     # Format each codestream for the json
     cs_data = {}
     for key, cs in _codestreams.items():
-        cs_data[key] = cs.data()
+        cs_data[key] = cs.to_data()
 
     data = {"archs": _cs_data.archs,
-            "commits": _cs_data.commits,
+            "upstream": _cs_data.upstream,
             "cve": _cs_data.cve,
             "patched_cs": _cs_data.patched_cs,
-            "patched_kernels": _cs_data.patched_kernels,
             "codestreams": cs_data}
 
     cs_file = __get_cs_file(lp_name)
@@ -107,24 +103,14 @@ def get_codestream_by_name(name):
     return _codestreams.get(name, None)
 
 
-def get_codestreams_dict():
+def get_codestreams_list():
     """
-    Retrieve the dictionary of all codestreams.
+    Retrieve the list of all codestream.
 
     Returns:
-        dict: A dictionary of all codestreams.
+        list: A list of all codestream.
     """
-    return _codestreams
-
-
-def get_codestreams_items():
-    """
-    Retrieve the items (key-value pairs) of the codestreams dictionary.
-
-    Returns:
-        dict_items: The items of the codestreams dictionary.
-    """
-    return _codestreams.items()
+    return list(_codestreams.values())
 
 
 def get_codestreams_data(name: str):

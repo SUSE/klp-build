@@ -9,12 +9,13 @@ import shutil
 import subprocess
 
 from functools import wraps
+from pathlib import Path
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.utils import ARCH
-from pathlib import Path
-
 
 __kernel_tags_are_fetched = False
+
+
 def __check_kernel_tags_are_fetched(func):
     """
     This decorator checks whether the kernel tags are fetched. If not, it
@@ -42,8 +43,14 @@ def __fetch_kernel_tree_tags():
     """
     logging.debug("Updating kernel tree tags..")
     kernel_tree = get_user_path("kernel_dir")
-    subprocess.check_output(['git', "-C", kernel_tree, 'fetch', '--tags', '--force', '--quiet'],
-                            stderr=subprocess.PIPE)
+    ret = subprocess.run(['git', "-C", kernel_tree, 'fetch', '--tags', '--force', '--quiet'],
+                         stderr=subprocess.PIPE,
+                         stdout=subprocess.PIPE,
+                         check=False,
+                         text=True)
+    if ret.returncode:
+        logging.info("Failed to update kernel tree tags\n%s", ret.stderr)
+
 
 # Currently this function returns the date of the patch and its subject
 @__check_kernel_tags_are_fetched
@@ -65,6 +72,7 @@ def get_commit_data(commit, savedir=None):
             f.write('\n'.join(body))
 
     return date, title
+
 
 @__check_kernel_tags_are_fetched
 def init_cs_kernel_tree(kernel_version, outdir):
@@ -110,7 +118,7 @@ def cleanup_kernel_trees():
     for entry in os.listdir(sources_dir):
         full_path = sources_dir/entry
         if os.path.isdir(full_path) and not entry.endswith("-obj"):
-            logging.info(f"Removing pending kernel tree: {full_path}")
+            logging.info("Removing pending kernel tree: %s", full_path)
             shutil.rmtree(full_path)
 
     __prune_worktrees(kernel_tree)
@@ -132,7 +140,7 @@ def file_exists_in_tag(kernel_version, file_path):
     kernel_tree = get_user_path("kernel_dir")
     kernel_tree_git_tag = "rpm-" + kernel_version
 
-    ret = subprocess.check_output([ 'git',  "-C", kernel_tree, 'ls-tree',
+    ret = subprocess.check_output(['git',  "-C", kernel_tree, 'ls-tree',
                                    kernel_tree_git_tag, file_path],
                                   stderr=subprocess.PIPE)
     return len(ret)
@@ -143,15 +151,15 @@ def read_file_in_tag(kernel_version, file_path):
     kernel_tree = get_user_path("kernel_dir")
     kernel_tree_git_tag = "rpm-" + kernel_version
 
-    ret = subprocess.run(["git", "-C", kernel_tree, "show",
-                          f"{kernel_tree_git_tag}:{file_path}"],
-                         capture_output=True, text=True)
+    ret = subprocess.run(["git", "-C", kernel_tree, "show", f"{kernel_tree_git_tag}:{file_path}"],
+                         check=False, capture_output=True, text=True)
     return ret.stdout
 
 
 def __get_active_worktrees(kernel_tree):
     data_dir = str(get_user_path("data_dir"))
-    worktrees_output = subprocess.run(["git", "-C", kernel_tree, "worktree", "list"], capture_output=True, text=True)
+    worktrees_output = subprocess.run(["git", "-C", kernel_tree, "worktree", "list"],
+                                      capture_output=True, check=False, text=True)
 
     worktrees = []
     for line in worktrees_output.stdout.strip().split("\n"):
@@ -165,7 +173,7 @@ def __get_active_worktrees(kernel_tree):
 
 
 def __remove_worktree(kernel_tree, worktree_dir):
-    subprocess.check_output([ "/usr/bin/git", "-C", kernel_tree, "worktree",
+    subprocess.check_output(["/usr/bin/git", "-C", kernel_tree, "worktree",
                              "remove", worktree_dir, "-f", "-f"],
                             stderr=subprocess.PIPE)
 
@@ -175,6 +183,6 @@ def __remove_worktree(kernel_tree, worktree_dir):
 
 def __prune_worktrees(kernel_tree):
     logging.debug("Pruning pending kernel worktrees")
-    subprocess.check_output([ "/usr/bin/git", "-C", kernel_tree, "worktree",
+    subprocess.check_output(["/usr/bin/git", "-C", kernel_tree, "worktree",
                              "prune"],
                             stderr=subprocess.PIPE)

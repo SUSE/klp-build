@@ -3,15 +3,16 @@
 # Copyright (C) 2021-2025 SUSE
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
-from klpbuild.klplib.ksrc import get_commit_files, ksrc_is_module_supported
+from klpbuild.klplib.ksrc import (get_patch_files, ksrc_is_module_supported,
+                                  get_branch_patches)
 
 def test_get_commit_files():
     expected = ["include/net/dst_ops.h",
                 "include/net/sock.h",
                 "net/ipv6/route.c",
                 "net/xfrm/xfrm_policy.c"]
-    commit = "604ed28f2720b3354a2eceb530c7e923566f70b8"
-    files = get_commit_files(commit, inside_patch=True)
+    patch = ["patches.suse/net-fix-__dst_negative_advice-race.patch"]
+    files = get_patch_files(patch, "SLE15-SP6")
     assert len(set(files) & set(expected)) == len(expected)
 
 
@@ -29,3 +30,11 @@ def test_is_module_supported():
     mod = "drivers/net/wireless/mac80211_hwsim"
     # Expected: "  drivers/net/wireless/mac80211_hwsim"
     assert ksrc_is_module_supported(mod, "5.14.21-150400.24.144")
+
+def test_get_rt_patches():
+    expected = [
+            "patches.suse/bpf-Check-bloom-filter-map-value-size.patch",
+            "patches.suse/bpf-Protect-against-int-overflow-for-stack-access-si.patch"
+            ]
+    patches = get_branch_patches("2024-35905", "SUSE-2024-RT")
+    assert patches and expected == patches

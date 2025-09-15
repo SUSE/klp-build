@@ -4,14 +4,14 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
 import logging
+import re
 import sys
 
 from klpbuild.klplib import utils
 from klpbuild.klplib import patch
-from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
-from klpbuild.klplib.ksrc import get_commits, get_patched_kernels, cs_is_affected
+from klpbuild.klplib.ksrc import get_patches, get_patched_kernels, cs_is_affected
 
 PLUGIN_CMD = "scan"
 
@@ -35,44 +35,35 @@ def register_argparser(subparser):
     )
 
 
-def run(cve, conf, lp_filter, no_check, download):
-    no_check = False
-
-    return scan(cve, conf, no_check, lp_filter, download)
+def run(cve, conf, lp_filter, download):
+    return scan(cve, conf, lp_filter, download)
 
 
-def scan(cve, conf, no_check, lp_filter, download, savedir=None):
-    # Always get the latest supported.csv file and check the content
-    # against the codestreams informed by the user
+def scan(cve, conf, lp_filter, download, savedir=None):
+    # Support CVEs from 2020 up to 2029
+    assert cve and re.match(r"^202[0-9]-[0-9]{4,7}$", cve)
+
+    patches = get_patches(cve, savedir)
+    upstream = patches.get("upstream", [])
+
     all_codestreams = get_supported_codestreams()
+    filtered_codesteams = utils.filter_codestreams(lp_filter, all_codestreams, verbose=True)
+    patched_kernels = get_patched_kernels(filtered_codesteams, patches)
 
-    # list of codestreams that matches the file-funcs argument
     working_cs = []
     patched_cs = []
     unaffected_cs = []
-    conf_not_set = []
-    unsupported = []
+    for cs in filtered_codesteams:
 
-    if not cve or no_check:
-        logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
-        working_cs = utils.filter_codestreams(lp_filter, all_codestreams)
-        commits = {}
-        patched_kernels = []
-    else:
-        commits = get_commits(cve, savedir)
-        patched_kernels = get_patched_kernels(all_codestreams, commits, cve)
+        if cs.kernel in patched_kernels:
+            patched_cs.append(cs.full_cs_name())
+            continue
 
-        for cs in utils.filter_codestreams(lp_filter, all_codestreams, verbose=True):
+        if not cs_is_affected(cs, cve, patches):
+            unaffected_cs.append(cs)
+            continue
 
-            if cs.kernel in patched_kernels:
-                patched_cs.append(cs.name())
-                continue
-
-            if not cs_is_affected(cs, cve, commits):
-                unaffected_cs.append(cs)
-                continue
-
-            working_cs.append(cs)
+        working_cs.append(cs)
 
     # Download also if conf is set, because the codestreams data are needed to
     # check for the configuration entry of each codestreams.
@@ -80,10 +71,12 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
         download_missing_cs_data(working_cs)
 
     # Automated patch analysis phase. Not compatible with --conf.
-    if commits and not conf:
+    conf_not_set = []
+    unsupported = []
+    if patches and not conf:
         logging.info("Initiating patch analysis...\n")
         logging.info("[*] Analysing modified files...\n")
-        files_report = patch.analyse_files(working_cs, commits)
+        files_report = patch.analyse_files(working_cs, patches)
         patch.print_files(files_report)
 
         logging.info("[*] Analysing required CONFIGs...\n")
@@ -130,4 +123,4 @@ def scan(cve, conf, no_check, lp_filter, download, savedir=None):
     logging.info("All affected codestreams:")
     logging.info("\t%s", utils.classify_codestreams_str(working_cs))
 
-    return commits, patched_cs, patched_kernels, working_cs
+    return upstream, patched_cs, working_cs

@@ -3,21 +3,17 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-import copy
-import gzip
 import io
 import logging
-import lzma
 import os
+from pathlib import Path
 import platform
 import re
 import git
-import zstandard
 
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
-from pathlib import Path, PurePath
 
 from natsort import natsorted
 
@@ -40,7 +36,7 @@ def classify_codestreams(cs_list):
     cs_group = {}
     for cs in cs_list:
         if not isinstance(cs, str):
-            cs = cs.name()
+            cs = cs.full_cs_name()
 
         prefix, up = cs.split("u")
         if not cs_group.get(prefix, ""):
@@ -113,18 +109,7 @@ def get_elf_object(obj):
     with open(obj, "rb") as f:
         data = f.read()
 
-    # FIXME: use magic lib instead of checking the file extension
-    if str(obj).endswith(".gz"):
-        io_bytes = io.BytesIO(gzip.decompress(data))
-    elif str(obj).endswith(".zst"):
-        dctx = zstandard.ZstdDecompressor()
-        io_bytes = io.BytesIO(dctx.decompress(data))
-    elif str(obj).endswith(".xz"):
-        io_bytes = io.BytesIO(lzma.decompress(data))
-    else:
-        io_bytes = io.BytesIO(data)
-
-    return ELFFile(io_bytes)
+    return ELFFile(io.BytesIO(data))
 
 
 # Load the ELF object and return all symbols
@@ -219,29 +204,24 @@ def check_module_unsupported(arch, mod_path):
 
 
 def filter_codestreams(lp_filter, cs_list, verbose=False):
-    if isinstance(cs_list, dict):
-        full_cs = copy.deepcopy(list(cs_list.values()))
-    else:
-        full_cs = copy.deepcopy(cs_list)
+    if not lp_filter:
+        return cs_list
 
     if verbose:
         logging.info("Checking filter...")
 
     result = []
     filtered = []
-    for cs in full_cs:
-        name = cs.name()
-
-        if lp_filter and not re.match(lp_filter, name):
+    for cs in cs_list:
+        name = cs.full_cs_name()
+        if re.match(lp_filter, name):
+            result.append(cs)
+        else:
             filtered.append(name)
-            continue
 
-        result.append(cs)
-
-    if verbose:
-        if filtered:
-            logging.info("Skipping codestreams:")
-            logging.info("\t%s", classify_codestreams_str(filtered))
+    if verbose and filtered:
+        logging.info("Skipping codestreams:")
+        logging.info("\t%s", classify_codestreams_str(filtered))
 
     return result
 

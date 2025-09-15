@@ -4,16 +4,15 @@
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
 import logging
-import os
 
 from collections import defaultdict
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.file2config import find_configs_for_files
-from klpbuild.klplib.ksrc import get_commit_files, ksrc_is_module_supported
+from klpbuild.klplib.ksrc import KERNEL_BRANCHES, get_patch_files
 
 
-def analyse_files(cs_list, sle_commits):
+def analyse_files(cs_list, sle_patches):
     '''
     Function that analyses, per codestream, each of the files modified
     by the backported patches.
@@ -30,8 +29,10 @@ def analyse_files(cs_list, sle_commits):
     report = defaultdict(list)
 
     for cs in cs_list:
-        for c in sle_commits[cs.name_cs()]["commits"]:
-            files = get_commit_files(c, inside_patch=True)
+            bc = cs.base_cs_name()
+            patches = sle_patches[bc]
+            branch = KERNEL_BRANCHES[bc]
+            files = get_patch_files(patches, branch)
             fconfigs, _, missing = find_configs_for_files(cs, files)
 
             for file in missing:

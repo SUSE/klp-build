@@ -8,13 +8,12 @@ import sys
 
 from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestreams_data import load_codestreams
-from klpbuild.klplib.ibs import IBS
 from klpbuild.klplib.plugins import try_run_plugin
-from klpbuild.plugins.extractor import Extractor
 
 
 def main():
-    args = create_parser().parse_args(sys.argv[1:])
+    parser = create_parser()
+    args = parser.parse_args(sys.argv[1:])
 
     logging_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=logging_level, format="%(message)s")
@@ -22,39 +21,12 @@ def main():
     if hasattr(args, 'lp_name'):
         load_codestreams(args.lp_name)
 
-    try:
-        try_run_plugin(args.cmd, args)
-        return
-    except (AssertionError, ModuleNotFoundError) as e:
-        # TODO: this should be removed as soon as all the modules are converted
-        # into plugins
-        if isinstance(e, AssertionError) and not "is not a plugin!" in str(e):
-                raise
+    if not args.cmd:
+        print("Missing required command.")
+        parser.print_help()
+        exit(1)
 
-        logging.debug("Plugin %s cannot be loaded dinamically!", args.cmd)
-
-    # NOTE: all the code below should be gone when all the modules will be
-    # converted into plugins
-    if args.cmd == "extract":
-        Extractor(args.lp_name, args.lp_filter, args.apply_patches, args.avoid_ext).run()
-
-    elif args.cmd == "cs-diff":
-        Extractor(args.lp_name, args.lp_filter, False, []).cs_diff()
-
-    elif args.cmd == "status":
-        IBS(args.lp_name, args.lp_filter).status(args.wait)
-
-    elif args.cmd == "push":
-        IBS(args.lp_name, args.lp_filter).push(args.wait)
-
-    elif args.cmd == "log":
-        IBS(args.lp_name, args.lp_filter).log(args.arch)
-
-    elif args.cmd == "cleanup":
-        IBS(args.lp_name, args.lp_filter).cleanup()
-
-    elif args.cmd == "prepare-tests":
-        IBS(args.lp_name, args.lp_filter).prepare_tests()
+    try_run_plugin(args.cmd, args)
 
 
 if __name__ == "__main__":
