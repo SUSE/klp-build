@@ -286,11 +286,15 @@ def ksrc_is_module_supported(module, kernel):
     returns:
         Return True if supported. False otherwise.
         """
+    UNSUPPORTED_MARKERS = {
+        "-",
+        "+external",
+        "-!optional"
+    }
 
     mpath = module
     prev = ""
     idx = 1
-    supported = True
 
     out = ksrc_read_rpm_file(kernel, "supported.conf").splitlines()
     if not out:
@@ -303,14 +307,29 @@ def ksrc_is_module_supported(module, kernel):
     #   my/kernel/*
     #   my/*
     while mpath != prev:
-        r = re.compile(rf"^[-+\s].*{mpath}")
-        match = list(filter(r.match, out))
-        if match:
-            supported = match[0][0] != '-'
-            break
+        r = re.compile(rf"^([-+]!?\w*)?\s+{mpath}")
+        matches = [m for line in out if (m := r.match(line))]
 
-        prev = mpath
-        mpath = module.rsplit("/", idx)[0] + r"/\*"
-        idx += 1
+        # Try more generic path if we don't match
+        if not matches:
+            prev = mpath
+            mpath = module.rsplit("/", idx)[0] + r"/\*"
+            idx += 1
+            continue
 
-    return supported
+        # At this point we've surely matched. Check if we support it or not.
+        markers = [marker for match in matches if (marker := match.group(1))]
+        if len(markers) > 1:
+            raise RuntimeError(f"ERROR: matched more than one line in {kernel}:supported.conf")
+
+        # Line has matched but there's no marker -> module is supported
+        if not markers:
+            return True
+
+        # Check if any marker belongs to UNSUPPORTED_MARKERS
+        if markers[0] in UNSUPPORTED_MARKERS:
+            return False
+
+        raise RuntimeError(f"ERROR: marker {marker} in {kernel}:supported.conf is not known!")
+
+    return True
