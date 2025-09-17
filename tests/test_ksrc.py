@@ -31,6 +31,10 @@ def test_is_module_supported():
     # Expected: "  drivers/net/wireless/mac80211_hwsim"
     assert ksrc_is_module_supported(mod, "5.14.21-150400.24.144")
 
+    mod = "net/tipc/tipc"
+    # Expected: "+external	net/tipc/tipc"
+    assert not ksrc_is_module_supported(mod, "6.4.0-150600.23.65")
+
 def test_get_rt_patches():
     expected = [
             "patches.suse/bpf-Check-bloom-filter-map-value-size.patch",
