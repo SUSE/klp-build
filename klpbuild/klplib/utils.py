@@ -147,55 +147,29 @@ def get_lp_branches(lp_name, git_dir):
 
 
 def get_cs_branch(cs, lp_name, git_dir):
-    branch_name = ""
-
     for branch in get_lp_branches(lp_name, git_dir):
-        # Check if the codestream is a rt one, and if yes, apply the correct
-        # separator later on
-        if cs.rt and "rt" not in branch:
-            continue
+        # Split and get rid of bsc12345_ prefix
+        branch_codestreams_groups = branch.split("_")[1:]
 
-        separator = "u"
-        if cs.rt:
-            separator = "rtu"
-
-        # First check if the branch has more than code stream sharing
-        # the same code
-        for b in branch.replace(lp_name + "_", "").split("_"):
-            # Only check the branches that are the same type of the branch
-            # being searched. Only check RT branches if the codestream is a
-            # RT one.
-            if cs.rt and "rtu" not in b:
+        expected_prefix = f"{cs.sle}.{cs.sp}{cs.rt}u"
+        for branch_codestream_group in branch_codestreams_groups:
+            # Filter based on cs.sle, cs.sp and cs.rt
+            if not branch_codestream_group.startswith(expected_prefix):
                 continue
 
-            if not cs.rt and "rtu" in b:
-                continue
-
-            sle, u = b.split(separator)
-            if f"{cs.sle}.{cs.sp}" != f"{sle}":
-                continue
-
-            # Get codestreams interval
-            up = u
-            down = u
-            if "-" in u:
-                down, up = u.split("-")
+            # Get only the string after "u", so stripping "12.5rtu" away from
+            # 12.5rtu5-7 and getting only "5-7"
+            updates = branch_codestream_group.split("u")[1]
+            updates = updates.split("-")
+            assert len(updates) <= 2
+            up = updates[0]
+            down = updates[-1] # This will take again the first element if len(updates)=1
 
             # Codestream between the branch codestream interval
             if cs.update >= int(down) and cs.update <= int(up):
-                branch_name = branch
-                break
+                return branch
 
-            # At this point we found a match for our codestream in
-            # codestreams.json, but we may have a more specialized git
-            # branch later one, like:
-            # bsc1197597_12.4u21-25_15.0u25-28
-            # bsc1197597_15.0u25-28
-            # Since 15.0 SLE uses a different kgraft-patches branch to
-            # be built on. In this case, we continue to loop over the
-            # other branches.
-
-    return branch_name
+    return None
 
 
 def check_module_unsupported(arch, mod_path):
@@ -250,28 +224,6 @@ def get_fname(src_name):
     """
 
     return str(Path(src_name).with_suffix("")).replace("-", "_")
-
-
-def get_kgraft_branch(cs_name):
-    if "6.0" in cs_name:
-        branch = "MICRO-6-0"
-
-        if "rt" in cs_name:
-            branch = branch + "-RT"
-
-        _, update = cs_name.split("u")
-        return f"{branch}_Update_{update}"
-
-    if '12.' in cs_name:
-        return "master-livepatch-sle12"
-
-    if '15.3' in cs_name:
-        return "master-livepatch"
-
-    if "15.4" in cs_name or "15.5" in cs_name:
-        return "master-livepatch-sle15sp4"
-
-    return "master-livepatch-sle15sp6"
 
 
 def get_workdir(lp_name):
