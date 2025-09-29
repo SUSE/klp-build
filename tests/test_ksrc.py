@@ -35,6 +35,11 @@ def test_is_module_supported():
     # Expected: "+external	net/tipc/tipc"
     assert not ksrc_is_module_supported(mod, "6.4.0-150600.23.65")
 
+    mod = "net/netfilter/ipset/ip_set_bitmap_ip"
+    # Expected: "+base	net/netfilter/ipset/ip_set_bitmap_ip    # ipset: IP bitmap"
+    assert ksrc_is_module_supported(mod, "6.4.0-10")
+
+
 def test_get_rt_patches():
     expected = [
             "patches.suse/bpf-Check-bloom-filter-map-value-size.patch",

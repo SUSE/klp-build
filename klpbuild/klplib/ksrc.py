@@ -291,6 +291,10 @@ def ksrc_is_module_supported(module, kernel):
         "-!optional"
     }
 
+    SUPPORTED_MARKERS = {
+        "+base",
+    }
+
     mpath = module
     prev = ""
     idx = 1
@@ -306,7 +310,7 @@ def ksrc_is_module_supported(module, kernel):
     #   my/kernel/*
     #   my/*
     while mpath != prev:
-        r = re.compile(rf"^([-+]!?\w*)?\s+{mpath}")
+        r = re.compile(rf"^([-+]!?\w*)?\s+{mpath}(?:\s+#.*)?$")
         matches = [m for line in out if (m := r.match(line))]
 
         # Try more generic path if we don't match
@@ -319,7 +323,7 @@ def ksrc_is_module_supported(module, kernel):
         # At this point we've surely matched. Check if we support it or not.
         markers = [marker for match in matches if (marker := match.group(1))]
         if len(markers) > 1:
-            raise RuntimeError(f"ERROR: matched more than one line in {kernel}:supported.conf")
+            raise RuntimeError(f"ERROR: {mpath} matched more than one line in {kernel}:supported.conf")
 
         # Line has matched but there's no marker -> module is supported
         if not markers:
@@ -329,6 +333,9 @@ def ksrc_is_module_supported(module, kernel):
         if markers[0] in UNSUPPORTED_MARKERS:
             return False
 
-        raise RuntimeError(f"ERROR: marker {marker} in {kernel}:supported.conf is not known!")
+        if markers[0] in SUPPORTED_MARKERS:
+            return True
+
+        raise RuntimeError(f"ERROR: {mpatch} marker {marker} in {kernel}:supported.conf is not known!")
 
     return True
