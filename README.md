@@ -8,10 +8,6 @@ To install the project and dependencies use:
 
 `pipx install .`
 
-To run the project locally and test your changes use:
-
-`./klp-build`
-
 To run tests use:
 
 `tox -e tests`

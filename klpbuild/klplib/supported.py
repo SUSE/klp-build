@@ -9,6 +9,7 @@ import logging
 import re
 import requests
 
+from multiprocessing import Lock
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestream import Codestream
 
@@ -16,8 +17,30 @@ SUPPORTED_CS_URL = "https://gitlab.suse.de/live-patching/sle-live-patching-data/
 SUSE_CERT = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
 
 __supported_codestreams_cache = []
+__supported_codestreams_fetched = False
+__supported_codestreams_lock = Lock()
 
 def get_supported_codestreams():
+    """
+    Download and parse the list of supported codestreams in a thread-safe way.
+
+    Returns:
+        list[Codestream]: A list of supported codestreams.
+    """
+    global __supported_codestreams_cache
+    global __supported_codestreams_fetched
+    global __supported_codestreams_lock
+
+    # (Non-blocking read) Return cached list if present.
+    if __supported_codestreams_fetched:
+        return copy.deepcopy(__supported_codestreams_cache)
+
+    # Lock access and fetch the list.
+    with __supported_codestreams_lock:
+        return __get_supported_codestreams()
+
+
+def __get_supported_codestreams():
     """
     Download and parse the list of supported codestreams.
 
@@ -25,9 +48,11 @@ def get_supported_codestreams():
         list[Codestream]: A list of supported codestreams.
     """
     global __supported_codestreams_cache
+    global __supported_codestreams_fetched
 
-    # Return cached list if present
-    if __supported_codestreams_cache:
+    # In case a reader got locked while the cache was still being written.
+    # Return cached list.
+    if __supported_codestreams_fetched:
         return copy.deepcopy(__supported_codestreams_cache)
 
     __supported_codestreams_cache = []
@@ -49,6 +74,7 @@ def get_supported_codestreams():
         cs = __codestream_from_supported(full_cs, proj, patchid, kernel)
         __supported_codestreams_cache.append(cs)
 
+    __supported_codestreams_fetched = True
     return copy.deepcopy(__supported_codestreams_cache)
 
 

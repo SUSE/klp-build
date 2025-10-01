@@ -59,19 +59,74 @@ Re-download also codestream that are not missing.
 .B scan
 In the scan,
 .B klp-build
-does a shallow analysis of the given CVE, searching for already patched codestreams
-and reporting those that most likley are still affected by the bug.
-This subcommand does not store any data, as it is mainly targeted for automation
-and not for livepatch development. For the latter see the
-.B setup
-subcommand.
+does a bulk analysis of all the pending CVEs meant to be livepatched, as
+indicated in SUSE's Bugzilla. Once completed, a full report is generated
+and printed in stdout with all the bugs information. Example report:
+.TP
+.PP
+.EX
+     ID  CVE         SUBSYSTEM       CVSS    PRIORITY      CLASSIFICATION    STATUS         AFFECTED
+-------  ----------  ------------  ------   ----------   ----------------  -------------  --------------------
+122xxxx  2021-xxxxx  scsi             7.8    Medium         complex          Incomplete(0)  No
+122xxxx  2024-xxxxx  drm/amdgpu       7.8    Medium         trivial          Fixed(3)       15.6rtu0 15.6u0
+122xxxx  2024-xxxxx  iommu/vt-d       7.8    High           None             Fixed(1)       15.6rtu0 15.6u0-1
+.EE
+.PP
 .RS 7
+Most of the fields are self-explanatory except for perhaps
+the
+.B status
+and
+.B affected
+ones.
+.TP
+.B status:
+*
+.I Fixed(n)
+Bug has been fixed in all the vulnerable SLEs.
+.sp
+*
+.I Incomplete(n)
+Most likely someone is working on the bug.
+.sp
+*
+.I Not-Fixed
+No one has started working on the bug yet. Or the bug has been discarded,
+but it cannot be confirmed by
+.B klp-build
+alone.
+.sp
+*
+.I Dropped
+Bug has been discarded with 100% certainty, so no livepatch needed.
+.sp
+.I n
+is the total number of backports for this specific CVE.
+.sp
+.B status
+is derived from the available information in bugzilla, and as such
+it might be incorrect and should be manually verified. That being said, in most cases
+the reported information is realiable enough to be used as a hint.
+.LP
+.B affected:
+List of codestreams still affected by the bug that need to be livepatched.
+.I No
+otherwise.
+.PP
+This subcommand does not store any data, as it is mainly targeted for automation
+and as a first step during livepatch development.
+.PP
+Optional arguments:
 .TP
 .BI --cve " CVE"
-The CVE to be analyzed.
+If passed, scan will just analyse the given CVE.
 .TP
 .B --download
 Download missing codestreams data.
+.TP
+.BI --conf " CONF"
+Helps to check only the codestreams that have this config set.
+Not compatible with the automated patch analysis phase.
 .RE
 .TP
 .B setup

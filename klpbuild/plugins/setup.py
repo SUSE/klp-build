@@ -134,9 +134,9 @@ def setup_codestreams(lp_name, data):
         all_codestreams = get_supported_codestreams()
         codestreams = utils.filter_codestreams(data["lp_filter"], all_codestreams)
     else:
-        upstream, patched_cs, codestreams = scan(data["cve"], data["conf"],
-                                                 data["lp_filter"], True,
-                                                 utils.get_workdir(lp_name))
+        _, upstream, patched_cs, codestreams = scan(data["cve"], data["conf"],
+                                                    data["lp_filter"], True,
+                                                    utils.get_workdir(lp_name))
 
     # Add new codestreams to the already existing list, skipping duplicates
     old_patched_cs = get_codestreams_data('patched_cs')

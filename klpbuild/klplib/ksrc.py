@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 from pathlib import PurePath
-
+from multiprocessing import Lock
 from functools import wraps
 
 from klpbuild.klplib import utils
@@ -43,10 +43,12 @@ KERNEL_BRANCHES = {
 
 
 __kernel_source_tags_are_fetched = False
+__kernel_source_fetch_lock = Lock()
 def __check_kernel_source_tags_are_fetched(func):
     """
-    This decorator checks whether the kernel-source tags are fetched. If not,
-    it fetches them the configuration and then calls the wrapped function.
+    This decorator ensures the kernel-source tags are retrieved only once
+    and in a thread-safe manner. If tags need to be fetched, it does so
+    by calling the wrapped function.
 
     Args:
         func (function): The function to be wrapped.
@@ -57,9 +59,12 @@ def __check_kernel_source_tags_are_fetched(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         global __kernel_source_tags_are_fetched
-        if not __kernel_source_tags_are_fetched:
-            __fetch_kernel_branches()
-            __kernel_source_tags_are_fetched = True
+        global __kernel_source_fetch_lock
+
+        with __kernel_source_fetch_lock:
+            if not __kernel_source_tags_are_fetched:
+                __fetch_kernel_branches()
+                __kernel_source_tags_are_fetched = True
         return func(*args, **kwargs)
     return wrapper
 
@@ -151,9 +156,8 @@ def get_branch_patches(cve, mbranch):
 def get_patches(cve, savedir=None):
     logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
-    # Store all patches from each branch and upstream
+    # Store all patches from each branch
     patches = {}
-    patches["upstream"] = []
     # Temporal list of upstream commits
     upstream = set()
 
@@ -190,14 +194,11 @@ def get_patches(cve, savedir=None):
             if m:
                 c = m.group(1)[:12]
                 d, msg = get_commit_data(c, upstream_patches_dir)
-                upstream.add((d, c, msg))
+                upstream.add((d, c, msg, f'{c} ("{msg}")'))
 
             patches[bc].append(patch)
 
     for key, bc_patches in patches.items():
-        if key == "upstream":
-            continue
-
         logging.info(f"{key}: {KERNEL_BRANCHES[key]}")
 
         if not bc_patches:
@@ -206,15 +207,13 @@ def get_patches(cve, savedir=None):
             logging.info(c)
         logging.info("")
 
-    logging.info(f"upstream")
-    for _, c, msg in sorted(upstream):
-        fmt = f'{c} ("{msg}")'
-        patches["upstream"].append(fmt)
-        logging.info(fmt)
+    logging.info("upstream")
+    upslogs = [log for _, _, _, log in sorted(upstream)]
+    logging.info("\n".join(upslogs))
 
     logging.info("")
 
-    return patches
+    return upslogs, patches
 
 
 def get_patched_kernels(codestreams, patches):
@@ -292,6 +291,10 @@ def ksrc_is_module_supported(module, kernel):
         "-!optional"
     }
 
+    SUPPORTED_MARKERS = {
+        "+base",
+    }
+
     mpath = module
     prev = ""
     idx = 1
@@ -307,7 +310,7 @@ def ksrc_is_module_supported(module, kernel):
     #   my/kernel/*
     #   my/*
     while mpath != prev:
-        r = re.compile(rf"^([-+]!?\w*)?\s+{mpath}")
+        r = re.compile(rf"^([-+]!?\w*)?\s+{mpath}(?:\s+#.*)?$")
         matches = [m for line in out if (m := r.match(line))]
 
         # Try more generic path if we don't match
@@ -320,7 +323,7 @@ def ksrc_is_module_supported(module, kernel):
         # At this point we've surely matched. Check if we support it or not.
         markers = [marker for match in matches if (marker := match.group(1))]
         if len(markers) > 1:
-            raise RuntimeError(f"ERROR: matched more than one line in {kernel}:supported.conf")
+            raise RuntimeError(f"ERROR: {mpath} matched more than one line in {kernel}:supported.conf")
 
         # Line has matched but there's no marker -> module is supported
         if not markers:
@@ -330,6 +333,9 @@ def ksrc_is_module_supported(module, kernel):
         if markers[0] in UNSUPPORTED_MARKERS:
             return False
 
-        raise RuntimeError(f"ERROR: marker {marker} in {kernel}:supported.conf is not known!")
+        if markers[0] in SUPPORTED_MARKERS:
+            return True
+
+        raise RuntimeError(f"ERROR: {mpatch} marker {marker} in {kernel}:supported.conf is not known!")
 
     return True

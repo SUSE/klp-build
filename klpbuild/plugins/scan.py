@@ -6,12 +6,15 @@
 import logging
 import re
 import sys
+import concurrent.futures
+import tabulate
 
 from klpbuild.klplib import utils
 from klpbuild.klplib import patch
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
 from klpbuild.klplib.ksrc import get_patches, get_patched_kernels, cs_is_affected
+from klpbuild.klplib.bugzilla import get_pending_bugs, get_bug_data, is_bug_dropped, get_bug_dep
 
 PLUGIN_CMD = "scan"
 
@@ -19,7 +22,7 @@ def register_argparser(subparser):
     scan = subparser.add_parser(PLUGIN_CMD)
     scan.add_argument(
         "--cve",
-        required=True,
+        required=False,
         help="Shows which codestreams are vulnerable to the CVE"
     )
     scan.add_argument(
@@ -34,17 +37,74 @@ def register_argparser(subparser):
         help="SLE specific. Download missing codestreams data"
     )
 
-
 def run(cve, conf, lp_filter, download):
+    if not cve:
+        scan_bugzilla()
+        return
+
     return scan(cve, conf, lp_filter, download)
+
+
+def scan_bugzilla():
+    table = []
+    pool = {}
+
+    bugs = get_pending_bugs()
+
+    logging.info("Scanning %d bugs...", len(bugs))
+
+    # Restrict logging to just errors
+    logging.getLogger().setLevel(logging.ERROR)
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for b in bugs:
+            cve, system, cvss, level, prio  = get_bug_data(b)
+            if not cve:
+                continue
+            job = executor.submit(scan_job, b, cve)
+            pool[job] = [b.id, cve, system, cvss, level, prio]
+
+        for job in concurrent.futures.as_completed(pool):
+            bug = pool[job]
+            bug.extend(job.result())
+            table.append(bug)
+
+    # Restore the original log level
+    logging.getLogger().setLevel(logging.INFO)
+
+    logging.info(tabulate.tabulate(table, headers=["ID", "CVE", "SUBSYSTEM", "CVSS", "PRIORITY",
+                                                   "CLASSIFICATION", "STATUS", "AFFECTED"]))
+
+
+def scan_job(bug, cve):
+    affected = "No"
+    status = "Not-Fixed"
+
+    patches, _, _, affected_cs = scan(cve, None, None, False)
+
+    # Check if parent bug has been discarded
+    dep = get_bug_dep(bug)
+    if is_bug_dropped(dep):
+        status = "Dropped"
+
+    npatches = len(set(f for _, files in patches.items() for f in files))
+    if npatches:
+        status = f"Fixed({npatches})"
+
+    if dep and "security-team" not in dep.assigned_to:
+        status = f"Incomplete({npatches})"
+
+    if affected_cs:
+        affected = utils.classify_codestreams_str(affected_cs)
+
+    return status, affected
 
 
 def scan(cve, conf, lp_filter, download, savedir=None):
     # Support CVEs from 2020 up to 2029
     assert cve and re.match(r"^202[0-9]-[0-9]{4,7}$", cve)
 
-    patches = get_patches(cve, savedir)
-    upstream = patches.get("upstream", [])
+    upstream, patches = get_patches(cve, savedir)
 
     all_codestreams = get_supported_codestreams()
     filtered_codesteams = utils.filter_codestreams(lp_filter, all_codestreams, verbose=True)
@@ -117,10 +177,9 @@ def scan(cve, conf, lp_filter, download, savedir=None):
         logging.info("\t%s", utils.classify_codestreams_str(unaffected_cs))
 
     if not working_cs:
-        logging.info("All supported codestreams are already patched. Exiting klp-build")
-        sys.exit(0)
+        logging.info("All supported codestreams are already patched.")
+    else:
+        logging.info("All affected codestreams:")
+        logging.info("\t%s", utils.classify_codestreams_str(working_cs))
 
-    logging.info("All affected codestreams:")
-    logging.info("\t%s", utils.classify_codestreams_str(working_cs))
-
-    return upstream, patched_cs, working_cs
+    return patches, upstream, patched_cs, working_cs

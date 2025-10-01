@@ -35,7 +35,8 @@ setuptools.setup(
         "filelock",
         "pyelftools",
         "zstandard",
-        "python-bugzilla"
+        "python-bugzilla",
+        "tabulate"
     ],
     setuptools_git_versioning={
         "enabled": True,
