@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import subprocess
+import re
 
 from multiprocessing import Lock
 from functools import wraps
@@ -56,7 +57,8 @@ def __fetch_kernel_tree_tags():
         logging.info("Failed to update kernel tree tags\n%s", ret.stderr)
 
 
-# Currently this function returns the date of the patch and its subject
+# Currently this function returns the date of the patch, its subject
+# and the hash of the corresponding commit in kernel-source.
 @__check_kernel_tags_are_fetched
 def get_commit_data(commit, savedir=None):
 
@@ -69,13 +71,71 @@ def get_commit_data(commit, savedir=None):
     date = head[0]
     title = head[1]
     body = ret[1:]
+    suse_commit = re.search(r"suse-commit:\s*([a-z0-9]{40})|$",
+                            '\n'.join(body)).group(1)
 
     # Save the upstream commit if requested
     if savedir:
         with open(Path(savedir, f"{commit}.patch"), "w") as f:
             f.write('\n'.join(body))
 
-    return date, title
+    return date, title, suse_commit
+
+
+@__check_kernel_tags_are_fetched
+def get_commit_body(commit, file_path):
+    """
+    Get the changes done to the given file in a specific commit.
+    For each change, the whole function is returned as context.
+    """
+
+    kernel_tree = get_user_path("kernel_dir")
+
+    ret = subprocess.run(["git", "-C", kernel_tree, "show", "-W",
+                          "--pretty='%b'", commit, "--", file_path],
+                         check=True, capture_output=True, text=True)
+    return ret.stdout
+
+
+@__check_kernel_tags_are_fetched
+def find_commit(subject, branch, skip=0):
+    """
+    Find a commit by subject. Skip, if specified, the first 'n'
+    found commits.
+
+    Returns:
+        - (str) Commit hash on success.
+        - None otherwise.
+    """
+
+    kernel_tree = get_user_path("kernel_dir")
+
+    while True:
+        try:
+            ret = subprocess.run(["git", "-C", kernel_tree, "log", "-n1",
+                                  f"--grep=^{subject}",
+                                  f"--grep=-\s*{subject}",
+                                  "--pretty='%h'",
+                                  f"--skip={skip}",
+                                  f"remotes/origin/{branch}"],
+                                 capture_output=True, check=False,
+                                 text=True, timeout=1)
+            return ret.stdout.replace("'","").strip()
+        except subprocess.TimeoutExpired:
+            """
+            Sometimes the subject doesn't match due to unexpected line breaks in
+            the commit's subject.
+            Unfortunatly, git-log cannot grep more than one line at a time, so
+            as workaround we have to trim long subjects and re-try.
+            """
+            if len(subject) <= 40:
+                break
+            # Cut off the last two words of the subject.
+            subject = subject.rsplit(' ', 2)[0]
+
+    logging.debug("Failed to find the kernel commit for '%s'", subject)
+
+    return None
 
 
 @__check_kernel_tags_are_fetched
