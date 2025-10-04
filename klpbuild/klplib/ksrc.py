@@ -14,7 +14,9 @@ from functools import wraps
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
-from klpbuild.klplib.kernel_tree import get_commit_data
+from klpbuild.klplib.kernel_tree import (get_commit_data,
+                                         get_commit_body,
+                                         find_commit)
 
 KERNEL_BRANCHES = {
     "12.5": "SLE12-SP5",
@@ -90,30 +92,100 @@ def __fetch_kernel_branches():
         logging.info("Fetch failed\n%s", ret.stderr)
 
 
-def get_patch_files(patches, branch):
+def get_commit_patch(commit):
+    kern_src = get_user_path('kernel_src_dir')
+    ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
+                                   "diff-tree", "--no-commit-id",
+                                   "--name-only", commit,
+                                   "-r"]).decode().splitlines()
+    return ret
+
+
+def get_patch_kernel_commit(patch, branch):
     """
-    Get the kernel files that have been modified by the give list of patches.
+    Return the commit in kernel.git correspondig to the patch.
+    """
+    kernel_commit = ''
+    s = get_patch_subject(patch, branch)
+
+    for skip in range(0, 3):
+        if not (kernel_commit := find_commit(s, branch, skip)):
+            break
+        # Verify that the found kernel commit actually corresponds
+        # to this patch: Check the 'suse-commit' in the commit msg.
+        # This new suse-commit should have introduced the patch in
+        # kernel-source. If it did not, then it was a false-positive,
+        # skip it, and try with the next found kernel commit.
+        # This is a very corner case, so try at most 3 times.
+        _, _, suse_commit = get_commit_data(kernel_commit)
+        if patch in get_commit_patch(suse_commit):
+            break
+
+    return kernel_commit
+
+
+def __get_patch_files(patch, branch):
+    """
+    Return the files modified by the given patch.
+    """
+
+    kern_src = get_user_path('kernel_src_dir')
+    files = []
+
+    ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
+                                   "grep", "-Ih", "^+++",
+                                   f"remotes/origin/{branch}:{patch}"]).decode()
+    for l in ret.splitlines():
+        # Remove the first caracters "+++ [a,b]/" in the line. Leftovers
+        # from the patch's diff.
+        files.append(l[6:])
+
+    return sorted(set(files))
+
+
+def get_patches_files(patches, branch):
+    """
+    Get the kernel files and functions that have been modified by the given
+    list of patches.
 
     Args:
         patches (list): Input list of patches to analyse.
         branch (str): Branch where to locate the given patches.
 
     returns:
-        List: Return the files modified by the given patches.
+        List: Return the files and functions modified by the given patches.
     """
+
+    files = {}
+    for p in patches:
+        kernel_commit = get_patch_kernel_commit(p, branch)
+        for f in __get_patch_files(p, branch):
+            if f not in files:
+                files[f] = set()
+            if not kernel_commit:
+                continue
+
+            raw = get_commit_body(kernel_commit, f)
+            # Get the modified functions' name
+            funcs = re.findall(r"\s*(\w+)\s*\([^(]*\)\n\+*\s*{\n", raw)
+            files[f].update(set(funcs))
+
+    return files
+
+
+def get_patch_subject(patch, branch):
+    """
+    Get the subject field in the patch.
+    """
+
     kern_src = get_user_path('kernel_src_dir')
 
-    files = []
-    for p in patches:
-        ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
-                                       "grep", "-Ih", "^+++",
-                                       f"remotes/origin/{branch}:{p}"]).decode()
-        for l in ret.splitlines():
-            # Remove the first caracters "+++ [a,b]/" in the line. Leftovers
-            # from the patch's diff.
-            files.append(l[6:])
+    ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
+                                   "grep", "-Ih", "^Subject:",
+                                   f"remotes/origin/{branch}:{patch}"]).decode()
+    subj = re.sub(r"Subject:\s*(\[PATCH.*\])?", "", ret)
 
-    return sorted(set(files))
+    return subj.strip()
 
 
 def store_patch(pfile, patch, savedir, savedir_idx, bc):
@@ -202,7 +274,7 @@ def get_patches(cve, savedir=None):
             m = re.search(r"Git-commit: ([\w]+)", pfile)
             if m:
                 c = m.group(1)[:12]
-                d, msg = get_commit_data(c, upstream_patches_dir)
+                d, msg, _ = get_commit_data(c, upstream_patches_dir)
                 upstream.add((d, c, msg, f'{c} ("{msg}")'))
 
             patches[bc].append(patch)
