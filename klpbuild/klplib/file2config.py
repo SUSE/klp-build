@@ -88,7 +88,7 @@ def find_configs_for_files(cs, file_paths: list):
         if not config:
             missing.append(path)
         elif config.startswith('CONFIG_'):
-            configs[path] = {'config': config, 'obj': obj}
+            configs[path] = {'conf': config, 'module': obj}
         # else there is garbage like 'subst', 'vds' for wrongly parsed input
 
     return configs, missing
