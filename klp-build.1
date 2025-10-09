@@ -134,12 +134,20 @@ During the setup,
 .B klp-build
 analysis each codestream in order to identify those affected by
 the indicated CVE. Note that in this phase a lot of per-codestream
-data is generated and stored for future use.
+data is generated and stored for future use. By default,
+.B setup
+retrieves all the technical information (files, functions, configs,
+modules and archs) from the report generated during the
+.B scan.
+In case the report is incorrect, the values can be passed manually
+with the optional arguments.
 .RS 7
 .TP
 .BI --cve " CVE"
 The CVE assigned to this livepatch.
 .TP
+Optional arguments:
+.PP
 .BI --conf " CONF"
 The kernel CONFIG used to build the object to be livepatched.
 .TP
@@ -274,9 +282,16 @@ kernel module
 .IP
 $
 .B klp-build
+setup --name bsc1197597 --cve 2022-1048 --filter '15.5' --archs x86_64 ppc64le
+.PP
+Or if the automated setup is incorrected, the information can be
+passed manually:
+.IP
+$
+.B klp-build
 setup --name bsc1197597 --cve 2022-1048 --mod snd-pcm --conf
 CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream
-snd_pcm_detach_substream --codestreams '15.5' --archs x86_64 ppc64le
+snd_pcm_detach_substream --filter '15.5' --archs x86_64 ppc64le
 .PP
 Compare two codestreams:
 .IP
