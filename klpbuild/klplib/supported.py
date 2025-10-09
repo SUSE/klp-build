@@ -11,6 +11,7 @@ import requests
 
 from multiprocessing import Lock
 from klpbuild.klplib import utils
+from klpbuild.klplib.cache import cache_func
 from klpbuild.klplib.codestream import Codestream
 
 SUPPORTED_CS_URL = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
@@ -112,6 +113,7 @@ def __load_supported_file():
     with open("tests/supported.csv") as file:
         return file.readlines()[1:]
 
+@cache_func
 def __download_supported_file():
     """
     Download and return the lines of the supported file.

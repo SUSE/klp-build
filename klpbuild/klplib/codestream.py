@@ -9,6 +9,7 @@ import re
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
+from klpbuild.klplib.cache import cache_func
 
 class Codestream:
     __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "__project",
@@ -39,6 +40,9 @@ class Codestream:
         self.files = files if files is not None else {}
         self.modules = modules if modules is not None else {}
         self.configs = configs if configs is not None else {}
+
+    def __klp_build_obj_hash__(self):
+        return self.__name
 
 
     @classmethod
@@ -404,6 +408,7 @@ class Codestream:
     # It is also used when we want to check if a symbol externalized in one
     # architecture exists in the other supported ones. In this case skip_on_host
     # will be True, since we trust the decisions made by the extractor tool.
+    @cache_func
     def check_symbol_archs(self, lp_archs, mod, symbols, skip_on_host):
         cache = {}
 
