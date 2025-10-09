@@ -86,14 +86,10 @@ def analyse_configs(cs_list):
     report = defaultdict(list)
 
     for cs in cs_list:
-        for _, dat in cs.files.items():
-            conf = dat['config']
-            if conf in cs.configs:
-                continue
-
-            cs.configs[conf] = cs.get_all_configs(conf)
-
-            key = f"{conf}:{cs.configs[conf]}"
+        configs = {dat['confing'] for _, dat in cs.files.items()}
+        cs.set_configs(configs)
+        for conf, archs in cs.configs.items():
+            key = f"{conf}:{archs}"
             if cs not in report[key]:
                 report[key].append(cs)
 

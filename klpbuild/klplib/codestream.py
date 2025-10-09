@@ -6,6 +6,7 @@
 import re
 import subprocess
 import tempfile
+import logging
 
 from pathlib import Path, PurePath
 from importlib import resources
@@ -169,16 +170,19 @@ class Codestream:
         # We support all architecture for all other codestreams
         return ["x86_64", "s390x", "ppc64le"]
 
-
     def set_files(self, files):
         self.files = files
 
+    def set_configs(self, configs):
+        self.configs = {conf: self.get_all_configs(conf) for conf in configs}
+
+    def set_archs(self, archs):
+        self.archs = list(set(archs) & set(self.__get_default_archs()))
 
     def get_kernel_type(self, suffix=False):
         dash = "-" if suffix else ""
         suffix = "rt" if self.rt else "default"
         return dash + suffix
-
 
     def get_full_kernel_name(self):
         """Returns the kernel name with flavor suffix"""
@@ -323,6 +327,10 @@ class Codestream:
         the configuration is not set the return value will be an empty dict.
         """
         configs = {}
+
+        if conf and not conf.startswith("CONFIG_"):
+            logging.error(f"Invalid config '{conf}': Missing CONFIG_ prefix")
+            sys.exit(1)
 
         for arch in self.archs:
             kconf = self.get_config_content(arch)
