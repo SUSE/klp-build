@@ -115,6 +115,7 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
     unaffected_cs = []
     for cs in filtered_codesteams:
 
+        # Skip codestreams that do not support the given archs.
         cs.set_archs(archs)
         if not cs.archs:
             continue
