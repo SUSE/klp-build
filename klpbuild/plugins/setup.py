@@ -87,8 +87,9 @@ def setup(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
 
     codestreams = setup_codestreams(lp_name, {"cve": cve, "conf": conf,
                                               "lp_filter": lp_filter,
-                                              "no_check": no_check})
-    setup_project_files(lp_name, codestreams, ffuncs, archs)
+                                              "no_check": no_check,
+                                              "archs": archs})
+
 
 def setup_file_funcs(conf, mod, file_funcs, mod_file_funcs, conf_mod_file_funcs):
     if conf and not conf.startswith("CONFIG_"):
@@ -136,6 +137,7 @@ def setup_codestreams(lp_name, data):
     else:
         _, upstream, patched_cs, codestreams = scan(data["cve"], data["conf"],
                                                     data["lp_filter"], True,
+                                                    data["archs"],
                                                     utils.get_workdir(lp_name))
 
     # Add new codestreams to the already existing list, skipping duplicates
