@@ -348,39 +348,6 @@ class Codestream:
 
         return configs
 
-    def validate_config(self, archs, conf, mod):
-        configs = {}
-        cs_config = self.get_all_configs(conf)
-
-        # Validate only the specified architectures, but check if the codestream
-        # is supported on that arch (like RT that is currently supported only on
-        # x86_64)
-        for arch in archs:
-            # Check if the desired CONFIG entry is set on the codestreams's supported
-            # architectures, by iterating on the specified architectures from the setup command.
-            if arch not in self.archs:
-                continue
-
-            try:
-                conf_entry = cs_config.pop(arch)
-            except KeyError as exc:
-                raise RuntimeError(f"{self.full_cs_name()}: {conf} not set on {arch}. Aborting") from exc
-
-            if conf_entry == "m" and mod == "vmlinux":
-                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
-            if conf_entry == "y" and mod != "vmlinux":
-                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
-
-            configs.setdefault(conf_entry, [])
-            configs[conf_entry].append(f"{self.full_cs_name()}:{arch}")
-
-        # Validate if we have different settings for the same config on
-        # different architecures, like having it as builtin on one and as a
-        # module on a different arch.
-        if len(configs.keys()) > 1:
-            print(configs["y"])
-            print(configs["m"])
-            raise RuntimeError(f"{self.full_cs_name()}: Configuration mismatach between codestreams. Aborting.")
 
     def find_obj_path(self, arch, mod):
         # Return the path if the modules was previously found for ARCH, or refetch if
