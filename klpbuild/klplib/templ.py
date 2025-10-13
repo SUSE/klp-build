@@ -11,7 +11,8 @@ from mako.template import Template
 
 from klpbuild.klplib.bugzilla import get_bug_title, get_bug
 from klpbuild.klplib.codestreams_data import get_codestreams_data
-from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir, get_lp_number, get_fname
+from klpbuild.klplib.utils import (ARCHS, fix_mod_string, get_mail, get_workdir,
+                                   get_lp_number, get_fname, is_mod)
 
 
 MACRO_PROTO_SYMS = """\
@@ -380,20 +381,20 @@ ${get_entries(lpdir, bsc, cs)}
 
 TEMPL_PATCHED = """\
 <%
-def get_patched(cs_files, check_enabled):
+def get_patched(cs, check_enabled):
     ret = []
-    for ffile, fdata in cs_files.items():
+    for ffile, fdata in cs.files.items():
         conf = ''
         if check_enabled and fdata['conf']:
             conf = f' IS_ENABLED({fdata["conf"]})'
 
-        mod = fdata['module'].replace('-', '_')
+        mod = cs.get_file_mod(ffile).replace('-', '_')
         for func in fdata['symbols']:
             ret.append(f'{mod} {func} klpp_{func}{conf}')
 
     return "\\n".join(ret)
 %>\
-${get_patched(cs_files, check_enabled)}
+${get_patched(cs, check_enabled)}
 """
 
 
@@ -402,7 +403,7 @@ def __preproc_slashes(text):
     return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
 
 def __generate_patched_conf(lp_name, cs):
-    render_vars = {"cs_files": cs.files, "check_enabled": __is_check_enabled()}
+    render_vars = {"cs": cs, "check_enabled": __is_check_enabled()}
     with open(Path(cs.get_lp_dir(lp_name), "patched_funcs.csv"), "w") as f:
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
@@ -423,15 +424,16 @@ def __generate_header_file(lp_name, lp_path, cs):
 
         for src_file, data in cs.files.items():
             configs.add(data["conf"])
+            mod = cs.get_file_mod(src_file)
             # If we have external symbols we need an init function to load them. If the module
             # isn't vmlinux then we also need an _exit function
             if data["ext_symbols"]:
-                if data["module"] != "vmlinux":
+                if is_mod(mod):
                     # Used by the livepatch_cleanup
                     has_cleanup = True
 
                 proto_fname = get_fname(cs.lp_out_file(lp_name, src_file))
-                proto_syms[proto_fname] = {"cleanup": data["module"] != "vmlinux"}
+                proto_syms[proto_fname] = {"cleanup": is_mod(mod)}
 
         # If we don't have any external symbols then we don't need the empty _init/_exit functions
         if proto_syms.keys():
@@ -494,12 +496,13 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
         lp_inc_dir = Path("non-existent")
     else:
         fdata = cs.files[str(src_file)]
+        mod = cs.get_file_mod(src_file)
         tvars.update({
             "config": fdata.get("conf", ""),
             "ext_vars": fdata.get("ext_symbols", ""),
             "ibt": fdata.get("ibt", False),
             "inc_src_file": cs.lp_out_file(lp_name, src_file),
-            "mod": fix_mod_string(fdata.get("module", "")),
+            "mod": fix_mod_string(mod if is_mod(mod) else ""),
             "mod_mutex": cs.is_mod_mutex(),
         })
 
