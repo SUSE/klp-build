@@ -345,29 +345,26 @@ def group_equal_files(lp_name, working_cs):
         logging.info("\t%s", group)
 
 
-def quilt_log_path(lp_name, apply_patches):
-    if apply_patches:
-        return get_patches_dir(lp_name)/"quilt.log"
-
-    return "/dev/null"
-
+def get_lp_branch(lp_name, cs):
+    return lp_name + "_" + cs.full_cs_name()
 
 def remove_patches(lp_name, cs, apply_patches):
     sdir = cs.get_src_dir()
-    # Check if there were patches applied previously
-    patches_dir = Path(sdir, "patches")
-    if not patches_dir.exists():
-        return
 
-    with open(quilt_log_path(lp_name, apply_patches), "a") as f:
-        f.write(f"\nRemoving patches from {cs.full_cs_name()}({cs.kernel})\n")
-        err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=f, stdout=f, check=False)
+    err = subprocess.run(["git", "checkout", f"rpm-{cs.kernel}"],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         cwd=sdir, check=False)
+    if err.returncode != 0:
+        raise RuntimeError(f"Failed to switch to rpm-{cs.kernel} branch. Aborting\n")
 
-    if err.returncode not in [0, 2]:
-        raise RuntimeError(f"{cs.full_cs_name()}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
-
-    shutil.rmtree(patches_dir, ignore_errors=True)
-    shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
+    if apply_patches:
+        bname = get_lp_branch(lp_name, cs)
+        err = subprocess.run(["git", "branch", "-D", f"{bname}"], cwd=sdir,
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.PIPE, check=False)
+        if err.returncode != 0 and f"'{bname}' not found" not in str(err.stderr):
+            raise RuntimeError(f"Failed to delete branch {bname}:\n{err.stderr}\n")
 
 
 def apply_all_patches(lp_name, cs, apply_patches):
@@ -391,35 +388,35 @@ def apply_all_patches(lp_name, cs, apply_patches):
     patched = False
     sdir = cs.get_src_dir()
 
-    with open(quilt_log_path(lp_name, apply_patches), "a") as f:
-        for pdir in patch_dirs:
-            if not pdir.exists():
-                f.write(f"\nPatches dir {pdir} doesnt exists\n")
+    bname = get_lp_branch(lp_name, cs)
+    err = subprocess.run(["git", "checkout", "-b", bname], cwd=sdir,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         check=False)
+    if err.returncode != 0:
+        raise RuntimeError(f"Failed to create branch {bname}. Aborting")
+
+    for pdir in patch_dirs:
+        if not pdir.exists():
+            logging.debug(f"Patches dir {pdir} doesnt exists")
+            continue
+
+        logging.debug(f"Applying patches on {cs.full_cs_name()}({cs.kernel}) from {pdir}")
+
+        for patch in sorted(pdir.iterdir(), reverse=True):
+            if not str(patch).endswith(".patch"):
                 continue
 
-            f.write(f"\nApplying patches on {cs.full_cs_name()}({cs.kernel}) from {pdir}\n")
-            for patch in sorted(pdir.iterdir(), reverse=True):
-                if not str(patch).endswith(".patch"):
-                    continue
-
-                err = subprocess.run(["quilt", "import", str(patch)], cwd=sdir,
-                                     stderr=f, stdout=f, check=False)
-                if err.returncode != 0:
-                    f.write("\nFailed to import patches, remove applied and try again\n")
-                    f.flush()
-                    remove_patches(lp_name, cs, apply_patches)
-
-            err = subprocess.run(["quilt", "push", "-a"], cwd=sdir,
-                                 stderr=f, stdout=f, check=False)
+            err = subprocess.run(["git", "am", str(patch)],
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL,
+                                 cwd=sdir, check=False)
             if err.returncode != 0:
-                f.write("\nFailed to apply patches, remove applied and try again\n")
-                f.flush()
-                remove_patches(lp_name, cs, apply_patches)
-                continue
+                break
 
-            patched = True
-            # Stop the loop in the first dir that we find patches.
-            break
+        patched = True
+        # Stop the loop in the first dir that we find patches.
+        break
 
     if not patched:
         raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): Failed to apply patches. Aborting")
@@ -622,11 +619,6 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
         raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
     logging.info("Work directory: %s", utils.get_workdir(lp_name))
-
-    # Clean any previous logs
-    if apply_patches:
-        with open(quilt_log_path(lp_name, apply_patches), "w") as f:
-            f.truncate()
 
     working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
 
