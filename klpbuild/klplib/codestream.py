@@ -312,6 +312,13 @@ class Codestream:
     def get_mod(self, mod):
         return self.modules[mod]
 
+
+    def get_file_mod(self, file, arch=ARCH):
+        fdat = self.files[file]
+        conf_arch = self.configs[fdat["conf"]][arch]
+        return "vmlinux" if conf_arch == 'y' else fdat["module"]
+
+
     def is_module_supported(self, mod):
         return ksrc_is_module_supported(mod, self.kernel)
 
