@@ -201,7 +201,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         return ret
 
 
-def get_symbol_list(out_dir):
+def get_ext_symbols(out_dir):
     # Generate the list of exported symbols
     exts = []
 
@@ -234,6 +234,41 @@ def get_symbol_list(out_dir):
         symbols[mod].append(sym)
 
     return symbols
+
+
+def get_klpp_symbols(out_dir, lp_out):
+    fpath = Path(out_dir, "patched_funcs")
+    if not fpath.exists():
+        raise RuntimeError(f"File not found: {fpath}")
+
+    with open(lp_out) as f:
+        lp_code = f.read()
+
+    klpp_syms = {}
+    with open(fpath) as f:
+        # Each line is a symbol patched by klp-ccp
+        for sym in f:
+            sym = sym.strip()
+            # Create a regex for finding the klpp_{sym} function
+            # declaration and definition.
+            rfmt = fr"(static\s+)(([\w\*]\s*)*klpp_{sym}\s*\([^)]*\))"
+            regex = re.compile(rfmt, re.S)
+
+            # Search and save the function prototype for later use
+            m = regex.search(lp_code)
+            if not m:
+                logging.warning(f"Failed to find klpp_{sym} in {lp_out}")
+                continue
+            klpp_proto = re.sub(r'\s+',' ', m.group(2)).strip() + ';'
+            klpp_syms.update({sym:klpp_proto})
+
+            # Remove the 'static' keyword in the prototypes, if any
+            lp_code = regex.sub(r'\2', lp_code)
+
+    with open(lp_out, "w") as f:
+        f.write(lp_code)
+
+    return klpp_syms
 
 
 def get_cmd_from_json(cs, fname):
@@ -599,9 +634,11 @@ def process(lp_name, total, args, avoid_ext):
         if len(syms) > 0:
             cs.files[fname]["dup_symbols"] = syms
 
-    cs.files[fname]["ext_symbols"] = get_symbol_list(out_dir)
-
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
+
+    cs.files[fname]["ext_symbols"] = get_ext_symbols(out_dir)
+    cs.files[fname]["klpp_symbols"] = get_klpp_symbols(out_dir, lp_out)
+
 
     # Remove the local path prefix of the klp-ccp generated comments
     # Open the file, read, seek to the beginning, write the new data, and
