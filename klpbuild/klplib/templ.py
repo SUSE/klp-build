@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
-
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -35,12 +35,16 @@ def get_protos(proto_syms):
 """
 
 
-TEMPL_NO_SYMS_H = """\
+TEMPL_IBT_H = """\
 #ifndef _${ fname.upper() }_H
 #define _${ fname.upper() }_H
 
+#include <linux/types.h>
+
 static inline int ${ fname }_init(void) { return 0; }
 static inline void ${ fname }_cleanup(void) {}
+
+${ klpp_header }
 
 #endif /* _${ fname.upper() }_H */
 """
@@ -49,6 +53,8 @@ static inline void ${ fname }_cleanup(void) {}
 TEMPL_H = """\
 #ifndef _${ fname.upper() }_H
 #define _${ fname.upper() }_H
+
+#include <linux/types.h>
 
 % if check_enabled:
 #if IS_ENABLED(${ config })
@@ -60,10 +66,12 @@ void ${ fname }_cleanup(void);
 static inline void ${ fname }_cleanup(void) {}
 % endif %
 ${get_protos(proto_syms)}
+${ klpp_header }
 #else /* !IS_ENABLED(${ config }) */
 
 static inline int ${ fname }_init(void) { return 0; }
 static inline void ${ fname }_cleanup(void) {}
+
 
 #endif /* IS_ENABLED(${ config }) */
 
@@ -75,6 +83,8 @@ void ${ fname }_cleanup(void);
 static inline void ${ fname }_cleanup(void) {}
 % endif
 ${get_protos(proto_syms)}
+
+${ klpp_header }
 % endif
 #endif /* _${ fname.upper() }_H */
 """
@@ -381,6 +391,8 @@ ${get_entries(lpdir, bsc, cs)}
 
 TEMPL_PATCHED = """\
 <%
+from klpbuild.klplib.utils import (is_mod,
+                                   fix_mod_string)
 def get_patched(cs, check_enabled):
     ret = []
     for ffile, fdata in cs.files.items():
@@ -388,9 +400,14 @@ def get_patched(cs, check_enabled):
         if check_enabled and fdata['conf']:
             conf = f' IS_ENABLED({fdata["conf"]})'
 
-        mod = cs.get_file_mod(ffile).replace('-', '_')
-        for func in fdata['symbols']:
-            ret.append(f'{mod} {func} klpp_{func}{conf}')
+        mod = cs.get_file_mod(ffile)
+        if is_mod(mod):
+            mod = fix_mod_string(mod)
+
+        syms = list(fdata['klpp_symbols'].keys())
+        syms.sort()
+        for sym in syms:
+            ret.append(f'{mod} {sym} klpp_{sym}{conf}')
 
     return "\\n".join(ret)
 %>\
@@ -407,14 +424,43 @@ def __generate_patched_conf(lp_name, cs):
     with open(Path(cs.get_lp_dir(lp_name), "patched_funcs.csv"), "w") as f:
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
+def __generate_klpp_header(cs):
+    '''
+    Generate any klpp-specific header information, such as:
+    - klpp functions declarations.
+    - Incomplete struct declaration used by the klpp functions.
+
+    Return a formated string with the generated information.
+    '''
+
+    funcs = []
+    structs = set()
+
+    for dat in cs.files.values():
+        protos = list(dat["klpp_symbols"].values())
+        funcs.extend(protos)
+        for p in protos:
+            m = re.findall(r"(struct\s+\w+)\s*\*?\w+", p)
+            if not m:
+                continue
+            structs.update(m)
+
+    funcs.sort()
+    structs = structs and ';\n'.join(sorted(structs)) + ';\n\n' or ''
+
+    return structs + '\n'.join(funcs)
+
 def __generate_header_file(lp_name, lp_path, cs):
     out_name = f"livepatch_{lp_name}.h"
     render_vars = {
         "fname": get_fname(out_name),
     }
 
-    # We don't need any setups on IBT besides the livepatch_init/cleanup ones
-    header_templ = TEMPL_NO_SYMS_H
+    # We don't need any setups on IBT besides the livepatch_init/cleanup
+    # and klpp functions information.
+    header_templ = TEMPL_IBT_H
+
+    render_vars.update({"klpp_header": __generate_klpp_header(cs)})
 
     if not cs.needs_ibt():
         configs = set()
