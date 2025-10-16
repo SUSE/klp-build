@@ -28,6 +28,12 @@ from klpbuild.klplib.templ import generate_livepatches
 
 PLUGIN_CMD = "extract"
 
+UNSUPPORTED_MACROS = [
+        "__KERNEL__",
+        "MODULE",
+        "KBUILD_MODNAME",
+        r"__has_attribute\("
+        ]
 
 def register_argparser(subparser):
     extract_opts = subparser.add_parser(
@@ -686,15 +692,28 @@ def process(lp_name, total, args, avoid_ext):
     cs.files[fname]["ext_symbols"] = get_ext_symbols(out_dir)
     cs.files[fname]["klpp_symbols"] = get_klpp_symbols(out_dir, lp_out)
 
+    lp_out_cleanup(lp_out, sdir)
 
-    # Remove the local path prefix of the klp-ccp generated comments
-    # Open the file, read, seek to the beginning, write the new data, and
-    # then truncate (which will use the current position in file as the
-    # size)
+
+def lp_out_cleanup(lp_out, sdir):
+    """
+    Open the file, read, seek to the beginning, write the new data, and
+    then truncate (which will use the current position in file as the
+    size).
+    - Remove the local path prefix of the klp-ccp generated comments.
+    - Remove #includes with local path prefix. Leftovers headers from klp-ccp.
+    - Remove unsupported macro definitions.
+    - Remove big chunks of empty lines.
+    """
+    macros = '|'.join(UNSUPPORTED_MACROS)
     with open(str(lp_out), "r+") as f:
         file_buf = f.read()
         f.seek(0)
-        f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
+        file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
+        file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
+        file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
+        file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
+        f.write(file_buf)
         f.truncate()
 
 
