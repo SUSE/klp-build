@@ -25,6 +25,8 @@ KERNEL_BRANCHES = {
     "15.6rt": "SLE15-SP6-RT",
     "15.7": "SLE15-SP7",
     "15.7rt": "SLE15-SP7-RT",
+    "16.0": "SL-16.0",
+    "16.0rt": "SL-16.0",
     "6.0": "SUSE-2024",
     "6.0rt": "SUSE-2024-RT",
     "cve-5.3": "cve/linux-5.3-LTSS",
@@ -37,6 +39,8 @@ KERNEL_BRANCHES = {
     "15.6rt": "SLE15-SP6-RT",
     "15.7": "SLE15-SP7",
     "15.7rt": "SLE15-SP7-RT",
+    "16.0": "SL-16.0",
+    "16.0rt": "SL-16.0",
     "6.0": "SUSE-2024",
     "6.0rt": "SUSE-2024-RT",
 }
@@ -167,6 +171,11 @@ def get_patches(cve, savedir=None):
         upstream_patches_dir.mkdir(exist_ok=True, parents=True)
 
     for bc, mbranch in KERNEL_BRANCHES.items():
+        # Skip 16.0rt as it will have the same patches of 16.0
+        # TODO: Find a better way to handle this situation
+        if bc == "16.0rt":
+            continue
+
         logging.debug("	processing %s:%s", bc, mbranch)
         patches[bc] = []
 
@@ -197,6 +206,9 @@ def get_patches(cve, savedir=None):
                 upstream.add((d, c, msg, f'{c} ("{msg}")'))
 
             patches[bc].append(patch)
+
+    # Both codestreams point to the same kernel-sources
+    patches["16.0rt"] = patches["16.0"][:]
 
     for key, bc_patches in patches.items():
         logging.info(f"{key}: {KERNEL_BRANCHES[key]}")
