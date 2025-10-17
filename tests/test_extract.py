@@ -83,7 +83,7 @@ def test_compile_commands_enoent():
 
 def test_detect_opt_clone(caplog):
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.3u47"
+    cs = "15.3u55"
 
     setup_args = {
         "lp_name": lp,
