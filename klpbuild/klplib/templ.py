@@ -28,7 +28,8 @@ def get_protos(proto_syms):
             if data["cleanup"]:
                 proto_list.append(f"void {fname}_cleanup(void);\\n")
             else:
-                proto_list.append(f"static inline void {fname}_cleanup(void);\\n")
+                proto_list.append(f"static inline void {fname}_cleanup(void)" +\\
+                                   " {}\\n")
 
         return '\\n' + '\\n'.join(proto_list)
 %>\
@@ -333,7 +334,8 @@ void ${ fname }_cleanup(void)
 % endif # check_enabled
 """
 
-TEMPL_HOLLOW = """\
+
+TEMPL_MULTI_ENTRY = """\
 % if check_enabled:
 #if IS_ENABLED(${ config })
 % endif # check_enabled
@@ -342,11 +344,14 @@ TEMPL_HOLLOW = """\
 
 int ${ fname }_init(void)
 {
+
+${ inits }
 \treturn 0;
 }
 
 void ${ fname }_cleanup(void)
 {
+${ cleanups }
 }
 
 % if check_enabled:
@@ -413,6 +418,32 @@ def get_patched(cs, check_enabled):
 %>\
 ${get_patched(cs, check_enabled)}
 """
+
+
+def get_multi_funcs(cs, lp_name):
+    '''
+    Generate the 'livepatch.c' that wires up multiple inits() and
+    cleanups().
+    '''
+    if cs.needs_ibt():
+        return "", ""
+
+    inits = ["\tint ret;\n"]
+    cleanups = []
+
+    for file, dat in cs.files.items():
+        if not dat["ext_symbols"]:
+            continue
+
+        fname = get_fname(cs.lp_out_file(lp_name, file))
+        mod = cs.get_file_mod(file)
+        cln = is_mod(mod) and f"\t{fname}_cleanup();\n" or ''
+        init = f"\tret = {fname}_init();\n\tif (ret)\n\t\treturn ret;\n"
+
+        inits.append(init)
+        cleanups.append(cln)
+
+    return "\n".join(inits), "\n".join(cleanups)
 
 
 def __preproc_slashes(text):
@@ -530,7 +561,7 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
     }
 
     # If we have multiple source files for the same livepatch,
-    # create one hollow file to wire-up the multiple _init and
+    # create one file to wire-up the multiple _init and
     # _clean functions
     #
     # If we are patching a module, we should have the
@@ -538,7 +569,11 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
     # in order to do the symbol lookups. Otherwise only _init is
     # needed, and only if there are externalized symbols being used.
     if not src_file:
-        temp_str = TEMPL_HOLLOW
+        if cs.needs_ibt():
+            return
+        inits, cleanups = get_multi_funcs(cs, lp_name)
+        tvars.update({"inits": inits, "cleanups": cleanups})
+        temp_str = TEMPL_MULTI_ENTRY
         lp_inc_dir = Path("non-existent")
     else:
         fdata = cs.files[str(src_file)]
@@ -548,7 +583,7 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
             "ext_vars": fdata.get("ext_symbols", ""),
             "ibt": fdata.get("ibt", False),
             "inc_src_file": cs.lp_out_file(lp_name, src_file),
-            "mod": fix_mod_string(mod if is_mod(mod) else ""),
+            "mod": fix_mod_string(mod),
             "mod_mutex": cs.is_mod_mutex(),
         })
 
