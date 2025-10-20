@@ -47,12 +47,12 @@ def register_argparser(subparser):
         "different architectures",
     )
     extract_opts.add_argument(
-        "--apply-patches", action="store_true", help="Apply patches if they exist"
+        "--no-patches", action="store_true", help="Do not apply patches if they exist"
     )
 
 
-def run(lp_name, lp_filter, apply_patches, avoid_ext):
-    return extract(lp_name, lp_filter, apply_patches, avoid_ext)
+def run(lp_name, lp_filter, no_patches, avoid_ext):
+    return extract(lp_name, lp_filter, no_patches, avoid_ext)
 
 
 def get_cs_code(lp_name, working_cs):
@@ -384,7 +384,7 @@ def get_lp_branch(lp_name, cs):
     return lp_name + "_" + cs.full_cs_name()
 
 
-def remove_patches(lp_name, cs, apply_patches):
+def remove_patches(lp_name, cs):
     '''
     Remove any leftovers from previous operations.
     '''
@@ -408,13 +408,12 @@ def remove_patches(lp_name, cs, apply_patches):
 
     # Delete any branch related to this livepatch.
     # We need to start in a clean state.
-    if apply_patches:
-        bname = get_lp_branch(lp_name, cs)
-        err = subprocess.run(["git", "branch", "-D", f"{bname}"], cwd=sdir,
-                             stdout=subprocess.DEVNULL,
-                             stderr=subprocess.PIPE, check=False)
-        if err.returncode != 0 and f"'{bname}' not found" not in str(err.stderr):
-            raise RuntimeError(f"Failed to delete branch {bname}:\n{err.stderr}\n")
+    bname = get_lp_branch(lp_name, cs)
+    err = subprocess.run(["git", "branch", "-D", f"{bname}"], cwd=sdir,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.PIPE, check=False)
+    if err.returncode != 0 and f"'{bname}' not found" not in str(err.stderr):
+        raise RuntimeError(f"Failed to delete branch {bname}:\n{err.stderr}\n")
 
 
 def apply_patch(patch, sdir):
@@ -699,14 +698,14 @@ def process(lp_name, total, args, avoid_ext):
         f.truncate()
 
 
-def extract(lp_name, lp_filter, apply_patches, avoid_ext):
+def extract(lp_name, lp_filter, no_patches, avoid_ext):
     sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
 
     with sdir_lock:
-        start_extract(lp_name, lp_filter, apply_patches, avoid_ext)
+        start_extract(lp_name, lp_filter, no_patches, avoid_ext)
 
 
-def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
+def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
     if not utils.get_workdir(lp_name).exists():
         raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
@@ -726,11 +725,11 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
     for cs in working_cs:
         # remove any previously generated files and leftover patches
         shutil.rmtree(cs.get_ccp_dir(lp_name), ignore_errors=True)
-        remove_patches(lp_name, cs, apply_patches)
+        remove_patches(lp_name, cs)
 
         # Apply patches before the LPs were created
-        if apply_patches:
-            apply_all_patches(lp_name, cs, apply_patches)
+        if not no_patches:
+            apply_all_patches(lp_name, cs)
 
         for fname, fdata in cs.files.items():
             args.append((i, make_lock, fname, cs, fdata))
@@ -780,8 +779,8 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
     # externalized symbols of this file
     for cs in working_cs:
         # Cleanup patches after the LPs were created if they were applied
-        if apply_patches:
-            remove_patches(lp_name, cs, apply_patches)
+        if not no_patches:
+            remove_patches(lp_name, cs)
 
         # Map all symbols related to each obj, to make it check the symbols
         # only once per object

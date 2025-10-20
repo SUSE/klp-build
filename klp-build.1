@@ -191,8 +191,6 @@ In this phase
 creates the livepatch for each affected codestream based on the data generated
 during the
 .BR setup "."
-Results may differ greatly depending on the back-end tool selected for the
-livepatch creation.
 .RS 7
 .TP
 .BI --avoid-ext " AVOID_EXT [AVOID_EXT ...]"
@@ -200,11 +198,8 @@ Functions to be copied into the livepatch instead of externalizing them.
 Useful to make sure to include symbols that are optimized in
 different architectures.
 .TP
-.B --apply-patches
-Apply patches if they exist.
-.TP
-.BI --codestreams " CODESTREAMS CODESTREAMS"
-Apply diff on two different codestreams.
+.B --no-patches
+Do not apply the patches even if they exist.
 .RE
 .TP
 .B format-patches
