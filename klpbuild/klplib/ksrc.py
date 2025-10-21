@@ -348,6 +348,6 @@ def ksrc_is_module_supported(module, kernel):
         if markers[0] in SUPPORTED_MARKERS:
             return True
 
-        raise RuntimeError(f"ERROR: {mpatch} marker {marker} in {kernel}:supported.conf is not known!")
+        raise RuntimeError(f"ERROR: {mpath} marker {marker} in {kernel}:supported.conf is not known!")
 
     return True

@@ -103,7 +103,7 @@ def test_templ_without_externalized_vars():
 # bscXXXXXXX.
 def test_check_header_file_included():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u17"
+    cs = "15.5u19"
 
     setup_args = {
         "lp_name" : lp,
