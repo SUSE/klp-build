@@ -457,6 +457,9 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
 
     if cs.is_slfo or (cs.sle >= 15 and cs.sp >= 4):
         cmd += " -D__has_attribute(x)=0"
+        # Only required for sle >= 16
+        cmd += " -D__seg_gs="
+        cmd += " -D__seg_fs="
 
     ccp_args.extend(cmd.split(" "))
 
