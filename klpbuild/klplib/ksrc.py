@@ -15,6 +15,7 @@ from functools import wraps
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.kernel_tree import get_commit_data
+from klpbuild.klplib.cache import cache_func
 
 KERNEL_BRANCHES = {
     "12.5": "SLE12-SP5",
@@ -73,6 +74,7 @@ def __check_kernel_source_tags_are_fetched(func):
     return wrapper
 
 
+@cache_func
 def __fetch_kernel_branches():
     kern_src = get_user_path('kernel_src_dir')
     logging.info("Fetching changes from all supported branches...")
@@ -157,6 +159,7 @@ def get_branch_patches(cve, mbranch):
 
 
 @__check_kernel_source_tags_are_fetched
+@cache_func
 def get_patches(cve, savedir=None):
     logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
@@ -268,14 +271,17 @@ def cs_is_affected(cs, cve, patches):
     return len(patches[cs.base_cs_name()]) > 0
 
 
+@cache_func
 def ksrc_read_rpm_file(kernel_version, file_path):
     return __read_file("rpm-" + kernel_version, file_path)
 
 
+@cache_func
 def ksrc_read_branch_file(branch, file_path):
     return __read_file("remotes/origin/" + branch, file_path)
 
 
+@cache_func
 def __read_file(ref, file_path):
     ksrc_dir = get_user_path("kernel_src_dir")
 
@@ -285,6 +291,7 @@ def __read_file(ref, file_path):
     return ret.stdout
 
 
+@cache_func
 def ksrc_is_module_supported(module, kernel):
     """
     Check if a kernel module is supported on a specific kernel.

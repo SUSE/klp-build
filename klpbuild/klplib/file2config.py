@@ -8,6 +8,7 @@
 import re
 
 from pathlib import Path
+from klpbuild.klplib.cache import cache_func
 
 def _load_makefile(cs, make_file: str) -> list:
 
@@ -63,6 +64,7 @@ def _find_config(cs, base_dir, relative_obj_path, deep):
     return None, ""
 
 
+@cache_func
 def find_configs_for_files(cs, file_paths: list):
 
     configs = {}

@@ -48,6 +48,12 @@ def create_parser() -> argparse.ArgumentParser:
         version=f"%(prog)s v{importlib.metadata.version('klp-build')}"
     )
 
+    parentparser.add_argument(
+        "--nocache",
+        action="store_true",
+        help=f"Disable cache"
+    )
+
     register_plugins_argparser(sub)
 
     return parentparser

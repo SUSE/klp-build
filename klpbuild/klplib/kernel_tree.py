@@ -13,6 +13,7 @@ from functools import wraps
 from pathlib import Path
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.utils import ARCH
+from klpbuild.klplib.cache import cache_func
 
 __kernel_tags_are_fetched = False
 __kernel_fetch_lock = Lock()
@@ -41,6 +42,7 @@ def __check_kernel_tags_are_fetched(func):
     return wrapper
 
 
+@cache_func
 def __fetch_kernel_tree_tags():
     """
     Fetch and update the list of tags in the kernel repository.
