@@ -71,8 +71,9 @@ class Codestream:
 
 
     def get_src_dir(self, arch=ARCH, init=True):
-        # Only -rt codestreams have a suffix for source directory
-        name = self.get_full_kernel_name() if self.rt else self.kernel
+        # Before sle16, only -rt codestreams have a suffix for source directory
+        has_rt_suffix = self.rt and self.sle < 16
+        name = self.get_full_kernel_name() if has_rt_suffix else self.kernel
         src_dir = get_datadir(arch)/"usr"/"src"/f"linux-{name}"
         if init:
             init_cs_kernel_tree(self.kernel, src_dir)
