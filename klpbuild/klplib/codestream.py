@@ -5,7 +5,9 @@
 
 from pathlib import Path, PurePath
 import re
+import subprocess
 
+from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
@@ -91,8 +93,24 @@ class Codestream:
         rpms, but this difference should not affect the entries that
         enable/disable portion of the source.
         """
-        file = f"config/{arch}/{self.get_kernel_type()}"
-        return ksrc_read_rpm_file(self.kernel, file)
+
+        target_config_file = f"config/{arch}/{self.get_kernel_type()}"
+        if self.sle < 16 or not self.rt:
+            return ksrc_read_rpm_file(self.kernel, target_config_file)
+
+        # From SLE16, the same source is used both for -default kernel and for
+        # -rt kernel. The config file needs to be retrieved by mergind the
+        # default config with the rt config on the fly as we no longer have a
+        # dedicated -rt one
+        ksrc_path = get_user_path("kernel_src_dir")
+        default_config_file = f"{ksrc_path}/config/{arch}/default"
+        file = f"{ksrc_path}/{target_config_file}"
+        script = f"{ksrc_path}/scripts/config-merge"
+        cmd = [script, default_config_file, file]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return result.stdout
+
+
 
     def get_boot_file(self, file, arch=ARCH):
         assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
