@@ -7,6 +7,8 @@ import logging
 import time
 
 from osctiny import Osc
+from tabulate import tabulate
+from termcolor import colored
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.ibs import get_project_names
@@ -23,6 +25,16 @@ def register_argparser(subparser):
     add_arg_lp_filter(st)
     st.add_argument("--wait", action="store_true",
                     help="Wait unti all codestreams builds are finished")
+
+
+def colored_build_result(build_result):
+    if "succeeded" in build_result:
+        return colored(build_result, color="green")
+
+    if build_result in ["unresolvable", "failed"]:
+        return colored(build_result, color="red")
+
+    return colored(build_result, color="yellow")
 
 
 def status(lp_name, lp_filter, wait=False):
@@ -46,15 +58,22 @@ def status(lp_name, lp_filter, wait=False):
 
         logging.info("%d codestreams to finish", len(prjs))
 
+        prj_dicts = []
+
         for prj, archs in prjs.items():
-            st = []
             finished = False
+
+            prj_dict = {"Project": prj}
+
             # Save the status of all architecture build, and set to fail if
             # an error happens in any of the supported architectures
-            for k, v in archs.items():
-                st.append(f"{k}: {v}")
-                if v in ["unresolvable", "failed"]:
+            for arch_build, arch_result in archs.items():
+                prj_dict[arch_build] = colored_build_result(arch_result)
+
+                if arch_result in ["unresolvable", "failed"]:
                     finished = True
+
+            prj_dicts.append(prj_dict)
 
             # Only set finished is all architectures supported by the
             # codestreams built without issues
@@ -66,7 +85,7 @@ def status(lp_name, lp_filter, wait=False):
             if finished:
                 finished_prj.append(prj)
 
-            logging.info("%s\t%s", prj, "\t".join(st))
+        logging.info(tabulate(prj_dicts, headers="keys"))
 
         for p in finished_prj:
             prjs.pop(p, None)
