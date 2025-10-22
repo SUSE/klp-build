@@ -223,7 +223,8 @@ class Codestream:
         if self.is_micro:
             return f"MICRO-{self.sle}-{self.sp}{rt}"
 
-        return f"SLE{self.sle}-SP{self.sp}{rt}"
+        sp = f"-SP{self.sp}" if self.sp else ""
+        return f"SLE{self.sle}{sp}{rt}"
 
 
     def get_full_product_name(self):
