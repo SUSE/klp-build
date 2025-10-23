@@ -10,7 +10,7 @@ import subprocess
 
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
-from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
+from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_elf_object, get_datadir
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
@@ -370,35 +370,26 @@ class Codestream:
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f"{lp_name}_{fpath}"
 
-
-    # Cache the symbols using the object path. It differs for each
-    # codestream and architecture
     # Return all the symbols not found per arch/obj
-    def __check_symbol(self, arch, mod, symbols, cache):
-        name = self.full_cs_name()
-
-        cache.setdefault(arch, {})
-        cache[arch].setdefault(name, {})
-
-        if not cache[arch][name].get(mod, ""):
-            obj = get_datadir(arch)/self.find_obj_path(arch, mod)
-            cache[arch][name][mod] = get_all_symbols_from_object(obj, True)
-
+    def __check_symbol(self, arch, mod, symbols):
         ret = []
 
+        obj = get_datadir(arch)/self.find_obj_path(arch, mod)
+        symtab = get_elf_object(obj).get_section_by_name(".symtab")
         for symbol in symbols:
-            nsyms = cache[arch][name][mod].count(symbol)
-            if nsyms == 0:
+            syms = symtab.get_symbol_by_name(symbol)
+            # can return None is the symbol is not found, or a list if the symbol
+            # is not unique
+            if not syms:
                 ret.append(symbol)
 
-            elif nsyms > 1:
+            elif len(syms) > 1:
                 print(f"WARNING: {self.full_cs_name()}-{arch} ({self.kernel}): symbol {symbol} duplicated on {mod}")
 
             # If len(syms) == 1 means that we found a unique symbol, which is
             # what we expect, and nothing need to be done.
 
         return ret
-
 
     # This functions is used to check if the symbols exist in the module that
     # will be livepatched. In this case skip_on_host argument will be false,
@@ -409,8 +400,6 @@ class Codestream:
     # architecture exists in the other supported ones. In this case skip_on_host
     # will be True, since we trust the decisions made by the extractor tool.
     def check_symbol_archs(self, lp_archs, mod, symbols, skip_on_host):
-        cache = {}
-
         arch_sym = {}
         # Validate only architectures supported by the codestream
         for arch in self.archs:
@@ -422,16 +411,14 @@ class Codestream:
                 continue
 
             # Assign the not found symbols on arch
-            syms = self.__check_symbol(arch, mod, symbols, cache)
+            syms = self.__check_symbol(arch, mod, symbols)
             if syms:
                 arch_sym[arch] = syms
 
         return arch_sym
-
 
     def check_file_exists(self, file):
         return file_exists_in_tag(self.kernel, file)
 
     def read_file(self, file):
         return read_file_in_tag(self.kernel, file)
-
