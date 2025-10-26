@@ -58,11 +58,11 @@ def scan_bugzilla():
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for b in bugs:
-            cve, system, cvss, level, prio  = get_bug_data(b)
+            cve, system, cvss, prio  = get_bug_data(b)
             if not cve:
                 continue
             job = executor.submit(scan_job, b, cve)
-            pool[job] = [b.id, cve, system, cvss, level, prio]
+            pool[job] = [b.id, cve, system, cvss, prio]
 
         for job in concurrent.futures.as_completed(pool):
             bug = pool[job]
@@ -73,12 +73,13 @@ def scan_bugzilla():
     logging.getLogger().setLevel(logging.INFO)
 
     logging.info(tabulate.tabulate(table, headers=["ID", "CVE", "SUBSYSTEM", "CVSS", "PRIORITY",
-                                                   "CLASSIFICATION", "STATUS", "AFFECTED"]))
+                                                   "STATUS", "ARCHS", "AFFECTED"]))
 
 
 def scan_job(bug, cve):
     affected = "No"
     status = "Not-Fixed"
+    affected_archs = "None"
 
     patches, _, _, affected_cs = scan(cve, None, None, False)
 
@@ -97,7 +98,12 @@ def scan_job(bug, cve):
     if affected_cs:
         affected = utils.classify_codestreams_str(affected_cs)
 
-    return status, affected
+    # All = ppc64le, s390x and x86_64
+    # None = klp-build failed to determine the CONFIGs.
+    if (archs := utils.affected_archs(affected_cs)):
+        affected_archs = "All" if archs == utils.ARCHS else ','.join(archs)
+
+    return status, affected_archs, affected
 
 
 def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
