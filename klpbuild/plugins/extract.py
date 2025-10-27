@@ -644,9 +644,6 @@ def process(lp_name, total, args, avoid_ext):
         with make_lock:
             cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
-    if " -pg " not in cmd:
-        logging.warning("%s:%s is not compiled with livepatch support (-pg flag)", cs.full_cs_name(), fname)
-
     args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
 
     # Detect and set ibt information. It will be used in the TemplateGen
