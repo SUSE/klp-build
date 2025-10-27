@@ -255,7 +255,7 @@ def test_templ_ibt_without_externalized_vars():
         "cve": None,
         "conf": "CONFIG_IPV6",
         "module" : "vmlinux",
-        "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]],
+        "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_addr_compress"]],
         "mod_file_funcs" : [],
         "conf_mod_file_funcs" : []
     }
