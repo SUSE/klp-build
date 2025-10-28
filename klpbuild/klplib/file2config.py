@@ -97,11 +97,23 @@ def find_configs_for_files(cs, file_paths: list):
         # Do not check headers
         if path.endswith('h'):
             continue
+
         valid_path = _filter_path(path)
         obj_file = Path(valid_path.replace('.c', '.o'))
         config, obj = _find_config(cs, obj_file.parent, obj_file.name, 0)
         if not config:
             missing.append(path)
+
+        # Detect code that is only enabled on a specific architecture
+        elif path.startswith("arch") and len(cs.get_all_configs(config)) > 1:
+            if "s390" in path:
+                configs[path] = {'conf': "CONFIG_S390", 'module': 'vmlinux'}
+            elif "x86" in path:
+                configs[path] = {'conf': "CONFIG_X86_64", 'module': 'vmlinux'}
+            elif "powerpc" in path:
+                configs[path] = {'conf': "CONFIG_PPC64", 'module': 'vmlinux'}
+            continue
+
         elif config.startswith('CONFIG_'):
             configs[path] = {'conf': config, 'module': obj}
         # else there is garbage like 'subst', 'vds' for wrongly parsed input
