@@ -85,13 +85,11 @@ class Codestream:
             init_cs_kernel_tree(self.kernel, src_dir)
         return src_dir
 
+    def get_obj_dir(self, arch=ARCH):
+        return Path(f"{self.get_src_dir(arch, init=False)}-obj", arch, self.get_kernel_type())
 
-    def get_obj_dir(self):
-        return Path(f"{self.get_src_dir(ARCH, init=False)}-obj", ARCH, self.get_kernel_type())
-
-
-    def get_ipa_file(self, fname):
-        return Path(self.get_obj_dir(), f"{fname}.000i.ipa-clones")
+    def get_ipa_file(self, fname, arch=ARCH):
+        return Path(self.get_obj_dir(arch), f"{fname}.000i.ipa-clones")
 
     def get_config_content(self, arch=ARCH):
         """

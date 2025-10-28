@@ -187,7 +187,7 @@ def setup_project_files(lp_name, codestreams):
 
             for arch in archs:
                 mod = cs.get_file_mod(f, arch)
-                __setup_check_mod(cs, mod)
+                __setup_check_mod(cs, mod, arch)
                 __setup_check_syms(cs, mod, syms, arch)
 
         if not len(cs.files):
@@ -202,21 +202,22 @@ def __setup_check_file(cs, file):
     if not cs.check_file_exists(file):
         raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}): File {file} not found.")
 
-    ipa_f = cs.get_ipa_file(file)
+    # Get the first affected arch
+    ipa_f = cs.get_ipa_file(file, get_codestreams_data("archs")[0])
     if not ipa_f.is_file():
         ipa_f.touch()
         logging.warning("%s (%s): File %s not found. Creating an empty file.",
                         cs.full_cs_name(), cs.kernel, ipa_f)
 
 
-def __setup_check_mod(cs, mod):
+def __setup_check_mod(cs, mod, arch):
     if mod in cs.modules:
         return
 
-    mod_path = cs.find_obj_path(utils.ARCH, mod)
+    mod_path = cs.find_obj_path(arch, mod)
 
     # Validate if the module being livepatched is supported or not
-    if utils.check_module_unsupported(utils.ARCH, mod_path):
+    if utils.check_module_unsupported(arch, mod_path):
         logging.warning("%s (%s): Module %s is not supported by SLE",
                         cs.full_cs_name(), cs.kernel, mod)
 
