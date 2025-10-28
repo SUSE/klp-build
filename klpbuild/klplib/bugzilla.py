@@ -147,7 +147,7 @@ def get_bug_subsys(bug):
     if len(summary) < 3:
         return "Unknown"
 
-    return summary[3][:40].strip()
+    return summary[3][:40].strip().replace(' ', '')
 
 
 def get_bug_prio(bug):
