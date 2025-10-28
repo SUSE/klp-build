@@ -83,6 +83,17 @@ def find_configs_for_files(cs, file_paths: list):
         # Do not check headers
         if path.endswith('h'):
             continue
+
+        # Detect code that is only enabled on a specific architecture
+        if path.startswith("arch"):
+            if "s390" in path:
+                configs[path] = {'conf': "CONFIG_S390", 'module': 'vmlinux'}
+            elif "x86" in path:
+                configs[path] = {'conf': "CONFIG_X86_64", 'module': 'vmlinux'}
+            elif "powerpc" in path:
+                configs[path] = {'conf': "CONFIG_PPC64", 'module': 'vmlinux'}
+            continue
+
         obj_file = Path(path.replace('.c', '.o'))
         config, obj = _find_config(cs, obj_file.parent, obj_file.name, 0)
         if not config:
