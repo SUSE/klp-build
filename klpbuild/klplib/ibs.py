@@ -131,18 +131,6 @@ def get_cs_packages(cs_list, dest):
                 else:
                     rpm = file[0]
 
-                # Download all packages for the HOST arch
-                # For the others only download kernel-default
-                if arch != ARCH and not re.search(r"kernel-default-\d", rpm):
-                    continue
-
-                # Extract the source and kernel-devel in the current
-                # machine arch to make it possible to run klp-build in
-                # different architectures
-                if "kernel-default-devel" in rpm:
-                    if arch != ARCH:
-                        continue
-
                 rpms.append(RPMData(i, osc, cs, cs.get_project_name(),
                                     cs.get_repo(), arch, cs.get_package_name(),
                                     rpm, dest))
