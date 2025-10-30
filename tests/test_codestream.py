@@ -64,3 +64,9 @@ def test_find_obj_path_arch():
 
     for arch in ARCHS:
         assert arch not in str(cs.find_obj_path(arch, "sch_taprio"))
+
+
+def test_sle16rt_config():
+    cs = Codestream("16.0rtu0", kernel="6.12.0-160000.11")
+    config_content = cs.get_config_content()
+    assert "CONFIG_RCU_BOOST_DELAY" in config_content
