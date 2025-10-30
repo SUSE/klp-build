@@ -84,12 +84,54 @@ def classify_codestreams_str(cs_list):
     return " ".join(classify_codestreams(cs_list))
 
 
+def unclassify_codestreams(cs_group, cs_list):
+    cs_updates = re.findall(r"(\d{1,2}\.\d(?:rt)?u)(\d{1,2})-?(\d{1,2})?", cs_group)
+    if not cs_updates or len(cs_updates) != len(cs_group.split()):
+        return None
+
+    expanded = set()
+    for cs_class in cs_updates:
+        cs_base = cs_class[0]
+        start = cs_class[1]
+        end = cs_class[2]
+
+        if not end:
+            expanded.add(f"{cs_base}{start}")
+            continue
+
+        for i in range(int(start), int(end) + 1):
+            expanded.add(f"{cs_base}{i}")
+
+    return [cs for cs in cs_list if cs.full_cs_name() in expanded]
+
+
 def is_mod(mod):
     return mod != "vmlinux"
 
 
 def get_lp_number(lp_name):
     return lp_name.replace("bsc", "")
+
+
+def get_lp_groups(lp_name, codestreams):
+    workdir = get_workdir(lp_name)/"ccp"
+    with open(f"{workdir}/groups", "r") as f:
+        groups = f.read()
+
+    cs_groups = dict()
+    for group in groups.splitlines():
+        group = group.strip()
+
+        # Expand group and get all the contained codestreams
+        cs_grp = unclassify_codestreams(group, codestreams)
+        if not cs_grp:
+            logging.debug(f"Skipping codestream group: {group}")
+            continue
+
+        cs_groups[group] = cs_grp
+
+    return cs_groups
+
 
 
 def get_elf_modinfo_entry(elffile, conf):
@@ -224,6 +266,16 @@ def filter_codestreams(lp_filter, cs_list, verbose=False):
         logging.info("\t%s", classify_codestreams_str(filtered))
 
     return result
+
+
+def affected_archs(cs_list):
+    conf_archs = {}
+    for cs in cs_list:
+        for val in cs.configs.values():
+            conf_archs.update(val)
+
+    return list(sorted(conf_archs))
+
 
 def get_mail():
     git_data = git.GitConfigParser()

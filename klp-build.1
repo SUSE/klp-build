@@ -134,12 +134,20 @@ During the setup,
 .B klp-build
 analysis each codestream in order to identify those affected by
 the indicated CVE. Note that in this phase a lot of per-codestream
-data is generated and stored for future use.
+data is generated and stored for future use. By default,
+.B setup
+retrieves all the technical information (files, functions, configs,
+modules and archs) from the report generated during the
+.B scan.
+In case the report is incorrect, the values can be passed manually
+with the optional arguments.
 .RS 7
 .TP
 .BI --cve " CVE"
 The CVE assigned to this livepatch.
 .TP
+Optional arguments:
+.PP
 .BI --conf " CONF"
 The kernel CONFIG used to build the object to be livepatched.
 .TP
@@ -183,8 +191,6 @@ In this phase
 creates the livepatch for each affected codestream based on the data generated
 during the
 .BR setup "."
-Results may differ greatly depending on the back-end tool selected for the
-livepatch creation.
 .RS 7
 .TP
 .BI --avoid-ext " AVOID_EXT [AVOID_EXT ...]"
@@ -192,11 +198,21 @@ Functions to be copied into the livepatch instead of externalizing them.
 Useful to make sure to include symbols that are optimized in
 different architectures.
 .TP
-.B --apply-patches
-Apply patches if they exist.
+.B --no-patches
+Do not apply the patches even if they exist.
+.RE
 .TP
-.BI --codestreams " CODESTREAMS CODESTREAMS"
-Apply diff on two different codestreams.
+.B commit
+Commit the extracted livepatches to kgraft-patches (see the
+.BR "SEE ALSO" " section)."
+It organizes the codestreams as per indicated in the
+.I groups
+file. Each codestream group will have a corresponding
+branch in the repository.
+.RS 7
+.TP
+.BI "-f, --force"
+Overwrite existing livepatches and branches in the repository.
 .RE
 .TP
 .B format-patches
@@ -220,7 +236,7 @@ Generates a tar archive per supported architecture containing
 scripts and files that can later be used to run tests in the desired test benchs.
 .TP
 .B push
-Push the generated livetpatch packages to SUSE's Build Service.
+Push and commit the generated livetpatch packages to SUSE's Build Service.
 By doing so,
 .B klp-build
 can automate the building phase for each codestream and architecture.
@@ -274,9 +290,16 @@ kernel module
 .IP
 $
 .B klp-build
+setup --name bsc1197597 --cve 2022-1048 --filter '15.5' --archs x86_64 ppc64le
+.PP
+Or if the automated setup is incorrected, the information can be
+passed manually:
+.IP
+$
+.B klp-build
 setup --name bsc1197597 --cve 2022-1048 --mod snd-pcm --conf
 CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream
-snd_pcm_detach_substream --codestreams '15.5' --archs x86_64 ppc64le
+snd_pcm_detach_substream --filter '15.5' --archs x86_64 ppc64le
 .PP
 Compare two codestreams:
 .IP
