@@ -40,9 +40,9 @@ def analyse_files(cs_list, sle_patches):
             for file, funcs in files_funcs.items():
                 conf = files_conf.get(file, {})
                 if conf:
-                    cs.files[file] = {'symbols': funcs}
+                    cs.files[file] = {'symbols': list(funcs)}
                     cs.files[file].update(conf)
-                    key = f"{file}:{conf['config']}:{conf['obj']}:{sorted(funcs)}"
+                    key = f"{file}:{conf['conf']}:{conf['module']}:{sorted(funcs)}"
                 else:
                     key = f"{file}:::"
 
@@ -64,8 +64,8 @@ def print_files(report):
             logging.info(f"{cs_str}:\nFILE: {file}\n")
             continue
 
-        conf = cs.files[file]['config']
-        obj = cs.files[file]['obj']
+        conf = cs.files[file]['conf']
+        obj = cs.files[file]['module']
         funcs = cs.files[file]['symbols']
         logging.info("%s:\nFILE: %s\nCONF: %s\nOBJ: %s\nFUNCS: %s\n",
                      cs_str, file, conf, obj, ', '.join(funcs))
@@ -86,14 +86,10 @@ def analyse_configs(cs_list):
     report = defaultdict(list)
 
     for cs in cs_list:
-        for _, dat in cs.files.items():
-            conf = dat['config']
-            if conf in cs.configs:
-                continue
-
-            cs.configs[conf] = cs.get_all_configs(conf)
-
-            key = f"{conf}:{cs.configs[conf]}"
+        configs = {dat['conf'] for _, dat in cs.files.items()}
+        cs.set_configs(configs)
+        for conf, archs in cs.configs.items():
+            key = f"{conf}:{archs}"
             if cs not in report[key]:
                 report[key].append(cs)
 
@@ -154,8 +150,8 @@ def analyse_kmodules(cs_list):
 
     for cs in cs_list:
         for _, dat in cs.files.items():
-            conf = dat['config']
-            mod = dat['obj']
+            conf = dat['conf']
+            mod = dat['module']
             if mod in cs.modules:
                 continue
 
@@ -195,6 +191,9 @@ def filter_unsupported_kmodules(cs_list):
         supported = [s for _, s in cs.modules.items() if s]
         if not supported:
             unset_cs.append(cs)
+
+        # Cleanup for future re-use
+        cs.modules.clear()
 
     for cs in unset_cs:
         cs_list.remove(cs)
