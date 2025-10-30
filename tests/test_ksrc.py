@@ -3,17 +3,33 @@
 # Copyright (C) 2021-2025 SUSE
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
-from klpbuild.klplib.ksrc import (get_patch_files, ksrc_is_module_supported,
-                                  get_branch_patches)
+from klpbuild.klplib.ksrc import (get_patches_files, ksrc_is_module_supported,
+                                  get_branch_patches, get_patch_subject)
 
-def test_get_commit_files():
-    expected = ["include/net/dst_ops.h",
-                "include/net/sock.h",
-                "net/ipv6/route.c",
-                "net/xfrm/xfrm_policy.c"]
+def test_get_patches_files():
     patch = ["patches.suse/net-fix-__dst_negative_advice-race.patch"]
-    files = get_patch_files(patch, "SLE15-SP6")
-    assert len(set(files) & set(expected)) == len(expected)
+    expected = {'include/net/dst_ops.h': [],
+                'include/net/sock.h': ['__dst_negative_advice'],
+                'net/ipv4/route.c': ['ipv4_negative_advice'],
+                'net/ipv6/route.c': ['ip6_negative_advice'],
+                'net/xfrm/xfrm_policy.c': ['xfrm_negative_advice']}
+
+    files = get_patches_files(patch, "SLE15-SP6")
+    assert len(files) == len(expected)
+    for file, funcs in files.items():
+        assert file in expected
+        if expected[file]:
+            assert set(expected[file]) & funcs
+
+
+def test_get_patch_subject():
+    expected = "tcp/dccp: Don't use timer_pending() in reqsk_queue_unlink()."
+    patch = "patches.suse/tcp-dccp-Don-t-use-timer_pending-in-reqsk_queue_unlink.patch"
+    assert expected == get_patch_subject(patch, "SLE15-SP7")
+
+    expected = "mptcp: fix TCP options overflow."
+    patch = "patches.suse/mptcp-fix-TCP-options-overflow.patch"
+    assert expected == get_patch_subject(patch, "SLE15-SP7")
 
 
 def test_is_module_supported():
