@@ -22,7 +22,7 @@ from natsort import natsorted
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_list
+from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_list
 from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.templ import generate_livepatches
 
@@ -794,7 +794,7 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
                 obj_syms[obj].extend(syms)
 
         for obj, syms in obj_syms.items():
-            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
+            missing = cs.check_symbol_archs(obj, syms, True, False)
             if missing:
                 for arch, arch_syms in missing.items():
                     missing_syms.setdefault(arch, {})
