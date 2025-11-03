@@ -45,7 +45,8 @@ class Codestream:
         self.patchid = patchid
         self.kernel = kernel
 
-        self.archs = archs if archs is not None else self.__get_default_archs()
+        self.archs = archs if archs is not None else self.get_default_archs()
+        self.archs.sort()
         self.files = files if files is not None else {}
         self.modules = modules if modules is not None else {}
         self.configs = configs if configs is not None else {}
@@ -174,15 +175,15 @@ class Codestream:
 
         return self.__project
 
-    def __get_default_archs(self):
+    def get_default_archs(self):
         # RT is supported only on x86_64 at the moment
         if self.rt:
             return ["x86_64"]
         # MICRO 6.0 doesn't support ppc64le
         elif self.is_micro:
-            return ["x86_64", "s390x"]
+            return ["s390x", "x86_64"]
         # We support all architecture for all other codestreams
-        return ["x86_64", "s390x", "ppc64le"]
+        return ["ppc64le", "s390x", "x86_64"]
 
     def set_files(self, files):
         self.files = files
@@ -191,7 +192,7 @@ class Codestream:
         self.configs = {conf: self.get_all_configs(conf) for conf in configs}
 
     def set_archs(self, archs):
-        self.archs = list(set(archs) & set(self.__get_default_archs()))
+        self.archs = list(set(archs) & set(self.get_default_archs()))
 
     def get_kernel_type(self, suffix=False):
         dash = "-" if suffix else ""
