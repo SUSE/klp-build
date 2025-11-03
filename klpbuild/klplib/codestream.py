@@ -155,9 +155,9 @@ class Codestream:
             return ["x86_64"]
         # MICRO 6.0 doesn't support ppc64le
         elif self.is_micro:
-            return ["x86_64", "s390x"]
+            return ["s390x", "x86_64"]
         # We support all architecture for all other codestreams
-        return ["x86_64", "s390x", "ppc64le"]
+        return ["ppc64le", "s390x", "x86_64"]
 
     def set_files(self, files):
         self.files = files
