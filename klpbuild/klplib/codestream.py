@@ -325,8 +325,7 @@ class Codestream:
         configs = {}
 
         if conf and not conf.startswith("CONFIG_"):
-            logging.error(f"Invalid config '{conf}': Missing CONFIG_ prefix")
-            sys.exit(1)
+            raise ValueError(f"Invalid config '{conf}': Missing CONFIG_ prefix")
 
         for arch in self.archs:
             kconf = self.get_config_content(arch)
