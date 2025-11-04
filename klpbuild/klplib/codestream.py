@@ -3,8 +3,10 @@
 # Copyright (C) 2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import bisect
 import re
 import subprocess
+import sys
 import tempfile
 import logging
 
@@ -382,24 +384,103 @@ class Codestream:
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f"{lp_name}_{fpath}"
 
+    def __check_patchable_sym(self, arch, name, sym, trace_addrs):
+        val = sym["st_value"]
+
+        pos = bisect.bisect_left(trace_addrs, val)
+        if pos == len(trace_addrs) or trace_addrs[pos] != val:
+            logging.error("%s-%s (%s): Symbol %s has tracing disabled.",  self.full_cs_name(),
+                          arch, self.kernel, name)
+            sys.exit(1)
+
+    # On ppc64le the trace_address points to symbol descriptor table, and not
+    # the symbol itself, so we need to check for the address range
+    def __check_patchable_sym_ppc64le(self, arch, name, sym, trace_addrs):
+        code_start = sym["st_value"]
+        code_end = code_start + sym["st_size"]
+
+        pos = bisect.bisect_left(trace_addrs, code_start)
+        if pos == len(trace_addrs) or trace_addrs[pos] > code_end:
+            logging.error("%s-%s (%s): Symbol %s has tracing disabled.",  self.full_cs_name(),
+                          arch, self.kernel, name)
+            sys.exit(1)
+
+    def __get_trace_addresses(self, arch, elf_obj):
+        # Get all addresses related to the functions that can be traced/livepatched
+        # and populate an array for later inspection
+        symtab = elf_obj.get_section_by_name(".symtab")
+
+        start_mcount = symtab.get_symbol_by_name("__start_mcount_loc")[0]
+        stop_mcount = symtab.get_symbol_by_name("__stop_mcount_loc")[0]
+
+        sec = elf_obj.get_section(start_mcount["st_shndx"])
+
+        start = start_mcount["st_value"] - sec["sh_addr"]
+        stop = stop_mcount["st_value"] - sec["sh_addr"]
+
+        order = "big" if arch == "s390x" else "little"
+
+        sec_data = sec.data()[start:stop]
+        syms = []
+
+        for i in range(0, len(sec_data), 8):
+            ptr = sec_data[i:i+8]
+
+            data = int.from_bytes(ptr, byteorder=order)
+            if data > 0:
+                syms.append(data)
+
+        syms.sort()
+
+        return syms
+
     # Return all the symbols not found per arch/obj
-    def __check_symbol(self, arch, mod, symbols):
+    def __check_symbol(self, arch, mod, symbols, check_patchable):
         ret = []
 
         obj = get_datadir(arch)/self.find_obj_path(arch, mod)
-        symtab = get_elf_object(obj).get_section_by_name(".symtab")
+        elf_obj = get_elf_object(obj)
+
+        trace_addrs = []
+
+        # Get the addresses of the traceable objects on vmlinux
+        if not is_mod(mod) and check_patchable:
+            trace_addrs = self.__get_trace_addresses(arch, elf_obj)
+
+        symtab = elf_obj.get_section_by_name(".symtab")
+
         for symbol in symbols:
             syms = symtab.get_symbol_by_name(symbol)
             # can return None is the symbol is not found, or a list if the symbol
             # is not unique
             if not syms:
                 ret.append(symbol)
+                continue
 
-            elif len(syms) > 1:
+            if len(syms) > 1:
                 logging.warning("%s-%s (%s): symbol %s duplicated on %d", self.full_cs_name(), arch, self.kernel, symbol, mod)
 
             # If len(syms) == 1 means that we found a unique symbol, which is
-            # what we expect, and nothing need to be done.
+            # what we expect
+
+            # Check if the symbol itself can be traced. There are cases where
+            # the symbol is found, but it was instructed to not be possible
+            # to trace, so we can't livepatch it either
+            # For now only check this on vmlinux. The support for modules
+            # required applying relocation, which is far more complicated.
+            #
+            # This method is called on setup and extraction phase, but check
+            # is only necessary for setup, since the extractor knows if a symbol
+            # is traceable or not.
+            #
+            # TODO: implement support for modules as well
+            if trace_addrs:
+                # The symbol is unique, so we can grab the first entry safely
+                if arch in ["x86_64", "s390x"]:
+                    self.__check_patchable_sym(arch, symbol, syms[0], trace_addrs)
+
+                else:
+                    self.__check_patchable_sym_ppc64le(arch, symbol, syms[0], trace_addrs)
 
         return ret
 
@@ -411,7 +492,7 @@ class Codestream:
     # It is also used when we want to check if a symbol externalized in one
     # architecture exists in the other supported ones. In this case skip_on_host
     # will be True, since we trust the decisions made by the extractor tool.
-    def check_symbol_archs(self, lp_archs, mod, symbols, skip_on_host):
+    def check_symbol_archs(self, lp_archs, mod, symbols, skip_on_host, check_patchable):
         arch_sym = {}
         # Validate only architectures supported by the codestream
         for arch in self.archs:
@@ -423,7 +504,7 @@ class Codestream:
                 continue
 
             # Assign the not found symbols on arch
-            syms = self.__check_symbol(arch, mod, symbols)
+            syms = self.__check_symbol(arch, mod, symbols, check_patchable)
             if syms:
                 arch_sym[arch] = syms
 

@@ -225,9 +225,9 @@ def __setup_check_mod(cs, mod):
 
 def __setup_check_syms(cs, mod, syms, arch):
     # Verify if the functions exist in the specified object
-    arch_syms = cs.check_symbol_archs(arch, mod, syms, False)
-    for arch, syms in arch_syms.items():
-        logging.warning("%s-%s (%s): Symbols %s not found on %s object",
-                        cs.full_cs_name(), arch, cs.kernel,
-                        ",".join(syms), mod)
+    arch_syms = cs.check_symbol_archs(arch, mod, syms, False, True)
+    if arch_syms:
+        for arch, syms in arch_syms.items():
+            logging.warning("%s-%s (%s): Symbols %s not found on %s object",
+                            cs.full_cs_name(), arch, cs.kernel, ",".join(syms), mod)
 
