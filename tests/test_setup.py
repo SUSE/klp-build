@@ -101,7 +101,7 @@ def test_invalid_sym(caplog):
 def test_valid_micro_patchid():
     # Make sure that patchid is informed for SLE MICRO
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    micro_cs = "6.0u2"
+    micro_cs = "6.0u11"
     micro_data = {"cve": None, "lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": True}
 
     setup_args = {

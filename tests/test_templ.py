@@ -13,7 +13,7 @@ from tests.utils import get_file_content
 
 def test_templ_with_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u19"
+    cs = "15.5u25"
 
     setup_args = {
         "lp_name" : lp,
@@ -56,7 +56,7 @@ def test_templ_with_externalized_vars():
 
 def test_templ_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u19"
+    cs = "15.5u25"
 
     setup_args = {
         "lp_name" : lp,
@@ -103,7 +103,7 @@ def test_templ_without_externalized_vars():
 # bscXXXXXXX.
 def test_check_header_file_included():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u19"
+    cs = "15.5u25"
 
     setup_args = {
         "lp_name" : lp,
@@ -135,7 +135,7 @@ def test_check_header_file_included():
 
 def test_templ_cve_specified():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u19"
+    cs = "15.5u25"
 
     setup_args = {
         "lp_name" : lp,
@@ -211,7 +211,7 @@ def test_templ_micro_is_ibt():
     For IBT we don't need to use kallsyms, so the _init and _cleanup should be empty;
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u2"
+    cs = "6.0u11"
 
     setup_args = {
         "lp_name" : lp,
@@ -245,7 +245,7 @@ def test_templ_micro_is_ibt():
 
 def test_templ_ibt_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u2"
+    cs = "6.0u11"
 
     setup_args = {
         "lp_name" : lp,
@@ -292,7 +292,7 @@ def test_templ_kbuild_has_contents():
     Making sure that Kbuild.inc has the correct content
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u2"
+    cs = "6.0u11"
 
     setup_args = {
         "lp_name" : lp,

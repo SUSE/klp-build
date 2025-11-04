@@ -112,7 +112,6 @@ def find_configs_for_files(cs, file_paths: list):
                 configs[path] = {'conf': "CONFIG_X86_64", 'module': 'vmlinux'}
             elif "powerpc" in path:
                 configs[path] = {'conf': "CONFIG_PPC64", 'module': 'vmlinux'}
-            continue
 
         elif config.startswith('CONFIG_'):
             configs[path] = {'conf': config, 'module': obj}
