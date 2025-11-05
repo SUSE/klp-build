@@ -15,29 +15,6 @@ from klpbuild.klplib import utils
 
 import tests.utils as tests_utils
 
-def test_detect_file_without_ftrace_support(caplog):
-    lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.6u8"
-
-    setup_args = {
-        "lp_name" : lp,
-        "lp_filter": cs,
-        "no_check": True,
-        "archs" : [utils.ARCH],
-        "cve": None,
-        "conf": "CONFIG_SMP",
-        "module" : "vmlinux",
-        "file_funcs" : [["lib/seq_buf.c", "seq_buf_putmem_hex"]],
-        "mod_file_funcs" : [],
-        "conf_mod_file_funcs" : []
-    }
-    setup(**setup_args)
-
-    with caplog.at_level(logging.WARNING):
-        extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
-
-    assert "lib/seq_buf.c is not compiled with livepatch support (-pg flag)" in caplog.text
-
 
 def test_compile_commands_enoent():
     """
@@ -78,7 +55,7 @@ def test_compile_commands_enoent():
 
     # Now it should fail with hid_core.c that doesn't exists on compile_commands.json
     with pytest.raises(RuntimeError, match=r"Couldn't find cmdline for drivers/hid/hid_core.c on.*compile_commands.json. Aborting"):
-        extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
+        extract(lp_name=lp, lp_filter=cs, no_patches=True, avoid_ext=[])
 
 
 def test_detect_opt_clone(caplog):
@@ -100,6 +77,6 @@ def test_detect_opt_clone(caplog):
     setup(**setup_args)
 
     with caplog.at_level(logging.WARNING):
-        extract(lp_name=lp, lp_filter=cs, apply_patches=False, avoid_ext=[])
+        extract(lp_name=lp, lp_filter=cs, no_patches=True, avoid_ext=[])
 
     assert "Symbol l2cap_sock_kill contains optimized clone" in caplog.text

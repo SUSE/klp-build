@@ -2,6 +2,7 @@
 #
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
+import re
 
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +12,8 @@ from mako.template import Template
 
 from klpbuild.klplib.bugzilla import get_bug_title, get_bug
 from klpbuild.klplib.codestreams_data import get_codestreams_data
-from klpbuild.klplib.utils import ARCHS, fix_mod_string, get_mail, get_workdir, get_lp_number, get_fname
+from klpbuild.klplib.utils import (ARCHS, fix_mod_string, get_mail, get_workdir,
+                                   get_lp_number, get_fname, is_mod)
 
 
 MACRO_PROTO_SYMS = """\
@@ -27,19 +29,24 @@ def get_protos(proto_syms):
             if data["cleanup"]:
                 proto_list.append(f"void {fname}_cleanup(void);\\n")
             else:
-                proto_list.append(f"static inline void {fname}_cleanup(void);\\n")
+                proto_list.append(f"static inline void {fname}_cleanup(void)" +\\
+                                   " {}\\n")
 
         return '\\n' + '\\n'.join(proto_list)
 %>\
 """
 
 
-TEMPL_NO_SYMS_H = """\
+TEMPL_IBT_H = """\
 #ifndef _${ fname.upper() }_H
 #define _${ fname.upper() }_H
 
+#include <linux/types.h>
+
 static inline int ${ fname }_init(void) { return 0; }
 static inline void ${ fname }_cleanup(void) {}
+
+${ klpp_header }
 
 #endif /* _${ fname.upper() }_H */
 """
@@ -48,6 +55,8 @@ static inline void ${ fname }_cleanup(void) {}
 TEMPL_H = """\
 #ifndef _${ fname.upper() }_H
 #define _${ fname.upper() }_H
+
+#include <linux/types.h>
 
 % if check_enabled:
 #if IS_ENABLED(${ config })
@@ -59,10 +68,12 @@ void ${ fname }_cleanup(void);
 static inline void ${ fname }_cleanup(void) {}
 % endif %
 ${get_protos(proto_syms)}
+${ klpp_header }
 #else /* !IS_ENABLED(${ config }) */
 
 static inline int ${ fname }_init(void) { return 0; }
 static inline void ${ fname }_cleanup(void) {}
+
 
 #endif /* IS_ENABLED(${ config }) */
 
@@ -74,6 +85,8 @@ void ${ fname }_cleanup(void);
 static inline void ${ fname }_cleanup(void) {}
 % endif
 ${get_protos(proto_syms)}
+
+${ klpp_header }
 % endif
 #endif /* _${ fname.upper() }_H */
 """
@@ -322,7 +335,8 @@ void ${ fname }_cleanup(void)
 % endif # check_enabled
 """
 
-TEMPL_HOLLOW = """\
+
+TEMPL_MULTI_ENTRY = """\
 % if check_enabled:
 #if IS_ENABLED(${ config })
 % endif # check_enabled
@@ -331,11 +345,14 @@ TEMPL_HOLLOW = """\
 
 int ${ fname }_init(void)
 {
+
+${ inits }
 \treturn 0;
 }
 
 void ${ fname }_cleanup(void)
 {
+${ cleanups }
 }
 
 % if check_enabled:
@@ -380,21 +397,45 @@ ${get_entries(lpdir, bsc, cs)}
 
 TEMPL_PATCHED = """\
 <%
-def get_patched(cs_files, check_enabled):
+def get_patched(cs, check_enabled):
     ret = []
-    for ffile, fdata in cs_files.items():
+    for ffile, fdata in cs.files.items():
         conf = ''
         if check_enabled and fdata['conf']:
             conf = f' IS_ENABLED({fdata["conf"]})'
 
-        mod = fdata['module'].replace('-', '_')
-        for func in fdata['symbols']:
-            ret.append(f'{mod} {func} klpp_{func}{conf}')
+        mod = cs.get_file_mod(ffile).replace('-', '_')
+        syms = list(fdata['klpp_symbols'].keys())
+        syms.sort()
+        for sym in syms:
+            ret.append(f'{mod} {sym} klpp_{sym}{conf}')
 
     return "\\n".join(ret)
 %>\
-${get_patched(cs_files, check_enabled)}
+${get_patched(cs, check_enabled)}
 """
+
+
+def get_multi_funcs(cs, lp_name):
+    if cs.needs_ibt():
+        return "", ""
+
+    inits = ["\tint ret;\n"]
+    cleanups = []
+
+    for file, dat in cs.files.items():
+        if not dat["ext_symbols"]:
+            continue
+
+        fname = get_fname(cs.lp_out_file(lp_name, file))
+        mod = cs.get_file_mod(file)
+        cln = is_mod(mod) and f"\t{fname}_cleanup();\n" or ''
+        init = f"\tret = {fname}_init();\n\tif (ret)\n\t\treturn ret;\n"
+
+        inits.append(init)
+        cleanups.append(cln)
+
+    return "\n".join(inits), "\n".join(cleanups)
 
 
 def __preproc_slashes(text):
@@ -402,9 +443,27 @@ def __preproc_slashes(text):
     return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
 
 def __generate_patched_conf(lp_name, cs):
-    render_vars = {"cs_files": cs.files, "check_enabled": __is_check_enabled()}
+    render_vars = {"cs": cs, "check_enabled": __is_check_enabled(cs)}
     with open(Path(cs.get_lp_dir(lp_name), "patched_funcs.csv"), "w") as f:
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
+
+def __generate_klpp_header(cs):
+    funcs = []
+    structs = set()
+
+    for dat in cs.files.values():
+        protos = list(dat["klpp_symbols"].values())
+        funcs.extend(protos)
+        for p in protos:
+            m = re.findall("(struct\s+\w+)\s*\*?\w+", p)
+            if not m:
+                continue
+            structs.update(m)
+
+    funcs.sort()
+    structs = structs and ';\n'.join(sorted(structs)) + ';\n\n' or ''
+
+    return structs + '\n'.join(funcs)
 
 def __generate_header_file(lp_name, lp_path, cs):
     out_name = f"livepatch_{lp_name}.h"
@@ -412,8 +471,11 @@ def __generate_header_file(lp_name, lp_path, cs):
         "fname": get_fname(out_name),
     }
 
-    # We don't need any setups on IBT besides the livepatch_init/cleanup ones
-    header_templ = TEMPL_NO_SYMS_H
+    # We don't need any setups on IBT besides the livepatch_init/cleanup
+    # and klpp functions information.
+    header_templ = TEMPL_IBT_H
+
+    render_vars.update({"klpp_header": __generate_klpp_header(cs)})
 
     if not cs.needs_ibt():
         configs = set()
@@ -423,15 +485,16 @@ def __generate_header_file(lp_name, lp_path, cs):
 
         for src_file, data in cs.files.items():
             configs.add(data["conf"])
+            mod = cs.get_file_mod(src_file)
             # If we have external symbols we need an init function to load them. If the module
             # isn't vmlinux then we also need an _exit function
             if data["ext_symbols"]:
-                if data["module"] != "vmlinux":
+                if is_mod(mod):
                     # Used by the livepatch_cleanup
                     has_cleanup = True
 
                 proto_fname = get_fname(cs.lp_out_file(lp_name, src_file))
-                proto_syms[proto_fname] = {"cleanup": data["module"] != "vmlinux"}
+                proto_syms[proto_fname] = {"cleanup": is_mod(mod)}
 
         # If we don't have any external symbols then we don't need the empty _init/_exit functions
         if proto_syms.keys():
@@ -450,7 +513,7 @@ def __generate_header_file(lp_name, lp_path, cs):
                 proto_syms = {}
 
             render_vars.update({
-                "check_enabled": __is_check_enabled(),
+                "check_enabled": __is_check_enabled(cs),
                 "config": config,
                 "has_cleanup": has_cleanup,
                 "proto_syms": proto_syms,
@@ -468,7 +531,7 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
         cve = "XXXX-XXXX"
     user, email = get_mail()
     tvars = {
-        "check_enabled": __is_check_enabled(),
+        "check_enabled": __is_check_enabled(cs),
         "upstream": get_codestreams_data('upstream'),
         "config": "CONFIG_CHANGE_ME",
         "cve": cve,
@@ -482,7 +545,7 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
     }
 
     # If we have multiple source files for the same livepatch,
-    # create one hollow file to wire-up the multiple _init and
+    # create one file to wire-up the multiple _init and
     # _clean functions
     #
     # If we are patching a module, we should have the
@@ -490,16 +553,21 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
     # in order to do the symbol lookups. Otherwise only _init is
     # needed, and only if there are externalized symbols being used.
     if not src_file:
-        temp_str = TEMPL_HOLLOW
+        if cs.needs_ibt():
+            return
+        inits, cleanups = get_multi_funcs(cs, lp_name)
+        tvars.update({"inits": inits, "cleanups": cleanups})
+        temp_str = TEMPL_MULTI_ENTRY
         lp_inc_dir = Path("non-existent")
     else:
         fdata = cs.files[str(src_file)]
+        mod = cs.get_file_mod(src_file)
         tvars.update({
             "config": fdata.get("conf", ""),
             "ext_vars": fdata.get("ext_symbols", ""),
             "ibt": fdata.get("ibt", False),
             "inc_src_file": cs.lp_out_file(lp_name, src_file),
-            "mod": fix_mod_string(fdata.get("module", "")),
+            "mod": fix_mod_string(mod if is_mod(mod) else ""),
             "mod_mutex": cs.is_mod_mutex(),
         })
 
@@ -546,10 +614,10 @@ def generate_livepatches(lp_name, cs):
     __create_kbuild(lp_name, cs)
 
 
-def __is_check_enabled():
+def __is_check_enabled(cs):
     # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
     # is not enabled on all architectures
-    return get_codestreams_data('archs') != ARCHS
+    return get_codestreams_data('archs') != cs.archs
 
 
 def __create_kbuild(lp_name, cs):
