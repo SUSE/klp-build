@@ -248,7 +248,7 @@ def fix_mod_string(mod):
 
     # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
     # and in kallsyms lookup
-    return mod.replace("-", "_")
+    return os.path.basename(mod.replace("-", "_"))
 
 
 def get_fname(src_name):
