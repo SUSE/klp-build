@@ -68,6 +68,8 @@ def get_cs_code(lp_name, working_cs):
     for cs in working_cs:
         cs_files.setdefault(cs.full_cs_name(), [])
 
+        arch = utils.preferred_arch([cs])
+
         for fpath in cs.get_lp_dir(lp_name).iterdir():
             fname = fpath.name
             with open(fpath.absolute(), "r+") as fi:
@@ -78,10 +80,12 @@ def get_cs_code(lp_name, working_cs):
                 src = re.sub(r'#include ".+compiler\-version\.h"\n', "", src)
                 # Since RT variants, there is now an definition for auto_type
                 src = src.replace(r"#define __auto_type int\n", "")
+                # Do not compare the klp-ccp comments
+                src = re.sub(r"klp-ccp: .+\.[hc]", "", src)
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f"{utils.get_datadir(utils.ARCH)}.+{fname}", "", src)
+                src = re.sub(f"{utils.get_datadir(arch)}.+{fname}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(r"\.lineno = \d+,", "", src)
