@@ -6,8 +6,11 @@
 
 import bugzilla
 import time
+import re
+
 from functools import wraps
 
+from klpbuild.klplib.utils import is_cve_valid
 from klpbuild.klplib.config import get_user_settings
 
 __bzapi = None
@@ -139,7 +142,12 @@ def get_bug_cve(bug):
     if len(summary) < 2:
         return ""
 
-    return summary[1][5:].strip()
+    cve = summary[1][5:].strip()
+
+    if not is_cve_valid(cve):
+        return ""
+
+    return cve
 
 
 def get_bug_subsys(bug):
