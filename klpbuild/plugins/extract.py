@@ -540,6 +540,13 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
         "-mharden-sls=all",
         "-fmin-function-alignment=16",
         "-Wno-dangling-pointer",
+        # s390x arguments
+        "-mbackchain",
+        "-mpacked-stack",
+        "-mindirect-branch-table",
+        "-mhotpatch=0,3",
+        "-march=z196",
+        "-mtune=z13",
     ]:
         cmd = cmd.replace(opt, "")
 
