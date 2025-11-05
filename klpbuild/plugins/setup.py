@@ -203,7 +203,7 @@ def __setup_check_file(cs, file):
         raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}): File {file} not found.")
 
     # Get the first affected arch
-    ipa_f = cs.get_ipa_file(file, get_codestreams_data("archs")[0])
+    ipa_f = cs.get_ipa_file(file)
     if not ipa_f.is_file():
         ipa_f.touch()
         logging.warning("%s (%s): File %s not found. Creating an empty file.",

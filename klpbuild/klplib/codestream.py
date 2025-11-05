@@ -15,7 +15,7 @@ from importlib import resources
 
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
-from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_elf_object, get_datadir
+from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_elf_object, get_datadir, preferred_arch
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 
 class Codestream:
@@ -75,20 +75,30 @@ class Codestream:
                 self.update == cs.update and \
                 self.rt == cs.rt
 
-
-    def get_src_dir(self, arch=ARCH, init=True):
+    def get_src_dir(self, arch=None, init=True):
         # Before sle16, only -rt codestreams have a suffix for source directory
         has_rt_suffix = self.rt and self.sle < 16
         name = self.get_full_kernel_name() if has_rt_suffix else self.kernel
+
+        if not arch:
+            arch = preferred_arch([self])
+
         src_dir = get_datadir(arch)/"usr"/"src"/f"linux-{name}"
         if init:
             init_cs_kernel_tree(self.kernel, src_dir)
         return src_dir
 
-    def get_obj_dir(self, arch=ARCH):
+    def get_obj_dir(self, arch=None):
+        if not arch:
+            arch = preferred_arch([self])
+
         return Path(f"{self.get_src_dir(arch, init=False)}-obj", arch, self.get_kernel_type())
 
-    def get_ipa_file(self, fname, arch=ARCH):
+    def get_ipa_file(self, fname, arch=None):
+
+        if not arch:
+            arch = preferred_arch([self])
+
         return Path(self.get_obj_dir(arch), f"{fname}.000i.ipa-clones")
 
     def get_config_content(self, arch=ARCH):
@@ -126,8 +136,12 @@ class Codestream:
             return result.stdout
 
 
-    def get_boot_file(self, file, arch=ARCH):
+    def get_boot_file(self, file, arch=None):
         assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
+
+        if not arch:
+            arch = preferred_arch([self])
+
         if self.is_slfo:
             return Path(self.get_mod_path(arch), file)
 
@@ -313,8 +327,12 @@ class Codestream:
         return self.modules[mod]
 
 
-    def get_file_mod(self, file, arch=ARCH):
+    def get_file_mod(self, file, arch=None):
         fdat = self.files[file]
+
+        if not arch:
+            arch = preferred_arch([self])
+
         conf_arch = self.configs[fdat["conf"]][arch]
         return "vmlinux" if conf_arch == 'y' else fdat["module"]
 
