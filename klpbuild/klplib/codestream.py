@@ -3,9 +3,12 @@
 # Copyright (C) 2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-from pathlib import Path, PurePath
 import re
 import subprocess
+import tempfile
+
+from pathlib import Path, PurePath
+from importlib import resources
 
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
@@ -100,17 +103,26 @@ class Codestream:
             return ksrc_read_rpm_file(self.kernel, target_config_file)
 
         # From SLE16, the same source is used both for -default kernel and for
-        # -rt kernel. The config file needs to be retrieved by mergind the
+        # -rt kernel. The config file needs to be retrieved by merging the
         # default config with the rt config on the fly as we no longer have a
         # dedicated -rt one
-        ksrc_path = get_user_path("kernel_src_dir")
-        default_config_file = f"{ksrc_path}/config/{arch}/default"
-        file = f"{ksrc_path}/{target_config_file}"
-        script = f"{ksrc_path}/scripts/config-merge"
-        cmd = [script, default_config_file, file]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return result.stdout
+        default_config_file = f"config/{arch}/default"
+        default_config_file_content = ksrc_read_rpm_file(self.kernel, default_config_file)
+        target_config_file_content = ksrc_read_rpm_file(self.kernel, target_config_file)
+        config_merge_script = resources.files("scripts")/"config-merge"
+        with tempfile.NamedTemporaryFile(mode="w+") as default_tmp, \
+             tempfile.NamedTemporaryFile(mode="w+") as target_tmp:
 
+            default_tmp.write(default_config_file_content)
+            target_tmp.write(target_config_file_content)
+
+            # Mandatory otherwise the next script won't work.
+            default_tmp.flush()
+            target_tmp.flush()
+
+            cmd = [config_merge_script, default_tmp.name, target_tmp.name]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return result.stdout
 
 
     def get_boot_file(self, file, arch=ARCH):
