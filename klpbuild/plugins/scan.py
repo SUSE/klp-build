@@ -100,7 +100,7 @@ def scan_job(bug, cve):
     return status, affected
 
 
-def scan(cve, conf, lp_filter, download, savedir=None):
+def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
     # Support CVEs from 2020 up to 2029
     assert cve and re.match(r"^202[0-9]-[0-9]{4,7}$", cve)
 
@@ -114,6 +114,11 @@ def scan(cve, conf, lp_filter, download, savedir=None):
     patched_cs = []
     unaffected_cs = []
     for cs in filtered_codesteams:
+
+        # Skip codestreams that do not support the given archs.
+        cs.set_archs(archs)
+        if not cs.archs:
+            continue
 
         if cs.kernel in patched_kernels:
             patched_cs.append(cs.full_cs_name())
@@ -149,11 +154,13 @@ def scan(cve, conf, lp_filter, download, savedir=None):
         patch.print_kmodules(kmodules_report)
         unsupported = patch.filter_unsupported_kmodules(working_cs)
 
+        working_archs = utils.affected_archs(working_cs)
+        logging.info("Affected architectures:")
+        logging.info("\t%s", ' '.join(working_archs))
     # If conf is set, drop codestream not containing that conf entry from working_cs
     elif conf:
         tmp_working_cs = []
         for cs in working_cs:
-            # TODO: here we could check for affected arch automatically
             if not cs.get_all_configs(conf):
                 conf_not_set.append(cs)
             else:
@@ -180,6 +187,6 @@ def scan(cve, conf, lp_filter, download, savedir=None):
         logging.info("All supported codestreams are already patched.")
     else:
         logging.info("All affected codestreams:")
-        logging.info("\t%s", utils.classify_codestreams_str(working_cs))
+        logging.info("\t%s\n", utils.classify_codestreams_str(working_cs))
 
     return patches, upstream, patched_cs, working_cs

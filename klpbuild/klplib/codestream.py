@@ -6,6 +6,7 @@
 import re
 import subprocess
 import tempfile
+import logging
 
 from pathlib import Path, PurePath
 from importlib import resources
@@ -169,16 +170,19 @@ class Codestream:
         # We support all architecture for all other codestreams
         return ["x86_64", "s390x", "ppc64le"]
 
-
     def set_files(self, files):
         self.files = files
 
+    def set_configs(self, configs):
+        self.configs = {conf: self.get_all_configs(conf) for conf in configs}
+
+    def set_archs(self, archs):
+        self.archs = list(set(archs) & set(self.__get_default_archs()))
 
     def get_kernel_type(self, suffix=False):
         dash = "-" if suffix else ""
         suffix = "rt" if self.rt else "default"
         return dash + suffix
-
 
     def get_full_kernel_name(self):
         """Returns the kernel name with flavor suffix"""
@@ -308,6 +312,13 @@ class Codestream:
     def get_mod(self, mod):
         return self.modules[mod]
 
+
+    def get_file_mod(self, file, arch=ARCH):
+        fdat = self.files[file]
+        conf_arch = self.configs[fdat["conf"]][arch]
+        return "vmlinux" if conf_arch == 'y' else fdat["module"]
+
+
     def is_module_supported(self, mod):
         return ksrc_is_module_supported(mod, self.kernel)
 
@@ -324,6 +335,10 @@ class Codestream:
         """
         configs = {}
 
+        if conf and not conf.startswith("CONFIG_"):
+            logging.error(f"Invalid config '{conf}': Missing CONFIG_ prefix")
+            sys.exit(1)
+
         for arch in self.archs:
             kconf = self.get_config_content(arch)
 
@@ -333,39 +348,6 @@ class Codestream:
 
         return configs
 
-    def validate_config(self, archs, conf, mod):
-        configs = {}
-        cs_config = self.get_all_configs(conf)
-
-        # Validate only the specified architectures, but check if the codestream
-        # is supported on that arch (like RT that is currently supported only on
-        # x86_64)
-        for arch in archs:
-            # Check if the desired CONFIG entry is set on the codestreams's supported
-            # architectures, by iterating on the specified architectures from the setup command.
-            if arch not in self.archs:
-                continue
-
-            try:
-                conf_entry = cs_config.pop(arch)
-            except KeyError as exc:
-                raise RuntimeError(f"{self.full_cs_name()}: {conf} not set on {arch}. Aborting") from exc
-
-            if conf_entry == "m" and mod == "vmlinux":
-                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
-            if conf_entry == "y" and mod != "vmlinux":
-                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
-
-            configs.setdefault(conf_entry, [])
-            configs[conf_entry].append(f"{self.full_cs_name()}:{arch}")
-
-        # Validate if we have different settings for the same config on
-        # different architecures, like having it as builtin on one and as a
-        # module on a different arch.
-        if len(configs.keys()) > 1:
-            print(configs["y"])
-            print(configs["m"])
-            raise RuntimeError(f"{self.full_cs_name()}: Configuration mismatach between codestreams. Aborting.")
 
     def find_obj_path(self, arch, mod):
         # Return the path if the modules was previously found for ARCH, or refetch if

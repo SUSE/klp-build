@@ -273,7 +273,7 @@ def test_templ_ibt_without_externalized_vars():
         assert check not in content
 
     # As the config only targets one arch, IS_ENABLED should be set
-    assert "#if IS_ENABLED" not in content
+    assert "#if IS_ENABLED" in content
 
     # Without CVE speficied, we should have XXXX-XXXX
     assert "CVE-XXXX-XXXX" in content

@@ -5,8 +5,9 @@ import inspect
 import logging
 import pytest
 
-from klpbuild.plugins.setup import setup, setup_file_funcs
+from klpbuild.plugins.setup import setup, setup_manual
 from tests.utils import get_codestreams_file
+from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib import utils
 
 CS = "15.5u19"
@@ -15,27 +16,34 @@ DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_TUN", "no_check": 
 
 def test_missing_file_funcs():
     with pytest.raises(ValueError, match=r"You need to specify at least one of the file-funcs variants!"):
-        setup_file_funcs(None, None, [], [], [])
+        setup_manual({}, utils.ARCHS, None, None, [], [], [])
 
 
-def test_missing_conf_prefix():
-    with pytest.raises(ValueError, match=r"Please specify --conf with CONFIG_ prefix"):
-        setup_file_funcs("TUN", None, [], [], [])
+def test_missing_conf_prefix(caplog):
+    with pytest.raises(SystemExit):
+        file_funcs = [["drivers/net/tuna.c", "tun_chr_ioctl", "tun_free_netdev"]]
+        setup_manual([Codestream(CS)], utils.ARCHS, "TUN", None, file_funcs, [], [])
+    assert "Invalid config 'TUN': Missing CONFIG_ prefix" in caplog.text
 
 
 def test_file_funcs_ok():
     # Check for multiple variants of file-funcs
-    assert setup_file_funcs("CONFIG_TUN", "tun", [
-                                  ["drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]], [], []) == \
-        {"drivers/net/tun.c": {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}}
+    cs = Codestream(CS)
 
-    assert setup_file_funcs("CONFIG_TUN", None, [],
-                                  [["tun", "drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]], []) == \
-        {"drivers/net/tun.c": {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}}
+    setup_manual([cs], utils.ARCHS, "CONFIG_TUN", "tun",
+                 [["drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]], [], [])
+    assert cs.files["drivers/net/tun.c"] == \
+            {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}
 
-    assert setup_file_funcs(None, None, [], [],
-                                  [["CONFIG_TUN", "tun", "drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]]) == \
-        {"drivers/net/tun.c": {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}}
+    setup_manual([cs], utils.ARCHS, "CONFIG_TUN", "tun", [],
+                 [["tun", "drivers/net/tun1.c", "tun_chr_ioctl", "tun_free_netdev"]], [])
+    assert cs.files["drivers/net/tun1.c"] == \
+            {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}
+
+    setup_manual([cs], utils.ARCHS, "CONFIG_TUN", "tun", [], [],
+                 [["CONFIG_TUN", "tun", "drivers/net/tun2.c", "tun_chr_ioctl", "tun_free_netdev"]])
+    assert cs.files["drivers/net/tun2.c"] == \
+            {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}
 
 
 def test_non_existent_file():
@@ -115,55 +123,26 @@ def test_valid_micro_patchid():
 def test_valite_conf_mod_file_funcs():
     # Check that passing mod-file-funcs can create entries differently from general
     # --module and --file-funcs
-    ffuncs = setup_file_funcs("CONFIG_NET_SCH_QFQ", "sch_qfq", [["net/sched/sch_qfq.c", "qfq_change_class"]], [
-                                    ["btsdio", "drivers/bluetooth/btsdio.c", "btsdio_probe", "btsdio_remove"]], [])
+    cs = Codestream(CS)
+    setup_manual([cs], utils.ARCHS, "CONFIG_NET_SCH_QFQ", "sch_qfq",
+                 [["net/sched/sch_qfq.c", "qfq_change_class"]],
+                 [["btsdio", "drivers/bluetooth/btsdio.c",
+                   "btsdio_probe", "btsdio_remove"]], [])
 
-    sch = ffuncs["net/sched/sch_qfq.c"]
-    bts = ffuncs["drivers/bluetooth/btsdio.c"]
+    sch = cs.files["net/sched/sch_qfq.c"]
+    bts = cs.files["drivers/bluetooth/btsdio.c"]
     assert sch["conf"] == bts["conf"]
     assert sch["module"] == "sch_qfq"
     assert bts["module"] == "btsdio"
 
-    ffuncs = setup_file_funcs("CONFIG_NET_SCH_QFQ", "sch_qfq",
-                                    [["net/sched/sch_qfq.c", "qfq_change_class"]], [],
-                                    [["CONFIG_BT_HCIBTSDIO", "btsdio",
-                                        "drivers/bluetooth/btsdio.c", "btsdio_probe", "btsdio_remove"]])
+    setup_manual([cs], utils.ARCHS, "CONFIG_NET_SCH_QFQ", "sch_qfq",
+                 [["net/sched/sch_qfq.c", "qfq_change_class"]], [],
+                 [["CONFIG_BT_HCIBTSDIO", "btsdio",
+                   "drivers/bluetooth/btsdio.c", "btsdio_probe", "btsdio_remove"]])
 
-    sch = ffuncs["net/sched/sch_qfq.c"]
-    bts = ffuncs["drivers/bluetooth/btsdio.c"]
+    sch = cs.files["net/sched/sch_qfq.c"]
+    bts = cs.files["drivers/bluetooth/btsdio.c"]
     assert sch["conf"] == "CONFIG_NET_SCH_QFQ"
     assert sch["module"] == "sch_qfq"
     assert bts["conf"] == "CONFIG_BT_HCIBTSDIO"
     assert bts["module"] == "btsdio"
-
-
-def test_valite_conf_unsupported_arch():
-    # Make sure we error out in the case of a configuration entry that is not enabled
-    # on a codestream
-    lp = "bsc_" + inspect.currentframe().f_code.co_name
-
-    # CONFIG_HID is not enabled on s390x, so setup should fail here
-    LP_DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_HID", "no_check": True}
-    with pytest.raises(RuntimeError, match=rf"{CS}: CONFIG_HID not set on s390x"):
-        setup_args = {
-            "lp_name": lp,
-            "archs": utils.ARCHS,
-            "module": "vmlinux",
-            "file_funcs": [["drivers/hid/hid-core.c", "hid_alloc_report_buf"]],
-            "mod_file_funcs": [],
-            "conf_mod_file_funcs": [],
-            **LP_DEFAULT_DATA
-        }
-        setup(**setup_args)
-
-    # It shoudl succeed when s390x is removed from the setup command
-    setup_args = {
-        "lp_name": lp,
-        "archs": ["x86_64", "ppc64le"],
-        "module": "vmlinux",
-        "file_funcs": [["drivers/hid/hid-core.c", "hid_alloc_report_buf"]],
-        "mod_file_funcs": [],
-        "conf_mod_file_funcs": [],
-        **LP_DEFAULT_DATA
-    }
-    setup(**setup_args)

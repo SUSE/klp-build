@@ -225,6 +225,16 @@ def filter_codestreams(lp_filter, cs_list, verbose=False):
 
     return result
 
+
+def affected_archs(cs_list):
+    conf_archs = set()
+    for cs in cs_list:
+        for val in cs.configs.values():
+            conf_archs.update(val)
+
+    return sorted(conf_archs)
+
+
 def get_mail():
     git_data = git.GitConfigParser()
     user = git_data.get_value("user", "name")
