@@ -319,7 +319,7 @@ def get_patched_kernels(codestreams, patches):
 
         logging.debug(f"\n{cs.full_cs_name()} ({kernel}):")
         for patch in suse_patches:
-            if not ksrc_read_rpm_file(kernel, patch):
+            if not cs.has_patch(patch):
                 break
             logging.debug(f"{patch}")
         else:

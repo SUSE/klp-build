@@ -291,6 +291,12 @@ class Codestream:
 
         return pkg
 
+
+    def has_patch(self, patch):
+        kernel_version = self.kernel
+        return bool(ksrc_read_rpm_file(kernel_version, patch))
+
+
     def needs_ibt(self):
         return self.is_slfo or (self.sle == 15 and self.sp >= 6)
 
