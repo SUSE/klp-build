@@ -309,7 +309,7 @@ def get_patched_kernels(codestreams, patches):
     kernels = set()
 
     for cs in codestreams:
-        bc = cs.full_cs_name().split("u")[0]
+        bc = cs.base_cs_name()
         suse_patches = patches[bc]
         if not suse_patches:
             continue
