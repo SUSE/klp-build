@@ -108,18 +108,13 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
 
     all_codestreams = get_supported_codestreams()
     filtered_codesteams = utils.filter_codestreams(lp_filter, all_codestreams, verbose=True)
+    filtered_codesteams = utils.filter_codestreams_by_arch(archs, filtered_codesteams)
     patched_kernels = get_patched_kernels(filtered_codesteams, patches)
 
     working_cs = []
     patched_cs = []
     unaffected_cs = []
     for cs in filtered_codesteams:
-
-        # Skip codestreams that do not support the given archs.
-        cs.set_archs(archs)
-        if not cs.archs:
-            continue
-
         if cs.kernel in patched_kernels:
             patched_cs.append(cs.full_cs_name())
             continue
