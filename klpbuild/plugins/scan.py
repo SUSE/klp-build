@@ -176,10 +176,6 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
 
 
 def filter_affected_codestreams(codestreams, patches):
-    # TODO: remove this
-    if not patches:
-        return []
-
     logging.info("Filtering already patched codestreams...")
     affected_codestreams = []   # Codestreams without all the patches
     unaffected_codestreams = [] # Codestreams belonging to a non affected product
