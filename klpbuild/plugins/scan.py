@@ -123,7 +123,7 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
     if patches and not conf:
         logging.info("Initiating patch analysis...\n")
         logging.info("[*] Analysing modified files...\n")
-        files_report = patch.analyse_files(affected_cs, patches)
+        files_report = patch.analyse_files(affected_cs)
         patch.print_files(files_report)
 
         logging.info("[*] Analysing required CONFIGs...\n")

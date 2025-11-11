@@ -12,7 +12,7 @@ from klpbuild.klplib.file2config import find_configs_for_files
 from klpbuild.klplib.ksrc import get_patches_files
 
 
-def analyse_files(cs_list, sle_patches):
+def analyse_files(cs_list):
     '''
     Function that analyses, per codestream, each of the files modified
     by the backported patches.
@@ -29,8 +29,7 @@ def analyse_files(cs_list, sle_patches):
     report = defaultdict(list)
 
     for cs in cs_list:
-            bc = cs.base_cs_name()
-            patches = sle_patches[bc]
+            patches = cs.get_required_patches()
             branch = cs.get_base_branch()
 
             files_funcs = get_patches_files(patches, branch)
