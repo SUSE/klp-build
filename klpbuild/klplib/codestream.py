@@ -16,6 +16,7 @@ from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
+from klpbuild.klplib.ksrc import KERNEL_BRANCHES
 
 class Codestream:
     __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "is_slfo",
@@ -292,6 +293,10 @@ class Codestream:
             pkg = f"{pkg}.{self.get_repo()}"
 
         return pkg
+
+
+    def get_base_branch(self):
+        return KERNEL_BRANCHES[self.base_cs_name()]
 
 
     def has_patch(self, patch):
