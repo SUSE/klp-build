@@ -109,26 +109,13 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
     all_codestreams = get_supported_codestreams()
     filtered_codesteams = utils.filter_codestreams(lp_filter, all_codestreams, verbose=True)
     filtered_codesteams = utils.filter_codestreams_by_arch(archs, filtered_codesteams)
-    patched_kernels = get_patched_kernels(filtered_codesteams, patches)
 
-    working_cs = []
-    patched_cs = []
-    unaffected_cs = []
-    for cs in filtered_codesteams:
-        if cs.kernel in patched_kernels:
-            patched_cs.append(cs.full_cs_name())
-            continue
-
-        if not cs_is_affected(cs, cve, patches):
-            unaffected_cs.append(cs)
-            continue
-
-        working_cs.append(cs)
+    affected_cs, unaffected_cs, patched_cs = filter_affected_codestreams(filtered_codesteams, patches)
 
     # Download also if conf is set, because the codestreams data are needed to
     # check for the configuration entry of each codestreams.
     if conf or download:
-        download_missing_cs_data(working_cs)
+        download_missing_cs_data(affected_cs)
 
     # Automated patch analysis phase. Not compatible with --conf.
     conf_not_set = []
@@ -136,31 +123,32 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
     if patches and not conf:
         logging.info("Initiating patch analysis...\n")
         logging.info("[*] Analysing modified files...\n")
-        files_report = patch.analyse_files(working_cs, patches)
+        files_report = patch.analyse_files(affected_cs, patches)
         patch.print_files(files_report)
 
         logging.info("[*] Analysing required CONFIGs...\n")
-        configs_report = patch.analyse_configs(working_cs)
+        configs_report = patch.analyse_configs(affected_cs)
         patch.print_configs(configs_report)
-        conf_not_set, conf = patch.filter_unset_configs(working_cs)
+        conf_not_set, conf = patch.filter_unset_configs(affected_cs)
 
         logging.info("[*] Analysing affected kernel modules...\n")
-        kmodules_report = patch.analyse_kmodules(working_cs)
+        kmodules_report = patch.analyse_kmodules(affected_cs)
         patch.print_kmodules(kmodules_report)
-        unsupported = patch.filter_unsupported_kmodules(working_cs)
+        unsupported = patch.filter_unsupported_kmodules(affected_cs)
 
-        working_archs = utils.affected_archs(working_cs)
+        working_archs = utils.affected_archs(affected_cs)
         logging.info("Affected architectures:")
         logging.info("\t%s", ' '.join(working_archs))
+
     # If conf is set, drop codestream not containing that conf entry from working_cs
     elif conf:
-        tmp_working_cs = []
-        for cs in working_cs:
+        tmp_affected_cs = []
+        for cs in affected_cs:
             if not cs.get_all_configs(conf):
                 conf_not_set.append(cs)
             else:
-                tmp_working_cs.append(cs)
-        working_cs = tmp_working_cs
+                tmp_affected_cs.append(cs)
+        affected_cs = tmp_affected_cs
 
     if unsupported:
         logging.info(f"Skipping codestreams with unsupported kernel modules:")
@@ -178,52 +166,44 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
         logging.info("Skipping unaffected codestreams (missing backports):")
         logging.info("\t%s", utils.classify_codestreams_str(unaffected_cs))
 
-    if not working_cs:
+    if not affected_cs:
         logging.info("All supported codestreams are already patched.")
     else:
         logging.info("All affected codestreams:")
-        logging.info("\t%s\n", utils.classify_codestreams_str(working_cs))
+        logging.info("\t%s\n", utils.classify_codestreams_str(affected_cs))
 
-    return patches, upstream, patched_cs, working_cs
+    return patches, upstream, patched_cs, affected_cs
 
 
-def get_patched_kernels(codestreams, patches):
+def filter_affected_codestreams(codestreams, patches):
+    # TODO: remove this
     if not patches:
         return []
 
-    logging.info("Searching for already patched codestreams...")
-
-    kernels = set()
+    logging.info("Filtering already patched codestreams...")
+    affected_codestreams = []   # Codestreams without all the patches
+    unaffected_codestreams = [] # Codestreams belonging to a non affected product
+    patched_codestreams = []    # Codestreams with all the patches
 
     for cs in codestreams:
         bc = cs.base_cs_name()
         suse_patches = patches[bc]
+
         if not suse_patches:
+            unaffected_codestreams.append(cs)
             continue
 
-        # Proceed to analyse each codestream's kernel
-        kernel = cs.kernel
-
-        logging.debug(f"\n{cs.full_cs_name()} ({kernel}):")
+        logging.debug("%s (%s) requires:", cs.full_cs_name(), cs.kernel)
         for patch in suse_patches:
             if not cs.has_patch(patch):
                 # Store the patched required by this codestream for future use
                 cs.add_required_patch(patch)
-                break
-            logging.debug(f"{patch}")
+                logging.debug("\t%s", patch)
+        logging.debug("")
+
+        if cs.needs_patches():
+            affected_codestreams.append(cs)
         else:
-            kernels.add(kernel)
+            patched_codestreams.append(cs)
 
-    logging.debug("")
-
-    return kernels
-
-
-def cs_is_affected(cs, cve, patches):
-    # We can only check if the cs is affected or not if the CVE was informed
-    # (so we can get all commits related to that specific CVE). Otherwise we
-    # consider all codestreams as affected.
-    if not cve:
-        return True
-
-    return len(patches[cs.base_cs_name()]) > 0
+    return affected_codestreams, unaffected_codestreams, patched_codestreams
