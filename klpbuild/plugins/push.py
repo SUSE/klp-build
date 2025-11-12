@@ -114,7 +114,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
     # This scenario can occur in case of LPing function that is already
     # part of different LP in which case we modify the existing one.
     if lp_name not in os.listdir(kgr_path):
-        logging.warning("Warning: Directory %s not found on branch %s", lp_name, branch)
+        logging.warning("Directory %s not found on branch %s", lp_name, branch)
 
     # Fix RELEASE version
     with open(Path(kgr_path, "scripts", "release-version.sh"), "w") as f:
