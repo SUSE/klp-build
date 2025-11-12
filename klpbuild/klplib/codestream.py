@@ -7,6 +7,7 @@ import re
 import subprocess
 import tempfile
 import logging
+import sys
 
 from pathlib import Path, PurePath
 from importlib import resources
