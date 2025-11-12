@@ -675,8 +675,7 @@ def process(lp_name, total, args, avoid_ext):
             if match:
                 opt_symbol_name = match.group(1)
                 symbol_name = opt_symbol_name.split(".")[0]
-                logging.warning("Warning when processing %s:%s: "
-                                "Symbol %s contains optimized clone: %s",
+                logging.warning("%s:%s: Symbol %s contains optimized clone: %s",
                                 cs.full_cs_name(), fname, symbol_name, opt_symbol_name)
                 logging.warning("Make sure to patch all the callers of %s.", symbol_name)
 
