@@ -112,6 +112,9 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
 
     affected_cs, unaffected_cs, patched_cs = filter_affected_codestreams(filtered_codesteams, patches)
 
+    # FIXME: the following statemend is no longer true since the config is
+    # retrieved from the kernel-source:
+    #
     # Download also if conf is set, because the codestreams data are needed to
     # check for the configuration entry of each codestreams.
     if conf or download:
