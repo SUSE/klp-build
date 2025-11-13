@@ -381,5 +381,11 @@ def get_tests_path(lp_name):
     logging.warning("No testscript found for %s", lp_name)
     return None
 
+
 def in_test_mode():
     return os.getenv("TEST_MODE", 'n') == 'y'
+
+
+def is_cve_valid(cve):
+    # Support CVEs from 2020 up to 2029
+    return re.match(r"^202[0-9]-[0-9]{4,7}$", cve)
