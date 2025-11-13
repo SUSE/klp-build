@@ -107,8 +107,8 @@ def scan_job(bug, cve):
 
 
 def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
-    # Support CVEs from 2020 up to 2029
-    assert cve and re.match(r"^202[0-9]-[0-9]{4,7}$", cve)
+
+    assert cve and utils.is_cve_valid(cve)
 
     upstream, patches = get_patches(cve, savedir)
 
