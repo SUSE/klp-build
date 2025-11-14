@@ -155,7 +155,9 @@ def setup_codestreams(lp_name, data):
                                                     data["archs"],
                                                     utils.get_workdir(lp_name))
 
-    # Add new codestreams to the already existing list, skipping duplicates
+    # Add new codestreams names to the already existing list, skipping
+    # duplicates
+    patched_cs = [cs.full_cs_name() for cs in patched_cs]
     old_patched_cs = get_codestreams_data('patched_cs')
     new_patched_cs = natsorted(list(set(old_patched_cs + patched_cs)))
 

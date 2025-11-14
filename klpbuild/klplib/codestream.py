@@ -7,6 +7,7 @@ import re
 import subprocess
 import tempfile
 import logging
+import sys
 
 from pathlib import Path, PurePath
 from importlib import resources
@@ -15,11 +16,12 @@ from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
+from klpbuild.klplib.ksrc import KERNEL_BRANCHES
 
 class Codestream:
     __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "is_slfo",
                  "__project", "patchid", "kernel", "archs", "files", "modules",
-                 "repo", "configs")
+                 "repo", "configs", "required_patches")
 
     def __init__(self, name, project="", patchid="", kernel="",
                  archs=None, files=None, modules=None, configs=None):
@@ -47,6 +49,8 @@ class Codestream:
         self.files = files if files is not None else {}
         self.modules = modules if modules is not None else {}
         self.configs = configs if configs is not None else {}
+
+        self.required_patches = []
 
 
     @classmethod
@@ -290,6 +294,16 @@ class Codestream:
 
         return pkg
 
+
+    def get_base_branch(self):
+        return KERNEL_BRANCHES[self.base_cs_name()]
+
+
+    def has_patch(self, patch):
+        kernel_version = self.kernel
+        return bool(ksrc_read_rpm_file(kernel_version, patch))
+
+
     def needs_ibt(self):
         return self.is_slfo or (self.sle == 15 and self.sp >= 6)
 
@@ -446,4 +460,16 @@ class Codestream:
 
     def read_file(self, file):
         return read_file_in_tag(self.kernel, file)
+
+
+    def add_required_patch(self, patch):
+        self.required_patches.append(patch)
+
+
+    def get_required_patches(self):
+        return self.required_patches[:]
+
+
+    def needs_patches(self):
+        return bool(self.required_patches)
 
