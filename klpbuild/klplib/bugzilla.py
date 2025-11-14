@@ -6,8 +6,11 @@
 
 import bugzilla
 import time
+import re
+
 from functools import wraps
 
+from klpbuild.klplib.utils import is_cve_valid
 from klpbuild.klplib.config import get_user_settings
 
 __bzapi = None
@@ -101,19 +104,6 @@ def get_bug_comments(bug):
     return []
 
 
-def get_bug_classification(bug):
-    """
-    Return the difficulty score assigned by Nicolai in the comment section.
-    """
-    rating = ["trivial", "medium", "complex"]
-
-    for c in get_bug_comments(bug):
-        if "nstange" in c["creator"]:
-            return w if any((w:=i) in c["text"] for i in rating) else "unknown"
-
-    return "None"
-
-
 def get_bug_dep(bug):
     """
     Return the corresponding dependency for the given bug.
@@ -152,7 +142,12 @@ def get_bug_cve(bug):
     if len(summary) < 2:
         return ""
 
-    return summary[1][5:].strip()
+    cve = summary[1][5:].strip()
+
+    if not is_cve_valid(cve):
+        return ""
+
+    return cve
 
 
 def get_bug_subsys(bug):
@@ -160,7 +155,7 @@ def get_bug_subsys(bug):
     if len(summary) < 3:
         return "Unknown"
 
-    return summary[3][:40].strip()
+    return summary[3][:40].strip().replace(' ', '')
 
 
 def get_bug_prio(bug):
@@ -174,7 +169,7 @@ def is_bug_dropped(bug):
 def get_bug_data(bug):
     dep = get_bug_dep(bug)
     return (get_bug_cve(bug), get_bug_subsys(bug), get_bug_cvss(dep),
-            get_bug_classification(bug), get_bug_prio(bug))
+            get_bug_prio(bug))
 
 
 def get_bug_desc(bug):

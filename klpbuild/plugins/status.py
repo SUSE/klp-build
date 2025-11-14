@@ -39,6 +39,7 @@ def colored_build_result(build_result):
 
 def status(lp_name, lp_filter, wait=False):
     finished_prj = []
+    failed = False
 
     osc = Osc(url="https://api.suse.de")
 
@@ -71,6 +72,7 @@ def status(lp_name, lp_filter, wait=False):
                 prj_dict[arch_build] = colored_build_result(arch_result)
 
                 if arch_result in ["unresolvable", "failed"]:
+                    failed = True
                     finished = True
 
             prj_dicts.append(prj_dict)
@@ -97,6 +99,8 @@ def status(lp_name, lp_filter, wait=False):
         time.sleep(30)
         logging.info("")
 
+    return failed
+
 
 def run(lp_name, lp_filter, wait=False):
-    status(lp_name, lp_filter, wait)
+    exit(status(lp_name, lp_filter, wait))
