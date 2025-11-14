@@ -28,6 +28,12 @@ from klpbuild.klplib.templ import generate_livepatches
 
 PLUGIN_CMD = "extract"
 
+UNSUPPORTED_MACROS = [
+        "__KERNEL__",
+        "MODULE",
+        "KBUILD_MODNAME",
+        r"__has_attribute\("
+        ]
 
 def register_argparser(subparser):
     extract_opts = subparser.add_parser(
@@ -47,12 +53,12 @@ def register_argparser(subparser):
         "different architectures",
     )
     extract_opts.add_argument(
-        "--apply-patches", action="store_true", help="Apply patches if they exist"
+        "--no-patches", action="store_true", help="Do not apply patches if they exist"
     )
 
 
-def run(lp_name, lp_filter, apply_patches, avoid_ext):
-    return extract(lp_name, lp_filter, apply_patches, avoid_ext)
+def run(lp_name, lp_filter, no_patches, avoid_ext):
+    return extract(lp_name, lp_filter, no_patches, avoid_ext)
 
 
 def get_cs_code(lp_name, working_cs):
@@ -201,7 +207,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         return ret
 
 
-def get_symbol_list(out_dir):
+def get_ext_symbols(out_dir):
     # Generate the list of exported symbols
     exts = []
 
@@ -234,6 +240,41 @@ def get_symbol_list(out_dir):
         symbols[mod].append(sym)
 
     return symbols
+
+
+def get_klpp_symbols(out_dir, lp_out):
+    fpath = Path(out_dir, "patched_funcs")
+    if not fpath.exists():
+        raise RuntimeError(f"File not found: {fpath}")
+
+    with open(lp_out) as f:
+        lp_code = f.read()
+
+    klpp_syms = {}
+    with open(fpath) as f:
+        # Each line is a symbol patched by klp-ccp
+        for sym in f:
+            sym = sym.strip()
+            # Create a regex for finding the klpp_{sym} function
+            # declaration and definition.
+            rfmt = fr"(static\s+)(([\w\*]\s*)*klpp_{sym}\s*\([^)]*\))"
+            regex = re.compile(rfmt, re.S)
+
+            # Search and save the function prototype for later use
+            m = regex.search(lp_code)
+            if not m:
+                logging.warning(f"Failed to find klpp_{sym} in {lp_out}")
+                continue
+            klpp_proto = re.sub(r'\s+',' ', m.group(2)).strip() + ';'
+            klpp_syms.update({sym:klpp_proto})
+
+            # Remove the 'static' keyword in the prototypes, if any
+            lp_code = regex.sub(r'\2', lp_code)
+
+    with open(lp_out, "w") as f:
+        f.write(lp_code)
+
+    return klpp_syms
 
 
 def get_cmd_from_json(cs, fname):
@@ -345,32 +386,78 @@ def group_equal_files(lp_name, working_cs):
         logging.info("\t%s", group)
 
 
-def quilt_log_path(lp_name, apply_patches):
-    if apply_patches:
-        return get_patches_dir(lp_name)/"quilt.log"
-
-    return "/dev/null"
+def get_lp_branch(lp_name, cs):
+    return lp_name + "_" + cs.full_cs_name()
 
 
-def remove_patches(lp_name, cs, apply_patches):
+def remove_patches(lp_name, cs):
+    '''
+    Remove any leftovers from previous operations.
+    '''
+
     sdir = cs.get_src_dir()
-    # Check if there were patches applied previously
-    patches_dir = Path(sdir, "patches")
-    if not patches_dir.exists():
-        return
 
-    with open(quilt_log_path(lp_name, apply_patches), "a") as f:
-        f.write(f"\nRemoving patches from {cs.full_cs_name()}({cs.kernel})\n")
-        err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=f, stdout=f, check=False)
+    # Abort any pending git-am from previous extractions.
+    subprocess.run(["git", "am", "--abort"],
+                   stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL,
+                   cwd=sdir, check=False)
 
-    if err.returncode not in [0, 2]:
-        raise RuntimeError(f"{cs.full_cs_name()}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
+    # Switch to the original kernel branch. Even if that requires
+    # dropping any local changes.
+    err = subprocess.run(["git", "checkout", "-f", f"rpm-{cs.kernel}"],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         cwd=sdir, check=False)
+    if err.returncode != 0:
+        raise RuntimeError(f"Failed to switch to rpm-{cs.kernel} branch. Aborting\n")
 
-    shutil.rmtree(patches_dir, ignore_errors=True)
-    shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
+    # Delete any branch related to this livepatch.
+    # We need to start in a clean state.
+    bname = get_lp_branch(lp_name, cs)
+    err = subprocess.run(["git", "branch", "-D", f"{bname}"], cwd=sdir,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.PIPE, check=False)
+    if err.returncode != 0 and f"'{bname}' not found" not in str(err.stderr):
+        raise RuntimeError(f"Failed to delete branch {bname}:\n{err.stderr}\n")
 
 
-def apply_all_patches(lp_name, cs, apply_patches):
+def apply_patch(patch, sdir):
+    # Try to apply the patch first with git-am.
+    # Beware that git-am will not work in all cases,
+    # as it is more strict than patch(1).
+    err = subprocess.run(["git", "am", patch],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         cwd=sdir, check=False)
+    if err.returncode == 0:
+        return True
+
+    # Failed to apply the patch with git-am, so now we are in
+    # a conflict state. Fallback to patch(1) and hope for the best!
+    # If patch(1) resolved the conflict, commit the changes and continue
+    # with git-am. Otherwise, exit so that the user can manually fix it.
+    err = subprocess.run(["patch", "-s", "-f", "-p1", "-i", patch],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         cwd=sdir, check=False)
+    if err.returncode != 0:
+        return False
+
+    subprocess.run(["git", "add", "."],
+                   stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL,
+                   cwd=sdir, check=False)
+
+    subprocess.run(["git", "am", "--continue"],
+                   stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL,
+                   cwd=sdir, check=False)
+
+    return True
+
+
+def apply_all_patches(lp_name, cs):
     dirs = []
 
     if cs.rt:
@@ -391,38 +478,39 @@ def apply_all_patches(lp_name, cs, apply_patches):
     patched = False
     sdir = cs.get_src_dir()
 
-    with open(quilt_log_path(lp_name, apply_patches), "a") as f:
-        for pdir in patch_dirs:
-            if not pdir.exists():
-                f.write(f"\nPatches dir {pdir} doesnt exists\n")
+    bname = get_lp_branch(lp_name, cs)
+    err = subprocess.run(["git", "checkout", "-B", bname],
+                         cwd=sdir,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         check=False)
+    if err.returncode != 0:
+        raise RuntimeError(f"Failed to create branch {bname}. Aborting")
+
+    for pdir in patch_dirs:
+        if not pdir.exists():
+            logging.debug(f"Patches dir {pdir} doesnt exists")
+            continue
+
+        logging.debug(f"Applying patches on {cs.full_cs_name()}({cs.kernel}) from {pdir}")
+
+        for patch in sorted(pdir.iterdir(), reverse=True):
+            if not str(patch).endswith(".patch"):
                 continue
 
-            f.write(f"\nApplying patches on {cs.full_cs_name()}({cs.kernel}) from {pdir}\n")
-            for patch in sorted(pdir.iterdir(), reverse=True):
-                if not str(patch).endswith(".patch"):
-                    continue
+            logging.info("%s:%s: Applying %s...",
+                         cs.full_cs_name(), cs.kernel, patch)
 
-                err = subprocess.run(["quilt", "import", str(patch)], cwd=sdir,
-                                     stderr=f, stdout=f, check=False)
-                if err.returncode != 0:
-                    f.write("\nFailed to import patches, remove applied and try again\n")
-                    f.flush()
-                    remove_patches(lp_name, cs, apply_patches)
+            if not (patched := apply_patch(str(patch), sdir)):
+                break
 
-            err = subprocess.run(["quilt", "push", "-a"], cwd=sdir,
-                                 stderr=f, stdout=f, check=False)
-            if err.returncode != 0:
-                f.write("\nFailed to apply patches, remove applied and try again\n")
-                f.flush()
-                remove_patches(lp_name, cs, apply_patches)
-                continue
-
-            patched = True
-            # Stop the loop in the first dir that we find patches.
-            break
+        # Stop the loop in the first dir that we find patches.
+        break
 
     if not patched:
-        raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): Failed to apply patches. Aborting")
+        raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): "
+                           "Failed to apply patches. Aborting\n"
+                           f"For more information go to: {sdir}")
 
 
 def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
@@ -599,38 +687,48 @@ def process(lp_name, total, args, avoid_ext):
         if len(syms) > 0:
             cs.files[fname]["dup_symbols"] = syms
 
-    cs.files[fname]["ext_symbols"] = get_symbol_list(out_dir)
-
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
-    # Remove the local path prefix of the klp-ccp generated comments
-    # Open the file, read, seek to the beginning, write the new data, and
-    # then truncate (which will use the current position in file as the
-    # size)
+    cs.files[fname]["ext_symbols"] = get_ext_symbols(out_dir)
+    cs.files[fname]["klpp_symbols"] = get_klpp_symbols(out_dir, lp_out)
+
+    lp_out_cleanup(lp_out, sdir)
+
+
+def lp_out_cleanup(lp_out, sdir):
+    """
+    Open the file, read, seek to the beginning, write the new data, and
+    then truncate (which will use the current position in file as the
+    size).
+    - Remove the local path prefix of the klp-ccp generated comments.
+    - Remove #includes with local path prefix. Leftovers headers from klp-ccp.
+    - Remove unsupported macro definitions.
+    - Remove big chunks of empty lines.
+    """
+    macros = '|'.join(UNSUPPORTED_MACROS)
     with open(str(lp_out), "r+") as f:
         file_buf = f.read()
         f.seek(0)
-        f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
+        file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
+        file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
+        file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
+        file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
+        f.write(file_buf)
         f.truncate()
 
 
-def extract(lp_name, lp_filter, apply_patches, avoid_ext):
+def extract(lp_name, lp_filter, no_patches, avoid_ext):
     sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
 
     with sdir_lock:
-        start_extract(lp_name, lp_filter, apply_patches, avoid_ext)
+        start_extract(lp_name, lp_filter, no_patches, avoid_ext)
 
 
-def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
+def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
     if not utils.get_workdir(lp_name).exists():
         raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
 
     logging.info("Work directory: %s", utils.get_workdir(lp_name))
-
-    # Clean any previous logs
-    if apply_patches:
-        with open(quilt_log_path(lp_name, apply_patches), "w") as f:
-            f.truncate()
 
     working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
 
@@ -646,11 +744,11 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
     for cs in working_cs:
         # remove any previously generated files and leftover patches
         shutil.rmtree(cs.get_ccp_dir(lp_name), ignore_errors=True)
-        remove_patches(lp_name, cs, apply_patches)
+        remove_patches(lp_name, cs)
 
         # Apply patches before the LPs were created
-        if apply_patches:
-            apply_all_patches(lp_name, cs, apply_patches)
+        if not no_patches:
+            apply_all_patches(lp_name, cs)
 
         for fname, fdata in cs.files.items():
             args.append((i, make_lock, fname, cs, fdata))
@@ -700,8 +798,8 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
     # externalized symbols of this file
     for cs in working_cs:
         # Cleanup patches after the LPs were created if they were applied
-        if apply_patches:
-            remove_patches(lp_name, cs, apply_patches)
+        if not no_patches:
+            remove_patches(lp_name, cs)
 
         # Map all symbols related to each obj, to make it check the symbols
         # only once per object
