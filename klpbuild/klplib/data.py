@@ -11,7 +11,8 @@ from klpbuild.klplib.ibs import download_cs_rpms
 
 def download_missing_cs_data(codestreams):
     cs_to_download = __get_cs_missing_data(codestreams)
-    download_cs_data(cs_to_download)
+    if cs_to_download:
+        download_cs_data(cs_to_download)
 
 
 def download_cs_data(codestreams):
