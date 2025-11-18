@@ -168,7 +168,9 @@ def setup_project_files(lp_name, codestreams):
     utils.get_workdir(lp_name).mkdir(exist_ok=True)
 
     generate_commit_msg_file(lp_name)
-    logging.info("Checking files, symbols, modules...")
+
+    if codestreams:
+        logging.info("Checking files, symbols, modules...")
 
     # Setup the missing codestream info needed
     for cs in codestreams:
