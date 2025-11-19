@@ -251,7 +251,7 @@ def test_templ_ibt_without_externalized_vars():
         "lp_name" : lp,
         "lp_filter": cs,
         "no_check": True,
-        "archs" : utils.ARCHS,
+        "archs" : [utils.ARCH],
         "cve": None,
         "conf": "CONFIG_IPV6",
         "module" : "vmlinux",
