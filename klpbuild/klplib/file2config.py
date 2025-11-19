@@ -9,6 +9,20 @@ import re
 
 from pathlib import Path
 
+BLACKLIST = {
+        r"drivers/gpu/drm/amd/(?!amdgpu/).*":
+        "drivers/gpu/drm/amd/amdgpu/amdgpu_irq.c"
+}
+
+
+def _filter_path(path: str) -> str:
+    for regex, fixed_path in BLACKLIST.items():
+        if re.match(regex, path):
+            return fixed_path
+
+    return path
+
+
 def _load_makefile(cs, make_file: str) -> list:
 
     if not cs.check_file_exists(make_file):
@@ -83,7 +97,8 @@ def find_configs_for_files(cs, file_paths: list):
         # Do not check headers
         if path.endswith('h'):
             continue
-        obj_file = Path(path.replace('.c', '.o'))
+        valid_path = _filter_path(path)
+        obj_file = Path(valid_path.replace('.c', '.o'))
         config, obj = _find_config(cs, obj_file.parent, obj_file.name, 0)
         if not config:
             missing.append(path)

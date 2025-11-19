@@ -150,7 +150,7 @@ def __load_user_conf():
     """
     user_conf_file = __get_user_conf_file()
     if not user_conf_file.is_file():
-        logging.warning("Warning: user configuration file not found")
+        logging.warning("User configuration file not found")
         __setup_user_env(Path.home()/"klp")
 
     logging.debug("Loading user configuration from '%s'", user_conf_file)

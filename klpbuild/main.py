@@ -6,6 +6,7 @@
 import logging
 import sys
 
+from klpbuild.klplib import logger
 from klpbuild.klplib.cmd import create_parser
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.klplib.plugins import try_run_plugin
@@ -15,8 +16,9 @@ def main():
     parser = create_parser()
     args = parser.parse_args(sys.argv[1:])
 
-    logging_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=logging_level, format="%(message)s")
+    logger.load_config()
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     if hasattr(args, 'lp_name'):
         load_codestreams(args.lp_name)
