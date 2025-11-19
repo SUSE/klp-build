@@ -270,6 +270,9 @@ def get_klpp_symbols(out_dir, lp_out):
                 logging.warning(f"Failed to find klpp_{sym} in {lp_out}")
                 continue
             klpp_proto = re.sub(r'\s+',' ', m.group(2)).strip() + ';'
+            # Remove the attributes left by klp-ccp, since they don't mean much
+            # for kernel modules
+            klpp_proto = re.sub(r' __(init|exit)', ' ', klpp_proto)
             klpp_syms.update({sym:klpp_proto})
 
             # Remove the 'static' keyword in the prototypes, if any
@@ -719,6 +722,9 @@ def lp_out_cleanup(lp_out, sdir):
         file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
         file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
+        # Remove the attributes left by klp-ccp, since they don't mean much
+        # for kernel modules
+        file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
