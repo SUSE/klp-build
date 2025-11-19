@@ -4,6 +4,8 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
+set -eo pipefail
+
 LPS=" -r built "
 
 if [ "$1" == "--no-lp" ]; then
