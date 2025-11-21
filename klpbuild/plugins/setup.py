@@ -17,20 +17,21 @@ from klpbuild.plugins.scan import scan
 
 PLUGIN_CMD = "setup"
 
+
 def register_argparser(subparser):
-    setup = subparser.add_parser(
+    args = subparser.add_parser(
         PLUGIN_CMD, help="Establish an initial working directory for a given livepatch"
     )
-    add_arg_lp_name(setup)
-    add_arg_lp_filter(setup)
-    setup.add_argument("--cve", type=str, required=True, help="The CVE assigned to this livepatch")
-    setup.add_argument("--conf", type=str, required=False, help="The kernel CONFIG used to be build the livepatch")
-    setup.add_argument(
+    add_arg_lp_name(args)
+    add_arg_lp_filter(args)
+    args.add_argument("--cve", type=str, required=True, help="The CVE assigned to this livepatch")
+    args.add_argument("--conf", type=str, required=False, help="The kernel CONFIG used to be build the livepatch")
+    args.add_argument(
         "--no-check",
         action="store_true",
         help="Do not check for already patched codestreams, do the setup for all non filtered codestreams.",
     )
-    setup.add_argument(
+    args.add_argument(
         "--file-funcs",
         required=False,
         action="append",
@@ -40,7 +41,7 @@ def register_argparser(subparser):
         "multiple times. The format is --file-funcs file/path.c func1 "
         "func2 --file-func file/patch2 func1...",
     )
-    setup.add_argument(
+    args.add_argument(
         "--mod-file-funcs",
         required=False,
         action="append",
@@ -50,7 +51,7 @@ def register_argparser(subparser):
         "multiple times. The format is --file-funcs module1 file/path.c func1 "
         "func2 --file-func module2 file/patch2 func1...",
     )
-    setup.add_argument(
+    args.add_argument(
         "--conf-mod-file-funcs",
         required=False,
         action="append",
@@ -60,10 +61,10 @@ def register_argparser(subparser):
         "multiple times. The format is --file-funcs conf1 module1 file/path.c func1 "
         "func2 --file-func conf2 module2 file/patch2 func1...",
     )
-    setup.add_argument(
+    args.add_argument(
         "--module", type=str, default="vmlinux", help="The module that will be livepatched for all files"
     )
-    setup.add_argument(
+    args.add_argument(
         "--archs",
         default=utils.ARCHS,
         choices=utils.ARCHS,
@@ -229,7 +230,6 @@ def __setup_check_mod(cs, mod, arch):
 def __setup_check_syms(cs, mod, syms, arch):
     # Verify if the functions exist in the specified object
     arch_syms = cs.check_symbol_archs(arch, mod, syms, False, True)
-    if arch_syms:
-        for arch, syms in arch_syms.items():
-            logging.warning("%s-%s (%s): Symbols %s not found on %s object",
-                            cs.full_cs_name(), arch, cs.kernel, ",".join(syms), mod)
+    for larch, lsyms in arch_syms.items():
+        logging.warning("%s-%s (%s): Symbols %s not found on %s object",
+                        cs.full_cs_name(), larch, cs.kernel, ",".join(lsyms), mod)

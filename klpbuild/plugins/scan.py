@@ -16,19 +16,20 @@ from klpbuild.klplib.bugzilla import get_pending_bugs, get_bug_data, is_bug_drop
 
 PLUGIN_CMD = "scan"
 
+
 def register_argparser(subparser):
-    scan = subparser.add_parser(PLUGIN_CMD)
-    scan.add_argument(
+    args = subparser.add_parser(PLUGIN_CMD)
+    args.add_argument(
         "--cve",
         required=False,
         help="Shows which codestreams are vulnerable to the CVE"
     )
-    scan.add_argument(
+    args.add_argument(
         "--conf",
         required=False,
         help="Helps to check only the codestreams that have this config set."
     )
-    scan.add_argument(
+    args.add_argument(
         "--download",
         required=False,
         action="store_true",
