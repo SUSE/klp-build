@@ -347,7 +347,6 @@ class Codestream:
     def get_kernel_build_path(self, arch):
         return Path(self.get_mod_path(arch), "build")
 
-
     def get_all_configs(self, conf):
         """
         Get the config value for all supported architectures of a codestream. If
@@ -356,7 +355,7 @@ class Codestream:
         configs = {}
 
         if conf and not conf.startswith("CONFIG_"):
-            logging.error(f"Invalid config '{conf}': Missing CONFIG_ prefix")
+            logging.error("Invalid config '%s': Missing CONFIG_ prefix", conf)
             sys.exit(1)
 
         for arch in self.archs:
@@ -367,7 +366,6 @@ class Codestream:
                 configs[arch] = match.group(1)
 
         return configs
-
 
     def find_obj_path(self, arch, mod):
         # Return the path if the modules was previously found for ARCH, or refetch if

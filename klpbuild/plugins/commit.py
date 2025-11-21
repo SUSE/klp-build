@@ -19,6 +19,7 @@ from klpbuild.klplib.kgraft import (find_lp_branches,
 
 PLUGIN_CMD = "commit"
 
+
 def register_argparser(subparser):
     fmt = subparser.add_parser(
         PLUGIN_CMD, help="Commit the extracted livepatches to kgraft repository."
@@ -36,7 +37,7 @@ def commit(lp_name, codestreams, force):
     branches = find_lp_branches(f"{lp_name}_*")
     if branches and not force:
         branches_str = '\n\t' + '\n\t'.join(branches)
-        logging.info(f"Found already commited livepatches:{branches_str}")
+        logging.info("Found already commited livepatches: %s", branches_str)
         return
 
     logging.info("Commiting livepatch to kgraft...")
@@ -51,12 +52,11 @@ def commit(lp_name, codestreams, force):
         code_path = cs_list[0].get_lp_dir(lp_name)
         shutil.copytree(code_path, f"{get_kgraft()}/{lp_name}", dirs_exist_ok=True)
         commit_lp_changes(lp_name)
-        logging.info(f"Livepatch '{branch}' commited")
-
+        logging.info("Livepatch '%s' commited", branch)
 
 
 def run(lp_name, lp_filter, force):
-    supported_codestreams =  get_supported_codestreams()
+    supported_codestreams = get_supported_codestreams()
     filtered_codestreams = filter_codestreams(lp_filter, supported_codestreams)
 
     commit(lp_name, filtered_codestreams, force)

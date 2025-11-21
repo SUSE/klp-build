@@ -148,7 +148,7 @@ def get_lp_groups(lp_name, codestreams):
         # Expand group and get all the contained codestreams
         cs_grp = unclassify_codestreams(group, codestreams)
         if not cs_grp:
-            logging.debug(f"Skipping codestream group: {group}")
+            logging.debug("Skipping codestream group: %s", group)
             continue
 
         cs_groups[group] = cs_grp

@@ -283,7 +283,7 @@ def get_patches(cve, savedir=None):
     patches["16.0rt"] = patches["16.0"][:]
 
     for key, bc_patches in patches.items():
-        logging.info(f"{key}: {KERNEL_BRANCHES[key]}")
+        logging.info("%s: %s", key, KERNEL_BRANCHES[key])
 
         if not bc_patches:
             logging.info("None")
@@ -317,11 +317,11 @@ def get_patched_kernels(codestreams, patches):
         # Proceed to analyse each codestream's kernel
         kernel = cs.kernel
 
-        logging.debug(f"\n{cs.full_cs_name()} ({kernel}):")
+        logging.debug("\n%s (%s):", cs.full_cs_name(), kernel)
         for patch in suse_patches:
             if not ksrc_read_rpm_file(kernel, patch):
                 break
-            logging.debug(f"{patch}")
+            logging.debug(patch)
         else:
             kernels.add(kernel)
 

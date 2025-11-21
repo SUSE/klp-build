@@ -62,7 +62,7 @@ def print_files(report):
         file = key.split(':')[0]
 
         if not cs.files or file not in cs.files:
-            logging.info(f"{cs_str}:\nFILE: {file}\n")
+            logging.info("%s:\nFILE: %s\n", cs_str, file)
             continue
 
         conf = cs.files[file]['conf']
