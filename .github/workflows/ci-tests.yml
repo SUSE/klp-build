@@ -24,6 +24,9 @@ jobs:
     - name: Install dependencies
       run: zypper in -y python3-devel git python3-pytest tox
 
+    - name: Run pylint
+      run: tox -e lint -- --fail-under 9.4 --fail-on F --fail-on unused-variable
+
     - name: Get month
       id: get-month
       run: |
@@ -64,6 +67,3 @@ jobs:
         cp tests/config ~/.config/klp-build/ &&
         mkdir -p klp/{livepatches,data} &&
         tox -e tests -- tests/test_{ksrc,scan,config,kernel_tree,utils,codestream}.py
-
-    - name: Run pylint
-      run: tox -e lint -- --fail-under 9.4 --fail-on F

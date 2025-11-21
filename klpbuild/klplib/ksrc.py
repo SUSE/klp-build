@@ -270,7 +270,6 @@ def get_patches(cve, savedir=None):
             # upstream fix, and is using a different way to mimic the fix.
             # In this case add a note for the livepatch author to fill the
             # blank when finishing the livepatch
-            ups = ""
             m = re.search(r"Git-commit: ([\w]+)", pfile)
             if m:
                 c = m.group(1)[:12]
