@@ -233,4 +233,3 @@ def __setup_check_syms(cs, mod, syms, arch):
         for arch, syms in arch_syms.items():
             logging.warning("%s-%s (%s): Symbols %s not found on %s object",
                             cs.full_cs_name(), arch, cs.kernel, ",".join(syms), mod)
-

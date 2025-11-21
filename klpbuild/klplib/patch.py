@@ -201,4 +201,3 @@ def filter_unsupported_kmodules(cs_list):
         cs_list.remove(cs)
 
     return unset_cs
-
