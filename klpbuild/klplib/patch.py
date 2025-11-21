@@ -45,7 +45,7 @@ def analyse_files(cs_list, sle_patches):
                     key = f"{file}:{conf['conf']}:{conf['module']}:{sorted(funcs)}"
                 else:
                     key = f"{file}:::"
-                    logging.warning(f"%s: Failed to find a config for %s",
+                    logging.warning("%s: Failed to find a config for %s",
                                     cs.full_cs_name(), file)
 
                 if cs not in report[key]:

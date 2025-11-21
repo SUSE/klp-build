@@ -177,7 +177,7 @@ def scan(cve, conf, lp_filter, download, archs=None, savedir=None):
         working_cs = tmp_working_cs
 
     if unsupported:
-        logging.info(f"Skipping codestreams with unsupported kernel modules:")
+        logging.info("Skipping codestreams with unsupported kernel modules:")
         logging.info("\t%s", utils.classify_codestreams_str(unsupported))
 
     if conf_not_set:

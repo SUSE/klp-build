@@ -16,6 +16,7 @@ from klpbuild.klplib.config import get_user_path
 
 PLUGIN_CMD = "format-patches"
 
+
 def register_argparser(subparser):
     fmt = subparser.add_parser(
         "format-patches", help="Format patches from kgraft-patches[_testscripts]"
@@ -115,7 +116,7 @@ def update_cover_letter(patches_dir, lp_name):
     body += f"# Patched codestreams:\n - {cs_patched}\n"
     body += f"# Affeted codestreams:\n - {cs_affected}\n"
     body += f"# Grouped codestreams:\n{cs_groups}\n"
-    body += f"# Manual work:\nNone\n\n"
+    body += "# Manual work:\nNone\n\n"
     letter = re.sub(r"\*{3} BLURB HERE.*", body, letter, flags=re.DOTALL)
 
     with open(letter_path, 'w') as f:
