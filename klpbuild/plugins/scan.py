@@ -36,12 +36,13 @@ def register_argparser(subparser):
         help="SLE specific. Download missing codestreams data"
     )
 
+
 def run(cve, conf, lp_filter, download):
     if not cve:
         scan_bugzilla()
         return
 
-    return scan(cve, conf, lp_filter, download)
+    scan(cve, conf, lp_filter, download)
 
 
 def scan_bugzilla():
