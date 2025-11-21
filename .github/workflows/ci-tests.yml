@@ -25,7 +25,7 @@ jobs:
       run: zypper in -y python3-devel git python3-pytest tox
 
     - name: Run pylint
-      run: tox -e lint -- --fail-under 9.4 --fail-on F --fail-on unused-variable --fail-on unused-import
+      run: tox -e lint -- --fail-under 9.4 --fail-on F --fail-on unused-variable --fail-on unused-import --fail-on consider-using-sys-exit
 
     - name: Get month
       id: get-month

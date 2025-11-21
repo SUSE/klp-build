@@ -168,7 +168,7 @@ def push(lp_name, lp_filter, wait=False):
 
         # One more status after everything finished, since we remove
         # finished builds on each iteration
-        exit(status(lp_name, lp_filter, False))
+        sys.exit(status(lp_name, lp_filter, False))
 
 
 def run(lp_name, lp_filter, wait=False):
