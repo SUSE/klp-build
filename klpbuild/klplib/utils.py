@@ -141,7 +141,7 @@ def get_lp_groups(lp_name, codestreams):
     with open(f"{workdir}/groups", "r") as f:
         groups = f.read()
 
-    cs_groups = dict()
+    cs_groups = {}
     for group in groups.splitlines():
         group = group.strip()
 
