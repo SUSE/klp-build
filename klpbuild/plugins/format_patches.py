@@ -22,9 +22,10 @@ def register_argparser(subparser):
     )
     add_arg_lp_name(fmt)
     fmt.add_argument("-v", "--version", type=int, required=True, help="Version to be added, like vX")
+    fmt.add_argument("--no-test", action="store_true", default=False, help="Skip the test script.")
 
 
-def run(lp_name, version):
+def run(lp_name, no_test, version):
     ver = f"v{version}"
     index = 1
 
@@ -36,28 +37,29 @@ def run(lp_name, version):
 
     prefix = f"Klp-patches][PATCH {ver}"
 
-    test_src = utils.get_tests_path(lp_name)
-    if test_src:
-        logging.info(test_src.name)
-        subprocess.check_output(
-            [
-                "/usr/bin/git",
-                "-C",
-                str(get_user_path('kgr_patches_tests_dir')),
-                "format-patch",
-                "-1",
-                "-N",
-                f"{test_src}",
-                "--cover-letter",
-                "--start-number",
-                f"{index}",
-                "--subject-prefix",
-                f"{prefix}",
-                "--output-directory",
-                f"{patches_dir}",
-            ]
-        )
-        index += 1
+    if not no_test:
+        test_src = utils.get_tests_path(lp_name)
+        if test_src:
+            logging.info(test_src.name)
+            subprocess.check_output(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(get_user_path('kgr_patches_tests_dir')),
+                    "format-patch",
+                    "-1",
+                    "-N",
+                    f"{test_src}",
+                    "--cover-letter",
+                    "--start-number",
+                    f"{index}",
+                    "--subject-prefix",
+                    f"{prefix}",
+                    "--output-directory",
+                    f"{patches_dir}",
+                ]
+            )
+            index += 1
 
     # Filter only the branches related to this BSC
     for branch in utils.get_lp_branches(lp_name, kgr_patches):
