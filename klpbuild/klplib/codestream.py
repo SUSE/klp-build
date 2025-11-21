@@ -13,7 +13,6 @@ import logging
 from pathlib import Path, PurePath
 from importlib import resources
 
-from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_elf_object, get_datadir, preferred_arch
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
@@ -179,9 +178,11 @@ class Codestream:
         # RT is supported only on x86_64 at the moment
         if self.rt:
             return ["x86_64"]
+
         # MICRO 6.0 doesn't support ppc64le
-        elif self.is_micro:
+        if self.is_micro:
             return ["s390x", "x86_64"]
+
         # We support all architecture for all other codestreams
         return ["ppc64le", "s390x", "x86_64"]
 
@@ -346,7 +347,6 @@ class Codestream:
     def get_kernel_build_path(self, arch):
         return Path(self.get_mod_path(arch), "build")
 
-
     def get_all_configs(self, conf):
         """
         Get the config value for all supported architectures of a codestream. If
@@ -355,7 +355,7 @@ class Codestream:
         configs = {}
 
         if conf and not conf.startswith("CONFIG_"):
-            logging.error(f"Invalid config '{conf}': Missing CONFIG_ prefix")
+            logging.error("Invalid config '%s': Missing CONFIG_ prefix", conf)
             sys.exit(1)
 
         for arch in self.archs:
@@ -366,7 +366,6 @@ class Codestream:
                 configs[arch] = match.group(1)
 
         return configs
-
 
     def find_obj_path(self, arch, mod):
         # Return the path if the modules was previously found for ARCH, or refetch if

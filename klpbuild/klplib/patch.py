@@ -29,28 +29,27 @@ def analyse_files(cs_list, sle_patches):
     report = defaultdict(list)
 
     for cs in cs_list:
-            bc = cs.base_cs_name()
-            patches = sle_patches[bc]
-            branch = KERNEL_BRANCHES[bc]
+        bc = cs.base_cs_name()
+        patches = sle_patches[bc]
+        branch = KERNEL_BRANCHES[bc]
 
-            files_funcs = get_patches_files(patches, branch)
-            files_path = files_funcs.keys()
-            files_conf, _ = find_configs_for_files(cs, files_path)
+        files_funcs = get_patches_files(patches, branch)
+        files_path = files_funcs.keys()
+        files_conf, _ = find_configs_for_files(cs, files_path)
 
-            for file, funcs in files_funcs.items():
-                conf = files_conf.get(file, {})
-                if conf:
-                    cs.files[file] = {'symbols': list(funcs)}
-                    cs.files[file].update(conf)
-                    key = f"{file}:{conf['conf']}:{conf['module']}:{sorted(funcs)}"
-                else:
-                    key = f"{file}:::"
-                    logging.warning(f"%s: Failed to find a config for %s",
-                                    cs.full_cs_name(), file)
+        for file, funcs in files_funcs.items():
+            conf = files_conf.get(file, {})
+            if conf:
+                cs.files[file] = {'symbols': list(funcs)}
+                cs.files[file].update(conf)
+                key = f"{file}:{conf['conf']}:{conf['module']}:{sorted(funcs)}"
+            else:
+                key = f"{file}:::"
+                logging.warning("%s: Failed to find a config for %s",
+                                cs.full_cs_name(), file)
 
-                if cs not in report[key]:
-                    report[key].append(cs)
-
+            if cs not in report[key]:
+                report[key].append(cs)
 
     return report
 
@@ -63,7 +62,7 @@ def print_files(report):
         file = key.split(':')[0]
 
         if not cs.files or file not in cs.files:
-            logging.info(f"{cs_str}:\nFILE: {file}\n")
+            logging.info("%s:\nFILE: %s\n", cs_str, file)
             continue
 
         conf = cs.files[file]['conf']
@@ -201,4 +200,3 @@ def filter_unsupported_kmodules(cs_list):
         cs_list.remove(cs)
 
     return unset_cs
-

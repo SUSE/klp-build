@@ -5,6 +5,7 @@
 
 import logging
 import time
+import sys
 
 from osctiny import Osc
 from tabulate import tabulate
@@ -103,4 +104,4 @@ def status(lp_name, lp_filter, wait=False):
 
 
 def run(lp_name, lp_filter, wait=False):
-    exit(status(lp_name, lp_filter, wait))
+    sys.exit(status(lp_name, lp_filter, wait))

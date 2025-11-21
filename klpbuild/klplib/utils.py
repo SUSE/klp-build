@@ -141,14 +141,14 @@ def get_lp_groups(lp_name, codestreams):
     with open(f"{workdir}/groups", "r") as f:
         groups = f.read()
 
-    cs_groups = dict()
+    cs_groups = {}
     for group in groups.splitlines():
         group = group.strip()
 
         # Expand group and get all the contained codestreams
         cs_grp = unclassify_codestreams(group, codestreams)
         if not cs_grp:
-            logging.debug(f"Skipping codestream group: {group}")
+            logging.debug("Skipping codestream group: %s", group)
             continue
 
         cs_groups[group] = cs_grp

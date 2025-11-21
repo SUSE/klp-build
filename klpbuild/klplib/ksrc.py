@@ -87,6 +87,7 @@ def __fetch_kernel_branches():
                           "--quiet", "--atomic", "--force", "--tags"],
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
+                         check=False,
                          text=True)
     if ret.returncode:
         logging.info("Fetch failed\n%s", ret.stderr)
@@ -270,7 +271,6 @@ def get_patches(cve, savedir=None):
             # upstream fix, and is using a different way to mimic the fix.
             # In this case add a note for the livepatch author to fill the
             # blank when finishing the livepatch
-            ups = ""
             m = re.search(r"Git-commit: ([\w]+)", pfile)
             if m:
                 c = m.group(1)[:12]
@@ -283,7 +283,7 @@ def get_patches(cve, savedir=None):
     patches["16.0rt"] = patches["16.0"][:]
 
     for key, bc_patches in patches.items():
-        logging.info(f"{key}: {KERNEL_BRANCHES[key]}")
+        logging.info("%s: %s", key, KERNEL_BRANCHES[key])
 
         if not bc_patches:
             logging.info("None")
@@ -317,11 +317,11 @@ def get_patched_kernels(codestreams, patches):
         # Proceed to analyse each codestream's kernel
         kernel = cs.kernel
 
-        logging.debug(f"\n{cs.full_cs_name()} ({kernel}):")
+        logging.debug("\n%s (%s):", cs.full_cs_name(), kernel)
         for patch in suse_patches:
             if not ksrc_read_rpm_file(kernel, patch):
                 break
-            logging.debug(f"{patch}")
+            logging.debug(patch)
         else:
             kernels.add(kernel)
 
@@ -352,7 +352,7 @@ def __read_file(ref, file_path):
     ksrc_dir = get_user_path("kernel_src_dir")
 
     ret = subprocess.run(["git", "-C", ksrc_dir, "show",
-                          f"{ref}:{file_path}"],
+                          f"{ref}:{file_path}"], check=False,
                          capture_output=True, text=True)
     return ret.stdout
 
