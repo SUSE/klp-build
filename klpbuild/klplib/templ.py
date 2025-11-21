@@ -11,7 +11,7 @@ from mako.template import Template
 
 from klpbuild.klplib.bugzilla import get_bug_title, get_bug
 from klpbuild.klplib.codestreams_data import get_codestreams_data
-from klpbuild.klplib.utils import (ARCHS, fix_mod_string, get_mail, get_workdir,
+from klpbuild.klplib.utils import (fix_mod_string, get_mail, get_workdir,
                                    get_lp_number, get_fname, is_mod)
 
 

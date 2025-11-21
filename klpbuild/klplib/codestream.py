@@ -13,7 +13,6 @@ import logging
 from pathlib import Path, PurePath
 from importlib import resources
 
-from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_elf_object, get_datadir, preferred_arch
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag

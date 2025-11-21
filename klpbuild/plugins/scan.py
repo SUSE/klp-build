@@ -4,8 +4,6 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
 import logging
-import re
-import sys
 import concurrent.futures
 import tabulate
 

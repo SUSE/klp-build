@@ -4,16 +4,11 @@
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
 import logging
-import subprocess
-import os
 import shutil
-import re
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.utils import (filter_codestreams,
-                                   get_workdir,
                                    get_lp_groups)
 from klpbuild.klplib.kgraft import (find_lp_branches,
                                     delete_lp_branches,
