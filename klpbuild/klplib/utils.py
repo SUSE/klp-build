@@ -299,6 +299,23 @@ def affected_archs(cs_list):
     return sorted(conf_archs)
 
 
+def preferred_arch(cs_list) -> str:
+    """
+    Get one of the affected architectures to be used in klp-ccp.
+
+    Returns:
+        String: The architecture found in the preferred order
+    """
+    archs = affected_archs(cs_list)
+
+    # the preference order
+    for arch in ["x86_64", "s390x", "ppc64le"]:
+        if arch in archs:
+            return arch
+
+    # Should not happen
+    return "x86_64"
+
 def get_mail():
     git_data = git.GitConfigParser()
     user = git_data.get_value("user", "name")

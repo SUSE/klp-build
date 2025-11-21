@@ -10,7 +10,7 @@ from tests.utils import get_codestreams_file
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib import utils
 
-CS = "15.5u19"
+CS = "15.5u23"
 DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_TUN", "no_check": True}
 
 
@@ -101,7 +101,7 @@ def test_invalid_sym(caplog):
 def test_valid_micro_patchid():
     # Make sure that patchid is informed for SLE MICRO
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    micro_cs = "6.0u2"
+    micro_cs = "6.0u11"
     micro_data = {"cve": None, "lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": True}
 
     setup_args = {
@@ -146,3 +146,26 @@ def test_valite_conf_mod_file_funcs():
     assert sch["module"] == "sch_qfq"
     assert bts["conf"] == "CONFIG_BT_HCIBTSDIO"
     assert bts["module"] == "btsdio"
+
+
+def test_symbol_with_noinstr(caplog):
+    # Make sure we error out in the case of a configuration entry that is not enabled
+    # on a codestream
+    # Make sure that we detect when a symbol cannot be patched on setup phase
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+
+    lp_default_data = {"cve": None, "lp_filter": CS, "conf": "CONFIG_SUSE_KERNEL", "no_check": True}
+    for arch in ["x86_64", "ppc64le", "s390x"]:
+        with pytest.raises(SystemExit):
+            setup_args = {
+                "lp_name": lp,
+                "archs": [arch],
+                "module": "vmlinux",
+                "file_funcs": [["kernel/time/timekeeping.c", "__ktime_get_real_seconds"]],
+                "mod_file_funcs": [],
+                "conf_mod_file_funcs": [],
+                **lp_default_data
+            }
+            setup(**setup_args)
+
+    assert "Symbol __ktime_get_real_seconds has tracing disabled." in caplog.text

@@ -13,7 +13,7 @@ from tests.utils import get_file_content
 
 def test_templ_with_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u19"
+    cs = "15.5u25"
 
     setup_args = {
         "lp_name" : lp,
@@ -56,7 +56,7 @@ def test_templ_with_externalized_vars():
 
 def test_templ_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u19"
+    cs = "15.5u25"
 
     setup_args = {
         "lp_name" : lp,
@@ -103,7 +103,7 @@ def test_templ_without_externalized_vars():
 # bscXXXXXXX.
 def test_check_header_file_included():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u19"
+    cs = "15.5u25"
 
     setup_args = {
         "lp_name" : lp,
@@ -113,8 +113,8 @@ def test_check_header_file_included():
         "cve": None,
         "conf": "CONFIG_IPV6",
         "module" : "vmlinux",
-        "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"],
-                        ["kernel/events/core.c", "perf_event_exec"]],
+        "file_funcs": [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"],
+                       ["fs/proc/cmdline.c", "cmdline_proc_show"]],
         "mod_file_funcs" : [],
         "conf_mod_file_funcs" : []
     }
@@ -123,19 +123,19 @@ def test_check_header_file_included():
 
     extract(lp_name=lp, lp_filter=cs, no_patches=True, avoid_ext=[])
 
-    # Check that for file kernel/events/core.c there are externalized symbols, so the prototype
-    # of init/cleanup are created on header
-    # As net/ipv6/rpl.c there are no externalized symbols we expect that it's prototype isn't
-    # created on livepatch_header file
+    # Check that for file fs/proc/cmdline.c there are externalized symbols, so
+    # the prototype of init/cleanup are created on header
+    # As net/ipv6/rpl.c there are no externalized symbols we expect that it's
+    # prototype isn't created on livepatch_header file
     header = get_file_content(lp, cs, f"livepatch_{lp}.h")
-    assert "kernel_events_core_init(void);" in header
-    assert "kernel_events_core_cleanup(void);" in header
+    assert "fs_proc_cmdline_init(void)" in header
+    assert "fs_proc_cmdline_cleanup(void)" in header
     assert "net_ipv6_rpl" not in header
 
 
 def test_templ_cve_specified():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u19"
+    cs = "15.5u25"
 
     setup_args = {
         "lp_name" : lp,
@@ -211,7 +211,7 @@ def test_templ_micro_is_ibt():
     For IBT we don't need to use kallsyms, so the _init and _cleanup should be empty;
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u2"
+    cs = "6.0u11"
 
     setup_args = {
         "lp_name" : lp,
@@ -245,17 +245,17 @@ def test_templ_micro_is_ibt():
 
 def test_templ_ibt_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u2"
+    cs = "6.0u11"
 
     setup_args = {
         "lp_name" : lp,
         "lp_filter": cs,
         "no_check": True,
-        "archs" : utils.ARCHS,
+        "archs" : [utils.ARCH],
         "cve": None,
         "conf": "CONFIG_IPV6",
         "module" : "vmlinux",
-        "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]],
+        "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_addr_compress"]],
         "mod_file_funcs" : [],
         "conf_mod_file_funcs" : []
     }
@@ -292,7 +292,7 @@ def test_templ_kbuild_has_contents():
     Making sure that Kbuild.inc has the correct content
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u2"
+    cs = "6.0u11"
 
     setup_args = {
         "lp_name" : lp,

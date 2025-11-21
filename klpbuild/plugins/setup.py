@@ -168,7 +168,9 @@ def setup_project_files(lp_name, codestreams):
     utils.get_workdir(lp_name).mkdir(exist_ok=True)
 
     generate_commit_msg_file(lp_name)
-    logging.info("Checking files, symbols, modules...")
+
+    if codestreams:
+        logging.info("Checking files, symbols, modules...")
 
     # Setup the missing codestream info needed
     for cs in codestreams:
@@ -187,7 +189,7 @@ def setup_project_files(lp_name, codestreams):
 
             for arch in archs:
                 mod = cs.get_file_mod(f, arch)
-                __setup_check_mod(cs, mod)
+                __setup_check_mod(cs, mod, arch)
                 __setup_check_syms(cs, mod, syms, arch)
 
         if not len(cs.files):
@@ -202,6 +204,7 @@ def __setup_check_file(cs, file):
     if not cs.check_file_exists(file):
         raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}): File {file} not found.")
 
+    # Get the first affected arch
     ipa_f = cs.get_ipa_file(file)
     if not ipa_f.is_file():
         ipa_f.touch()
@@ -209,14 +212,14 @@ def __setup_check_file(cs, file):
                         cs.full_cs_name(), cs.kernel, ipa_f)
 
 
-def __setup_check_mod(cs, mod):
+def __setup_check_mod(cs, mod, arch):
     if mod in cs.modules:
         return
 
-    mod_path = cs.find_obj_path(utils.ARCH, mod)
+    mod_path = cs.find_obj_path(arch, mod)
 
     # Validate if the module being livepatched is supported or not
-    if utils.check_module_unsupported(utils.ARCH, mod_path):
+    if utils.check_module_unsupported(arch, mod_path):
         logging.warning("%s (%s): Module %s is not supported by SLE",
                         cs.full_cs_name(), cs.kernel, mod)
 
@@ -225,9 +228,9 @@ def __setup_check_mod(cs, mod):
 
 def __setup_check_syms(cs, mod, syms, arch):
     # Verify if the functions exist in the specified object
-    arch_syms = cs.check_symbol_archs(arch, mod, syms, False)
-    for arch, syms in arch_syms.items():
-        logging.warning("%s-%s (%s): Symbols %s not found on %s object",
-                        cs.full_cs_name(), arch, cs.kernel,
-                        ",".join(syms), mod)
+    arch_syms = cs.check_symbol_archs(arch, mod, syms, False, True)
+    if arch_syms:
+        for arch, syms in arch_syms.items():
+            logging.warning("%s-%s (%s): Symbols %s not found on %s object",
+                            cs.full_cs_name(), arch, cs.kernel, ",".join(syms), mod)
 

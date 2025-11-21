@@ -68,6 +68,8 @@ def get_cs_code(lp_name, working_cs):
     for cs in working_cs:
         cs_files.setdefault(cs.full_cs_name(), [])
 
+        arch = utils.preferred_arch([cs])
+
         for fpath in cs.get_lp_dir(lp_name).iterdir():
             fname = fpath.name
             with open(fpath.absolute(), "r+") as fi:
@@ -78,10 +80,12 @@ def get_cs_code(lp_name, working_cs):
                 src = re.sub(r'#include ".+compiler\-version\.h"\n', "", src)
                 # Since RT variants, there is now an definition for auto_type
                 src = src.replace(r"#define __auto_type int\n", "")
+                # Do not compare the klp-ccp comments
+                src = re.sub(r"klp-ccp: .+\.[hc]", "", src)
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f"{utils.get_datadir(utils.ARCH)}.+{fname}", "", src)
+                src = re.sub(f"{utils.get_datadir(arch)}.+{fname}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(r"\.lineno = \d+,", "", src)
@@ -266,6 +270,9 @@ def get_klpp_symbols(out_dir, lp_out):
                 logging.warning(f"Failed to find klpp_{sym} in {lp_out}")
                 continue
             klpp_proto = re.sub(r'\s+',' ', m.group(2)).strip() + ';'
+            # Remove the attributes left by klp-ccp, since they don't mean much
+            # for kernel modules
+            klpp_proto = re.sub(r' __(init|exit)', ' ', klpp_proto)
             klpp_syms.update({sym:klpp_proto})
 
             # Remove the 'static' keyword in the prototypes, if any
@@ -540,6 +547,13 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
         "-mharden-sls=all",
         "-fmin-function-alignment=16",
         "-Wno-dangling-pointer",
+        # s390x arguments
+        "-mbackchain",
+        "-mpacked-stack",
+        "-mindirect-branch-table",
+        "-mhotpatch=0,3",
+        "-march=z196",
+        "-mtune=z13",
     ]:
         cmd = cmd.replace(opt, "")
 
@@ -560,7 +574,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt() else "0"
     env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
     env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
-    env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.ARCH)/cs.get_mod(obj))
+    env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.preferred_arch([cs]))/cs.get_mod(obj))
     env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
     env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
     env["KCP_WORK_DIR"] = str(out_dir)
@@ -644,9 +658,6 @@ def process(lp_name, total, args, avoid_ext):
         with make_lock:
             cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
-    if " -pg " not in cmd:
-        logging.warning("%s:%s is not compiled with livepatch support (-pg flag)", cs.full_cs_name(), fname)
-
     args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
 
     # Detect and set ibt information. It will be used in the TemplateGen
@@ -711,6 +722,9 @@ def lp_out_cleanup(lp_out, sdir):
         file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
         file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
+        # Remove the attributes left by klp-ccp, since they don't mean much
+        # for kernel modules
+        file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
@@ -809,13 +823,12 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
                 obj_syms[obj].extend(syms)
 
         for obj, syms in obj_syms.items():
-            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True)
-            if missing:
-                for arch, arch_syms in missing.items():
-                    missing_syms.setdefault(arch, {})
-                    missing_syms[arch].setdefault(obj, {})
-                    missing_syms[arch][obj].setdefault(cs.full_cs_name(), [])
-                    missing_syms[arch][obj][cs.full_cs_name()].extend(arch_syms)
+            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
+            for arch, arch_syms in missing.items():
+                missing_syms.setdefault(arch, {})
+                missing_syms[arch].setdefault(obj, {})
+                missing_syms[arch][obj].setdefault(cs.full_cs_name(), [])
+                missing_syms[arch][obj][cs.full_cs_name()].extend(arch_syms)
 
     if missing_syms:
         with open(utils.get_workdir(lp_name)/"missing_syms", "w") as f:
@@ -823,3 +836,9 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
 
         logging.warning("Symbols not found:")
         logging.warning(json.dumps(missing_syms, indent=4))
+
+    pref_archs = utils.preferred_arch(working_cs)
+    if 'x86_64' not in pref_archs:
+        logging.warning("ATTENTION! The current livepatch doesn't affect x86_64. "
+                        "klp-ccp doesn't officially support other architectures "
+                        "besides x86, meaning that it can generate wrong code.")

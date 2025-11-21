@@ -451,7 +451,7 @@ def __preproc_slashes(text):
     return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
 
 def __generate_patched_conf(lp_name, cs):
-    render_vars = {"cs": cs, "check_enabled": __is_check_enabled()}
+    render_vars = {"cs": cs, "check_enabled": __is_check_enabled(cs)}
     with open(Path(cs.get_lp_dir(lp_name), "patched_funcs.csv"), "w") as f:
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
@@ -529,7 +529,7 @@ def __generate_header_file(lp_name, lp_path, cs):
                 proto_syms = {}
 
             render_vars.update({
-                "check_enabled": __is_check_enabled(),
+                "check_enabled": __is_check_enabled(cs),
                 "config": config,
                 "has_cleanup": has_cleanup,
                 "proto_syms": proto_syms,
@@ -547,7 +547,7 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
         cve = "XXXX-XXXX"
     user, email = get_mail()
     tvars = {
-        "check_enabled": __is_check_enabled(),
+        "check_enabled": __is_check_enabled(cs),
         "upstream": get_codestreams_data('upstream'),
         "config": "CONFIG_CHANGE_ME",
         "cve": cve,
@@ -630,10 +630,10 @@ def generate_livepatches(lp_name, cs):
     __create_kbuild(lp_name, cs)
 
 
-def __is_check_enabled():
+def __is_check_enabled(cs):
     # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
     # is not enabled on all architectures
-    return get_codestreams_data('archs') != ARCHS
+    return get_codestreams_data('archs') != cs.get_default_archs()
 
 
 def __create_kbuild(lp_name, cs):
