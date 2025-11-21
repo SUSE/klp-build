@@ -178,9 +178,11 @@ class Codestream:
         # RT is supported only on x86_64 at the moment
         if self.rt:
             return ["x86_64"]
+
         # MICRO 6.0 doesn't support ppc64le
-        elif self.is_micro:
+        if self.is_micro:
             return ["s390x", "x86_64"]
+
         # We support all architecture for all other codestreams
         return ["ppc64le", "s390x", "x86_64"]
 
