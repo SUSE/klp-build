@@ -87,6 +87,7 @@ def __fetch_kernel_branches():
                           "--quiet", "--atomic", "--force", "--tags"],
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
+                         check=False,
                          text=True)
     if ret.returncode:
         logging.info("Fetch failed\n%s", ret.stderr)
@@ -351,7 +352,7 @@ def __read_file(ref, file_path):
     ksrc_dir = get_user_path("kernel_src_dir")
 
     ret = subprocess.run(["git", "-C", ksrc_dir, "show",
-                          f"{ref}:{file_path}"],
+                          f"{ref}:{file_path}"], check=False,
                          capture_output=True, text=True)
     return ret.stdout
 
