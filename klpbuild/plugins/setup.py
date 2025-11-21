@@ -180,7 +180,7 @@ def setup_project_files(lp_name, codestreams):
             conf = fdata["conf"]
             archs = cs.configs[conf]
             syms = fdata["symbols"]
-            if not len(syms):
+            if not syms:
                 logging.warning("%s (%s): No symbols found for %s file."
                                 " Skipping.", cs.full_cs_name(), cs.kernel, f)
                 cs.files.pop(f)
@@ -193,7 +193,7 @@ def setup_project_files(lp_name, codestreams):
                 __setup_check_mod(cs, mod, arch)
                 __setup_check_syms(cs, mod, syms, arch)
 
-        if not len(cs.files):
+        if not cs.files:
             raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}):"
                                " No files eligible to be livepatched. Aborting.")
 
