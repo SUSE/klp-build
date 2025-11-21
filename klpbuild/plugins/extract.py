@@ -836,3 +836,9 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
 
         logging.warning("Symbols not found:")
         logging.warning(json.dumps(missing_syms, indent=4))
+
+    pref_archs = utils.preferred_arch(working_cs)
+    if 'x86_64' not in pref_archs:
+        logging.warning("ATTENTION! The current livepatch doesn't affect x86_64. "
+                        "klp-ccp doesn't officially support other architectures "
+                        "besides x86, meaning that it can generate wrong code.")
