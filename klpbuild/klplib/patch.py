@@ -129,7 +129,7 @@ def filter_unset_configs(cs_list):
         isset = [conf for conf, archs in cs.configs.items() if archs]
         if not isset:
             unset_cs.append(cs)
-            unset_conf += [conf for conf in cs.configs]
+            unset_conf += list(cs.configs)
 
     for cs in unset_cs:
         cs_list.remove(cs)

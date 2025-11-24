@@ -48,6 +48,7 @@ jobs:
         --fail-on subprocess-run-check
         --fail-on logging-fstring-interpolation
         --fail-on anomalous-backslash-in-string
+        --fail-on unnecessary-comprehension
       
     - name: Get month
       id: get-month
