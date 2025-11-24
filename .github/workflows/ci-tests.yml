@@ -51,6 +51,7 @@ jobs:
         --fail-on unnecessary-comprehension
         --fail-on consider-using-ternary
         --fail-on bare-except
+        --fail-on using-assignment-expression-in-unsupported-version
       
     - name: Get month
       id: get-month
