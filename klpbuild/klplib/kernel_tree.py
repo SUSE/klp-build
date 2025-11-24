@@ -114,7 +114,7 @@ def find_commit(subject, branch, skip=0):
         try:
             ret = subprocess.run(["git", "-C", kernel_tree, "log", "-n1",
                                   f"--grep=^{subject}",
-                                  f"--grep=-\s*{subject}",
+                                  rf"--grep=-\s*{subject}",
                                   "--pretty='%h'",
                                   f"--skip={skip}",
                                   f"remotes/origin/{branch}"],

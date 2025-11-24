@@ -47,6 +47,7 @@ jobs:
         --fail-on ungrouped-imports
         --fail-on subprocess-run-check
         --fail-on logging-fstring-interpolation
+        --fail-on anomalous-backslash-in-string
       
     - name: Get month
       id: get-month
