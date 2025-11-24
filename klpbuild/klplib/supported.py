@@ -22,6 +22,7 @@ __supported_codestreams_cache = []
 __supported_codestreams_fetched = False
 __supported_codestreams_lock = Lock()
 
+
 def get_supported_codestreams():
     """
     Download and parse the list of supported codestreams in a thread-safe way.
@@ -29,9 +30,6 @@ def get_supported_codestreams():
     Returns:
         list[Codestream]: A list of supported codestreams.
     """
-    global __supported_codestreams_cache
-    global __supported_codestreams_fetched
-    global __supported_codestreams_lock
 
     # (Non-blocking read) Return cached list if present.
     if __supported_codestreams_fetched:

@@ -27,7 +27,7 @@ jobs:
     - name: Run pylint
       run: >
         tox -e lint --
-        --fail-under 9.81
+        --fail-under 9.85
         --fail-on F
         --fail-on unused-variable
         --fail-on unused-import
@@ -52,6 +52,7 @@ jobs:
         --fail-on consider-using-ternary
         --fail-on bare-except
         --fail-on using-assignment-expression-in-unsupported-version
+        --fail-on global-variable-not-assigned
       
     - name: Get month
       id: get-month

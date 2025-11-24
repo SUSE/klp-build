@@ -109,8 +109,6 @@ def get_bug_dep(bug):
     precalculated list of all the dependencies for all bugs.
     If that fails, it fetches the dependency from bugzilla.
     """
-    global __dep_bugs
-
     # XXX: Support returning more than one dependency?
 
     d = bug.depends_on
