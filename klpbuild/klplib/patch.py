@@ -5,6 +5,7 @@
 
 import logging
 
+from pathlib import PurePosixPath
 from collections import defaultdict
 
 from klpbuild.klplib import utils
@@ -162,7 +163,11 @@ def analyse_kmodules(cs_list):
                            cs.configs[conf].items()]:
                 continue
 
-            supported = cs.is_module_supported(mod)
+            supported, blacklisted = cs.is_module_supported(mod)
+            if blacklisted:
+                logging.warning("%s: Module '%s' is not supported by klp-build.",
+                                cs.full_cs_name(), PurePosixPath(mod).name)
+
             cs.modules[mod] = supported
             key = f"{mod}:{supported}"
             if cs not in report[key]:
