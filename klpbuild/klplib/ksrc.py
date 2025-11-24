@@ -367,7 +367,8 @@ def ksrc_is_module_supported(module, kernel):
         kernel (sr): Kernel version.
 
     returns:
-        Return True if supported. False otherwise.
+        Return True if supported and False otherwise.
+        Return True if blacklisted and False otherwise.
         """
     UNSUPPORTED_MARKERS = {
         "-",
@@ -382,10 +383,12 @@ def ksrc_is_module_supported(module, kernel):
     mpath = module
     prev = ""
     idx = 1
+    blacklisted = False
+    supported = True
 
     out = ksrc_read_rpm_file(kernel, "supported.conf").splitlines()
     if not out:
-        return False
+        return False, False
 
     # Try the following path combinations to see if it matches with
     # any rule in the supported.conf:
@@ -394,7 +397,7 @@ def ksrc_is_module_supported(module, kernel):
     #   my/kernel/*
     #   my/*
     while mpath != prev:
-        r = re.compile(rf"^([-+]!?\w*)?\s+{mpath}(?:\s+#.*)?$")
+        r = re.compile(rf"^([-+]!?[\w\-]*)?\s+{mpath}(?:\s+#.*)?$")
         matches = [m for line in out if (m := r.match(line))]
 
         # Try more generic path if we don't match
@@ -411,15 +414,19 @@ def ksrc_is_module_supported(module, kernel):
 
         # Line has matched but there's no marker -> module is supported
         if not markers:
-            return True
+            break
+
+        # Blacklisted, but supported for livepatching.
+        if re.match(r"\+.*-kmp", markers[0]):
+            blacklisted = True
 
         # Check if any marker belongs to UNSUPPORTED_MARKERS
-        if markers[0] in UNSUPPORTED_MARKERS:
-            return False
+        elif markers[0] in UNSUPPORTED_MARKERS:
+            supported = False
 
-        if markers[0] in SUPPORTED_MARKERS:
-            return True
+        elif markers[0] not in SUPPORTED_MARKERS:
+            raise RuntimeError(f"ERROR: {mpath} marker {marker} in {kernel}:supported.conf is not known!")
 
-        raise RuntimeError(f"ERROR: {mpath} marker {marker} in {kernel}:supported.conf is not known!")
+        break
 
-    return True
+    return supported, blacklisted

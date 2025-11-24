@@ -35,25 +35,36 @@ def test_get_patch_subject():
 def test_is_module_supported():
     mod = "drivers/net/wireless/ath/ath12k/ath12k"
     # Expected: "- drivers/net/wireless/ath/ath12k/ath12k"
-    assert not ksrc_is_module_supported(mod, "6.4.0-20")
+    supported, _ = ksrc_is_module_supported(mod, "6.4.0-20")
+    assert not supported
     # Expected: "- drivers/net/wireless/*"
-    assert not ksrc_is_module_supported(mod, "4.12.14-122.255")
+    supported, _ = ksrc_is_module_supported(mod, "4.12.14-122.255")
+    assert not supported
 
     mod = "drivers/net/wireless/intersil/prism54/prism54"
     # Expected: "-! drivers/net/wireless/intersil/prism54/prism54"
-    assert not ksrc_is_module_supported(mod, "5.14.21-150400.24.144")
+    supported, _ = ksrc_is_module_supported(mod, "5.14.21-150400.24.144")
+    assert not supported
 
     mod = "drivers/net/wireless/mac80211_hwsim"
     # Expected: "  drivers/net/wireless/mac80211_hwsim"
-    assert ksrc_is_module_supported(mod, "5.14.21-150400.24.144")
+    supported, filtered = ksrc_is_module_supported(mod, "5.14.21-150400.24.144")
+    assert supported and not filtered
 
     mod = "net/tipc/tipc"
     # Expected: "+external	net/tipc/tipc"
-    assert not ksrc_is_module_supported(mod, "6.4.0-150600.23.65")
+    supported, _ = ksrc_is_module_supported(mod, "6.4.0-150600.23.65")
+    assert not supported
 
     mod = "net/netfilter/ipset/ip_set_bitmap_ip"
     # Expected: "+base	net/netfilter/ipset/ip_set_bitmap_ip    # ipset: IP bitmap"
-    assert ksrc_is_module_supported(mod, "6.4.0-10")
+    supported, filtered = ksrc_is_module_supported(mod, "6.4.0-10")
+    assert supported and not filtered
+
+    mod = "fs/gfs2/gfs2"
+    # Expected: "+fs/gfs2/gfs2-kmp"
+    supported, filtered = ksrc_is_module_supported(mod, "6.12.0-160000.5")
+    assert supported and filtered
 
 
 def test_get_rt_patches():
