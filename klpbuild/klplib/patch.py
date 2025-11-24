@@ -4,6 +4,7 @@
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
 import logging
+import os
 
 from pathlib import PurePosixPath
 from collections import defaultdict
