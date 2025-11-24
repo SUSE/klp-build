@@ -6,9 +6,9 @@ import logging
 import pytest
 
 from klpbuild.plugins.setup import setup, setup_manual
-from tests.utils import get_codestreams_file
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib import utils
+from tests.utils import get_codestreams_file
 
 CS = "15.5u23"
 DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_TUN", "no_check": True}

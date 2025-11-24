@@ -267,13 +267,13 @@ def get_klpp_symbols(out_dir, lp_out):
             # Search and save the function prototype for later use
             m = regex.search(lp_code)
             if not m:
-                logging.warning(f"Failed to find klpp_{sym} in {lp_out}")
+                logging.warning("Failed to find klpp_%s in %s", sym, lp_out)
                 continue
-            klpp_proto = re.sub(r'\s+',' ', m.group(2)).strip() + ';'
+            klpp_proto = re.sub(r'\s+', ' ', m.group(2)).strip() + ';'
             # Remove the attributes left by klp-ccp, since they don't mean much
             # for kernel modules
             klpp_proto = re.sub(r' __(init|exit)', ' ', klpp_proto)
-            klpp_syms.update({sym:klpp_proto})
+            klpp_syms.update({sym: klpp_proto})
 
             # Remove the 'static' keyword in the prototypes, if any
             lp_code = regex.sub(r'\2', lp_code)
@@ -496,10 +496,10 @@ def apply_all_patches(lp_name, cs):
 
     for pdir in patch_dirs:
         if not pdir.exists():
-            logging.debug(f"Patches dir {pdir} doesnt exists")
+            logging.debug("Patches dir %s doesnt exists", pdir)
             continue
 
-        logging.debug(f"Applying patches on {cs.full_cs_name()}({cs.kernel}) from {pdir}")
+        logging.debug("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, pdir)
 
         for patch in sorted(pdir.iterdir(), reverse=True):
             if not str(patch).endswith(".patch"):

@@ -114,7 +114,7 @@ def find_commit(subject, branch, skip=0):
         try:
             ret = subprocess.run(["git", "-C", kernel_tree, "log", "-n1",
                                   f"--grep=^{subject}",
-                                  f"--grep=-\s*{subject}",
+                                  rf"--grep=-\s*{subject}",
                                   "--pretty='%h'",
                                   f"--skip={skip}",
                                   f"remotes/origin/{branch}"],
@@ -122,12 +122,10 @@ def find_commit(subject, branch, skip=0):
                                  text=True, timeout=1)
             return ret.stdout.replace("'","").strip()
         except subprocess.TimeoutExpired:
-            """
-            Sometimes the subject doesn't match due to unexpected line breaks in
-            the commit's subject.
-            Unfortunatly, git-log cannot grep more than one line at a time, so
-            as workaround we have to trim long subjects and re-try.
-            """
+            # Sometimes the subject doesn't match due to unexpected line breaks in
+            # the commit's subject.
+            # Unfortunatly, git-log cannot grep more than one line at a time, so
+            # as workaround we have to trim long subjects and re-try.
             if len(subject) <= 40:
                 break
             # Cut off the last two words of the subject.

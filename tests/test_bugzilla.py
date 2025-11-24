@@ -4,7 +4,8 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from klpbuild.klplib.bugzilla import (get_bug, get_bug_title, get_pending_bugs,
-                                      get_bug_data, get_bug_dep, get_bug_desc)
+                                      get_bug_data, get_bug_desc)
+
 
 def test_get_pending_bugs():
     bugs = get_pending_bugs()

@@ -4,8 +4,6 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
 import logging
-import re
-import sys
 import concurrent.futures
 import tabulate
 
@@ -18,31 +16,33 @@ from klpbuild.klplib.bugzilla import get_pending_bugs, get_bug_data, is_bug_drop
 
 PLUGIN_CMD = "scan"
 
+
 def register_argparser(subparser):
-    scan = subparser.add_parser(PLUGIN_CMD)
-    scan.add_argument(
+    args = subparser.add_parser(PLUGIN_CMD)
+    args.add_argument(
         "--cve",
         required=False,
         help="Shows which codestreams are vulnerable to the CVE"
     )
-    scan.add_argument(
+    args.add_argument(
         "--conf",
         required=False,
         help="Helps to check only the codestreams that have this config set."
     )
-    scan.add_argument(
+    args.add_argument(
         "--download",
         required=False,
         action="store_true",
         help="SLE specific. Download missing codestreams data"
     )
 
+
 def run(cve, conf, lp_filter, download):
     if not cve:
         scan_bugzilla()
         return
 
-    return scan(cve, conf, lp_filter, download)
+    scan(cve, conf, lp_filter, download)
 
 
 def scan_bugzilla():
@@ -106,9 +106,12 @@ def scan_job(bug, cve):
     return status, affected_archs, affected
 
 
-def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
+def scan(cve, conf, lp_filter, download, archs=None, savedir=None):
 
     assert cve and utils.is_cve_valid(cve)
+
+    if not archs:
+        archs = utils.ARCHS
 
     upstream, patches = get_patches(cve, savedir)
 
@@ -174,7 +177,7 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None):
         working_cs = tmp_working_cs
 
     if unsupported:
-        logging.info(f"Skipping codestreams with unsupported kernel modules:")
+        logging.info("Skipping codestreams with unsupported kernel modules:")
         logging.info("\t%s", utils.classify_codestreams_str(unsupported))
 
     if conf_not_set:

@@ -86,7 +86,6 @@ def _find_config(cs, base_dir, relative_obj_path, deep):
 def find_configs_for_files(cs, file_paths: list):
 
     configs = {}
-    build_ins = []
     missing = []
 
     if not file_paths:

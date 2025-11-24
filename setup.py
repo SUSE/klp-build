@@ -14,7 +14,7 @@ setuptools.setup(
     url="https://gitlab.suse.de/live-patching/klp-build",
     packages=setuptools.find_packages(exclude=["tests"]),
     package_data={"scripts": ["run-kgr-test.sh", "config-merge"]},
-    python_requires=">=3.6",
+    python_requires=">=3.11",
     classifiers=[
         "Programming Language :: Python :: 3",
         "Intended Audience :: Developers",

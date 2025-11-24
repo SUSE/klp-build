@@ -81,9 +81,8 @@ def delete_lp_branches(branches):
                              stdout=subprocess.DEVNULL,
                              stderr=subprocess.PIPE,
                              text=True, check=False)
-        if err.stderr and not "used by worktree" in str(err.stderr):
-            logging.warning(f"Failed to delete branch: {bname}: {err.stderr}")
-
+        if "used by worktree" not in str(err.stderr):
+            logging.warning("Failed to delete branch: %s: %s", bname, err.stderr)
 
 
 def create_lp_branch(branch, base="origin/master-livepatch"):

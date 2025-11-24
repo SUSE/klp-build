@@ -4,11 +4,9 @@
 # Authors: Fernando Gonzalez
 #          Marcos Paulo de Souza <mpdesouza@suse.com>
 
-import bugzilla
-import time
-import re
-
 from functools import wraps
+import time
+import bugzilla
 
 from klpbuild.klplib.utils import is_cve_valid
 from klpbuild.klplib.config import get_user_settings

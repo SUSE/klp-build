@@ -10,17 +10,14 @@ import shutil
 import subprocess
 import sys
 import time
-import re
 
 from osctiny import Osc
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import get_codestreams_list
-from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ibs import convert_cs_to_prj, delete_project, prj_prefix
 from klpbuild.klplib.utils import (classify_codestreams_str, filter_codestreams,
-                                   get_cs_branch, get_workdir,
-                                   unclassify_codestreams)
+                                   get_cs_branch)
 from klpbuild.plugins.status import status
 from klpbuild.plugins.commit import commit
 from klpbuild.klplib.kgraft import (create_lp_branch, fetch_branch,
@@ -171,7 +168,7 @@ def push(lp_name, lp_filter, wait=False):
 
         # One more status after everything finished, since we remove
         # finished builds on each iteration
-        exit(status(lp_name, lp_filter, False))
+        sys.exit(status(lp_name, lp_filter, False))
 
 
 def run(lp_name, lp_filter, wait=False):

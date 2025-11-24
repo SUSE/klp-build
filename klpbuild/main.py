@@ -26,7 +26,7 @@ def main():
     if not args.cmd:
         print("Missing required command.")
         parser.print_help()
-        exit(1)
+        sys.exit(1)
 
     try_run_plugin(args.cmd, args)
 

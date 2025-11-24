@@ -7,9 +7,11 @@ from pathlib import Path
 import copy
 import logging
 import re
-import requests
 
 from multiprocessing import Lock
+
+import requests
+
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestream import Codestream
 

@@ -4,16 +4,11 @@
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
 import logging
-import subprocess
-import os
 import shutil
-import re
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.utils import (filter_codestreams,
-                                   get_workdir,
                                    get_lp_groups)
 from klpbuild.klplib.kgraft import (find_lp_branches,
                                     delete_lp_branches,
@@ -23,6 +18,7 @@ from klpbuild.klplib.kgraft import (find_lp_branches,
                                     init_kgraft)
 
 PLUGIN_CMD = "commit"
+
 
 def register_argparser(subparser):
     fmt = subparser.add_parser(
@@ -41,7 +37,7 @@ def commit(lp_name, codestreams, force):
     branches = find_lp_branches(f"{lp_name}_*")
     if branches and not force:
         branches_str = '\n\t' + '\n\t'.join(branches)
-        logging.info(f"Found already commited livepatches:{branches_str}")
+        logging.info("Found already commited livepatches: %s", branches_str)
         return
 
     logging.info("Commiting livepatch to kgraft...")
@@ -56,12 +52,11 @@ def commit(lp_name, codestreams, force):
         code_path = cs_list[0].get_lp_dir(lp_name)
         shutil.copytree(code_path, f"{get_kgraft()}/{lp_name}", dirs_exist_ok=True)
         commit_lp_changes(lp_name)
-        logging.info(f"Livepatch '{branch}' commited")
-
+        logging.info("Livepatch '%s' commited", branch)
 
 
 def run(lp_name, lp_filter, force):
-    supported_codestreams =  get_supported_codestreams()
+    supported_codestreams = get_supported_codestreams()
     filtered_codestreams = filter_codestreams(lp_filter, supported_codestreams)
 
     commit(lp_name, filtered_codestreams, force)
