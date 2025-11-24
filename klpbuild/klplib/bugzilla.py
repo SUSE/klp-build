@@ -94,8 +94,8 @@ def get_bug_comments(bug):
     while i < 5:
         try:
             return bug.getcomments()
-        except:
-           # There's a max number of allowed simultaneous requests...
+        except bugzilla.BugzillaError:
+            # There's a max number of allowed simultaneous requests...
             time.sleep(5)
             i += 1
 
