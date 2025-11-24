@@ -437,7 +437,7 @@ def get_multi_funcs(cs, lp_name):
 
         fname = get_fname(cs.lp_out_file(lp_name, file))
         mod = cs.get_file_mod(file)
-        cln = is_mod(mod) and f"\t{fname}_cleanup();\n" or ''
+        cln = f"\t{fname}_cleanup();\n" if is_mod(mod) else ''
         init = f"\tret = {fname}_init();\n\tif (ret)\n\t\treturn ret;\n"
 
         inits.append(init)
@@ -450,10 +450,12 @@ def __preproc_slashes(text):
     txt = r"<%! BS='\\' %>" + text.replace("\\", "${BS}")
     return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
 
+
 def __generate_patched_conf(lp_name, cs):
     render_vars = {"cs": cs, "check_enabled": __is_check_enabled(cs)}
     with open(Path(cs.get_lp_dir(lp_name), "patched_funcs.csv"), "w") as f:
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
+
 
 def __generate_klpp_header(cs):
     '''
@@ -477,9 +479,10 @@ def __generate_klpp_header(cs):
             structs.update(m)
 
     funcs.sort()
-    structs = structs and ';\n'.join(sorted(structs)) + ';\n\n' or ''
+    structs = ';\n'.join(sorted(structs)) + ';\n\n' if structs else ''
 
     return structs + '\n'.join(funcs)
+
 
 def __generate_header_file(lp_name, lp_path, cs):
     out_name = f"livepatch_{lp_name}.h"
