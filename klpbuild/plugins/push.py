@@ -58,7 +58,7 @@ def create_push_branch(cs, lp_branch):
         fetch_branch(product_branch)
         create_lp_branch(push_branch, lp_branch)
         rebase_lp_branch(push_branch, product_branch)
-    except:
+    except subprocess.CalledProcessError:
         # Fallback in case the push_branch cannot be successfully created.
         # Not meant for building final livepatches.
         logging.warning("Failed to create branch '%s'. Using instead '%s'.",

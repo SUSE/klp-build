@@ -35,7 +35,6 @@ def init_kgraft():
 
 
 def get_kgraft():
-    global __kgr_path
     return __kgr_path
 
 

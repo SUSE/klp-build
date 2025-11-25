@@ -94,8 +94,8 @@ def get_bug_comments(bug):
     while i < 5:
         try:
             return bug.getcomments()
-        except:
-           # There's a max number of allowed simultaneous requests...
+        except bugzilla.BugzillaError:
+            # There's a max number of allowed simultaneous requests...
             time.sleep(5)
             i += 1
 
@@ -109,8 +109,6 @@ def get_bug_dep(bug):
     precalculated list of all the dependencies for all bugs.
     If that fails, it fetches the dependency from bugzilla.
     """
-    global __dep_bugs
-
     # XXX: Support returning more than one dependency?
 
     d = bug.depends_on

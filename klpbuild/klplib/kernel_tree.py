@@ -32,7 +32,6 @@ def __check_kernel_tags_are_fetched(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         global __kernel_tags_are_fetched
-        global __kernel_fetch_lock
 
         with __kernel_fetch_lock:
             if not __kernel_tags_are_fetched:
