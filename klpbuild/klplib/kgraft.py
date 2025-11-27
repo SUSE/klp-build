@@ -80,7 +80,7 @@ def delete_lp_branches(branches):
                              stdout=subprocess.DEVNULL,
                              stderr=subprocess.PIPE,
                              text=True, check=False)
-        if "used by worktree" not in str(err.stderr):
+        if err.stderr:
             logging.warning("Failed to delete branch: %s: %s", bname, err.stderr)
 
 
