@@ -211,6 +211,40 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         return ret
 
 
+def fix_ext_symbols(cs, lp_dat, lp_out):
+    '''
+    Fix klp-ccp mistakes on non-ibt livepatches:
+        - Drop any duplicated externalized symbol declaration generated
+          by klp-ccp. This is a workaround for:
+          https://github.com/SUSE/klp-ccp/issues/13
+        - Refactor percpu externalized symbols declaration. Default one
+          crashes at runtime.
+    '''
+
+    # Only happens with non-ibt codestreams for now
+    if cs.needs_ibt():
+        return lp_out
+
+    for sym_list in lp_dat["ext_symbols"].values():
+        for s in sym_list:
+            # Keep only static declarations
+            lp_out = re.sub(rf"^(?!static|\s|#).*\s+\(\*klpe_{s}\)[\s\S]*?;",
+                            '', lp_out, flags=re.MULTILINE)
+
+
+    # From:
+    # - static __attribute__((section(".data..percpu" ""))) __typeof__(int)
+    #   (*klpe_example);
+    # To:
+    # + static int __percpu (*klpe_example);
+    lp_out = re.sub(r'^static __attribute__\(\(section\(".data..percpu" '
+                    r'""\)\)\).*__typeof__\((.*)\) (.*)$',
+                    r'static \1 __percpu \2', lp_out,
+                    flags=re.MULTILINE)
+
+    return lp_out
+
+
 def get_ext_symbols(out_dir):
     # Generate the list of exported symbols
     exts = []
@@ -702,10 +736,10 @@ def process(lp_name, total, args, avoid_ext):
     cs.files[fname]["ext_symbols"] = get_ext_symbols(out_dir)
     cs.files[fname]["klpp_symbols"] = get_klpp_symbols(out_dir, lp_out)
 
-    lp_out_cleanup(lp_out, sdir)
+    lp_out_cleanup(cs, cs.files[fname], lp_out, sdir)
 
 
-def lp_out_cleanup(lp_out, sdir):
+def lp_out_cleanup(cs, lp_dat, lp_out, sdir):
     """
     Open the file, read, seek to the beginning, write the new data, and
     then truncate (which will use the current position in file as the
@@ -713,6 +747,9 @@ def lp_out_cleanup(lp_out, sdir):
     - Remove the local path prefix of the klp-ccp generated comments.
     - Remove #includes with local path prefix. Leftovers headers from klp-ccp.
     - Remove unsupported macro definitions.
+    - Remove the attributes left by klp-ccp, since they don't mean much for
+      kernel modules.
+    - Fix externalized symbols declaration.
     - Remove big chunks of empty lines.
     """
     macros = '|'.join(UNSUPPORTED_MACROS)
@@ -722,9 +759,8 @@ def lp_out_cleanup(lp_out, sdir):
         file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
         file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
-        # Remove the attributes left by klp-ccp, since they don't mean much
-        # for kernel modules
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
+        file_buf = fix_ext_symbols(cs, lp_dat, file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
