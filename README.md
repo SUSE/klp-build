@@ -77,7 +77,7 @@ klp-build uses subcommands to handle different stages of the livepatch lifecycle
 
 * **setup**: Initialize a new livepatch project, identifying vulnerable codestreams and setting up the environment.
 * **extract**: Extract affected functions using [klp-ccp](https://github.com/SUSE/klp-ccp).
-* **push**: Submit the livepatch project to the Integrated Build Service (IBS) for remote building and publication.
+* **push**: Submit the livepatch project to the Internal Build Service (IBS) for remote building and publication.
 * **format-patches**: Export the generated livepatches as git patches.
 
 ## **Workflow Examples**
@@ -135,7 +135,7 @@ klp-build logs --name bsc112234 --filter "15.5u34" --arch s390x
 
 ### **4\. Exporting**
 
-Extract generated livepatches as git patches from the kgraft-patches repository.
+Export generated livepatches as git patches from the kgraft-patches repository.
 ```
 klp-build format-patches --name bsc112234 -v1
 ```
