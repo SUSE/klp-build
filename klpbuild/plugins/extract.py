@@ -211,6 +211,42 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         return ret
 
 
+def get_missing_ext_symbols(working_cs):
+    '''
+    Find the symbols that were not externalized and report those that
+    can be unexternalized.
+    '''
+    missing_syms = OrderedDict()
+    unext_syms = set()
+
+    # Iterate over each codestream, getting each file processed, and all
+    # externalized symbols of this file
+    for cs in working_cs:
+        # Map all symbols related to each obj, to make it check the symbols
+        # only once per object
+        obj_syms = {}
+        for fdata in cs.files.values():
+            for obj, syms in fdata["ext_symbols"].items():
+                obj_syms.setdefault(obj, [])
+                obj_syms[obj].extend(syms)
+
+        for obj, syms in obj_syms.items():
+            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
+            for arch, arch_syms in missing.items():
+                blacklisted = re.findall(r"((?:__SCT__|__traceiter)\w+)",
+                                         ' '.join(arch_syms))
+                whitelisted = set(blacklisted) ^ set(arch_syms)
+                if whitelisted:
+                    unext_syms.update(whitelisted)
+                if blacklisted:
+                    missing_syms.setdefault(arch, {})
+                    missing_syms[arch].setdefault(obj, {})
+                    missing_syms[arch][obj].setdefault(cs.full_cs_name(), [])
+                    missing_syms[arch][obj][cs.full_cs_name()].extend(blacklisted)
+
+    return missing_syms, unext_syms
+
+
 def fix_ext_symbols(cs, lp_dat, lp_out):
     '''
     Fix klp-ccp mistakes on non-ibt livepatches:
@@ -821,13 +857,12 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
     # Save the ext_symbols set by execute
     store_codestreams(lp_name, working_cs)
 
-    # TODO: change the templates so we generate a similar code than we
-    # already do for SUSE livepatches
     # Create the livepatches per codestream
     for cs in working_cs:
         generate_livepatches(lp_name, cs)
-
-    group_equal_files(lp_name, working_cs)
+        # Cleanup patches after the LPs were created if they were applied
+        if not no_patches:
+            remove_patches(lp_name, cs)
 
     logging.info("\nChecking duplicated symbols...")
 
@@ -841,40 +876,26 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
 
     logging.info("\nChecking the externalized symbols in other architectures...")
 
-    missing_syms = OrderedDict()
+    missing, unext = get_missing_ext_symbols(working_cs)
+    if unext:
+        logging.info("\nUnexternalyzing symbols:\n%s\n", ', '.join(unext))
+        start_extract(lp_name, lp_filter, no_patches,
+                      avoid_ext + list(unext))
+        sys.exit(0)
 
-    # Iterate over each codestream, getting each file processed, and all
-    # externalized symbols of this file
-    for cs in working_cs:
-        # Cleanup patches after the LPs were created if they were applied
-        if not no_patches:
-            remove_patches(lp_name, cs)
-
-        # Map all symbols related to each obj, to make it check the symbols
-        # only once per object
-        obj_syms = {}
-        for f, fdata in cs.files.items():
-            for obj, syms in fdata["ext_symbols"].items():
-                obj_syms.setdefault(obj, [])
-                obj_syms[obj].extend(syms)
-
-        for obj, syms in obj_syms.items():
-            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
-            for arch, arch_syms in missing.items():
-                missing_syms.setdefault(arch, {})
-                missing_syms[arch].setdefault(obj, {})
-                missing_syms[arch][obj].setdefault(cs.full_cs_name(), [])
-                missing_syms[arch][obj][cs.full_cs_name()].extend(arch_syms)
-
-    if missing_syms:
+    if missing:
         with open(utils.get_workdir(lp_name)/"missing_syms", "w") as f:
-            f.write(json.dumps(missing_syms, indent=4))
+            f.write(json.dumps(missing, indent=4))
 
         logging.warning("Symbols not found:")
-        logging.warning(json.dumps(missing_syms, indent=4))
+        logging.warning(json.dumps(missing, indent=4))
+
+    group_equal_files(lp_name, working_cs)
 
     pref_archs = utils.preferred_arch(working_cs)
     if 'x86_64' not in pref_archs:
         logging.warning("ATTENTION! The current livepatch doesn't affect x86_64. "
                         "klp-ccp doesn't officially support other architectures "
                         "besides x86, meaning that it can generate wrong code.")
+
+    logging.info("\nDone. Extract finished.")
