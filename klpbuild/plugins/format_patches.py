@@ -104,7 +104,7 @@ def update_cover_letter(patches_dir, lp_name):
         letter = f.read()
 
     subject = f"livepatch CVE-{cve} {bsc}"
-    letter = re.sub(r"\*{3} SUBJECT HERE.*", subject, letter)
+    letter = re.sub(r"\*{3}\s+SUBJECT\s+HERE\s+\*{3}", subject, letter)
 
     archs = ', '.join(get_codestreams_data('archs'))
     cs_patched  = utils.classify_codestreams_str(cs_patched)
