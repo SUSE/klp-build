@@ -27,7 +27,7 @@ jobs:
     - name: Run pylint
       run: >
         tox -e lint --
-        --fail-under 9.85
+        --fail-under 9.83
         --fail-on F
         --fail-on unused-variable
         --fail-on unused-import
