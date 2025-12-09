@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza
 
 import inspect
+import pytest
 
 from klpbuild.klplib import utils
 from klpbuild.plugins.extract import extract
@@ -96,6 +97,42 @@ def test_templ_without_externalized_vars():
     assert "_cleanup(void);" not in header
     assert "_cleanup(void) {}" in header
     assert "IS_ENABLED" not in header
+
+
+# Check that IS_ENABLED macro is set only when the affected architectures of a
+# CVE is not all architectures supported by the given codestream.
+def test_is_enabled_only_on_cs_arcs():
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "6.0u5"
+
+    setup_args = {
+        "lp_name": lp,
+        "lp_filter": cs,
+        "no_check": True,
+        "archs": utils.ARCHS,
+        "cve": None,
+        "conf": "CONFIG_IPV6",
+        "module": "vmlinux",
+        "file_funcs": [
+            ["net/ipv6/ip6_fib.c", "fib6_del_route", "fib6_add_rt2node"],
+            ["net/ipv6/route.c", "rt6_nlmsg_size"],
+        ],
+        "mod_file_funcs": [],
+        "conf_mod_file_funcs": [],
+    }
+    setup(**setup_args)
+
+    with pytest.raises(SystemExit):
+        extract(lp_name=lp, lp_filter=cs, no_patches=True, avoid_ext=[])
+
+    for src in [
+        "bsc_test_is_enabled_only_on_cs_arcs_net_ipv6_ip6_fib.c",
+        "bsc_test_is_enabled_only_on_cs_arcs_net_ipv6_route.c",
+    ]:
+        content = get_file_content(lp, cs, src)
+        # The given CVE affects all archs in all codestreams, meaning that IS_ENABLED
+        # should not be set.
+        assert "#if IS_ENABLED" not in content
 
 
 # For multifile patches, a third file will be generated and called
