@@ -175,6 +175,8 @@ def setup_project_files(lp_name, codestreams):
 
     # Setup the missing codestream info needed
     for cs in codestreams:
+        syms_to_be_checked = {}
+
         # Check if the files and symbols exist in the respective codestream directories
         for f, fdata in cs.files.copy().items():
             conf = fdata["conf"]
@@ -191,7 +193,20 @@ def setup_project_files(lp_name, codestreams):
             for arch in archs:
                 mod = cs.get_file_mod(f, arch)
                 __setup_check_mod(cs, mod, arch)
-                __setup_check_syms(cs, mod, syms, arch)
+
+            # append the current symbols and module to anuy previously set ones
+            mod_info = syms_to_be_checked.get(mod, {})
+            syms_to_be_checked[mod] = {
+                "syms": mod_info.get("syms", []) + syms,
+                "archs": mod_info.get("archs", []) + list(archs.keys()),
+            }
+
+        # Just call the symbol check once per module
+        # The set calls are necessary because we can have duplicated entries
+        # like the arch for different files.
+        for mod, mod_info in syms_to_be_checked.items():
+            for arch in set(mod_info["archs"]):
+                __setup_check_syms(cs, mod, set(mod_info["syms"]), arch)
 
         if not cs.files:
             raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}):"
