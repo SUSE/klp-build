@@ -205,8 +205,7 @@ def setup_project_files(lp_name, codestreams):
         # The set calls are necessary because we can have duplicated entries
         # like the arch for different files.
         for mod, mod_info in syms_to_be_checked.items():
-            for arch in set(mod_info["archs"]):
-                __setup_check_syms(cs, mod, set(mod_info["syms"]), arch)
+            __symbol_check(cs, mod, set(mod_info["syms"]), set(mod_info["archs"]))
 
         if not cs.files:
             raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}):"
@@ -242,9 +241,39 @@ def __setup_check_mod(cs, mod, arch):
     cs.modules[mod] = str(mod_path)
 
 
-def __setup_check_syms(cs, mod, syms, arch):
-    # Verify if the functions exist in the specified object
-    arch_syms = cs.check_symbol_archs(arch, mod, syms, False, True)
-    for larch, lsyms in arch_syms.items():
-        logging.warning("%s-%s (%s): Symbols %s not found on %s object",
-                        cs.full_cs_name(), larch, cs.kernel, ",".join(lsyms), mod)
+def __symbol_check(cs, mod, syms, archs):
+    """
+    Check if a given symbol is inlined on all architectures. If yes, it means
+    that the klp-ccp can figure it our the callers, and automatically bring
+    them to the livepatch. Otherwise, it can mean that a given symbol had
+    different inlining decisions on different architectures, which is why a
+    warning is shown.
+    """
+
+    mod_syms = {}
+    for arch in archs:
+        # Verify if the functions exist in the specified object
+        mod_syms.update(cs.check_symbol_archs(arch, mod, syms, False, True))
+
+    # Reverse the dict, checking in which architectures are the symbol is not
+    # present. It it's not found on all architectures, it can mean that it's
+    # inline in all of them, so it's mostly harmless, since klp-ccp can handle
+    # it.
+    sym_archs = {}
+    for larch, lsyms in mod_syms.items():
+        for sym in lsyms:
+            sym_archs.setdefault(sym, [])
+            sym_archs[sym].append(larch)
+
+    for sym, larchs in sym_archs.items():
+        # The missing symbol can be a problem is it's missing on some
+        # architectures and present in others.
+        if set(larchs) != cs.archs:
+            logging.warning(
+                "%s-%s (%s): Symbols %s not found on %s object",
+                cs.full_cs_name(),
+                str(larchs),
+                cs.kernel,
+                sym,
+                mod,
+            )

@@ -95,7 +95,8 @@ def test_invalid_sym(caplog):
         }
         setup(**setup_args)
 
-    assert "Symbols tun_chr_ioctll not found on tun" in caplog.text
+    # As the symbol is not found on any arch, don't print any message
+    assert "Symbols tun_chr_ioctll not found on tun" not in caplog.text
 
 
 def test_valid_micro_patchid():
