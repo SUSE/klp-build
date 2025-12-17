@@ -571,7 +571,7 @@ def apply_all_patches(lp_name, cs):
 
         logging.debug("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, pdir)
 
-        for patch in sorted(pdir.iterdir(), reverse=True):
+        for patch in sorted(pdir.iterdir()):
             if not str(patch).endswith(".patch"):
                 continue
 
