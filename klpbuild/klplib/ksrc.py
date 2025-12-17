@@ -299,16 +299,6 @@ def get_patches(cve, savedir=None):
     return upslogs, patches
 
 
-def cs_is_affected(cs, cve, patches):
-    # We can only check if the cs is affected or not if the CVE was informed
-    # (so we can get all commits related to that specific CVE). Otherwise we
-    # consider all codestreams as affected.
-    if not cve:
-        return True
-
-    return len(patches[cs.base_cs_name()]) > 0
-
-
 def ksrc_read_rpm_file(kernel_version, file_path):
     return __read_file("rpm-" + kernel_version, file_path)
 

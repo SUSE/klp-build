@@ -11,7 +11,7 @@ from klpbuild.klplib import utils
 from klpbuild.klplib import patch
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
-from klpbuild.klplib.ksrc import get_patches, cs_is_affected
+from klpbuild.klplib.ksrc import get_patches
 from klpbuild.klplib.bugzilla import get_pending_bugs, get_bug_data, is_bug_dropped, get_bug_dep
 
 PLUGIN_CMD = "scan"
@@ -233,3 +233,11 @@ def get_patched_kernels(codestreams, patches):
     return kernels
 
 
+def cs_is_affected(cs, cve, patches):
+    # We can only check if the cs is affected or not if the CVE was informed
+    # (so we can get all commits related to that specific CVE). Otherwise we
+    # consider all codestreams as affected.
+    if not cve:
+        return True
+
+    return len(patches[cs.base_cs_name()]) > 0
