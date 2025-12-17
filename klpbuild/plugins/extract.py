@@ -535,22 +535,8 @@ def apply_patch(patch, sdir):
 
 
 def apply_all_patches(lp_name, cs):
-    dirs = []
-
-    if cs.rt:
-        dirs.extend([f"{cs.sle}.{cs.sp}rtu{cs.update}", f"{cs.sle}.{cs.sp}rt"])
-
-    dirs.extend([f"{cs.sle}.{cs.sp}u{cs.update}", f"{cs.sle}.{cs.sp}"])
-
-    if cs.sle == 15 and cs.sp < 4:
-        dirs.append("cve-5.3")
-    elif cs.sle == 15 and cs.sp <= 5:
-        dirs.append("cve-5.14")
-
-    patch_dirs = []
-
-    for d in dirs:
-        patch_dirs.append(Path(get_patches_dir(lp_name), d))
+    dirs = cs.get_candidate_patches_dirs()
+    patch_dirs = [Path(get_patches_dir(lp_name))/d for d in dirs]
 
     patched = False
     sdir = cs.get_src_dir()

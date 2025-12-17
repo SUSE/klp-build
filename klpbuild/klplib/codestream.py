@@ -555,3 +555,24 @@ class Codestream:
 
     def needs_patches(self):
         return bool(self.required_patches)
+
+    def get_candidate_patches_dirs(self):
+        """
+        Returns the list of names of the directories containing the patches to
+        be applied for the current codestream ordered by priority.
+
+        Beware, the entries do not represent the full path.
+        """
+        dirs = []
+
+        if self.rt:
+            dirs.extend([f"{self.sle}.{self.sp}rtu{self.update}", f"{self.sle}.{self.sp}rt"])
+
+        dirs.extend([f"{self.sle}.{self.sp}u{self.update}", f"{self.sle}.{self.sp}"])
+
+        if self.sle == 15 and self.sp < 4:
+            dirs.append("cve-5.3")
+        elif self.sle == 15 and self.sp <= 5:
+            dirs.append("cve-5.14")
+
+        return dirs
