@@ -11,7 +11,7 @@ from klpbuild.klplib import utils
 from klpbuild.klplib import patch
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
-from klpbuild.klplib.ksrc import get_patches, get_patched_kernels, cs_is_affected
+from klpbuild.klplib.ksrc import get_patches, cs_is_affected
 from klpbuild.klplib.bugzilla import get_pending_bugs, get_bug_data, is_bug_dropped, get_bug_dep
 
 PLUGIN_CMD = "scan"
@@ -199,3 +199,37 @@ def scan(cve, conf, lp_filter, download, archs=None, savedir=None):
         logging.info("\t%s\n", utils.classify_codestreams_str(working_cs))
 
     return patches, upstream, patched_cs, working_cs
+
+
+def get_patched_kernels(codestreams, patches):
+    if not patches:
+        return []
+
+    logging.info("Searching for already patched codestreams...")
+
+    kernels = set()
+
+    for cs in codestreams:
+        bc = cs.base_cs_name()
+        suse_patches = patches[bc]
+        if not suse_patches:
+            continue
+
+        # Proceed to analyse each codestream's kernel
+        kernel = cs.kernel
+
+        logging.debug("\n%s (%s):", cs.full_cs_name(), kernel)
+        for patch in suse_patches:
+            if not cs.has_patch(patch):
+                # Store the patches required by this codestreams for future use
+                cs.add_required_patch(patch)
+                break
+            logging.debug(patch)
+        else:
+            kernels.add(kernel)
+
+    logging.debug("")
+
+    return kernels
+
+

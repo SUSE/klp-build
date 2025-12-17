@@ -299,38 +299,6 @@ def get_patches(cve, savedir=None):
     return upslogs, patches
 
 
-def get_patched_kernels(codestreams, patches):
-    if not patches:
-        return []
-
-    logging.info("Searching for already patched codestreams...")
-
-    kernels = set()
-
-    for cs in codestreams:
-        bc = cs.base_cs_name()
-        suse_patches = patches[bc]
-        if not suse_patches:
-            continue
-
-        # Proceed to analyse each codestream's kernel
-        kernel = cs.kernel
-
-        logging.debug("\n%s (%s):", cs.full_cs_name(), kernel)
-        for patch in suse_patches:
-            if not cs.has_patch(patch):
-                # Store the patches required by this codestreams for future use
-                cs.add_required_patch(patch)
-                break
-            logging.debug(patch)
-        else:
-            kernels.add(kernel)
-
-    logging.debug("")
-
-    return kernels
-
-
 def cs_is_affected(cs, cve, patches):
     # We can only check if the cs is affected or not if the CVE was informed
     # (so we can get all commits related to that specific CVE). Otherwise we
