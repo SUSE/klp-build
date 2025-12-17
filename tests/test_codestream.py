@@ -59,7 +59,8 @@ def test_find_obj_path_arch():
         "repo": "SUSE_SLE-15-SP5_Update",
         "configs": {
             "CONFIG_NET_SCH_TAPRIO": {"x86_64":"m","ppc64le":"m","s390x":"m"}
-            }
+            },
+        "required_patches" : ""
     })
 
     for arch in ARCHS:

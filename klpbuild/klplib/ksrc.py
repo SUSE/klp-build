@@ -319,6 +319,8 @@ def get_patched_kernels(codestreams, patches):
         logging.debug("\n%s (%s):", cs.full_cs_name(), kernel)
         for patch in suse_patches:
             if not cs.has_patch(patch):
+                # Store the patches required by this codestreams for future use
+                cs.add_required_patch(patch)
                 break
             logging.debug(patch)
         else:

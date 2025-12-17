@@ -20,10 +20,11 @@ from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag,
 class Codestream:
     __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "is_slfo",
                  "__project", "patchid", "kernel", "archs", "files", "modules",
-                 "repo", "configs")
+                 "repo", "configs", "required_patches")
 
     def __init__(self, name, project="", patchid="", kernel="",
-                 archs=None, files=None, modules=None, configs=None):
+                 archs=None, files=None, modules=None, configs=None,
+                 required_patches=None):
 
         self.__name = name
 
@@ -49,12 +50,14 @@ class Codestream:
         self.modules = modules if modules is not None else {}
         self.configs = configs if configs is not None else {}
 
+        self.required_patches = required_patches if required_patches is not None else []
+
 
     @classmethod
     def from_data(cls, data):
         return cls(data["name"],data["project"], data["patchid"],
                    data["kernel"], data["archs"], data["files"],
-                   data["modules"], data["configs"])
+                   data["modules"], data["configs"], data["required_patches"])
 
     def to_data(self):
         # archs needs to be turned into a list, since a set is not serializable
@@ -67,6 +70,7 @@ class Codestream:
                 "files" : self.files,
                 "modules" : self.modules,
                 "configs" : self.configs,
+                "required_patches" : self.required_patches
                 }
 
     def __eq__(self, cs):
@@ -536,3 +540,13 @@ class Codestream:
 
     def read_file(self, file):
         return read_file_in_tag(self.kernel, file)
+
+    def add_required_patch(self, patch):
+        patch_name = Path(patch).name
+        self.required_patches.append(patch_name)
+
+    def get_required_patches(self):
+        return self.required_patches[:]
+
+    def needs_patches(self):
+        return bool(self.required_patches)
