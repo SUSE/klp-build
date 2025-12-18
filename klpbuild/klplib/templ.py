@@ -2,14 +2,15 @@
 #
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
-import re
 from datetime import datetime
 from pathlib import Path
+import re
 
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
 from klpbuild.klplib.bugzilla import get_bug_title, get_bug
+from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import get_codestreams_data
 from klpbuild.klplib.utils import (fix_mod_string, get_mail, get_workdir,
                                    get_lp_number, get_fname, is_mod)
@@ -633,10 +634,10 @@ def generate_livepatches(lp_name, cs):
     __create_kbuild(lp_name, cs)
 
 
-def __is_check_enabled(cs):
+def __is_check_enabled(cs: Codestream):
     # Require the IS_ENABLED ifdef guard whenever we have a livepatch that
-    # is not enabled on all architectures
-    return get_codestreams_data('archs') != cs.get_default_archs()
+    # is not enabled on all architectures of the given Codestream
+    return cs.archs != cs.get_default_archs()
 
 
 def __create_kbuild(lp_name, cs):

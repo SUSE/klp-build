@@ -20,7 +20,7 @@ from natsort import natsorted
 from klpbuild.klplib.config import get_user_path
 
 ARCH = platform.processor()
-ARCHS = ["ppc64le", "s390x", "x86_64"]
+ARCHS = {"ppc64le", "s390x", "x86_64"}
 
 
 # Group all codestreams that share code in a format like bellow:
