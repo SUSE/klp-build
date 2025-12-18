@@ -557,17 +557,30 @@ def apply_all_patches(lp_name, cs):
             break
     assert patch_dir, "Couldn't find a patch directory"
 
-    logging.debug("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, patch_dir)
+    # Get the patches that need to be applied for the current codestream
+    required_patches = set(cs.get_required_patches())
+
+    logging.info("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, patch_dir)
     # Here for the ordering we rely on the patches being previouly renamed with a prefix
     for patch in sorted(patch_dir.iterdir()):
         if not str(patch).endswith(".patch"):
             continue
 
-        logging.info("%s:%s: Applying %s...", cs.full_cs_name(), cs.kernel, patch)
+        # Skip if the patch is not required for the current codestream
+        patch_name = patch.name.split("-",1)[1] # Drop the prefix from the patch
+        if patch_name not in required_patches:
+            logging.info("\tDropping %s", patch_name)
+            continue
+
+        logging.info("\tApplying %s", patch_name)
         if not apply_patch(str(patch), sdir):
             raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): "
-                "Failed to apply patches. Aborting\n"
+                f"Failed to apply patch {patch_name}. Aborting\n"
                 f"For more information go to: {sdir}")
+
+        required_patches.discard(patch_name)
+
+    assert not required_patches, "Some required patches have not been applied"
 
 
 def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
