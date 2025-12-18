@@ -14,7 +14,7 @@ def test_get_patches_files():
                 'net/ipv6/route.c': ['ip6_negative_advice'],
                 'net/xfrm/xfrm_policy.c': ['xfrm_negative_advice']}
 
-    files = get_patches_files(patch, "SLE15-SP6")
+    files = get_patches_files(patch, "SLE15-SP6-LTSS")
     assert len(files) == len(expected)
     for file, funcs in files.items():
         assert file in expected
