@@ -44,8 +44,7 @@ class Codestream:
         self.patchid = patchid
         self.kernel = kernel
 
-        self.archs = archs if archs is not None else self.get_default_archs()
-        self.archs.sort()
+        self.archs = set(archs) if archs is not None else self.get_default_archs()
         self.files = files if files is not None else {}
         self.modules = modules if modules is not None else {}
         self.configs = configs if configs is not None else {}
@@ -58,12 +57,13 @@ class Codestream:
                    data["modules"], data["configs"])
 
     def to_data(self):
+        # archs needs to be turned into a list, since a set is not serializable
         return {
                 "name": self.__name,
                 "project": self.__project,
                 "patchid": self.patchid,
                 "kernel" : self.kernel,
-                "archs" : self.archs,
+                "archs": list(self.archs),
                 "files" : self.files,
                 "modules" : self.modules,
                 "configs" : self.configs,
@@ -177,14 +177,14 @@ class Codestream:
     def get_default_archs(self):
         # RT is supported only on x86_64 at the moment
         if self.rt:
-            return ["x86_64"]
+            return {"x86_64"}
 
         # MICRO 6.0 doesn't support ppc64le
         if self.is_micro:
-            return ["s390x", "x86_64"]
+            return {"s390x", "x86_64"}
 
         # We support all architecture for all other codestreams
-        return ["ppc64le", "s390x", "x86_64"]
+        return {"ppc64le", "s390x", "x86_64"}
 
     def set_files(self, files):
         self.files = files
@@ -193,7 +193,7 @@ class Codestream:
         self.configs = {conf: self.get_all_configs(conf) for conf in configs}
 
     def set_archs(self, archs):
-        self.archs = list(set(archs) & set(self.get_default_archs()))
+        self.archs = set(archs) & self.get_default_archs()
 
     def get_kernel_type(self, suffix=False):
         dash = "-" if suffix else ""
@@ -205,7 +205,6 @@ class Codestream:
         # some kernel versions already have the suffix, some other don't
         ktype = "" if "-rt" in self.kernel else self.get_kernel_type(suffix=True)
         return self.kernel + ktype
-
 
     def base_cs_name(self):
         """
