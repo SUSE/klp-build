@@ -15,7 +15,7 @@ def test_find_commit():
     assert "af9aa67aec10" in find_commit(subj, "SLE15-SP7")
 
     subj = "ALSA: firewire-lib: Avoid division by zero in apply_constraint_to_size()"
-    assert "76935334e479" in find_commit(subj, "SLE15-SP6")
+    assert "76935334e479" in find_commit(subj, "SLE15-SP6-LTSS")
 
 
 def test_get_commit_body():
