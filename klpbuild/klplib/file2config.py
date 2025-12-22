@@ -9,6 +9,14 @@ import re
 
 from pathlib import Path
 
+
+archs_config = {
+        's390x': {'conf': "CONFIG_S390", 'module': 'vmlinux'},
+        'x86_64': {'conf': "CONFIG_X86_64", 'module': 'vmlinux'},
+        'ppc64le': {'conf': "CONFIG_PPC64", 'module': 'vmlinux'},
+}
+
+
 BLACKLIST = {
         r"drivers/gpu/drm/amd/(?!amdgpu/).*":
         "drivers/gpu/drm/amd/amdgpu/amdgpu_irq.c"
@@ -21,6 +29,17 @@ def _filter_path(path: str) -> str:
             return fixed_path
 
     return path
+
+
+def _get_arch_in_path(path: str) -> str:
+    if "s390" in path:
+        return "s390x"
+    if "x86" in path:
+        return "x86_64"
+    if "powerpc" in path:
+        return "ppc64le"
+
+    return None
 
 
 def _load_makefile(cs, make_file: str) -> list:
@@ -103,14 +122,15 @@ def find_configs_for_files(cs, file_paths: list):
         if not config:
             missing.append(path)
 
-        # Detect code that is only enabled on a specific architecture
-        elif path.startswith("arch") and len(cs.get_all_configs(config)) > 1:
-            if "s390" in path:
-                configs[path] = {'conf': "CONFIG_S390", 'module': 'vmlinux'}
-            elif "x86" in path:
-                configs[path] = {'conf': "CONFIG_X86_64", 'module': 'vmlinux'}
-            elif "powerpc" in path:
-                configs[path] = {'conf': "CONFIG_PPC64", 'module': 'vmlinux'}
+        # Detect code that is only enabled on a specific architecture.
+        # Use a per-architecture generic CONFIG only if the found CONFIG
+        # does not affect the same architecture as the one indicated in
+        # the given file path.
+        elif path.startswith("arch"):
+            archs = cs.get_all_configs(config)
+            arch = _get_arch_in_path(path)
+            if arch and (len(archs) != 1 or not archs.get(arch)):
+                    configs[path] = archs_config[arch]
 
         elif config.startswith('CONFIG_'):
             configs[path] = {'conf': config, 'module': obj}
