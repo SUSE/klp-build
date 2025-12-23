@@ -535,26 +535,7 @@ def apply_patch(patch, sdir):
 
 
 def apply_all_patches(lp_name, cs):
-    dirs = []
-
-    if cs.rt:
-        dirs.extend([f"{cs.sle}.{cs.sp}rtu{cs.update}", f"{cs.sle}.{cs.sp}rt"])
-
-    dirs.extend([f"{cs.sle}.{cs.sp}u{cs.update}", f"{cs.sle}.{cs.sp}"])
-
-    if cs.sle == 15 and cs.sp < 4:
-        dirs.append("cve-5.3")
-    elif cs.sle == 15 and cs.sp <= 5:
-        dirs.append("cve-5.14")
-
-    patch_dirs = []
-
-    for d in dirs:
-        patch_dirs.append(Path(get_patches_dir(lp_name), d))
-
-    patched = False
     sdir = cs.get_src_dir()
-
     bname = get_lp_branch(lp_name, cs)
     err = subprocess.run(["git", "checkout", "-B", bname],
                          cwd=sdir,
@@ -564,30 +545,42 @@ def apply_all_patches(lp_name, cs):
     if err.returncode != 0:
         raise RuntimeError(f"Failed to create branch {bname}. Aborting")
 
-    for pdir in patch_dirs:
-        if not pdir.exists():
-            logging.debug("Patches dir %s doesnt exists", pdir)
+    dirs = cs.get_candidate_patches_dirs()
+    available_patch_dirs = [Path(get_patches_dir(lp_name))/d for d in dirs]
+
+    # Pick the first directory in available_patch_dirs that exists
+    patch_dir = None
+    while available_patch_dirs:
+        candidate_patch_dir = available_patch_dirs.pop(0)
+        if candidate_patch_dir.exists():
+            patch_dir = candidate_patch_dir
+            break
+    assert patch_dir, "Couldn't find a patch directory"
+
+    # Get the patches that need to be applied for the current codestream
+    required_patches = set(cs.get_required_patches())
+
+    logging.info("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, patch_dir)
+    # Here for the ordering we rely on the patches being previouly renamed with a prefix
+    for patch in sorted(patch_dir.iterdir()):
+        if not str(patch).endswith(".patch"):
             continue
 
-        logging.debug("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, pdir)
+        # Skip if the patch is not required for the current codestream
+        patch_name = patch.name.split("-",1)[1] # Drop the prefix from the patch
+        if patch_name not in required_patches:
+            logging.info("\tDropping %s", patch_name)
+            continue
 
-        for patch in sorted(pdir.iterdir()):
-            if not str(patch).endswith(".patch"):
-                continue
+        logging.info("\tApplying %s", patch_name)
+        if not apply_patch(str(patch), sdir):
+            raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): "
+                f"Failed to apply patch {patch_name}. Aborting\n"
+                f"For more information go to: {sdir}")
 
-            logging.info("%s:%s: Applying %s...",
-                         cs.full_cs_name(), cs.kernel, patch)
+        required_patches.discard(patch_name)
 
-            if not (patched := apply_patch(str(patch), sdir)):
-                break
-
-        # Stop the loop in the first dir that we find patches.
-        break
-
-    if not patched:
-        raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): "
-                           "Failed to apply patches. Aborting\n"
-                           f"For more information go to: {sdir}")
+    assert not required_patches, "Some required patches have not been applied"
 
 
 def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):

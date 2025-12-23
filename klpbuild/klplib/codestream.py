@@ -16,14 +16,16 @@ from importlib import resources
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_elf_object, get_datadir, preferred_arch
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
+from klpbuild.klplib.ksrc import KERNEL_BRANCHES
 
 class Codestream:
     __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "is_slfo",
                  "__project", "patchid", "kernel", "archs", "files", "modules",
-                 "repo", "configs")
+                 "repo", "configs", "required_patches")
 
     def __init__(self, name, project="", patchid="", kernel="",
-                 archs=None, files=None, modules=None, configs=None):
+                 archs=None, files=None, modules=None, configs=None,
+                 required_patches=None):
 
         self.__name = name
 
@@ -49,12 +51,14 @@ class Codestream:
         self.modules = modules if modules is not None else {}
         self.configs = configs if configs is not None else {}
 
+        self.required_patches = required_patches if required_patches is not None else []
+
 
     @classmethod
     def from_data(cls, data):
         return cls(data["name"],data["project"], data["patchid"],
                    data["kernel"], data["archs"], data["files"],
-                   data["modules"], data["configs"])
+                   data["modules"], data["configs"], data["required_patches"])
 
     def to_data(self):
         # archs needs to be turned into a list, since a set is not serializable
@@ -67,6 +71,7 @@ class Codestream:
                 "files" : self.files,
                 "modules" : self.modules,
                 "configs" : self.configs,
+                "required_patches" : self.required_patches
                 }
 
     def __eq__(self, cs):
@@ -305,6 +310,16 @@ class Codestream:
 
         return pkg
 
+
+    def get_base_branch(self):
+        return KERNEL_BRANCHES[self.base_cs_name()]
+
+
+    def has_patch(self, patch):
+        kernel_version = self.kernel
+        return bool(ksrc_read_rpm_file(kernel_version, patch))
+
+
     def needs_ibt(self):
         return self.is_slfo or (self.sle == 15 and self.sp >= 6)
 
@@ -530,3 +545,34 @@ class Codestream:
 
     def read_file(self, file):
         return read_file_in_tag(self.kernel, file)
+
+    def add_required_patch(self, patch):
+        patch_name = Path(patch).name
+        self.required_patches.append(patch_name)
+
+    def get_required_patches(self):
+        return self.required_patches[:]
+
+    def needs_patches(self):
+        return bool(self.required_patches)
+
+    def get_candidate_patches_dirs(self):
+        """
+        Returns the list of names of the directories containing the patches to
+        be applied for the current codestream ordered by priority.
+
+        Beware, the entries do not represent the full path.
+        """
+        dirs = []
+
+        if self.rt:
+            dirs.extend([f"{self.sle}.{self.sp}rtu{self.update}", f"{self.sle}.{self.sp}rt"])
+
+        dirs.extend([f"{self.sle}.{self.sp}u{self.update}", f"{self.sle}.{self.sp}"])
+
+        if self.sle == 15 and self.sp < 4:
+            dirs.append("cve-5.3")
+        elif self.sle == 15 and self.sp <= 5:
+            dirs.append("cve-5.14")
+
+        return dirs

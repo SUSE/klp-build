@@ -290,6 +290,26 @@ def filter_codestreams(lp_filter, cs_list, verbose=False):
     return result
 
 
+def filter_codestreams_by_arch(archs, cs_list):
+    '''
+    Filter the codestreams that do not have support for any arch in "archs".
+    E.g. this would filter out a real time codestreams if archs = ["ppc64le"],
+    since ppc64le does have real time support.
+
+    Beware that this function modifies cs.archs fiels in the codestream objects.
+    '''
+    result = []
+
+    for cs in cs_list:
+        # NOTE: should we adopt a different strategy here? This modifies the
+        # codestream object
+        cs.set_archs(archs)
+        if cs.archs:
+            result.append(cs)
+
+    return result
+
+
 def affected_archs(cs_list):
     conf_archs = set()
     for cs in cs_list:
