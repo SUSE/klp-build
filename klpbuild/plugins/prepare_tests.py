@@ -101,7 +101,7 @@ def prepare_tests(lp_name, lp_filter):
         logging.info("Checking %s symbols...", arch)
         build_cs = []
         for cs in filter_codestreams(lp_filter, get_codestreams_list()):
-            if arch not in cs.archs:
+            if arch not in cs.get_default_archs():
                 continue
 
             rpm_dir = Path(cs.get_ccp_dir(lp_name), arch, "rpm")
