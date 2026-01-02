@@ -170,3 +170,22 @@ def test_symbol_with_noinstr(caplog):
             setup(**setup_args)
 
     assert "Symbol __ktime_get_real_seconds has tracing disabled." in caplog.text
+
+
+def test_symbol_with_noinstr_ibt(caplog):
+    # IBT enabled kernels can have functions with an offset shifted by 4 bytes
+    # when the funciton has ENDBR instructions. Make sure klp-build handles it
+    # correctly
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+
+    lp_default_data = {"cve": None, "lp_filter": "16.0rtu1", "conf": "CONFIG_IO_URING", "no_check": True}
+    setup_args = {
+        "lp_name": lp,
+        "archs": ["x86_64"],
+        "module": "vmlinux",
+        "file_funcs": [["io_uring", "io_link_skb"]],
+        "mod_file_funcs": [],
+        "conf_mod_file_funcs": [],
+        **lp_default_data
+    }
+    setup(**setup_args)
