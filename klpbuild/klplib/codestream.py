@@ -417,11 +417,19 @@ class Codestream:
     def __check_patchable_sym(self, arch, name, sym, trace_addrs):
         val = sym["st_value"]
 
-        pos = bisect.bisect_left(trace_addrs, val)
-        if pos == len(trace_addrs) or trace_addrs[pos] != val:
-            logging.error("%s-%s (%s): Symbol %s has tracing disabled.",  self.full_cs_name(),
-                          arch, self.kernel, name)
-            sys.exit(1)
+        # For IBT enabled kernels, some functions might have ENDBR instructions
+        # at the first offset of the symbol. To make the check catch all cases,
+        # always check for the trace addr and also the same trace addr - 4, to
+        # match the symbol table on functions that don't have the IBT enabled.
+        for val in [sym["st_value"], sym["st_value"] + 4]:
+            pos = bisect.bisect_left(trace_addrs, val)
+
+            # Check if the symbol was found
+            if pos != len(trace_addrs) and trace_addrs[pos] == val:
+                return
+
+        logging.error("%s-%s (%s): Symbol %s has tracing disabled.", self.full_cs_name(), arch, self.kernel, name)
+        sys.exit(1)
 
     # On ppc64le the trace_address points to symbol descriptor table, and not
     # the symbol itself, so we need to check for the address range
