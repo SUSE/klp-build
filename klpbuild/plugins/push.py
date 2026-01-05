@@ -45,7 +45,7 @@ def create_prj_meta(cs):
                "<debuginfo><disable/></debuginfo>" + \
                "<repository name=\"standard\">" + \
                f"<path project=\"{cs.get_project_name()}\" repository=\"{cs.get_repo()}\"/>" + \
-               "".join([f"<arch>{arch}</arch>" for arch in cs.archs]) + \
+               "".join([f"<arch>{arch}</arch>" for arch in cs.get_default_archs()]) + \
                "</repository>" + \
            "</project>"
 
