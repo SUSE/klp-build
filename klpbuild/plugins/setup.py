@@ -270,7 +270,7 @@ def __symbol_check(cs, mod, syms, archs):
     for sym, larchs in sym_archs.items():
         # The missing symbol can be a problem is it's missing on some
         # architectures and present in others.
-        if set(larchs) != cs.archs:
+        if set(larchs) != archs:
             logging.warning(
                 "%s-%s (%s): Symbols %s not found on %s object",
                 cs.full_cs_name(),
