@@ -108,7 +108,6 @@ def create_lp_package(osc, lp_name, i, total, cs):
     logging.info("(%s/%s) pushing %s using branches %s...",
                  i, total, cs.full_cs_name(), push_branch)
 
-
     # Check if the directory related to this bsc exists.
     # Otherwise only warn the caller about this fact.
     # This scenario can occur in case of LPing function that is already
@@ -138,7 +137,7 @@ def create_lp_package(osc, lp_name, i, total, cs):
     logging.info("(%d/%d) %s done", i, total, cs.full_cs_name())
 
 
-def push(lp_name, lp_filter, wait=False, fast=False):
+def run(lp_name, lp_filter, wait=False, fast=False):
     if fast:
         cs_list = filter_fast(get_codestreams_list())
     else:
@@ -175,7 +174,3 @@ def push(lp_name, lp_filter, wait=False, fast=False):
         # One more status after everything finished, since we remove
         # finished builds on each iteration
         sys.exit(status(lp_name, lp_filter, False))
-
-
-def run(lp_name, lp_filter, wait=False, fast=False):
-    push(lp_name, lp_filter, wait, fast)
