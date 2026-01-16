@@ -17,6 +17,7 @@ from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import get_codestreams_list
 from klpbuild.klplib.ibs import convert_cs_to_prj, delete_project, prj_prefix
 from klpbuild.klplib.utils import (classify_codestreams_str, filter_codestreams,
+                                   filter_fast,
                                    get_cs_branch)
 from klpbuild.plugins.status import status
 from klpbuild.plugins.commit import commit
@@ -36,6 +37,8 @@ def register_argparser(subparser):
     add_arg_lp_filter(push_arg)
     push_arg.add_argument("--wait", action="store_true",
                           help="Wait unti all codestreams builds are finished")
+    push_arg.add_argument("--fast", action="store_true",
+                          help="Get only one codestream per product when pushing.")
 
 
 def create_prj_meta(cs):
@@ -135,8 +138,11 @@ def create_lp_package(osc, lp_name, i, total, cs):
     logging.info("(%d/%d) %s done", i, total, cs.full_cs_name())
 
 
-def push(lp_name, lp_filter, wait=False):
-    cs_list = filter_codestreams(lp_filter, get_codestreams_list())
+def push(lp_name, lp_filter, wait=False, fast=False):
+    if fast:
+        cs_list = filter_fast(get_codestreams_list())
+    else:
+        cs_list = filter_codestreams(lp_filter, get_codestreams_list())
 
     if not cs_list:
         logging.error("push: No codestreams found for %s", lp_name)
@@ -171,5 +177,5 @@ def push(lp_name, lp_filter, wait=False):
         sys.exit(status(lp_name, lp_filter, False))
 
 
-def run(lp_name, lp_filter, wait=False):
-    push(lp_name, lp_filter, wait)
+def run(lp_name, lp_filter, wait=False, fast=False):
+    push(lp_name, lp_filter, wait, fast)
