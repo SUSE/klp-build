@@ -22,3 +22,15 @@ def test_group_classify():
                                        Codestream("15.4u24"),
                                        Codestream("15.4u26")]) == \
         ["15.4u24-26", "15.5u6-9", "15.5u11-14", "15.6u0-10"]
+
+
+def test_filter_fast():
+    assert utils.filter_fast(
+        [
+            Codestream("6.0u0"),
+            Codestream("15.2u10"),
+            Codestream("15.2u11"),
+            Codestream("15.3u10"),
+            Codestream("15.3u12"),
+        ]
+    ) == [Codestream("6.0u0"), Codestream("15.2u10"), Codestream("15.3u10")]
