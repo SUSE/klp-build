@@ -267,6 +267,28 @@ def check_module_unsupported(arch, mod_path):
     return "no" == get_elf_modinfo_entry(elffile, "supported")
 
 
+def filter_fast(cs_list):
+    '''
+    Return the first codestream of each product. For example, given the list
+        15.5u10, 15.5u11, 12.5u10, 6.0u0
+    The return would be
+        15.5u10, 12.5u10, 6.0u0
+
+    Returns:
+        List: Containing only one entry per product
+    '''
+    ret = []
+    cs_once = []
+
+    for c in cs_list:
+        base = c.base_cs_name()
+        if base not in cs_once:
+            ret.append(c)
+            cs_once.append(base)
+
+    return ret
+
+
 def filter_codestreams(lp_filter, cs_list, verbose=False):
     if not lp_filter:
         return cs_list

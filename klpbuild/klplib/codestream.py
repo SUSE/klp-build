@@ -80,6 +80,9 @@ class Codestream:
                 self.update == cs.update and \
                 self.rt == cs.rt
 
+    def __str__(self):
+        return self.full_cs_name()
+
     def get_src_dir(self, arch=None, init=True):
         # Before sle16, only -rt codestreams have a suffix for source directory
         has_rt_suffix = self.rt and self.sle < 16
