@@ -32,6 +32,12 @@ def register_argparser(subparser):
         help="Do not check for already patched codestreams, do the setup for all non filtered codestreams.",
     )
     args.add_argument(
+        "--full-checks",
+        action="store_true",
+        help="Enable advanced checks that verify if symbol can be livepatched. "
+        "Enabling this option can incur in severe slowdowns.",
+    )
+    args.add_argument(
         "--file-funcs",
         required=False,
         action="append",
@@ -74,14 +80,14 @@ def register_argparser(subparser):
 
 
 def run(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
-        mod_file_funcs, conf_mod_file_funcs):
+        mod_file_funcs, conf_mod_file_funcs, full_checks):
 
     return setup(lp_name, lp_filter, no_check, archs, cve, conf, module,
-                 file_funcs, mod_file_funcs, conf_mod_file_funcs)
+                 file_funcs, mod_file_funcs, conf_mod_file_funcs, full_checks)
 
 
 def setup(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
-          mod_file_funcs, conf_mod_file_funcs):
+          mod_file_funcs, conf_mod_file_funcs, full_checks):
 
     codestreams = setup_codestreams(lp_name, {"cve": cve, "conf": conf,
                                               "lp_filter": lp_filter,
@@ -94,7 +100,7 @@ def setup(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
                      conf_mod_file_funcs)
 
     setup_archs(codestreams)
-    setup_project_files(lp_name, codestreams)
+    setup_project_files(lp_name, codestreams, full_checks)
 
 
 def setup_manual(codestreams, archs, conf, mod,
@@ -167,7 +173,7 @@ def setup_codestreams(lp_name, data):
     return codestreams
 
 
-def setup_project_files(lp_name, codestreams):
+def setup_project_files(lp_name, codestreams, full_checks):
     utils.get_workdir(lp_name).mkdir(exist_ok=True)
 
     generate_commit_msg_file(lp_name)
@@ -207,7 +213,7 @@ def setup_project_files(lp_name, codestreams):
         # The set calls are necessary because we can have duplicated entries
         # like the arch for different files.
         for mod, mod_info in syms_to_be_checked.items():
-            __symbol_check(cs, mod, set(mod_info["syms"]), set(mod_info["archs"]))
+            __symbol_check(cs, mod, set(mod_info["syms"]), set(mod_info["archs"]), full_checks)
 
         if not cs.files:
             raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}):"
@@ -243,7 +249,7 @@ def __setup_check_mod(cs, mod, arch):
     cs.modules[mod] = str(mod_path)
 
 
-def __symbol_check(cs, mod, syms, archs):
+def __symbol_check(cs, mod, syms, archs, full_checks):
     """
     Check if a given symbol is inlined on all architectures. If yes, it means
     that the klp-ccp can figure it our the callers, and automatically bring
@@ -255,7 +261,7 @@ def __symbol_check(cs, mod, syms, archs):
     mod_syms = {}
     for arch in archs:
         # Verify if the functions exist in the specified object
-        mod_syms.update(cs.check_symbol_archs(arch, mod, syms, False, True))
+        mod_syms.update(cs.check_symbol_archs(arch, mod, syms, False, full_checks))
 
     # Reverse the dict, checking in which architectures are the symbol is not
     # present. It it's not found on all architectures, it can mean that it's
