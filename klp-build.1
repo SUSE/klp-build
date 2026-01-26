@@ -155,6 +155,15 @@ The kernel CONFIG used to build the object to be livepatched.
 Do not check for already patched codestreams, do the setup for
 all non filtered codestreams.
 .TP
+.B --full-checks
+Enables advanced checks that verify if the symbol can be livepatched. Enabling
+this option incurs in slowdowns since it has to check if the symbols being
+livepatched are in the ftrace ELF sections of vmlinux, in all supported
+architectures of each affected codestream.
+
+The checks are done only on symbols that come from vmlinux. Module checks are
+planned to be added in the future.
+.TP
 .BI --codestreams " CODESTREAMS"
 Codestreams affected by the CVE. Can be used as a regex, like,
 "15.u[34]".
