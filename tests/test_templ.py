@@ -26,7 +26,8 @@ def test_templ_with_externalized_vars():
         "module" : "vmlinux",
         "file_funcs" : [["fs/proc/cmdline.c", "cmdline_proc_show"]],
         "mod_file_funcs" : [],
-        "conf_mod_file_funcs" : []
+        "conf_mod_file_funcs" : [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
@@ -69,7 +70,8 @@ def test_templ_without_externalized_vars():
         "module" : "vmlinux",
         "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]],
         "mod_file_funcs" : [],
-        "conf_mod_file_funcs" : []
+        "conf_mod_file_funcs" : [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
@@ -119,6 +121,7 @@ def test_is_enabled_only_on_cs_arcs():
         ],
         "mod_file_funcs": [],
         "conf_mod_file_funcs": [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
@@ -153,7 +156,8 @@ def test_check_header_file_included():
         "file_funcs": [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"],
                        ["fs/proc/cmdline.c", "cmdline_proc_show"]],
         "mod_file_funcs" : [],
-        "conf_mod_file_funcs" : []
+        "conf_mod_file_funcs" : [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
@@ -184,7 +188,8 @@ def test_templ_cve_specified():
         "module" : "vmlinux",
         "file_funcs" : [["fs/proc/cmdline.c", "cmdline_proc_show"]],
         "mod_file_funcs" : [],
-        "conf_mod_file_funcs" : []
+        "conf_mod_file_funcs" : [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
@@ -221,7 +226,8 @@ def test_templ_exts_mod_name():
         "module" : "nvme-tcp",
         "file_funcs" : [["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]],
         "mod_file_funcs" : [],
-        "conf_mod_file_funcs" : []
+        "conf_mod_file_funcs" : [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
@@ -260,7 +266,8 @@ def test_templ_micro_is_ibt():
         "module" : "nvme-tcp",
         "file_funcs" : [["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]],
         "mod_file_funcs" : [],
-        "conf_mod_file_funcs" : []
+        "conf_mod_file_funcs" : [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
@@ -294,7 +301,8 @@ def test_templ_ibt_without_externalized_vars():
         "module" : "vmlinux",
         "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_addr_compress"]],
         "mod_file_funcs" : [],
-        "conf_mod_file_funcs" : []
+        "conf_mod_file_funcs" : [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
@@ -341,7 +349,8 @@ def test_templ_kbuild_has_contents():
         "module" : "nvme-tcp",
         "file_funcs" : [["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]],
         "mod_file_funcs" : [],
-        "conf_mod_file_funcs" : []
+        "conf_mod_file_funcs" : [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
