@@ -35,7 +35,8 @@ def test_compile_commands_enoent():
         "module": "vmlinux",
         "file_funcs": [["drivers/hid/hid-core.c", "hid_alloc_report_buf"]],
         "mod_file_funcs": [],
-        "conf_mod_file_funcs": []
+        "conf_mod_file_funcs": [],
+        "full_checks": False,
     }
     setup(**setup_args)
 
@@ -60,7 +61,7 @@ def test_compile_commands_enoent():
 
 def test_detect_opt_clone(caplog):
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.3u55"
+    cs = "15.4u45"
 
     setup_args = {
         "lp_name": lp,
@@ -72,7 +73,8 @@ def test_detect_opt_clone(caplog):
         "module": "bluetooth",
         "file_funcs": [["net/bluetooth/l2cap_sock.c", "l2cap_sock_kill"]],
         "mod_file_funcs": [],
-        "conf_mod_file_funcs": []
+        "conf_mod_file_funcs": [],
+        "full_checks": False,
     }
     setup(**setup_args)
 

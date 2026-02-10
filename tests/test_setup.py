@@ -57,6 +57,7 @@ def test_non_existent_file():
             "file_funcs" : [["drivers/net/tuna.c", "tun_chr_ioctl", "tun_free_netdev"]],
             "mod_file_funcs" : [],
             "conf_mod_file_funcs" : [],
+            "full_checks": False,
             **DEFAULT_DATA
         }
         setup(**setup_args)
@@ -74,6 +75,7 @@ def test_non_existent_module():
             "file_funcs" : [["drivers/net/tun.c", "tun_chr_ioctll", "tun_free_netdev"]],
             "mod_file_funcs" : [],
             "conf_mod_file_funcs" : [],
+            "full_checks": False,
             **DEFAULT_DATA
         }
         setup(**setup_args)
@@ -91,6 +93,7 @@ def test_invalid_sym(caplog):
             "file_funcs" : [["drivers/net/tun.c", "tun_chr_ioctll", "tun_free_netdev"]],
             "mod_file_funcs" : [],
             "conf_mod_file_funcs" : [],
+            "full_checks": False,
             **DEFAULT_DATA
         }
         setup(**setup_args)
@@ -112,6 +115,7 @@ def test_valid_micro_patchid():
         "file_funcs" : [["drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]],
         "mod_file_funcs" : [],
         "conf_mod_file_funcs" : [],
+        "full_checks": False,
         **micro_data
     }
     setup(**setup_args)
@@ -165,6 +169,7 @@ def test_symbol_with_noinstr(caplog):
                 "file_funcs": [["kernel/time/timekeeping.c", "__ktime_get_real_seconds"]],
                 "mod_file_funcs": [],
                 "conf_mod_file_funcs": [],
+                "full_checks": True,
                 **lp_default_data
             }
             setup(**setup_args)
@@ -186,6 +191,7 @@ def test_symbol_with_noinstr_ibt(caplog):
         "file_funcs": [["io_uring", "io_link_skb"]],
         "mod_file_funcs": [],
         "conf_mod_file_funcs": [],
+        "full_checks": False,
         **lp_default_data
     }
     setup(**setup_args)
