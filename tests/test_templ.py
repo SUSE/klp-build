@@ -209,7 +209,7 @@ def test_templ_exts_mod_name():
     need the module to be nvme_tcp.
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.3u50"
+    cs = "15.4u45"
 
     setup_args = {
         "lp_name" : lp,
