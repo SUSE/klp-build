@@ -144,6 +144,10 @@ def setup_archs(codestreams):
     archs = utils.affected_archs(codestreams)
     set_codestreams_data(archs=archs)
 
+    # Inspect which codestreams are enabled for the affected architectures
+    for cs in codestreams:
+        cs.archs = (cs.archs & set(utils.affected_archs([cs])))
+
 
 def setup_codestreams(lp_name, data):
     if not lp_name.startswith("bsc"):
