@@ -138,6 +138,36 @@ def test_is_enabled_only_on_cs_arcs():
         assert "#if IS_ENABLED" not in content
 
 
+# Check if only x86_64 is affected by the CVE, meaning that IS_ENABLED should be
+# set in the final code
+def test_is_enabled_only_on_x86():
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+    cs = "15.7u5"
+
+    setup_args = {
+        "lp_name": lp,
+        "lp_filter": cs,
+        "no_check": True,
+        "archs": utils.ARCHS,
+        "cve": None,
+        "conf": "CONFIG_ACPI",
+        "module": None,
+        "file_funcs": [
+            ["drivers/acpi/acpica/utcopy.c", "acpi_ut_copy_ipackage_to_ipackage"]
+        ],
+        "mod_file_funcs": [],
+        "conf_mod_file_funcs": [],
+        "full_checks": False,
+    }
+    setup(**setup_args)
+
+    extract(lp_name=lp, lp_filter=cs, no_patches=True, avoid_ext=[])
+
+    content = get_file_content(lp, cs, f"livepatch_{lp}.c")
+    # This CVE impact only x86, so IS_ENABLED should be present
+    assert "#if IS_ENABLED" in content
+
+
 # For multifile patches, a third file will be generated and called
 # livepatch_XXX, and alongside this file the other files will have the prefix
 # bscXXXXXXX.
