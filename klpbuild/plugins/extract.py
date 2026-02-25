@@ -232,7 +232,7 @@ def get_missing_ext_symbols(working_cs):
         for obj, syms in obj_syms.items():
             missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
             for arch, arch_syms in missing.items():
-                blacklisted = re.findall(r"((?:__SCT__|__traceiter)\w+)",
+                blacklisted = re.findall(r"((?:__SCT__|__SCK__|__traceiter)\w+)",
                                          ' '.join(arch_syms))
                 whitelisted = set(blacklisted) ^ set(arch_syms)
                 if whitelisted:
