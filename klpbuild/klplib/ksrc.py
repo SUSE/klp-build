@@ -22,7 +22,7 @@ KERNEL_BRANCHES = {
     "12.5": "SLE12-SP5",
     "15.4": "SLE15-SP4-LTSS",
     "15.5": "SLE15-SP5-LTSS",
-    "15.6": "SLE15-SP6",
+    "15.6": "SLE15-SP6-LTSS",
     "15.7": "SLE15-SP7",
     "15.7rt": "SLE15-SP7-RT",
     "16.0": "SL-16.0",
