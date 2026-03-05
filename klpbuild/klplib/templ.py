@@ -186,9 +186,9 @@ TEMPL_PATCH_VMLINUX = """\
 #if IS_ENABLED(${ config })
 % endif # check_enabled
 
-<%include file="${ inc_src_file }"/>
-
 #include "livepatch_${ lp_name }.h"
+
+<%include file="${ inc_src_file }"/>
 
 % if ext_vars:
 % if ibt:
@@ -229,9 +229,9 @@ TEMPL_PATCH_MODULE = """\
 #endif
 % endif # check_enabled
 
-<%include file="${ inc_src_file }"/>
-
 #include "livepatch_${ lp_name }.h"
+
+<%include file="${ inc_src_file }"/>
 
 % if ext_vars:
 % if ibt:
