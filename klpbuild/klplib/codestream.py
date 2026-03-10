@@ -9,6 +9,13 @@ import subprocess
 import sys
 import tempfile
 import logging
+import gzip
+import lzma
+import shutil
+try:
+    import zstandard as zstd
+except ImportError:
+    zstd = None
 
 from pathlib import Path, PurePath
 from importlib import resources
@@ -384,6 +391,50 @@ class Codestream:
 
         return configs
 
+    # currently it suppports the format of .xz .gz and .zst
+    def check_mod_file_present(self, input_path):
+        dest_path = pathlib.Path(input_path)
+        
+        if dest_path.exists():
+            return dest_path
+    
+        # We check these in order of commonality
+        formats = {
+            '.zst': 'zstd',
+            '.xz': 'lzma',
+            '.gz': 'gzip'
+        }
+    
+        for ext, method in formats.items():
+            src_path = dest_path.with_name(dest_path.name + ext)
+            
+            if src_path.exists():
+                try:
+                    if method == 'gzip':
+                        with gzip.open(src_path, 'rb') as f_in, open(dest_path, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                    
+                    elif method == 'lzma':
+                        with lzma.open(src_path, 'rb') as f_in, open(dest_path, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                    
+                    elif method == 'zstd':
+                        if zstd is None:
+                            raise ImportError("zstandard library missing. Run: pip install zstandard")
+                        dctx = zstd.ZstdDecompressor()
+                        with open(src_path, 'rb') as f_in, open(dest_path, 'wb') as f_out:
+                            dctx.copy_stream(f_in, f_out)
+                    
+                    return dest_path # Success! Return the newly created .ko path
+                
+                except Exception as e:
+                    print(f"Failed to decompress {src_path.name}: {e}")
+                    if dest_path.exists():
+                        dest_path.unlink() # Clean up failed/partial files
+                    return None
+    
+        return None
+
     def find_obj_path(self, arch, mod):
         # We already know the path to vmlinux, so return it
         if not is_mod(mod):
@@ -400,8 +451,11 @@ class Codestream:
 
         # modules.order will show the module with suffix .o, so make sure the extension.
         obj_path = mod_path/(PurePath(obj_match.group(1)).with_suffix(".ko"))
+
+        # in case of the .ko file is compressed.
         # Make sure that the .ko file exists
-        assert obj_path.exists(), f"Module {str(obj_path)} doesn't exists. Aborting"
+        obj_path = check_mod_file_present(obj_path)
+        assert obj_path, f"Module {str(obj_path)} doesn't exists. Aborting"
 
         return obj_path.relative_to(get_datadir(arch))
 
