@@ -3,17 +3,17 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
-import json
 import inspect
+import json
 import logging
+
 import pytest
 
-from klpbuild.plugins.extract import extract
-from klpbuild.plugins.setup import setup
-from klpbuild.klplib.codestreams_data import load_codestreams
-from klpbuild.klplib import utils
-
 import tests.utils as tests_utils
+from klpbuild.klplib import utils
+from klpbuild.klplib.codestreams_data import load_codestreams
+from klpbuild.plugins.extract import extract
+from klpbuild.plugins.setup import run as setup
 
 
 def test_compile_commands_enoent():
@@ -23,14 +23,13 @@ def test_compile_commands_enoent():
     """
 
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.6u8"
+    cs = "15.6u16"
 
     setup_args = {
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
         "archs": {utils.ARCH},
-        "cve": None,
         "conf": "CONFIG_HID",
         "module": "vmlinux",
         "file_funcs": [["drivers/hid/hid-core.c", "hid_alloc_report_buf"]],
@@ -46,7 +45,7 @@ def test_compile_commands_enoent():
     data["codestreams"][cs]["files"]["drivers/hid/hid_core.c"] = file_funcs
 
     # write back the changed codestreams.json file
-    with open(utils.get_workdir(lp)/"codestreams.json", "r+") as f:
+    with open(utils.get_workdir(lp) / "codestreams.json", "r+") as f:
         f.seek(0)
         f.write(json.dumps(data, indent=4))
         f.truncate()
@@ -68,7 +67,6 @@ def test_detect_opt_clone(caplog):
         "lp_filter": cs,
         "no_check": True,
         "archs": {utils.ARCH},
-        "cve": None,
         "conf": "CONFIG_BT",
         "module": "bluetooth",
         "file_funcs": [["net/bluetooth/l2cap_sock.c", "l2cap_sock_kill"]],
