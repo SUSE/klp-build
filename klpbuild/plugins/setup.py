@@ -81,14 +81,6 @@ def register_argparser(subparser):
 
 def run(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
         mod_file_funcs, conf_mod_file_funcs, full_checks):
-
-    return setup(lp_name, lp_filter, no_check, archs, cve, conf, module,
-                 file_funcs, mod_file_funcs, conf_mod_file_funcs, full_checks)
-
-
-def setup(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
-          mod_file_funcs, conf_mod_file_funcs, full_checks):
-
     codestreams = setup_codestreams(lp_name, {"cve": cve, "conf": conf,
                                               "lp_filter": lp_filter,
                                               "no_check": no_check,
