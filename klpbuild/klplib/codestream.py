@@ -385,13 +385,6 @@ class Codestream:
         return configs
 
     def find_obj_path(self, arch, mod):
-        # Return the path if the modules was previously found for ARCH, or refetch if
-        # the obejct is for a different architecture
-        obj = self.modules.get(mod, "")
-        if obj:
-            assert self.kernel in str(obj)
-            return obj
-
         # We already know the path to vmlinux, so return it
         if not is_mod(mod):
             return self.get_boot_file("vmlinux", arch).relative_to(get_datadir(arch))
