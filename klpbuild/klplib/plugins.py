@@ -44,9 +44,8 @@ def register_plugins_argparser(subparser):
     :param subparser: the subparser whose plugin parser will be added
     """
     for module in __iter_plugins():
-        # TODO: use 'assert' instead of 'if' when all the plugins are ready
-        if hasattr(module, "register_argparser"):
-            module.register_argparser(subparser)
+        assert hasattr(module, "register_argparser"), f"Module {module} missing register_argparser!"
+        module.register_argparser(subparser)
 
 
 def __get_required_plugin_args(func, args):
