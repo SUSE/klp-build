@@ -114,8 +114,7 @@ def process_make_output(output):
     # outer quotes
     output = output.replace("'", "")
 
-    # Remove the compiler name used to compile the object. TODO: resolve
-    # when clang is used, or other cross-compilers.
+    # Remove the compiler name used to compile the object.
     output = re.sub(r'^gcc(-\d+)?\s+', '', output)
 
     # also remove double quotes from macros like -D"KBUILD....=.."
