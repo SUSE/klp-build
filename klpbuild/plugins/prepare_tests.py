@@ -76,10 +76,14 @@ def download_built_rpms(lp_name, lp_filter):
 
 
 def prepare_tests(lp_name, lp_filter):
+    test_src = get_tests_path(lp_name)
+    if not os.access(test_src, os.X_OK):
+        logging.error("Script %s has no execution bit set. Aborting", test_src)
+        sys.exit(1)
+
     # Download all built rpms
     download_built_rpms(lp_name, lp_filter)
 
-    test_src = get_tests_path(lp_name)
     run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
 
     logging.info("Validating the downloaded RPMs...")
