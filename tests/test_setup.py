@@ -177,7 +177,7 @@ def test_symbol_with_noinstr(caplog):
     assert "Symbol __ktime_get_real_seconds has tracing disabled." in caplog.text
 
 
-def test_symbol_with_noinstr_ibt(caplog):
+def test_symbol_with_noinstr_ibt():
     # IBT enabled kernels can have functions with an offset shifted by 4 bytes
     # when the funciton has ENDBR instructions. Make sure klp-build handles it
     # correctly
