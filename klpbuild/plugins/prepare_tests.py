@@ -114,11 +114,12 @@ def prepare_tests(lp_name, lp_filter):
                 continue
 
             # TODO: there will be only one rpm, format it directly
-            rpm = os.listdir(rpm_dir)
-            if len(rpm) > 1:
-                raise RuntimeError(f"ERROR: {cs.full_cs_name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
 
-            for rpm in os.listdir(rpm_dir):
+            rpms = [rpm for rpm in os.listdir(rpm_dir) if rpm.endswith(".rpm")]
+            if len(rpms) > 1:
+                raise RuntimeError(f"ERROR: {cs.full_cs_name()}/{arch}. {len(rpms)} rpms found. Excepting to find only one")
+
+            for rpm in rpms:
                 # Check for dependencies
                 validate_livepatch_module(cs, arch, rpm_dir, rpm)
 
