@@ -234,12 +234,15 @@ def __get_active_worktrees(kernel_tree):
 
 
 def __remove_worktree(kernel_tree, worktree_dir):
-    subprocess.check_output(["/usr/bin/git", "-C", kernel_tree, "worktree",
-                             "remove", worktree_dir, "-f", "-f"],
-                            stderr=subprocess.PIPE)
+    try:
+        subprocess.check_output(["/usr/bin/git", "-C", kernel_tree, "worktree",
+                                 "remove", worktree_dir, "-f", "-f"],
+                                stderr=subprocess.PIPE)
 
-    if os.path.isdir(worktree_dir):
-        shutil.rmtree(worktree_dir)
+        if os.path.isdir(worktree_dir):
+            shutil.rmtree(worktree_dir)
+    except Exception as e:
+        logging.info(f"Error removing {worktree_dir}: {e}")
 
 
 def __prune_worktrees(kernel_tree):
