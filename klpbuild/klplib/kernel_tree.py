@@ -161,6 +161,20 @@ def init_cs_kernel_tree(kernel_version, outdir):
             "add", outdir, "--checkout", kernel_tree_git_tag
         ], stderr=subprocess.PIPE)
 
+def cleanup_obsolete_trees(codestreams):
+    """
+    Remove obsolete kernel source trees.
+    """
+    kernel_tree = get_user_path("kernel_dir")
+    worktrees = __get_active_worktrees(kernel_tree)
+    valid_kerns = [cs.kernel for cs in codestreams]
+
+    for wt in worktrees:
+        wt_str = Path(wt).name # Use the name of the folder, not the full path string
+        is_valid = any(k in wt_str for k in valid_kerns)
+        if not is_valid:
+            logging.info("Removing worktree %s", wt)
+            __remove_worktree(kernel_tree, wt)
 
 def cleanup_kernel_trees():
     """
