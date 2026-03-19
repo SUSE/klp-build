@@ -74,15 +74,16 @@ def get_bug(bsc):
     Fetch a bug's data indicated by the given bug id.
 
     Args:
-        bsc (str/int): bug id. Must be a numerical value.
+        bsc (str/int): bug id. Can be a numerical value or contain the bsc prefix.
 
     Returns:
         bug object.
     """
-    if isinstance(bsc, str) and not bsc.isnumeric():
+    bug = str(bsc).replace("bsc", "")
+    if not bug.isnumeric():
         return None
 
-    return __bzapi.getbug(bsc)
+    return __bzapi.getbug(bug)
 
 
 def get_bug_comments(bug):
