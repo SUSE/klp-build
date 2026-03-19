@@ -474,7 +474,7 @@ def __generate_klpp_header(cs):
         protos = list(dat["klpp_symbols"].values())
         funcs.extend(protos)
         for p in protos:
-            m = re.findall(r"(struct\s+\w+)\s*\*?\w+", p)
+            m = re.findall(r"(struct\s+\w+)\s*\**\w+", p)
             if not m:
                 continue
             structs.update(m)
