@@ -781,8 +781,10 @@ def lp_out_cleanup(cs, lp_dat, lp_out, sdir):
     - Remove big chunks of empty lines.
     """
     macros = '|'.join(UNSUPPORTED_MACROS)
-    with open(str(lp_out), "r+") as f:
+    orig_file = f"{lp_out}.orig"
+    with open(str(lp_out), "r+") as f, open(str(orig_file), "w") as orig:
         file_buf = f.read()
+        orig.write(file_buf)
         f.seek(0)
         file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
         file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
