@@ -8,8 +8,8 @@ import pytest
 
 from klpbuild.klplib import utils
 from klpbuild.plugins.extract import extract
-from klpbuild.plugins.setup import setup
-from tests.utils import get_file_content
+from klpbuild.plugins.setup import run as setup
+from tests.utils import get_codestreams_file, get_file_content
 
 
 def test_templ_with_externalized_vars():
@@ -21,7 +21,6 @@ def test_templ_with_externalized_vars():
         "lp_filter": cs,
         "no_check": True,
         "archs": utils.ARCHS,
-        "cve": None,
         "conf": "CONFIG_PROC_FS",
         "module" : "vmlinux",
         "file_funcs" : [["fs/proc/cmdline.c", "cmdline_proc_show"]],
@@ -65,7 +64,6 @@ def test_templ_without_externalized_vars():
         "lp_filter": cs,
         "no_check": True,
         "archs": {utils.ARCH},
-        "cve": None,
         "conf": "CONFIG_IPV6",
         "module" : "vmlinux",
         "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"]],
@@ -112,7 +110,6 @@ def test_is_enabled_only_on_cs_arcs():
         "lp_filter": cs,
         "no_check": True,
         "archs": utils.ARCHS,
-        "cve": None,
         "conf": "CONFIG_IPV6",
         "module": "vmlinux",
         "file_funcs": [
@@ -149,7 +146,6 @@ def test_is_enabled_only_on_x86():
         "lp_filter": cs,
         "no_check": True,
         "archs": utils.ARCHS,
-        "cve": None,
         "conf": "CONFIG_ACPI",
         "module": None,
         "file_funcs": [
@@ -180,7 +176,6 @@ def test_check_header_file_included():
         "lp_filter": cs,
         "no_check": True,
         "archs" : utils.ARCHS,
-        "cve": None,
         "conf": "CONFIG_IPV6",
         "module" : "vmlinux",
         "file_funcs": [["net/ipv6/rpl.c", "ipv6_rpl_srh_size"],
@@ -205,15 +200,14 @@ def test_check_header_file_included():
 
 
 def test_templ_cve_specified():
-    lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u25"
+    lp = "bsc1227320"
+    cs = "15.5u30"
 
     setup_args = {
         "lp_name" : lp,
         "lp_filter": cs,
-        "no_check": True,
+        "no_check": False,
         "archs": {utils.ARCH},
-        "cve": "1234-5678",
         "conf": "CONFIG_PROC_FS",
         "module" : "vmlinux",
         "file_funcs" : [["fs/proc/cmdline.c", "cmdline_proc_show"]],
@@ -223,19 +217,8 @@ def test_templ_cve_specified():
     }
     setup(**setup_args)
 
-    extract(lp_name=lp, lp_filter=cs, no_patches=True, avoid_ext=[])
-
-    # With CVE speficied, we should have it in the final file
-    assert "CVE-1234-5678" in get_file_content(lp, cs)
-
-    # This livepatch targets only the running platform, so the IS_ENABLED needs to be there
-    # And with it, both prototypes and empty functions needs to be there. The _cleanup is a
-    # prototype of the IS_ENABLED path is only a prototype because the symbol is from vmlinux
-    header = get_file_content(lp, cs, f"livepatch_{lp}.h")
-    assert "_init(void);" in header
-    assert "_init(void) { return 0; }" in header
-    assert "_cleanup(void) {}" in header
-    assert "IS_ENABLED" in header
+    # The CVE is found by using the bsc number
+    assert "2024-35789" == get_codestreams_file(lp)["cve"]
 
 
 def test_templ_exts_mod_name():
@@ -251,7 +234,6 @@ def test_templ_exts_mod_name():
         "lp_filter": cs,
         "no_check": True,
         "archs" : utils.ARCHS,
-        "cve": None,
         "conf": "CONFIG_NVME_TCP",
         "module" : "nvme-tcp",
         "file_funcs" : [["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]],
@@ -291,7 +273,6 @@ def test_templ_micro_is_ibt():
         "lp_filter": cs,
         "no_check": True,
         "archs" : utils.ARCHS,
-        "cve": None,
         "conf": "CONFIG_NVME_TCP",
         "module" : "nvme-tcp",
         "file_funcs" : [["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]],
@@ -326,7 +307,6 @@ def test_templ_ibt_without_externalized_vars():
         "lp_filter": cs,
         "no_check": True,
         "archs": {utils.ARCH},
-        "cve": None,
         "conf": "CONFIG_IPV6",
         "module" : "vmlinux",
         "file_funcs" : [["net/ipv6/rpl.c", "ipv6_rpl_addr_compress"]],
@@ -374,7 +354,6 @@ def test_templ_kbuild_has_contents():
         "lp_filter": cs,
         "no_check": True,
         "archs" : utils.ARCHS,
-        "cve": None,
         "conf": "CONFIG_NVME_TCP",
         "module" : "nvme-tcp",
         "file_funcs" : [["drivers/nvme/host/tcp.c", "nvme_tcp_io_work"]],

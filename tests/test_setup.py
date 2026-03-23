@@ -5,13 +5,13 @@ import inspect
 import logging
 import pytest
 
-from klpbuild.plugins.setup import setup, setup_manual
+from klpbuild.plugins.setup import run as setup, setup_manual
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib import utils
 from tests.utils import get_codestreams_file
 
-CS = "15.5u23"
-DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_TUN", "no_check": True}
+CS = "15.5u30"
+DEFAULT_DATA = {"lp_filter": CS, "conf": "CONFIG_TUN", "no_check": True}
 
 
 def test_missing_file_funcs():
@@ -106,7 +106,7 @@ def test_valid_micro_patchid():
     # Make sure that patchid is informed for SLE MICRO
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     micro_cs = "6.0u11"
-    micro_data = {"cve": None, "lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": True}
+    micro_data = {"lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": True}
 
     setup_args = {
         "lp_name" : lp,
@@ -159,7 +159,7 @@ def test_symbol_with_noinstr(caplog):
     # Make sure that we detect when a symbol cannot be patched on setup phase
     lp = "bsc_" + inspect.currentframe().f_code.co_name
 
-    lp_default_data = {"cve": None, "lp_filter": CS, "conf": "CONFIG_SUSE_KERNEL", "no_check": True}
+    lp_default_data = {"lp_filter": CS, "conf": "CONFIG_SUSE_KERNEL", "no_check": True}
     for arch in ["x86_64", "ppc64le", "s390x"]:
         with pytest.raises(SystemExit):
             setup_args = {
@@ -183,7 +183,7 @@ def test_symbol_with_noinstr_ibt():
     # correctly
     lp = "bsc_" + inspect.currentframe().f_code.co_name
 
-    lp_default_data = {"cve": None, "lp_filter": "16.0rtu1", "conf": "CONFIG_IO_URING", "no_check": True}
+    lp_default_data = {"lp_filter": "16.0rtu1", "conf": "CONFIG_IO_URING", "no_check": True}
     setup_args = {
         "lp_name": lp,
         "archs": ["x86_64"],
