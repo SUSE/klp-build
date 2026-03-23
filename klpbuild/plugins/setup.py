@@ -159,6 +159,8 @@ def setup_codestreams(lp_name, data):
         codestreams = utils.filter_codestreams(data["lp_filter"], all_codestreams)
     else:
         cve = bugzilla.get_bug_cve(bugzilla.get_bug(lp_name))
+        assert cve, f"Could not retrieve CVE from bugzilla for {lp_name}"
+        logging.info("CVE retrieved from bugzilla: %s", cve)
         _, upstream, patched_cs, codestreams = scan(cve, data["conf"],
                                                     data["lp_filter"], True,
                                                     data["archs"],
