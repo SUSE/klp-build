@@ -224,7 +224,7 @@ def get_branch_patches(cve, mbranch):
 
 
 @__check_kernel_source_tags_are_fetched
-def get_patches(cve, savedir=None):
+def get_patches(cve, savedir=None, extra_patches=[]):
     logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
     # Store all patches from each branch
@@ -247,6 +247,20 @@ def get_patches(cve, savedir=None):
         patches[bc] = []
 
         idx = 0
+
+        # Handle extra patches: read them from the branch and store
+        # them before the CVE patches so they get applied first.
+        for extra_patch in extra_patches:
+            pfile = ksrc_read_branch_file(mbranch, extra_patch)
+            if pfile:
+                idx += 1
+                if savedir:
+                    store_patch(pfile, extra_patch, savedir, idx, bc)
+                patches[bc].append(extra_patch)
+                logging.debug("\textra patch %s found in %s", extra_patch, mbranch)
+            else:
+                logging.debug("\textra patch %s not found in %s", extra_patch, mbranch)
+
         for patch in get_branch_patches(cve, mbranch):
             if patch.strip().startswith("#"):
                 continue

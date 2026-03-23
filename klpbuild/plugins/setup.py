@@ -80,14 +80,26 @@ def register_argparser(subparser):
         nargs="+",
         help="Supported architectures for this livepatch",
     )
+    args.add_argument(
+        "--add-patches",
+        type=str,
+        nargs="+",
+        required=False,
+        default=[],
+        help="Path(s) of additional patches from kernel-source (e.g. "
+        "patches.suse/some-fix.patch). Can specify multiple patches. "
+        "These patches will be checked per-codestream and applied "
+        "before CVE patches if missing.",
+    )
 
 
 def run(lp_name, lp_filter, no_check, archs, conf, module, file_funcs,
-        mod_file_funcs, conf_mod_file_funcs, full_checks):
+        mod_file_funcs, conf_mod_file_funcs, full_checks, add_patches=[]):
     codestreams = setup_codestreams(lp_name, {"conf": conf,
                                               "lp_filter": lp_filter,
                                               "no_check": no_check,
-                                              "archs": archs})
+                                              "archs": archs,
+                                              "extra_patches": add_patches})
 
     if conf:
         setup_manual(codestreams, archs, conf, module,
@@ -162,7 +174,8 @@ def setup_codestreams(lp_name, data):
         _, upstream, patched_cs, codestreams = scan(cve, data["conf"],
                                                     data["lp_filter"], True,
                                                     data["archs"],
-                                                    utils.get_workdir(lp_name))
+                                                    utils.get_workdir(lp_name),
+                                                    data.get("extra_patches", []))
 
     # Add new codestreams names to the already existing list, skipping
     # duplicates
