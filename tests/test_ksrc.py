@@ -3,7 +3,8 @@
 # Copyright (C) 2021-2025 SUSE
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
-from klpbuild.klplib.ksrc import (get_patches_files, ksrc_is_module_supported,
+from klpbuild.klplib.ksrc import (get_patches, get_patches_files,
+                                  ksrc_is_module_supported,
                                   get_branch_patches, get_patch_subject)
 
 def test_get_patches_files():
@@ -74,3 +75,28 @@ def test_get_rt_patches():
             ]
     patches = get_branch_patches("2024-35905", "SUSE-2024-RT")
     assert patches and expected == patches
+
+
+def test_get_patches_with_extra_patches():
+    extra_patch = "patches.suse/net-fix-__dst_negative_advice-race.patch"
+    cve = "2022-48801"
+
+    _, patches = get_patches(cve, extra_patches=[extra_patch])
+
+    # The additional patch should appear before the CVE patch on branches
+    # where it exists
+    sp5_patches = patches["15.5"]
+    assert extra_patch in sp5_patches
+    assert sp5_patches.index(extra_patch) == 0
+
+
+def test_get_patches_with_nonexistent_extra_patches():
+    cve = "2022-48801"
+
+    _, patches_without = get_patches(cve)
+    _, patches_with = get_patches(cve, extra_patches=["patches.suse/does-not-exist.patch"])
+
+    # Non-existent additional patches should be silently skipped, so the
+    # patch lists must be identical
+    for bc in patches_without:
+        assert patches_without[bc] == patches_with[bc]
