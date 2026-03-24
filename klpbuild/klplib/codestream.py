@@ -499,7 +499,7 @@ class Codestream:
                 continue
 
             if len(syms) > 1:
-                logging.warning("%s-%s (%s): symbol %s duplicated on %d", self.full_cs_name(), arch, self.kernel, symbol, mod)
+                logging.warning("%s-%s (%s): symbol %s duplicated on %s", self.full_cs_name(), arch, self.kernel, symbol, mod)
 
             # If len(syms) == 1 means that we found a unique symbol, which is
             # what we expect
