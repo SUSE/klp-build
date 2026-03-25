@@ -161,6 +161,20 @@ def init_cs_kernel_tree(kernel_version, outdir):
             "add", outdir, "--checkout", kernel_tree_git_tag
         ], stderr=subprocess.PIPE)
 
+def cleanup_obsolete_trees(codestreams):
+    """
+    Remove obsolete kernel source trees.
+    """
+    kernel_tree = get_user_path("kernel_dir")
+    worktrees = __get_active_worktrees(kernel_tree)
+    valid_kerns = [cs.kernel for cs in codestreams]
+
+    for wt in worktrees:
+        wt_str = Path(wt).name # Use the name of the folder, not the full path string
+        is_valid = any(k in wt_str for k in valid_kerns)
+        if not is_valid:
+            logging.info("Removing worktree %s", wt)
+            __remove_worktree(kernel_tree, wt)
 
 def cleanup_kernel_trees():
     """
@@ -234,12 +248,15 @@ def __get_active_worktrees(kernel_tree):
 
 
 def __remove_worktree(kernel_tree, worktree_dir):
-    subprocess.check_output(["/usr/bin/git", "-C", kernel_tree, "worktree",
-                             "remove", worktree_dir, "-f", "-f"],
-                            stderr=subprocess.PIPE)
+    try:
+        subprocess.check_output(["/usr/bin/git", "-C", kernel_tree, "worktree",
+                                 "remove", worktree_dir, "-f", "-f"],
+                                stderr=subprocess.PIPE)
 
-    if os.path.isdir(worktree_dir):
-        shutil.rmtree(worktree_dir)
+        if os.path.isdir(worktree_dir):
+            shutil.rmtree(worktree_dir)
+    except Exception as e:
+        logging.info(f"Error removing {worktree_dir}: {e}")
 
 
 def __prune_worktrees(kernel_tree):
