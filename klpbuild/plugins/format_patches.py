@@ -117,7 +117,8 @@ def update_cover_letter(patches_dir, lp_name):
     body += f"# Affected archs:\n - {archs}\n"
     body += f"# Patched codestreams:\n - {cs_patched}\n"
     body += f"# Affeted codestreams:\n - {cs_affected}\n"
-    body += f"# Grouped codestreams:\n{cs_groups}\n"
+    if cs_groups is not None:
+        body += f"# Grouped codestreams:\n{cs_groups}\n"
     body += "# Manual work:\nNone\n\n"
     letter = re.sub(r"\*{3} BLURB HERE.*", body, letter, flags=re.DOTALL)
 
@@ -128,7 +129,12 @@ def update_cover_letter(patches_dir, lp_name):
 def generate_groups(lp_name, codestreams):
     groups = ""
 
-    cs_groups = utils.get_lp_groups(lp_name, codestreams)
+    try:
+        cs_groups = utils.get_lp_groups(lp_name, codestreams)
+    except FileNotFoundError:
+        logging.warning("ccp/groups file not found, skipping grouped codestreams")
+        return None
+
     for group, cs_list in cs_groups.items():
         groups += f" - {group}\n"
         cs = cs_list[0]
