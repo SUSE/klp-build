@@ -196,6 +196,13 @@ will be livepatched instead.
 .TP
 .BI --archs " {ppc64le,s390x,x86_64} [{ppc64le,s390x,x86_64} ...]"
 Supported architectures for this livepatch.
+.TP
+.BI --add-patches " PATCH [PATCH ...]"
+Path(s) of additional patches from kernel-source (e.g.\&
+.IR patches.suse/some-fix.patch ).
+Can specify multiple patches.
+These patches will be checked per-codestream and applied before CVE patches
+when present on the branch.
 .RE
 .TP
 .B extract
