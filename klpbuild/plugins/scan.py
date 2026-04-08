@@ -103,7 +103,7 @@ def scan_job(bug, cve):
     # All = ppc64le, s390x and x86_64
     # None = klp-build failed to determine the CONFIGs.
     if (archs := utils.affected_archs(affected_cs)):
-        affected_archs = "All" if archs == utils.ARCHS else ','.join(archs)
+        affected_archs = "All" if set(archs) == utils.ARCHS else ','.join(archs)
 
     return status, affected_archs, eol, affected
 
