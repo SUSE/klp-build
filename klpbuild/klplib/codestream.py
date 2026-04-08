@@ -20,10 +20,10 @@ from klpbuild.klplib.ksrc import KERNEL_BRANCHES
 
 class Codestream:
     __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "is_slfo",
-                 "__project", "patchid", "kernel", "archs", "files", "modules",
-                 "repo", "configs", "required_patches")
+                 "__project", "patchid", "kernel", "eol", "archs", "files",
+                 "modules", "repo", "configs", "required_patches")
 
-    def __init__(self, name, project="", patchid="", kernel="",
+    def __init__(self, name, project="", patchid="", kernel="", eol="",
                  archs=None, files=None, modules=None, configs=None,
                  required_patches=None):
 
@@ -45,6 +45,7 @@ class Codestream:
         self.__project = project
         self.patchid = patchid
         self.kernel = kernel
+        self.eol = eol
 
         self.archs = set(archs) if archs is not None else self.get_default_archs()
         self.files = files if files is not None else {}
@@ -56,8 +57,8 @@ class Codestream:
 
     @classmethod
     def from_data(cls, data):
-        return cls(data["name"],data["project"], data["patchid"],
-                   data["kernel"], data["archs"], data["files"],
+        return cls(data["name"], data["project"], data["patchid"],
+                   data["kernel"], data["eol"], data["archs"], data["files"],
                    data["modules"], data["configs"], data["required_patches"])
 
     def to_data(self):
@@ -67,6 +68,7 @@ class Codestream:
                 "project": self.__project,
                 "patchid": self.patchid,
                 "kernel" : self.kernel,
+                "eol" : self.eol,
                 "archs": list(self.archs),
                 "files" : self.files,
                 "modules" : self.modules,

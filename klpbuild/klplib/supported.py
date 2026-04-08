@@ -59,10 +59,9 @@ def __get_supported_codestreams():
     lines = __download_supported_file() if not utils.in_test_mode() else __load_supported_file()
 
     for line in lines:
-        # remove the last two columns, which are dates of the line
-        # and add a fifth field with the forth one + rpm- prefix, and
-        # remove the build counter number
-        full_cs, proj, kernel_full, _, _ = line.split(",")
+        full_cs, proj, kernel_full, eol, eol_ltss = line.split(",")
+        if eol_ltss.strip():
+            eol = eol_ltss
 
         kernel = re.sub(r"\.\d+$", "", kernel_full)
 
@@ -71,14 +70,14 @@ def __get_supported_codestreams():
         if "/" in proj:
             proj, patchid = proj.split("/")
 
-        cs = __codestream_from_supported(full_cs, proj, patchid, kernel)
+        cs = __codestream_from_supported(full_cs, proj, patchid, kernel, eol)
         __supported_codestreams_cache.append(cs)
 
     __supported_codestreams_fetched = True
     return copy.deepcopy(__supported_codestreams_cache)
 
 
-def __codestream_from_supported(cs, proj, patchid, kernel):
+def __codestream_from_supported(cs, proj, patchid, kernel, eol):
     # Parse SLE15-SP2_Update_25 to 15.2u25
     rt = "rt" if "-RT" in cs else ""
     sp = "0"
@@ -98,7 +97,7 @@ def __codestream_from_supported(cs, proj, patchid, kernel):
         assert False, "codestream name should contain either SLE or MICRO!"
 
     cs_name = f"{sle}.{sp}{rt}u{update}"
-    return Codestream(cs_name, proj, patchid, kernel)
+    return Codestream(cs_name, proj, patchid, kernel, eol)
 
 
 def __load_supported_file():
