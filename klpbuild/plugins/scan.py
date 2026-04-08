@@ -73,13 +73,14 @@ def scan_bugzilla():
     logging.getLogger().setLevel(logging.INFO)
 
     logging.info(tabulate.tabulate(table, headers=["ID", "CVE", "SUBSYSTEM", "CVSS", "PRIORITY",
-                                                   "STATUS", "ARCHS", "AFFECTED"]))
+                                                   "STATUS", "ARCHS", "EOL", "AFFECTED"]))
 
 
 def scan_job(bug, cve):
     affected = "No"
     status = "Not-Fixed"
     affected_archs = "None"
+    eol = "n/a"
 
     patches, _, _, affected_cs = scan(cve, None, None, False)
 
@@ -97,13 +98,14 @@ def scan_job(bug, cve):
 
     if affected_cs:
         affected = utils.classify_codestreams_str(affected_cs)
+        eol = utils.get_lp_eol(affected_cs)
 
     # All = ppc64le, s390x and x86_64
     # None = klp-build failed to determine the CONFIGs.
     if (archs := utils.affected_archs(affected_cs)):
         affected_archs = "All" if archs == utils.ARCHS else ','.join(archs)
 
-    return status, affected_archs, affected
+    return status, affected_archs, eol, affected
 
 
 def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None, extra_patches=[]):
@@ -179,6 +181,9 @@ def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None, extra_
     else:
         logging.info("All affected codestreams:")
         logging.info("\t%s\n", utils.classify_codestreams_str(affected_cs))
+        if utils.is_lp_eol_soon(affected_cs):
+            logging.warning("The livepatch EOL will be soon (%s).\n",
+                            utils.get_lp_eol(affected_cs))
 
     return patches, upstream, patched_cs, affected_cs
 
