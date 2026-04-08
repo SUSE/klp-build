@@ -298,3 +298,57 @@ def test_get_lp_groups_mixed(tmp_path, monkeypatch):
         "15.7rtu6-8": [Codestream("15.7rtu6"), Codestream("15.7rtu7"), Codestream("15.7rtu8")],
         "6.0u0-2":    [Codestream("6.0u0"), Codestream("6.0u1"), Codestream("6.0u2")],
     }
+
+
+def test_get_lp_eol():
+    cs_list = [
+        Codestream("15.5u20", eol="2025-11-09"),
+        Codestream("15.5u21", eol="2026-01-17"),
+        Codestream("15.5u22", eol="2026-02-21"),
+    ]
+    assert utils.get_lp_eol(cs_list) == "2026-02-21"
+
+
+def test_get_lp_eol_single():
+    cs_list = [Codestream("15.6u5", eol="2025-11-09")]
+    assert utils.get_lp_eol(cs_list) == "2025-11-09"
+
+
+def test_is_lp_eol_soon():
+    from datetime import date, timedelta
+
+    today = date.today()
+
+    # EOL in the past
+    past = (today - timedelta(days=1)).isoformat()
+    assert utils.is_lp_eol_soon([Codestream("15.5u20", eol=past)])
+
+    # EOL is today
+    assert utils.is_lp_eol_soon([Codestream("15.5u20", eol=today.isoformat())])
+
+    # EOL in 29 days
+    soon = (today + timedelta(days=29)).isoformat()
+    assert utils.is_lp_eol_soon([Codestream("15.5u20", eol=soon)])
+
+    # EOL in exactly 30 days
+    edge = (today + timedelta(days=30)).isoformat()
+    assert utils.is_lp_eol_soon([Codestream("15.5u20", eol=edge)])
+
+    # EOL in 31 days
+    far = (today + timedelta(days=31)).isoformat()
+    assert not utils.is_lp_eol_soon([Codestream("15.5u20", eol=far)])
+
+
+def test_is_lp_eol_soon_uses_latest():
+    from datetime import date, timedelta
+
+    today = date.today()
+    past = (today - timedelta(days=10)).isoformat()
+    far = (today + timedelta(days=60)).isoformat()
+
+    # One CS expired, but the latest EOL is far out
+    cs_list = [
+        Codestream("15.5u20", eol=past),
+        Codestream("15.5u21", eol=far),
+    ]
+    assert not utils.is_lp_eol_soon(cs_list)
