@@ -6,6 +6,7 @@
 import io
 import logging
 import os
+from datetime import date, timedelta
 from pathlib import Path
 import platform
 import re
@@ -448,3 +449,30 @@ def in_test_mode():
 def is_cve_valid(cve):
     # Support CVEs from 2020 up to 2029
     return re.match(r"^202[0-9]-[0-9]{4,7}$", cve)
+
+
+def get_lp_eol(cs_list):
+    '''
+    Return the latest EOL date across all codestreams in the list.
+
+    Args:
+        cs_list (list[Codestream]): List of codestreams.
+
+    Returns:
+        str: The latest EOL date string (YYYY-MM-DD).
+    '''
+    return max(cs.eol for cs in cs_list)
+
+
+def is_lp_eol_soon(cs_list):
+    '''
+    Check if the livepatch EOL is within 30 days.
+
+    Args:
+        cs_list (list[Codestream]): List of codestreams.
+
+    Returns:
+        bool: True if the latest EOL is within 30 days from today.
+    '''
+    eol = date.fromisoformat(get_lp_eol(cs_list))
+    return eol <= date.today() + timedelta(days=30)
