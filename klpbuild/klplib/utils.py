@@ -386,17 +386,29 @@ def get_fname(src_name):
     return str(Path(src_name).with_suffix("")).replace("-", "_")
 
 
-def get_workdir(lp_name):
+def get_workdir(lp_name, check=False):
     """
-    Get the working directory for a given livepatch name.
+    Get the working directory for a given livepatch name, and optionally check
+    if the livepatch directory exists.
 
     Args:
         lp_name (str): The name of the livepatch.
+        check (bool): Verify if the workdir exists
 
     Returns:
-        Path: The full path to the livepatch file.
+        Path: The full path to the livepatch project directory.
+        ValueError: If the check argument was True and the workdir doesn't exists
+        RuntimeError: If the lp_name doesn't comply with validate_lp_name
+
     """
-    return get_user_path('work_dir')/lp_name
+
+    validate_lp_name(lp_name)
+
+    wdir = get_user_path("work_dir") / lp_name
+    if check and not wdir.exists():
+        raise ValueError(f"Project {wdir} doesn't exists")
+
+    return wdir
 
 
 def get_datadir(arch=""):
