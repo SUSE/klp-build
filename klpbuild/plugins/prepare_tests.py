@@ -84,12 +84,13 @@ def prepare_tests(lp_name, lp_filter):
     # Download all built rpms
     download_built_rpms(lp_name, lp_filter)
 
+    tests_dir = get_workdir(lp_name, True) / "tests"
     run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
 
     logging.info("Validating the downloaded RPMs...")
 
     for arch in ARCHS:
-        tests_path = get_workdir(lp_name)/"tests"/arch
+        tests_path = tests_dir / arch
         test_arch_path = tests_path/lp_name
 
         # Remove previously created directory and archive
