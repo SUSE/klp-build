@@ -108,7 +108,12 @@ def scan_job(bug, cve):
     return status, affected_archs, eol, affected
 
 
-def scan(cve, conf, lp_filter, download, archs=utils.ARCHS, savedir=None, extra_patches=[]):
+def scan(cve, conf, lp_filter, download, archs=None, savedir=None, extra_patches=None):
+    if archs is None:
+        archs = utils.ARCHS
+    if extra_patches is None:
+        extra_patches = []
+
     assert cve and utils.is_cve_valid(cve)
 
     upstream, patches = get_patches(cve, savedir, extra_patches)
@@ -202,11 +207,11 @@ def filter_affected_codestreams(codestreams, patches):
             continue
 
         logging.debug("%s (%s) requires:", cs.full_cs_name(), cs.kernel)
-        for patch in suse_patches:
-            if not cs.has_patch(patch):
+        for suse_patch in suse_patches:
+            if not cs.has_patch(suse_patch):
                 # Store the patches required by this codestreams for future use
-                cs.add_required_patch(patch)
-                logging.debug("\t%s", patch)
+                cs.add_required_patch(suse_patch)
+                logging.debug("\t%s", suse_patch)
         logging.debug("")
 
         if cs.needs_patches():

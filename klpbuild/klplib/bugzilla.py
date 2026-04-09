@@ -11,7 +11,7 @@ import bugzilla
 from klpbuild.klplib.utils import is_cve_valid
 from klpbuild.klplib.config import get_user_settings
 
-__bzapi = None
+__BZAPI = None
 def __check_is_connected(func):
     """
     This decorator checks whether there's an active connection to a bugzilla
@@ -25,9 +25,9 @@ def __check_is_connected(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        global __bzapi
-        if not __bzapi:
-            __bzapi = __connect_to_bugzilla()
+        global __BZAPI
+        if not __BZAPI:
+            __BZAPI = __connect_to_bugzilla()
         return func(*args, **kwargs)
     return wrapper
 
@@ -52,18 +52,18 @@ def get_pending_bugs():
     """
     global __dep_bugs
 
-    query = __bzapi.build_query(
+    query = __BZAPI.build_query(
             status=["NEW","REOPENED","IN_PROGRESS"],
             component="Kernel Live Patches",
             assigned_to="kernel-lp")
 
     query["ids_only"] = True
-    ids = [b.id for b in __bzapi.query(query)]
-    bugs = __bzapi.getbugs(ids)
+    ids = [b.id for b in __BZAPI.query(query)]
+    bugs = __BZAPI.getbugs(ids)
 
     deps_ids = [b.depends_on[0] for b in bugs if len(b.depends_on) > 0]
     deps_fields = ["status", "resolution", "assigned_to", "whiteboard"]
-    __dep_bugs = {d.id:d for d in __bzapi.getbugs(deps_ids,include_fields=deps_fields)}
+    __dep_bugs = {d.id:d for d in __BZAPI.getbugs(deps_ids,include_fields=deps_fields)}
 
     return bugs
 
@@ -83,7 +83,7 @@ def get_bug(bsc):
     if not bug.isnumeric():
         return None
 
-    return __bzapi.getbug(bug)
+    return __BZAPI.getbug(bug)
 
 
 def get_bug_comments(bug):

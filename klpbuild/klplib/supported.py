@@ -19,7 +19,7 @@ SUPPORTED_CS_URL = "https://gitlab.suse.de/live-patching/sle-live-patching-data/
 SUSE_CERT = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
 
 __supported_codestreams_cache = []
-__supported_codestreams_fetched = False
+__SUPPORTED_CODESTREAMS_FETCHED = False
 __supported_codestreams_lock = Lock()
 
 
@@ -32,7 +32,7 @@ def get_supported_codestreams():
     """
 
     # (Non-blocking read) Return cached list if present.
-    if __supported_codestreams_fetched:
+    if __SUPPORTED_CODESTREAMS_FETCHED:
         return copy.deepcopy(__supported_codestreams_cache)
 
     # Lock access and fetch the list.
@@ -48,11 +48,11 @@ def __get_supported_codestreams():
         list[Codestream]: A list of supported codestreams.
     """
     global __supported_codestreams_cache
-    global __supported_codestreams_fetched
+    global __SUPPORTED_CODESTREAMS_FETCHED
 
     # In case a reader got locked while the cache was still being written.
     # Return cached list.
-    if __supported_codestreams_fetched:
+    if __SUPPORTED_CODESTREAMS_FETCHED:
         return copy.deepcopy(__supported_codestreams_cache)
 
     __supported_codestreams_cache = []
@@ -73,7 +73,7 @@ def __get_supported_codestreams():
         cs = __codestream_from_supported(full_cs, proj, patchid, kernel, eol)
         __supported_codestreams_cache.append(cs)
 
-    __supported_codestreams_fetched = True
+    __SUPPORTED_CODESTREAMS_FETCHED = True
     return copy.deepcopy(__supported_codestreams_cache)
 
 

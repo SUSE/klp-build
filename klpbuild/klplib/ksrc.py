@@ -43,7 +43,7 @@ KERNEL_BRANCHES = {
 }
 
 
-__kernel_source_tags_are_fetched = False
+__KERNEL_SOURCE_TAGS_ARE_FETCHED = False
 __kernel_source_fetch_lock = Lock()
 def __check_kernel_source_tags_are_fetched(func):
     """
@@ -59,12 +59,12 @@ def __check_kernel_source_tags_are_fetched(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        global __kernel_source_tags_are_fetched
+        global __KERNEL_SOURCE_TAGS_ARE_FETCHED
 
         with __kernel_source_fetch_lock:
-            if not __kernel_source_tags_are_fetched:
+            if not __KERNEL_SOURCE_TAGS_ARE_FETCHED:
                 __fetch_kernel_branches()
-                __kernel_source_tags_are_fetched = True
+                __KERNEL_SOURCE_TAGS_ARE_FETCHED = True
         return func(*args, **kwargs)
     return wrapper
 
@@ -224,7 +224,10 @@ def get_branch_patches(cve, mbranch):
 
 
 @__check_kernel_source_tags_are_fetched
-def get_patches(cve, savedir=None, extra_patches=[]):
+def get_patches(cve, savedir=None, extra_patches=None):
+    if extra_patches is None:
+        extra_patches = []
+
     logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
     # Store all patches from each branch
@@ -338,13 +341,13 @@ def ksrc_is_module_supported(module, kernel):
         Return True if supported and False otherwise.
         Return True if blacklisted and False otherwise.
         """
-    UNSUPPORTED_MARKERS = {
+    unsupported_markers = {
         "-",
         "+external",
         "-!optional"
     }
 
-    SUPPORTED_MARKERS = {
+    supported_markers = {
         "+base",
     }
 
@@ -389,10 +392,10 @@ def ksrc_is_module_supported(module, kernel):
             blacklisted = True
 
         # Check if any marker belongs to UNSUPPORTED_MARKERS
-        elif markers[0] in UNSUPPORTED_MARKERS:
+        elif markers[0] in unsupported_markers:
             supported = False
 
-        elif markers[0] not in SUPPORTED_MARKERS:
+        elif markers[0] not in supported_markers:
             raise RuntimeError(f"ERROR: {mpath} marker {marker} in {kernel}:supported.conf is not known!")
 
         break
