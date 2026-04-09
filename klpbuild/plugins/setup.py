@@ -160,8 +160,7 @@ def setup_archs(codestreams):
 
 
 def setup_codestreams(lp_name, data):
-    if not lp_name.startswith("bsc"):
-        raise ValueError("Please use prefix 'bsc' when creating a livepatch for codestreams")
+    utils.validate_lp_name(lp_name)
 
     cve = None
 

@@ -476,3 +476,8 @@ def is_lp_eol_soon(cs_list):
     '''
     eol = date.fromisoformat(get_lp_eol(cs_list))
     return eol <= date.today() + timedelta(days=30)
+
+
+def validate_lp_name(lp_name):
+    if not lp_name.startswith("bsc"):
+        raise ValueError("Please use prefix 'bsc' for livepatch name")
