@@ -8,7 +8,7 @@ import subprocess
 import os
 import re
 
-from klpbuild.klplib.config import get_user_path
+from klpbuild.klplib.config import get_repos_dir, get_user_path
 from klpbuild.klplib.utils import get_workdir
 
 TREE_NAME = "kgraft"
@@ -17,8 +17,7 @@ __KGR_PATH = ""
 
 def init_kgraft():
     global __KGR_PATH
-    data_path = get_user_path('data_dir')
-    __KGR_PATH = data_path/TREE_NAME
+    __KGR_PATH = get_repos_dir()/TREE_NAME
 
     if not os.path.isdir(__KGR_PATH):
         subprocess.check_output(
