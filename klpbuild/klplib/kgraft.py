@@ -12,30 +12,30 @@ from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.utils import get_workdir
 
 TREE_NAME = "kgraft"
-__kgr_path = ""
+__KGR_PATH = ""
 
 
 def init_kgraft():
-    global __kgr_path
+    global __KGR_PATH
     data_path = get_user_path('data_dir')
-    __kgr_path = data_path/TREE_NAME
+    __KGR_PATH = data_path/TREE_NAME
 
-    if not os.path.isdir(__kgr_path):
+    if not os.path.isdir(__KGR_PATH):
         subprocess.check_output(
-                ["git", "worktree", "add", "-f", __kgr_path],
+                ["git", "worktree", "add", "-f", __KGR_PATH],
                 cwd=get_user_path('kgr_patches_dir'),
                 stderr=subprocess.STDOUT,
                 )
     else:
         subprocess.check_output(
                 ["git", "checkout", "-f", TREE_NAME],
-                cwd=__kgr_path,
+                cwd=__KGR_PATH,
                 stderr=subprocess.STDOUT,
                 )
 
 
 def get_kgraft():
-    return __kgr_path
+    return __KGR_PATH
 
 
 def fetch_branch(branch, remote="origin"):

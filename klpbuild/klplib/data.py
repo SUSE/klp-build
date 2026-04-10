@@ -16,7 +16,7 @@ def filter_obsolete_directories(target_path, valid_kerns):
     check the path including the kernel version is valid or not
     """
     ret_paths = []
-    
+
     if not target_path.exists():
         return []
 
@@ -62,9 +62,9 @@ def cleanup_obsolete_data(valid_codestreams):
                 shutil.rmtree(p)
             else:
                 p.unlink() # Delete file if it's an RPM and not a directory
-            logging.info(f"Removed obsolete path: {p}")
-        except Exception as e:
-            logging.error(f"Error removing {p}: {e}")
+            logging.info("Removed obsolete path: %s", p)
+        except OSError as e:
+            logging.error("Error removing %s: %s", p, e)
 
     cleanup_obsolete_trees(valid_codestreams)
 

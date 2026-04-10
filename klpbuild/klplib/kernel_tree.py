@@ -15,7 +15,7 @@ from pathlib import Path
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.utils import ARCH
 
-__kernel_tags_are_fetched = False
+__KERNEL_TAGS_ARE_FETCHED = False
 __kernel_fetch_lock = Lock()
 
 def __check_kernel_tags_are_fetched(func):
@@ -31,12 +31,12 @@ def __check_kernel_tags_are_fetched(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        global __kernel_tags_are_fetched
+        global __KERNEL_TAGS_ARE_FETCHED
 
         with __kernel_fetch_lock:
-            if not __kernel_tags_are_fetched:
+            if not __KERNEL_TAGS_ARE_FETCHED:
                 __fetch_kernel_tree_tags()
-                __kernel_tags_are_fetched = True
+                __KERNEL_TAGS_ARE_FETCHED = True
         return func(*args, **kwargs)
     return wrapper
 
@@ -255,8 +255,8 @@ def __remove_worktree(kernel_tree, worktree_dir):
 
         if os.path.isdir(worktree_dir):
             shutil.rmtree(worktree_dir)
-    except Exception as e:
-        logging.info(f"Error removing {worktree_dir}: {e}")
+    except (subprocess.CalledProcessError, OSError) as e:
+        logging.info("Error removing %s: %s", worktree_dir, e)
 
 
 def __prune_worktrees(kernel_tree):

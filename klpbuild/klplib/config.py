@@ -10,7 +10,7 @@ import logging
 import os
 
 
-_loaded = False
+_LOADED = False
 _config = ConfigParser()
 
 
@@ -27,10 +27,10 @@ def __check_config_is_loaded(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        global _loaded
-        if not _loaded:
+        global _LOADED
+        if not _LOADED:
             __load_user_conf()
-            _loaded = True
+            _LOADED = True
         return func(*args, **kwargs)
     return wrapper
 

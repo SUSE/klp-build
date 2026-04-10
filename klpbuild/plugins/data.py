@@ -40,4 +40,3 @@ def run(download, force, cleanup_obsolete, update, lp_filter):
         cleanup_obsolete_data(supported_codestreams)
     if not (download or cleanup_obsolete or update):
         logging.error("Use --download, --cleanup-obsolete or --update for this command")
-

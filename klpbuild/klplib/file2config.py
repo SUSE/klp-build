@@ -130,7 +130,7 @@ def find_configs_for_files(cs, file_paths: list):
             archs = cs.get_all_configs(config)
             arch = _get_arch_in_path(path)
             if arch and (len(archs) != 1 or not archs.get(arch)):
-                    configs[path] = archs_config[arch]
+                configs[path] = archs_config[arch]
 
         elif config.startswith('CONFIG_'):
             configs[path] = {'conf': config, 'module': obj}
