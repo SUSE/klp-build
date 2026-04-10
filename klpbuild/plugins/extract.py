@@ -804,10 +804,7 @@ def extract(lp_name, lp_filter, no_patches, avoid_ext):
 
 
 def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
-    if not utils.get_workdir(lp_name).exists():
-        raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
-
-    logging.info("Work directory: %s", utils.get_workdir(lp_name))
+    logging.info("Work directory: %s", utils.get_workdir(lp_name, True))
 
     working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
 

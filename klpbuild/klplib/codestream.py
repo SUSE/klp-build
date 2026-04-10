@@ -239,7 +239,7 @@ class Codestream:
         Returns:
             Path: The path to the ccp directory of the current codestream.
         """
-        return get_workdir(lp_name)/"ccp"/self.full_cs_name()
+        return get_workdir(lp_name, True) / "ccp" / self.full_cs_name()
 
 
     def get_lp_dir(self, lp_name):

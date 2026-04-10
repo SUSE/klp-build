@@ -77,19 +77,20 @@ def download_built_rpms(lp_name, lp_filter):
 
 def prepare_tests(lp_name, lp_filter):
     test_src = get_tests_path(lp_name)
-    if not os.access(test_src, os.X_OK):
+    if test_src and not os.access(test_src, os.X_OK):
         logging.error("Script %s has no execution bit set. Aborting", test_src)
         sys.exit(1)
 
     # Download all built rpms
     download_built_rpms(lp_name, lp_filter)
 
+    tests_dir = get_workdir(lp_name, True) / "tests"
     run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
 
     logging.info("Validating the downloaded RPMs...")
 
     for arch in ARCHS:
-        tests_path = get_workdir(lp_name)/"tests"/arch
+        tests_path = tests_dir / arch
         test_arch_path = tests_path/lp_name
 
         # Remove previously created directory and archive
