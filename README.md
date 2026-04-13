@@ -28,6 +28,13 @@ To install the project and its dependencies, use pipx:
 pipx install .
 ```
 
+Or via zypper on openSUSE distributions:
+```sh
+sudo zypper ar https://download.opensuse.org/repositories/home:/vmezzela:/klp-tools/openSUSE_Factory/ klp-tools
+sudo zypper ref
+sudo zypper in  --repo klp-tools klp-build
+```
+
 ## **Configuration**
 
 klp-build supports a per-user configuration file located at `~/.config/klp-build/config`. The file follows the standard key=value format.
