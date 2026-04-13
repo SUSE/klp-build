@@ -702,6 +702,13 @@ def _warn_optimized_clone(match, cs, fname):
     logging.warning("Make sure to patch all the callers of %s.", symbol_name)
 
 
+def _warn_ipa_removed(match, cs, fname):
+    symbol_name = match.group(1)
+    logging.warning("%s:%s: Unable to verify if %s symbol is inlined or not."
+                    " Please check manually.",
+                    cs.full_cs_name(), fname, symbol_name)
+
+
 def _collect_dup_symbol(match, cs, fname):
     cs.files[fname].setdefault("dup_symbols", [])
     cs.files[fname]["dup_symbols"].append(match.group(1))
@@ -709,6 +716,7 @@ def _collect_dup_symbol(match, cs, fname):
 
 CCP_WARNING_SPECS = [
     (r'warning: optimized function "([^"]+)" in callgraph', _warn_optimized_clone),
+    (r'warning: "([^"]+)" symbol found in ELF but IPA says removed', _warn_ipa_removed),
     (r'conflicting definitions for symbol "([\w_]+)" found in ELF', _collect_dup_symbol),
 ]
 
