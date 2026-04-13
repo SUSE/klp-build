@@ -694,6 +694,34 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     return ccp_args, env
 
 
+def _warn_optimized_clone(match, cs, fname):
+    opt_symbol_name = match.group(1)
+    symbol_name = opt_symbol_name.split(".")[0]
+    logging.warning("%s:%s: Symbol %s contains optimized clone: %s",
+                    cs.full_cs_name(), fname, symbol_name, opt_symbol_name)
+    logging.warning("Make sure to patch all the callers of %s.", symbol_name)
+
+
+def _collect_dup_symbol(match, cs, fname):
+    cs.files[fname].setdefault("dup_symbols", [])
+    cs.files[fname]["dup_symbols"].append(match.group(1))
+
+
+CCP_WARNING_SPECS = [
+    (r'warning: optimized function "([^"]+)" in callgraph', _warn_optimized_clone),
+    (r'conflicting definitions for symbol "([\w_]+)" found in ELF', _collect_dup_symbol),
+]
+
+
+def parse_ccp_warnings(f, start_pos, cs, fname):
+    f.seek(start_pos)
+    for line in f:
+        for pattern, handler in CCP_WARNING_SPECS:
+            match = re.search(pattern, line)
+            if match:
+                handler(match, cs, fname)
+
+
 def process(lp_name, total, args, avoid_ext):
     i, make_lock, fname, cs, fdata = args
 
@@ -740,24 +768,7 @@ def process(lp_name, total, args, avoid_ext):
         except Exception as exc:
             raise RuntimeError(f"Error when processing {cs.full_cs_name()}:{fname}. Check file {out_log} for details.") from exc
 
-        # Look for optimized function warnings in the output of the command
-        f.seek(start_pos)
-        symbol_pattern = r'warning: optimized function "([^"]+)" in callgraph'
-        for line in f:
-            match = re.search(symbol_pattern, line)
-            if match:
-                opt_symbol_name = match.group(1)
-                symbol_name = opt_symbol_name.split(".")[0]
-                logging.warning("%s:%s: Symbol %s contains optimized clone: %s",
-                                cs.full_cs_name(), fname, symbol_name, opt_symbol_name)
-                logging.warning("Make sure to patch all the callers of %s.", symbol_name)
-
-    # Look for conflicting/duplicated symbols
-    with open(out_log) as f:
-        msg_pat = r'conflicting definitions for symbol "([\w_]+)" found in ELF'
-        syms = re.findall(msg_pat, f.read())
-        if len(syms) > 0:
-            cs.files[fname]["dup_symbols"] = syms
+        parse_ccp_warnings(f, start_pos, cs, fname)
 
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
