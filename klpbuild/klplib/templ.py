@@ -462,27 +462,32 @@ def __generate_klpp_header(cs):
     '''
     Generate any klpp-specific header information, such as:
     - klpp functions declarations.
-    - Incomplete struct declaration used by the klpp functions.
+    - Incomplete struct/enum declarations used by the klpp functions.
 
     Return a formated string with the generated information.
     '''
 
     funcs = []
     structs = set()
+    enums = set()
 
     for dat in cs.files.values():
         protos = list(dat["klpp_symbols"].values())
         funcs.extend(protos)
         for p in protos:
-            m = re.findall(r"(struct\s+\w+)\s*\**\w+", p)
-            if not m:
-                continue
-            structs.update(m)
+            structs.update(re.findall(r"(struct\s+\w+)\s*\**\w+", p))
+            enums.update(re.findall(r"(enum\s+\w+)\s*\**\w+", p))
 
     funcs.sort()
-    structs = ';\n'.join(sorted(structs)) + ';\n\n' if structs else ''
 
-    return structs + '\n'.join(funcs)
+    blocks = []
+    if structs:
+        blocks.append(';\n'.join(sorted(structs)) + ';')
+    if enums:
+        blocks.append(';\n'.join(sorted(enums)) + ';')
+    fwd_decls = '\n\n'.join(blocks) + '\n\n' if blocks else ''
+
+    return fwd_decls + '\n'.join(funcs)
 
 
 def __generate_header_file(lp_name, lp_path, cs):

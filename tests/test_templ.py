@@ -541,6 +541,7 @@ def test_generate_klpp_header_no_structs():
     assert "void klpp_baz(int x);" in result
     assert result.index("klpp_bar") < result.index("klpp_baz")
     assert "struct" not in result
+    assert "enum" not in result
 
 
 def test_generate_klpp_header_with_structs():
@@ -643,3 +644,81 @@ def test_generate_klpp_header_funcs_sorted_across_files():
     )
 
     assert result.index("klpp_alpha") < result.index("klpp_zoo")
+
+
+def test_generate_klpp_header_with_enum():
+    """Proto with an enum parameter → forward declaration prepended."""
+    result = _generate_klpp_header(
+        FakeCS(
+            {
+                "foo.c": {
+                    "klpp_symbols": {
+                        "bar": "void klpp_bar(enum color c);",
+                    }
+                }
+            }
+        )
+    )
+
+    assert "enum color;" in result
+    assert "void klpp_bar(enum color c);" in result
+    assert result.index("enum color;") < result.index("void klpp_bar")
+
+
+def test_generate_klpp_header_enum_in_return_type():
+    """An enum in the return type also triggers a forward declaration."""
+    result = _generate_klpp_header(
+        FakeCS(
+            {
+                "foo.c": {
+                    "klpp_symbols": {
+                        "bar": "enum color klpp_bar(void);",
+                    }
+                }
+            }
+        )
+    )
+
+    assert "enum color;" in result
+    assert result.index("enum color;") < result.index("enum color klpp_bar")
+
+
+def test_generate_klpp_header_dedup_enums():
+    """The same enum appearing in multiple protos is declared only once."""
+    result = _generate_klpp_header(
+        FakeCS(
+            {
+                "foo.c": {
+                    "klpp_symbols": {"foo": "void klpp_foo(enum color c);"}
+                },
+                "bar.c": {
+                    "klpp_symbols": {"bar": "void klpp_bar(enum color d);"}
+                },
+            }
+        )
+    )
+
+    assert result.count("enum color;") == 1
+
+
+def test_generate_klpp_header_mixed_struct_and_enum():
+    """Structs appear before enums, each group sorted, separated by blank line."""
+    result = _generate_klpp_header(
+        FakeCS(
+            {
+                "foo.c": {
+                    "klpp_symbols": {
+                        "foo": "int klpp_foo(struct zebra *z, enum alpha a);",
+                    }
+                }
+            }
+        )
+    )
+
+    assert "struct zebra;" in result
+    assert "enum alpha;" in result
+    assert result.index("struct zebra;") < result.index("enum alpha;")
+    # Verify blank line separates the two groups
+    struct_end = result.index("struct zebra;") + len("struct zebra;")
+    enum_start = result.index("enum alpha;")
+    assert "\n\n" in result[struct_end:enum_start]
