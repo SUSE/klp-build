@@ -19,8 +19,10 @@ from klpbuild.plugins.extract import (
     get_ext_symbols,
     get_klpp_symbols,
     lp_out_cleanup,
+    parse_ccp_warnings,
 )
 from klpbuild.plugins.setup import run as setup
+from tests.utils import FakeCS
 
 
 def test_get_klpp_symbols_missing_patched_funcs(tmp_path):
@@ -470,3 +472,122 @@ def test_lp_out_cleanup_collapses_multiple_empty_lines(tmp_path):
     lp_out = _make_lp_out(tmp_path, "line1\n\n\n\nline2\n")
     lp_out_cleanup(Codestream("15.4u0"), {"ext_symbols": {}}, lp_out, tmp_path)
     assert "\n\n\n" not in lp_out.read_text()
+
+
+# ── parse_ccp_warnings ─────────────────────────────────────────────────────────
+
+def test_parse_ccp_warnings_optimized_clone(tmp_path, caplog):
+    """Optimized-clone warning logs the clone name and a follow-up reminder."""
+    fname = "net/bluetooth/l2cap_sock.c"
+    cs = FakeCS({fname: {}})
+    log = tmp_path / "ccp.out.txt"
+
+    with open(log, "w+") as f:
+        start_pos = f.tell()
+        f.write('warning: optimized function "l2cap_sock_kill.cold" in callgraph\n')
+
+        with caplog.at_level(logging.WARNING):
+            parse_ccp_warnings(f, start_pos, cs, fname)
+
+    assert "Symbol l2cap_sock_kill contains optimized clone: l2cap_sock_kill.cold" in caplog.text
+    assert "Make sure to patch all the callers of l2cap_sock_kill." in caplog.text
+
+
+def test_parse_ccp_warnings_ipa_removed(tmp_path, caplog):
+    """IPA-removed warning logs the symbol name."""
+    fname = "kernel/sched/core.c"
+    cs = FakeCS({fname: {}})
+    log = tmp_path / "ccp.out.txt"
+
+    with open(log, "w+") as f:
+        start_pos = f.tell()
+        f.write('warning: "rcu_read_lock_held" symbol found in ELF but IPA says removed\n')
+
+        with caplog.at_level(logging.WARNING):
+            parse_ccp_warnings(f, start_pos, cs, fname)
+
+    assert "Unable to verify if rcu_read_lock_held symbol is inlined or not. Please check manually." in caplog.text
+
+
+def test_parse_ccp_warnings_dup_symbol(tmp_path):
+    """Conflicting-definition line appends the symbol to cs.files[fname]['dup_symbols']."""
+    fname = "net/ipv4/tcp_input.c"
+    cs = FakeCS({fname: {}})
+    log = tmp_path / "ccp.out.txt"
+
+    with open(log, "w+") as f:
+        start_pos = f.tell()
+        f.write('conflicting definitions for symbol "sk_filter_trim_cap" found in ELF\n')
+        parse_ccp_warnings(f, start_pos, cs, fname)
+
+    assert cs.files[fname]["dup_symbols"] == ["sk_filter_trim_cap"]
+
+
+def test_parse_ccp_warnings_no_warnings(tmp_path, caplog):
+    """Non-matching lines produce no log output and no side effects."""
+    fname = "fs/ext4/inode.c"
+    cs = FakeCS({fname: {}})
+    log = tmp_path / "ccp.out.txt"
+
+    with open(log, "w+") as f:
+        start_pos = f.tell()
+        f.write("info: everything is fine\n")
+        f.write("note: nothing to see here\n")
+
+        with caplog.at_level(logging.WARNING):
+            parse_ccp_warnings(f, start_pos, cs, fname)
+
+    assert caplog.text == ""
+    assert "dup_symbols" not in cs.files[fname]
+
+
+def test_parse_ccp_warnings_multiple_types(tmp_path, caplog):
+    """All three warning types in the same file are each handled."""
+    fname = "net/core/sock.c"
+    cs = FakeCS({fname: {}})
+    log = tmp_path / "ccp.out.txt"
+
+    with open(log, "w+") as f:
+        start_pos = f.tell()
+        f.write('warning: optimized function "tcp_v4_connect.isra.0" in callgraph\n')
+        f.write('warning: "lockdep_rtnl_is_held" symbol found in ELF but IPA says removed\n')
+        f.write('conflicting definitions for symbol "nf_conntrack_in" found in ELF\n')
+        f.write("unrelated output line\n")
+
+        with caplog.at_level(logging.WARNING):
+            parse_ccp_warnings(f, start_pos, cs, fname)
+
+    assert "Symbol tcp_v4_connect contains optimized clone: tcp_v4_connect.isra.0" in caplog.text
+    assert "Unable to verify if lockdep_rtnl_is_held symbol is inlined or not. Please check manually." in caplog.text
+    assert cs.files[fname]["dup_symbols"] == ["nf_conntrack_in"]
+
+
+def test_parse_ccp_warnings_respects_start_pos(tmp_path):
+    """Lines written before start_pos are not parsed."""
+    fname = "drivers/scsi/sd.c"
+    cs = FakeCS({fname: {}})
+    log = tmp_path / "ccp.out.txt"
+
+    with open(log, "w+") as f:
+        # Write a dup-symbol line BEFORE start_pos — must be ignored
+        f.write('conflicting definitions for symbol "sd_probe" found in ELF\n')
+        start_pos = f.tell()
+        f.write('conflicting definitions for symbol "sd_open" found in ELF\n')
+        parse_ccp_warnings(f, start_pos, cs, fname)
+
+    assert cs.files[fname]["dup_symbols"] == ["sd_open"]
+
+
+def test_parse_ccp_warnings_multiple_dup_symbols(tmp_path):
+    """Multiple conflicting-definition lines all append to dup_symbols."""
+    fname = "mm/slub.c"
+    cs = FakeCS({fname: {}})
+    log = tmp_path / "ccp.out.txt"
+
+    with open(log, "w+") as f:
+        start_pos = f.tell()
+        f.write('conflicting definitions for symbol "kmem_cache_alloc" found in ELF\n')
+        f.write('conflicting definitions for symbol "kmem_cache_free" found in ELF\n')
+        parse_ccp_warnings(f, start_pos, cs, fname)
+
+    assert cs.files[fname]["dup_symbols"] == ["kmem_cache_alloc", "kmem_cache_free"]

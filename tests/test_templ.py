@@ -12,25 +12,9 @@ from klpbuild.klplib import utils
 from klpbuild.klplib.templ import get_multi_funcs
 from klpbuild.plugins.extract import extract
 from klpbuild.plugins.setup import run as setup
-from tests.utils import get_codestreams_file, get_file_content
+from tests.utils import FakeCS, get_codestreams_file, get_file_content
 
 _generate_klpp_header = templ_module.__dict__["__generate_klpp_header"]
-
-
-class FakeCS:
-    def __init__(self, files, ibt=False, mods=None):
-        self.files = files
-        self._ibt = ibt
-        self._mods = mods or {}
-
-    def needs_ibt(self):
-        return self._ibt
-
-    def lp_out_file(self, lp, f):
-        return f"{lp}_{f.replace('/', '_').replace('-', '_')}"
-
-    def get_file_mod(self, f):
-        return self._mods.get(f, "vmlinux")
 
 
 def test_templ_with_externalized_vars():
