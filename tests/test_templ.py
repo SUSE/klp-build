@@ -116,8 +116,9 @@ def test_templ_without_externalized_vars():
     assert "IS_ENABLED" not in header
 
 
-# Check that IS_ENABLED macro is set only when the affected architectures of a
-# CVE is not all architectures supported by the given codestream.
+# Check that IS_ENABLED macro is set when the affected architectures of a CVE
+# do not cover all globally supported architectures (even if they cover all
+# architectures of the given codestream).
 def test_is_enabled_only_on_cs_arcs():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
     cs = "6.0u5"
@@ -147,9 +148,10 @@ def test_is_enabled_only_on_cs_arcs():
         "bsc_test_is_enabled_only_on_cs_arcs_net_ipv6_route.c",
     ]:
         content = get_file_content(lp, cs, src)
-        # The given CVE affects all archs in all codestreams, meaning that IS_ENABLED
-        # should not be set.
-        assert "#if IS_ENABLED" not in content
+        # The given CVE affects all archs supported by the MICRO codestream, but
+        # since it doesn't cover all globally supported architectures, IS_ENABLED
+        # should be set.
+        assert "#if IS_ENABLED" in content
 
 
 # Check if only x86_64 is affected by the CVE, meaning that IS_ENABLED should be
