@@ -258,23 +258,6 @@ def download_cs_rpms(cs_list):
     # Create a list of paths pointing to lib/modules for each downloaded
     # codestream
     for cs in cs_list:
-        for arch in cs.archs:
-            # Extract modules and vmlinux files that are compressed
-            mod_path = cs.get_mod_path(arch)
-            logging.info("extracting %s:%s in %s", arch, cs.full_cs_name(), str(mod_path))
-            for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d -k")]:
-                cmd = rf'find {mod_path} -name "*.{fext}" -exec {ecmd} --quiet {{}} \;'
-                subprocess.check_output(cmd, shell=True)
-
-            # Extract gzipped files per arch
-            files = ["vmlinux", "symvers"]
-            for f in files:
-                f_path = cs.get_boot_file(f"{f}.gz", arch)
-                # ppc64le doesn't gzips vmlinux
-                if f_path.exists():
-                    logging.info("extracting %s:%s:%s", arch, cs.full_cs_name(), f)
-                    subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
-
         # Use the SLE .config
         shutil.copy(Path(cs.get_boot_dir(), cs.get_boot_filename("config")),
                     Path(cs.get_obj_dir(), ".config"))
