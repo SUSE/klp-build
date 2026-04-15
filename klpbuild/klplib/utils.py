@@ -3,19 +3,23 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import gzip
 import io
 import logging
+import lzma
 import os
-from datetime import date, timedelta
-from pathlib import Path
 import platform
 import re
-import git
+from datetime import date, timedelta
+from pathlib import Path
 
+import git
+import magic
+
+import zstandard
 from elftools.common.utils import bytes2str
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
-
 from natsort import natsorted
 
 from klpbuild.klplib.config import get_user_path
@@ -174,7 +178,22 @@ def get_elf_object(obj):
     with open(obj, "rb") as f:
         data = f.read()
 
-    return ELFFile(io.BytesIO(data))
+    mime = magic.detect_from_filename(obj)
+
+    if "gzip" in mime.mime_type:
+        io_bytes = io.BytesIO(gzip.decompress(data))
+    elif "zstd" in mime.mime_type:
+        dctx = zstandard.ZstdDecompressor()
+        io_bytes = io.BytesIO(dctx.decompress(data))
+    elif "x-xz" in mime.mime_type:
+        io_bytes = io.BytesIO(lzma.decompress(data))
+    # Modules are x-object, while vmlinux is x-executable
+    elif "x-object" in mime.mime_type or "x-executable" in mime.mime_type:
+        io_bytes = io.BytesIO(data)
+    else:
+        raise RuntimeError(f"File {obj} with unknown format")
+
+    return ELFFile(io_bytes)
 
 
 # Load the ELF object and return all symbols
