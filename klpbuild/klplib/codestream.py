@@ -176,16 +176,6 @@ class Codestream:
 
         return f"{file}-{self.get_full_kernel_name()}"
 
-    def get_boot_file(self, file, arch=None):
-        assert file.startswith("vmlinux") or file.startswith("symvers")
-
-        mod_path = self.get_boot_dir(arch)
-
-        if not self.is_slfo:
-            file = f"{file}-{self.get_full_kernel_name()}"
-
-        return mod_path / file
-
     def get_repo(self):
         if self.update == 0 or self.is_slfo:
             return "standard"

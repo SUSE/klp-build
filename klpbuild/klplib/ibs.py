@@ -140,7 +140,7 @@ def get_cs_packages(cs_list, dest):
 
 
 def find_missing_symbols(cs, arch, lp_mod_path):
-    vmlinux_path = cs.get_boot_file("vmlinux", arch)
+    vmlinux_path = cs.find_obj_path("vmlinux", arch)
     vmlinux_syms = get_all_symbols_from_object(vmlinux_path, True)
 
     # Get list of UNDEFINED symbols from the livepatch module
