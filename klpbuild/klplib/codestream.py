@@ -333,7 +333,10 @@ class Codestream:
     def is_mod_mutex(self):
         return not self.is_slfo and (self.sle < 15 or (self.sle == 15 and self.sp < 4))
 
-    def get_mod_path(self, arch):
+    def get_mod_path(self, arch=None):
+        if not arch:
+            arch = preferred_arch([self])
+
         # Micro already has support for usrmerge
         if self.is_slfo:
             mod_path = Path("usr", "lib")
