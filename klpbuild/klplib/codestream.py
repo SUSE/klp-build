@@ -416,36 +416,60 @@ class Codestream:
 
         return configs
 
-    def find_obj_path(self, arch, mod):
-        # We already know the path to vmlinux, so return it
-        if not is_mod(mod):
-            return self.get_boot_file("vmlinux", arch).relative_to(get_datadir(arch))
-
-        # Return the path if the modules was previously found for ARCH, or refetch if
-        # the obejct is for a different architecture
-        obj = self.modules.get(mod, "")
-        if obj:
-            assert self.kernel in str(obj)
-            return obj
-
+    def get_mod_file_path(self, arch, mod):
+        """
+        Getting the path to a module can be tricky, given how setup is invoked.
+        When --conf and --module are specified, the mod name is only a filename,
+        but when using the auto detection, the mod name is an entire path with
+        the module name.
+        """
         # Module name use underscores, but the final module object uses hyphens.
         mod = mod.replace("_", "[-_]")
-        mod_path = self.get_mod_path(arch)
+
+        # If the module is a path, we can return immediatly since we know where
+        # to find the module, but we need to prepend the kernel directory.
+        if "/" in mod:
+            return Path("kernel", mod)
 
         # If the setup subcommand was informing the module, here the module
         # name will only contain the name, otherwise it will contain the path
         # to the module.
-        if "/" in mod:
-            with open(Path(mod_path, "modules.order")) as f:
-                obj_match = re.search(rf"([\w\/\-]+\/{mod})\.ko", f.read())
-                if not obj_match:
-                    raise RuntimeError(f"{self.full_cs_name()}-{arch} ({self.kernel}): Module not found: {mod}")
+        mod_path = self.get_mod_path(arch)
+        with open(Path(mod_path, "modules.order")) as f:
+            obj_match = re.search(rf"([\w\/\-]+\/{mod})\.ko", f.read())
+            if not obj_match:
+                raise RuntimeError(f"{self.full_cs_name()}-{arch} ({self.kernel}): Module not found: {mod}")
 
-            fpath = Path(obj_match.group(1))
+        return Path(obj_match.group(1))
+
+    def __search_obj_in_dir(self, fdir, fname):
+        file_path = list(fdir.glob(f"{fname}.*"))
+
+        # The given file doesn't have an extension, so try again without it
+        if len(file_path) == 0:
+            file_path = list(fdir.glob(f"{fname}"))
+
+        # Make sure that we don't find duplicated files
+        assert len(file_path) == 1
+        return file_path[0]
+
+    def find_obj_path(self, arch, mod):
+        # Return the path if the modules was previously found for ARCH, or refetch if
+        # the obejct is for a different architecture
+        if is_mod(mod):
+            obj = self.modules.get(mod, "")
+            if obj:
+                assert self.kernel in str(obj)
+                return obj
+
+        # If the module cache failed or if mod is vmlinux, we need to find the
+        # path to the object
+        if not is_mod(mod):
+            fpath = Path(self.get_boot_dir(arch), self.get_boot_filename("vmlinux"))
         else:
-            fpath = mod
+            fpath = Path(self.get_mod_path(arch), self.get_mod_file_path(arch, mod))
 
-        fmod = f"{Path(mod_path, fpath)}.ko"
+        fmod = self.__search_obj_in_dir(fpath.parent, fpath.name)
 
         assert fmod.exists(), f"Module {str(fmod)} doesn't exists. Aborting"
 

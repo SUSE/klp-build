@@ -634,7 +634,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     obj = cs.get_file_mod(fname)
 
     env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt() else "0"
-    env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
+    env["KCP_MOD_SYMVERS"] = str(Path(cs.get_boot_dir(), f'{cs.get_boot_filename("symvers")}.gz'))
     env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
     env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.preferred_arch([cs]))/cs.get_mod(obj))
     env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())

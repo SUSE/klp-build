@@ -225,3 +225,24 @@ def test_boot_dir_and_filenames():
     assert "config-6.4.0" in cs.get_boot_filename("config")
     assert "symvers-6.4.0" in cs.get_boot_filename("symvers")
     assert "vmlinux-6.4.0" in cs.get_boot_filename("vmlinux")
+
+
+def test_get_mod_file_path():
+    cs = Codestream("15.7u5", kernel="6.4.0-150700.53.19")
+    assert "kernel/net/bluetooth/bluetooth" == str(cs.get_mod_file_path("x86_64", "bluetooth"))
+    assert "kernel/net/bluetooth/bluetooth" == str(cs.get_mod_file_path("x86_64", "net/bluetooth/bluetooth"))
+
+
+def test_find_obj_path():
+    cs = Codestream("15.7u5", kernel="6.4.0-150700.53.19")
+    assert "lib/modules/6.4.0-150700.53.19-default/kernel/net/bluetooth/bluetooth.ko.zst" == str(
+        cs.find_obj_path("x86_64", "bluetooth")
+    )
+    assert "lib/modules/6.4.0-150700.53.19-default/kernel/net/bluetooth/bluetooth.ko.zst" == str(
+        cs.find_obj_path("x86_64", "net/bluetooth/bluetooth")
+    )
+
+    cs = Codestream("16.0u0", kernel="6.12.0-160000.5")
+    assert "usr/lib/modules/6.12.0-160000.5-default/kernel/net/bluetooth/bluetooth.ko.zst" == str(
+        cs.find_obj_path("x86_64", "net/bluetooth/bluetooth")
+    )
