@@ -195,3 +195,33 @@ def test_symbol_with_noinstr_ibt():
         **lp_default_data
     }
     setup(**setup_args)
+
+
+def test_boot_dir():
+    cs = Codestream("16.0rtu0", kernel="6.12.0-160000.11")
+    # For SLFO codestreams, we get the boot files from the usr/lib/modules
+    assert "modules" in str(cs.get_boot_dir())
+
+    cs = Codestream("15.7u5", kernel="6.4.0-150700.53.19.1")
+    # In the old method, we need to point to /boot inside the codestream data
+    assert "boot" in str(cs.get_boot_dir())
+
+
+def test_boot_dir_and_filenames():
+    cs = Codestream("16.0rtu0", kernel="6.12.0-160000.11")
+    # For SLFO codestreams, we get the boot files from the usr/lib/modules
+    assert "modules" in str(cs.get_boot_dir())
+    # For SLFO codestreams, the filenames of the boot files do not contain the
+    # kernel version suffix
+    assert "config" == cs.get_boot_filename("config")
+    assert "symvers" == cs.get_boot_filename("symvers")
+    assert "vmlinux" == cs.get_boot_filename("vmlinux")
+
+    cs = Codestream("15.7u5", kernel="6.4.0-150700.53.19.1")
+    # In the old method, we need to point to /boot inside the codestream data
+    assert "boot" in str(cs.get_boot_dir())
+    # We older codestreams the boot files contains the kernel version as
+    # suffix
+    assert "config-6.4.0" in cs.get_boot_filename("config")
+    assert "symvers-6.4.0" in cs.get_boot_filename("symvers")
+    assert "vmlinux-6.4.0" in cs.get_boot_filename("vmlinux")

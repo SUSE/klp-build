@@ -276,7 +276,8 @@ def download_cs_rpms(cs_list):
                     subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
 
         # Use the SLE .config
-        shutil.copy(cs.get_boot_file("config"), Path(cs.get_obj_dir(), ".config"))
+        shutil.copy(Path(cs.get_boot_dir(), cs.get_boot_filename("config")),
+                    Path(cs.get_obj_dir(), ".config"))
 
         # Recreate the build link to enable us to test the generated LP
         mod_path = cs.get_kernel_build_path(ARCH)

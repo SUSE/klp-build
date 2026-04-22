@@ -145,19 +145,46 @@ class Codestream:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             return result.stdout
 
-
-    def get_boot_file(self, file, arch=None):
-        assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
-
+    def get_boot_dir(self, arch=None):
+        """
+        Return the directory containing the boot files for the current
+        codestream.
+        """
         if not arch:
             arch = preferred_arch([self])
 
         if self.is_slfo:
-            return Path(self.get_mod_path(arch), file)
+            return self.get_mod_path(arch)
 
-        # Strip the suffix from the filename so we can add the kernel version in the middle
-        fname = f"{Path(file).stem}-{self.get_full_kernel_name()}{Path(file).suffix}"
-        return get_datadir(arch)/"boot"/fname
+        return get_datadir(arch) / "boot"
+
+    def get_boot_filename(self, file):
+        """
+        Files like vmlinux, config and symvers can have different names
+        depending which codestream there are. Return the expected names of the
+        files in the current codestream.
+
+        On SLFO, the filename are don't contain any suffixes, like kernel
+        versions, because they live inside usr/lib/modules directory. For
+        older codestreams we need to append the current kernel version to the
+        file, because all config, symvers and vmlinux live in the same /boot
+        directory.
+        """
+
+        if self.is_slfo:
+            return file
+
+        return f"{file}-{self.get_full_kernel_name()}"
+
+    def get_boot_file(self, file, arch=None):
+        assert file.startswith("vmlinux") or file.startswith("symvers")
+
+        mod_path = self.get_boot_dir(arch)
+
+        if not self.is_slfo:
+            file = f"{file}-{self.get_full_kernel_name()}"
+
+        return mod_path / file
 
     def get_repo(self):
         if self.update == 0 or self.is_slfo:
@@ -403,20 +430,26 @@ class Codestream:
 
         # Module name use underscores, but the final module object uses hyphens.
         mod = mod.replace("_", "[-_]")
-
         mod_path = self.get_mod_path(arch)
-        with open(Path(mod_path, "modules.order")) as f:
-            obj_match = re.search(rf"([\w\/\-]+\/{mod}\.k?o)", f.read())
-            if not obj_match:
-                raise RuntimeError(f"{self.full_cs_name()}-{arch} ({self.kernel}): Module not found: {mod}")
 
-        # modules.order will show the module with suffix .o, so make sure the extension.
-        obj_path = mod_path/(PurePath(obj_match.group(1)).with_suffix(".ko"))
-        # Make sure that the .ko file exists
-        assert obj_path.exists(), f"Module {str(obj_path)} doesn't exists. Aborting"
+        # If the setup subcommand was informing the module, here the module
+        # name will only contain the name, otherwise it will contain the path
+        # to the module.
+        if "/" in mod:
+            with open(Path(mod_path, "modules.order")) as f:
+                obj_match = re.search(rf"([\w\/\-]+\/{mod})\.ko", f.read())
+                if not obj_match:
+                    raise RuntimeError(f"{self.full_cs_name()}-{arch} ({self.kernel}): Module not found: {mod}")
 
-        return obj_path.relative_to(get_datadir(arch))
+            fpath = Path(obj_match.group(1))
+        else:
+            fpath = mod
 
+        fmod = f"{Path(mod_path, fpath)}.ko"
+
+        assert fmod.exists(), f"Module {str(fmod)} doesn't exists. Aborting"
+
+        return fmod.relative_to(get_datadir(arch))
 
     def lp_out_file(self, lp_name, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
@@ -484,7 +517,7 @@ class Codestream:
     def __check_symbol(self, arch, mod, symbols, check_patchable):
         ret = []
 
-        obj = get_datadir(arch)/self.find_obj_path(arch, mod)
+        obj = get_datadir(arch) / self.find_obj_path(arch, mod)
         elf_obj = get_elf_object(obj)
 
         trace_addrs = []
