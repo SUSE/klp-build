@@ -145,19 +145,36 @@ class Codestream:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             return result.stdout
 
-
-    def get_boot_file(self, file, arch=None):
-        assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
-
+    def get_boot_dir(self, arch=None):
+        """
+        Return the directory containing the boot files for the current
+        codestream.
+        """
         if not arch:
             arch = preferred_arch([self])
 
         if self.is_slfo:
-            return Path(self.get_mod_path(arch), file)
+            return self.get_mod_path(arch)
 
-        # Strip the suffix from the filename so we can add the kernel version in the middle
-        fname = f"{Path(file).stem}-{self.get_full_kernel_name()}{Path(file).suffix}"
-        return get_datadir(arch)/"boot"/fname
+        return get_datadir(arch) / "boot"
+
+    def get_boot_filename(self, file):
+        """
+        Files like vmlinux, config and symvers can have different names
+        depending which codestream there are. Return the expected names of the
+        files in the current codestream.
+
+        On SLFO, the filename are don't contain any suffixes, like kernel
+        versions, because they live inside usr/lib/modules directory. For
+        older codestreams we need to append the current kernel version to the
+        file, because all config, symvers and vmlinux live in the same /boot
+        directory.
+        """
+
+        if self.is_slfo:
+            return file
+
+        return f"{file}-{self.get_full_kernel_name()}"
 
     def get_repo(self):
         if self.update == 0 or self.is_slfo:
@@ -333,7 +350,10 @@ class Codestream:
     def is_mod_mutex(self):
         return not self.is_slfo and (self.sle < 15 or (self.sle == 15 and self.sp < 4))
 
-    def get_mod_path(self, arch):
+    def get_mod_path(self, arch=None):
+        if not arch:
+            arch = preferred_arch([self])
+
         # Micro already has support for usrmerge
         if self.is_slfo:
             mod_path = Path("usr", "lib")
@@ -386,34 +406,64 @@ class Codestream:
 
         return configs
 
-    def find_obj_path(self, arch, mod):
-        # Return the path if the modules was previously found for ARCH, or refetch if
-        # the obejct is for a different architecture
-        obj = self.modules.get(mod, "")
-        if obj:
-            assert self.kernel in str(obj)
-            return obj
-
-        # We already know the path to vmlinux, so return it
-        if not is_mod(mod):
-            return self.get_boot_file("vmlinux", arch).relative_to(get_datadir(arch))
-
+    def get_mod_file_path(self, arch, mod):
+        """
+        Getting the path to a module can be tricky, given how setup is invoked.
+        When --conf and --module are specified, the mod name is only a filename,
+        but when using the auto detection, the mod name is an entire path with
+        the module name.
+        """
         # Module name use underscores, but the final module object uses hyphens.
         mod = mod.replace("_", "[-_]")
 
+        # If the module is a path, we can return immediatly since we know where
+        # to find the module, but we need to prepend the kernel directory.
+        if "/" in mod:
+            return Path("kernel", mod)
+
+        # If the setup subcommand was informing the module, here the module
+        # name will only contain the name, otherwise it will contain the path
+        # to the module.
         mod_path = self.get_mod_path(arch)
         with open(Path(mod_path, "modules.order")) as f:
-            obj_match = re.search(rf"([\w\/\-]+\/{mod}\.k?o)", f.read())
+            obj_match = re.search(rf"([\w\/\-]+\/{mod})\.ko", f.read())
             if not obj_match:
                 raise RuntimeError(f"{self.full_cs_name()}-{arch} ({self.kernel}): Module not found: {mod}")
 
-        # modules.order will show the module with suffix .o, so make sure the extension.
-        obj_path = mod_path/(PurePath(obj_match.group(1)).with_suffix(".ko"))
-        # Make sure that the .ko file exists
-        assert obj_path.exists(), f"Module {str(obj_path)} doesn't exists. Aborting"
+        return Path(obj_match.group(1))
 
-        return obj_path.relative_to(get_datadir(arch))
+    def __search_obj_in_dir(self, fdir, fname):
+        file_path = list(fdir.glob(f"{fname}.*"))
 
+        # The given file doesn't have an extension, so try again without it
+        if len(file_path) == 0:
+            file_path = list(fdir.glob(f"{fname}"))
+
+        # Make sure that we don't find duplicated files
+        assert len(file_path) == 1
+        return file_path[0]
+
+    def find_obj_path(self, arch, mod):
+        # Return the path if the modules was previously found for ARCH, or refetch if
+        # the obejct is for a different architecture
+        if is_mod(mod):
+            obj = self.modules.get(mod, "")
+            if obj:
+                assert self.kernel in str(obj)
+                return obj
+
+        # If the module cache failed or if mod is vmlinux, we need to find the
+        # path to the object
+        if not is_mod(mod):
+            fpath = Path(self.get_boot_dir(arch), self.get_boot_filename("vmlinux"))
+        else:
+            fpath = Path(self.get_mod_path(arch), self.get_mod_file_path(arch, mod))
+
+        fmod = self.__search_obj_in_dir(fpath.parent, fpath.name)
+
+        assert fmod.exists(), f"Module {str(fmod)} doesn't exists. Aborting"
+
+        return fmod.relative_to(get_datadir(arch))
 
     def lp_out_file(self, lp_name, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
@@ -481,7 +531,7 @@ class Codestream:
     def __check_symbol(self, arch, mod, symbols, check_patchable):
         ret = []
 
-        obj = get_datadir(arch)/self.find_obj_path(arch, mod)
+        obj = get_datadir(arch) / self.find_obj_path(arch, mod)
         elf_obj = get_elf_object(obj)
 
         trace_addrs = []

@@ -36,6 +36,7 @@ setuptools.setup(
         "pyelftools",
         "zstandard",
         "python-bugzilla",
+        "python-magic",
         "tabulate",
         "termcolor"
     ],

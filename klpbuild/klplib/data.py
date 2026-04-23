@@ -68,6 +68,7 @@ def cleanup_obsolete_data(valid_codestreams):
 
     cleanup_obsolete_trees(valid_codestreams)
 
+
 def download_missing_cs_data(codestreams):
     cs_to_download = __get_cs_missing_data(codestreams)
     if cs_to_download:
@@ -82,8 +83,4 @@ def download_cs_data(codestreams):
 
 
 def __get_cs_missing_data(codestreams):
-    return [cs for cs in codestreams if __is_cs_data_missing(cs)]
-
-
-def __is_cs_data_missing(cs):
-    return not cs.get_boot_file("config").exists()
+    return [cs for cs in codestreams if not cs.get_mod_path().exists()]
