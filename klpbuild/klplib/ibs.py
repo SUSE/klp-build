@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from operator import itemgetter
 from pathlib import Path
 
@@ -173,18 +174,26 @@ def validate_livepatch_module(cs, arch, rpm_dir, rpm):
 
 
 def download_binary_rpms(data: RPMData, total: int):
-    try:
-        data.osc.build.download_binary(data.prj, data.repo,
-                                       data.arch, data.pkg, data.rpm,
-                                       data.dest)
-        logging.info("(%d/%d) %s %s: ok", data.index, total,
-                     data.cs.full_cs_name(), data.rpm)
-    except OSError as e:
-        if e.errno == errno.EEXIST:
-            logging.info("(%d/%d) %s %s: already downloaded. skipping",
-                         data.index, total, data.cs.full_cs_name(), data.rpm)
-        else:
-            raise RuntimeError(f"download error on {data.cs.get_project_name()}: {data.rpm}") from e
+    max_tries = 3
+    for tries in range(1, max_tries + 1):
+        try:
+            data.osc.build.download_binary(data.prj, data.repo,
+                                           data.arch, data.pkg, data.rpm,
+                                           data.dest)
+            logging.info("(%d/%d) %s %s: ok", data.index, total,
+                         data.cs.full_cs_name(), data.rpm)
+            return
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                logging.info("(%d/%d) %s %s: already downloaded. skipping",
+                             data.index, total, data.cs.full_cs_name(), data.rpm)
+                return
+            if tries < max_tries:
+                logging.info("(%d/%d) %s %s: download failed (attempt %d/%d), retrying in 2s...",
+                                data.index, total, data.cs.full_cs_name(), data.rpm, tries, max_tries)
+                time.sleep(2)
+            else:
+                raise RuntimeError(f"download error on {data.cs.get_project_name()}: {data.rpm}") from e
 
 
 def download_and_extract(data, total):
