@@ -5,6 +5,7 @@
 
 import logging
 import shutil
+from pathlib import Path
 
 from klpbuild.klplib.utils import classify_codestreams_str,ARCHS
 from klpbuild.klplib.ibs import download_cs_rpms, verify_rpm
@@ -107,5 +108,18 @@ def verify_all_rpms():
         logging.info("All RPMs passed verification")
 
 
+def __cs_is_missing_data(cs):
+    '''
+    Verify that the vmlinux for each supported arch exists.
+    '''
+    for arch in cs.archs:
+        try:
+            cs.find_obj_path(arch, "vmlinux")
+        except AssertionError:
+            # Assert triggered: vmlinux was not found
+            return True
+    return False
+
+
 def __get_cs_missing_data(codestreams):
-    return [cs for cs in codestreams if not cs.get_mod_path().exists()]
+    return [cs for cs in codestreams if __cs_is_missing_data(cs)]
