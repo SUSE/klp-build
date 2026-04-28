@@ -5,9 +5,10 @@
 
 import logging
 import shutil
+from pathlib import Path
 
 from klpbuild.klplib.utils import classify_codestreams_str,ARCHS
-from klpbuild.klplib.ibs import download_cs_rpms
+from klpbuild.klplib.ibs import download_cs_rpms, verify_rpm
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.kernel_tree import  cleanup_obsolete_trees
 
@@ -82,5 +83,43 @@ def download_cs_data(codestreams):
     logging.info("Done.")
 
 
+def verify_all_rpms():
+    rpm_dir = get_user_path("data_dir") / "kernel-rpms"
+    if not rpm_dir.exists():
+        logging.error("RPM directory %s does not exist", rpm_dir)
+        return
+
+    rpms = sorted(rpm_dir.glob("*.rpm"))
+    if not rpms:
+        logging.info("No RPM files found in %s", rpm_dir)
+        return
+
+    logging.info("Verifying %d RPM files...", len(rpms))
+    failed = []
+    for r in rpms:
+        if not verify_rpm(r):
+            failed.append(r)
+            r.unlink()
+            logging.info("Deleted corrupted RPM: %s", r.name)
+
+    if failed:
+        logging.error("%d RPM(s) failed verification and were deleted", len(failed))
+    else:
+        logging.info("All RPMs passed verification")
+
+
+def __cs_is_missing_data(cs):
+    '''
+    Verify that the vmlinux for each supported arch exists.
+    '''
+    for arch in cs.archs:
+        try:
+            cs.find_obj_path(arch, "vmlinux")
+        except AssertionError:
+            # Assert triggered: vmlinux was not found
+            return True
+    return False
+
+
 def __get_cs_missing_data(codestreams):
-    return [cs for cs in codestreams if not cs.get_mod_path().exists()]
+    return [cs for cs in codestreams if __cs_is_missing_data(cs)]

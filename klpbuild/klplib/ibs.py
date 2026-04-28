@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from operator import itemgetter
 from pathlib import Path
 
@@ -172,19 +173,48 @@ def validate_livepatch_module(cs, arch, rpm_dir, rpm):
     shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
 
 
+def verify_rpm(rpm_path):
+    ret = subprocess.run(["rpm", "-K", str(rpm_path)],
+                            capture_output=True, text=True)
+    if ret.returncode != 0:
+        logging.error("RPM verification failed for %s", rpm_path)
+        return False
+    logging.debug("RPM verification passed for %s", rpm_path)
+    return True
+
+
 def download_binary_rpms(data: RPMData, total: int):
-    try:
-        data.osc.build.download_binary(data.prj, data.repo,
-                                       data.arch, data.pkg, data.rpm,
-                                       data.dest)
-        logging.info("(%d/%d) %s %s: ok", data.index, total,
-                     data.cs.full_cs_name(), data.rpm)
-    except OSError as e:
-        if e.errno == errno.EEXIST:
+
+    rpm_path = data.dest / data.rpm
+
+    if rpm_path.exists():
+        if not verify_rpm(rpm_path):
+            rpm_path.unlink(missing_ok=True)
+        else:
             logging.info("(%d/%d) %s %s: already downloaded. skipping",
                          data.index, total, data.cs.full_cs_name(), data.rpm)
-        else:
-            raise RuntimeError(f"download error on {data.cs.get_project_name()}: {data.rpm}") from e
+            return
+
+    max_tries = 3
+    for tries in range(1, max_tries + 1):
+        try:
+            data.osc.build.download_binary(data.prj, data.repo,
+                                           data.arch, data.pkg, data.rpm,
+                                           data.dest)
+            if not verify_rpm(rpm_path):
+                rpm_path.unlink(missing_ok=True)
+                raise RuntimeError(f"RPM verification failed: {data.rpm}")
+
+            logging.info("(%d/%d) %s %s: ok", data.index, total,
+                         data.cs.full_cs_name(), data.rpm)
+            return
+        except OSError as e:
+            if tries < max_tries:
+                logging.info("(%d/%d) %s %s: download failed (attempt %d/%d), retrying in 2s...",
+                                data.index, total, data.cs.full_cs_name(), data.rpm, tries, max_tries)
+                time.sleep(2)
+            else:
+                raise RuntimeError(f"download error on {data.cs.get_project_name()}: {data.rpm}") from e
 
 
 def download_and_extract(data, total):
