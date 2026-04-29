@@ -4,13 +4,17 @@
 # Author: Fernando Gonzalez <fernando.gonzalez@suse.com>
 
 import logging
+import re
 
 from pathlib import PurePosixPath
 from collections import defaultdict
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.file2config import find_configs_for_files
+from klpbuild.klplib.file2config import find_file_config
 from klpbuild.klplib.ksrc import get_patches_files
+
+
+__FUNC_FINDER_RE = re.compile(r"\s*(\w+)\s*\([^(]*\)\n\+*\s*\{\n")
 
 
 def analyse_files(cs_list):
@@ -24,7 +28,6 @@ def analyse_files(cs_list):
 
     Args:
         cs_list (list): List of affected codestreams.
-        sle_commits (dict): List of commits by codestream.
     '''
 
     report = defaultdict(list)
@@ -32,26 +35,74 @@ def analyse_files(cs_list):
     for cs in cs_list:
         patches = [f"patches.suse/{p}" for p in cs.get_required_patches()]
         branch = cs.get_base_branch()
-
-        files_funcs = get_patches_files(patches, branch)
-        files_path = files_funcs.keys()
-        files_conf, _ = find_configs_for_files(cs, files_path)
-
-        for file, funcs in files_funcs.items():
-            conf = files_conf.get(file, {})
-            if conf:
-                cs.files[file] = {'symbols': list(funcs)}
-                cs.files[file].update(conf)
-                key = f"{file}:{conf['conf']}:{conf['module']}:{sorted(funcs)}"
-            else:
-                key = f"{file}:::"
-                logging.warning("%s: Failed to find a config for %s",
-                                cs.full_cs_name(), file)
-
-            if cs not in report[key]:
-                report[key].append(cs)
+        files = get_patches_files(patches, branch)
+        cs_report = __analyse_cs_files(cs, files)
+        for key in cs_report:
+            if key not in report:
+                report[key] = []
+            report[key].append(cs)
 
     return report
+
+
+def __analyse_cs_files(cs, files):
+
+    report = []
+
+    for file, diffs in files.items():
+        conf, obj = find_file_config(cs, file)
+        funcs = __extract_functions(diffs)
+        if conf:
+            cs.files[file] = {'symbols': list(funcs),
+                              'conf': conf, 'module': obj}
+            key = f"{file}:{conf}:{obj}:{sorted(funcs)}"
+        else:
+            key = f"{file}:::"
+            logging.warning("%s: Failed to find a config for %s",
+                            cs.full_cs_name(), file)
+
+        report.append(key)
+
+    return report
+
+
+def __extract_functions(diffs):
+    """
+    Return the set of function names actually modified across `diffs`.
+
+    Each diff is the `git show -W` output for one patch touching a
+    single file. For each signature, walk its body line by line,
+    balancing braces. Extract the function only if the body has
+    been modified (+/- line).
+    """
+
+    def is_change(line):
+        return line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
+
+    def get_content(line):
+        return line[1:] if line[:1] in "+- " else line
+
+    funcs = set()
+    for diff in diffs:
+        for sig in __FUNC_FINDER_RE.finditer(diff):
+            depth = 1  # the opening '{'
+            modified = False
+            for line in diff[sig.end():].splitlines():
+                # A hunk boundary here means the body wasn't included
+                if line.startswith(("@@", "diff ")):
+                    break
+                if is_change(line):
+                    modified = True
+                    break
+                content = get_content(line)
+                depth += content.count("{") - content.count("}")
+                if depth == 0:
+                    break # Outside of the body
+
+            if modified:
+                funcs.add(sig.group(1))
+
+    return funcs
 
 
 def print_files(report):
