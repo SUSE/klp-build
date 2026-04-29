@@ -8,7 +8,12 @@ import concurrent.futures
 import tabulate
 
 from klpbuild.klplib import utils
-from klpbuild.klplib import patch
+from klpbuild.klplib.analysis import (
+    analyse_files, analyse_kmodules, analyse_configs,
+    print_files, print_kmodules, print_configs,
+    filter_unsupported_kmodules,
+    filter_unset_configs,
+)
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
 from klpbuild.klplib.ksrc import get_patches
@@ -147,18 +152,18 @@ def scan(cve, conf, lp_filter, download, archs=None, savedir=None, extra_patches
     if patches and not conf:
         logging.info("Initiating patch analysis...\n")
         logging.info("[*] Analysing modified files...\n")
-        files_report = patch.analyse_files(affected_cs)
-        patch.print_files(files_report)
+        files_report = analyse_files(affected_cs)
+        print_files(files_report)
 
         logging.info("[*] Analysing required CONFIGs...\n")
-        configs_report = patch.analyse_configs(affected_cs)
-        patch.print_configs(configs_report)
-        conf_not_set, conf = patch.filter_unset_configs(affected_cs)
+        configs_report = analyse_configs(affected_cs)
+        print_configs(configs_report)
+        conf_not_set, conf = filter_unset_configs(affected_cs)
 
         logging.info("[*] Analysing affected kernel modules...\n")
-        kmodules_report = patch.analyse_kmodules(affected_cs)
-        patch.print_kmodules(kmodules_report)
-        unsupported = patch.filter_unsupported_kmodules(affected_cs)
+        kmodules_report = analyse_kmodules(affected_cs)
+        print_kmodules(kmodules_report)
+        unsupported = filter_unsupported_kmodules(affected_cs)
 
         working_archs = utils.affected_archs(affected_cs)
         logging.info("Affected architectures:")
