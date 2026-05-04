@@ -216,7 +216,11 @@ def setup_project_files(lp_name, codestreams, full_checks):
 
             __setup_check_file(cs, f)
 
-            for arch in archs:
+            # FIXME: sorted() is needed here so that x86_64 comes as the first
+            # arch in the loop and __setup_check_mode only check that one. This
+            # is a nasty workaround required until cs.modules and cs.configs
+            # get reworked to store per-arch values.
+            for arch in sorted(archs, reverse=True):
                 mod = cs.get_file_mod(f, arch)
                 __setup_check_mod(cs, mod, arch)
 
