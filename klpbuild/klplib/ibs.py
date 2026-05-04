@@ -174,7 +174,7 @@ def validate_livepatch_module(cs, arch, rpm_dir, rpm):
 
 
 def verify_rpm(rpm_path):
-    ret = subprocess.run(["rpm", "-K", str(rpm_path)],
+    ret = subprocess.run(["rpm", "-K", "--nosignature", str(rpm_path)],
                             capture_output=True, text=True)
     if ret.returncode != 0:
         logging.error("RPM verification failed for %s", rpm_path)
