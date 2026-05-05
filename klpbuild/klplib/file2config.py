@@ -58,46 +58,84 @@ def _load_makefile(cs, make_file: str) -> list:
 
 
 def _sanitize_config(target):
-    config = target.strip('+=').strip().strip('obj-$(){}:').strip()
-    return config
+    m = re.search(r'CONFIG_\w+', target)
+    return m.group(0) if m else None
+
+
+def has_targets(make_lines):
+    """
+    Check if there are any objects (*.o) or dir reference in a makefile.
+      - obj-$(CONFIG_TLS) += tls.o — contains .o
+      - mlx5_core-y := main.o cmd.o debugfs.o — contains .o
+      - obj-y += steering/ — ends with / (subdirectory reference)
+    Not valid:
+      - subdir-ccflags-y += -I$(src)/..
+      - # SPDX-License-Identifier: GPL-2.0-only
+    """
+    return make_lines and\
+           any('.o' in l or l.endswith('/') for l in make_lines)
 
 
 def _find_config(cs, base_dir, relative_obj_path, deep):
+    """
+    Walk up the directory tree looking for the CONFIG option that enables
+    a given .o file. At each level, load the Kbuild or Makefile and search
+    for the object. If the target has a CONFIG (e.g. obj-$(CONFIG_TLS)),
+    return it. If it's unconditionally built (e.g. obj-y, setup-y), move
+    to the parent directory. Reaches the tree root as a last resort.
+    """
+
     if deep > 10:
         return None, ""
 
     if Path(".") == base_dir:
         return "CONFIG_SUSE_KERNEL", "vmlinux"
 
-    make_file = Path(base_dir, "Makefile")
-
-    lines = _load_makefile(cs, make_file)
-
+    lines = _load_makefile(cs, Path(base_dir, "Kbuild"))
     if not lines:
+        lines = _load_makefile(cs, Path(base_dir, "Makefile"))
+
+    # Skip Makefiles with no build targets (e.g. only compiler flags)
+    if not has_targets(lines):
         relative_obj_path = base_dir.name + "/" + relative_obj_path
         return _find_config(cs, base_dir.parent, relative_obj_path, deep+1)
 
     for line in lines:
         sep = line.split()
-        if relative_obj_path not in sep:
+        # Strip variable prefixes like $(obj)/ from tokens
+        tokens = [re.sub(r'\$[\({][^)}]*[\)}]/', '', t) for t in sep]
+        if relative_obj_path not in tokens:
             continue
 
-        # target found, check if this one with config
+        # target found, check if it has a CONFIG option
         target = sep[0]
-        if target.startswith('obj-y'):
-            # If it's built-in then check the config of the parent directory
-            return _find_config(cs, base_dir.parent, base_dir.name + '/', deep)
-        if target.startswith('obj-'):
-            return _sanitize_config(target), str((base_dir/relative_obj_path).with_suffix(''))
 
-        # target contains another object file rule, so strip it would and try
-        # again
+        config = _sanitize_config(target)
+        if config:
+            return config, str((base_dir/relative_obj_path).with_suffix(''))
+
+        # Unconditionally built (e.g. obj-y, setup-y): check if the target
+        # groups multiple .o files, otherwise check the parent directory
+        target = re.sub(r'[:+]?=$', '', target)
+        if re.match(r'\w+-y$', target):
+            filename = target.rsplit('-', 1)[0]
+            config, obj = _find_config(cs, base_dir, filename + '.o', deep + 1)
+            if config:
+                return config, obj
+            return _find_config(cs, base_dir.parent, base_dir.name + '/', deep)
+
+        # target contains another object file rule, strip the suffix and retry
         try:
             target, _ = target.rsplit('-', 1)
         except ValueError:
             continue
 
         return _find_config(cs, base_dir, target + '.o', deep + 1)
+
+    # Directory reference not found here, keep searching upward
+    if relative_obj_path.endswith('/'):
+        relative_obj_path = base_dir.name + "/" + relative_obj_path
+        return _find_config(cs, base_dir.parent, relative_obj_path, deep + 1)
 
     return None, ""
 
