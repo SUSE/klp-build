@@ -140,7 +140,54 @@ def _find_config(cs, base_dir, relative_obj_path, deep):
     return None, ""
 
 
+def _find_including_obj(cs, base_dir, c_filename, lines):
+    """
+    Search .c files listed in the Makefile for one that #includes the
+    given c_filename. Return the matching .o, or None.
+    """
+
+    obj_files = set()
+    for line in lines:
+        for token in line.split():
+            if token.endswith('.o'):
+                obj_files.add(token)
+
+    for obj in obj_files:
+        c_file = str(Path(base_dir, obj.replace('.o', '.c')))
+        if not cs.check_file_exists(c_file):
+            continue
+        content = cs.read_file(c_file)
+        if content and f'#include "{c_filename}"' in content:
+            return obj
+
+    return None
+
+
+def _find_config_include(cs, base_dir, relative_obj_path):
+    """
+    Fallback for .c files not listed in the Makefile. Some kernel source
+    files are #included by other .c files instead of being compiled
+    directly. Search sibling .c files for an #include of the target,
+    and resolve the config for the including file instead.
+    """
+
+    if not relative_obj_path.endswith('.o'):
+        return None, ""
+
+    lines = _load_makefile(cs, Path(base_dir, "Makefile"))
+    if not lines:
+        return None, ""
+
+    c_filename = relative_obj_path.replace('.o', '.c')
+    including_obj = _find_including_obj(cs, base_dir, c_filename, lines)
+    if not including_obj:
+        return None, ""
+
+    return _find_config(cs, base_dir, including_obj, 0)
+
+
 def find_file_config(cs, path):
+
     path = path.strip()
 
     # Do not check headers
@@ -149,22 +196,22 @@ def find_file_config(cs, path):
 
     valid_path = _filter_path(path)
     obj_file = Path(valid_path.replace('.c', '.o'))
+
     config, obj = _find_config(cs, obj_file.parent, obj_file.name, 0)
     if not config:
-        return '', ''
+        config, obj = _find_config_include(cs, obj_file.parent, obj_file.name)
 
     # Detect code that is only enabled on a specific architecture.
     # Use a per-architecture generic CONFIG only if the found CONFIG
     # does not affect the same architecture as the one indicated in
     # the given file path.
     elif path.startswith("arch"):
-        archs = cs.get_all_configs(config)
         arch = _get_arch_in_path(path)
+        archs = cs.get_all_configs(config)
         if arch and (len(archs) != 1 or not archs.get(arch)):
             return archs_config[arch]['conf'], archs_config[arch]['module']
 
-    elif not config.startswith('CONFIG_'):
-        # Garbage like 'subst', 'vds' for wrongly parsed input
+    if not config or not config.startswith('CONFIG_'):
         return '', ''
 
     return config, obj
