@@ -163,6 +163,10 @@ def is_bug_dropped(bug):
     return bug.resolution and bug.resolution in {"INVALID", "WONTFIX", "DUPLICATED"}
 
 
+def is_bug_fixed(bug):
+    return bug.resolution and bug.resolution == "FIXED"
+
+
 def is_bug_embargoed(bug):
     return "EMBARGOED" in get_bug_summary(bug)
 
