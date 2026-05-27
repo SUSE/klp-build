@@ -131,7 +131,7 @@ def get_bug_cvss(bug):
 
 
 def get_bug_summary(bug):
-    return bug.summary.split(':')
+    return [s.strip() for s in bug.summary.split(':')]
 
 
 def get_bug_cve(bug):
@@ -139,7 +139,7 @@ def get_bug_cve(bug):
     if len(summary) < 2:
         return ""
 
-    cve = summary[1][5:].strip()
+    cve = summary[1][4:]
 
     if not is_cve_valid(cve):
         return ""
@@ -161,6 +161,14 @@ def get_bug_prio(bug):
 
 def is_bug_dropped(bug):
     return bug.resolution and bug.resolution in {"INVALID", "WONTFIX", "DUPLICATED"}
+
+
+def is_bug_fixed(bug):
+    return bug.resolution and bug.resolution == "FIXED"
+
+
+def is_bug_embargoed(bug):
+    return "EMBARGOED" in get_bug_summary(bug)
 
 
 def get_bug_data(bug):

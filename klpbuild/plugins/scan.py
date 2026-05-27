@@ -12,7 +12,11 @@ from klpbuild.klplib import patch
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.data import download_missing_cs_data
 from klpbuild.klplib.ksrc import get_patches
-from klpbuild.klplib.bugzilla import get_pending_bugs, get_bug_data, is_bug_dropped, get_bug_dep
+from klpbuild.klplib.bugzilla import (
+        get_pending_bugs, get_bug_data,
+        is_bug_dropped, get_bug_dep,
+        is_bug_embargoed,
+        is_bug_fixed)
 
 PLUGIN_CMD = "scan"
 
@@ -58,6 +62,8 @@ def scan_bugzilla():
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for b in bugs:
+            if is_bug_embargoed(b):
+                continue
             cve, system, cvss, prio  = get_bug_data(b)
             if not cve:
                 continue
@@ -84,10 +90,13 @@ def scan_job(bug, cve):
 
     patches, _, _, affected_cs = scan(cve, None, None, False)
 
-    # Check if parent bug has been discarded
+    # Check if parent bug has been discarded or
+    # marked as already fixed.
     dep = get_bug_dep(bug)
     if is_bug_dropped(dep):
         status = "Dropped"
+    elif is_bug_fixed(dep):
+        status = "Fixed(0)"
 
     npatches = len(set(f for _, files in patches.items() for f in files))
     if npatches:
