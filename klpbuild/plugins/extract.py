@@ -391,6 +391,54 @@ def get_patches_dir(lp_name):
     return utils.get_workdir(lp_name)/"fixes"
 
 
+def remove_patches(lp_name, cs):
+    '''
+    Remove any leftovers from previous operations.
+    '''
+    abort_patch()
+    delete_lp_branch(lp_name, cs)
+
+
+def apply_all_patches(lp_name, cs):
+    create_lp_branch(lp_name, cs)
+
+    dirs = cs.get_candidate_patches_dirs()
+    available_patch_dirs = [Path(get_patches_dir(lp_name))/d for d in dirs]
+
+    # Pick the first directory in available_patch_dirs that exists
+    patch_dir = None
+    while available_patch_dirs:
+        candidate_patch_dir = available_patch_dirs.pop(0)
+        if candidate_patch_dir.exists():
+            patch_dir = candidate_patch_dir
+            break
+    assert patch_dir, "Couldn't find a patch directory"
+
+    # Get the patches that need to be applied for the current codestream
+    required_patches = set(cs.get_required_patches())
+
+    logging.info("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, patch_dir)
+    # Here for the ordering we rely on the patches being previouly renamed with a prefix
+    for patch in sorted(patch_dir.iterdir()):
+        if not str(patch).endswith(".patch"):
+            continue
+
+        # Skip if the patch is not required for the current codestream
+        patch_name = patch.name.split("-",1)[1] # Drop the prefix from the patch
+        if patch_name not in required_patches:
+            logging.info("\tDropping %s", patch_name)
+            continue
+
+        logging.info("\tApplying %s", patch_name)
+        if not apply_patch(str(patch)):
+            raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): "
+                f"Failed to apply patch {patch_name}. Aborting")
+
+        required_patches.discard(patch_name)
+
+    assert not required_patches, "Some required patches have not been applied"
+
+
 # Get the code for each codestream, removing boilerplate code
 def group_equal_files(lp_name, working_cs):
     cs_equal = []
@@ -461,126 +509,6 @@ def group_equal_files(lp_name, working_cs):
     logging.info("\nGrouping codestreams that share the same content and files:")
     for group in groups:
         logging.info("\t%s", group)
-
-
-def get_lp_branch(lp_name, cs):
-    return lp_name + "_" + cs.full_cs_name()
-
-
-def remove_patches(lp_name, cs):
-    '''
-    Remove any leftovers from previous operations.
-    '''
-
-    sdir = cs.get_src_dir()
-
-    # Abort any pending git-am from previous extractions.
-    subprocess.run(["git", "am", "--abort"],
-                   stdout=subprocess.DEVNULL,
-                   stderr=subprocess.DEVNULL,
-                   cwd=sdir, check=False)
-
-    # Switch to the original kernel branch. Even if that requires
-    # dropping any local changes.
-    err = subprocess.run(["git", "checkout", "-f", f"rpm-{cs.kernel}"],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         cwd=sdir, check=False)
-    if err.returncode != 0:
-        raise RuntimeError(f"Failed to switch to rpm-{cs.kernel} branch. Aborting\n")
-
-    # Delete any branch related to this livepatch.
-    # We need to start in a clean state.
-    bname = get_lp_branch(lp_name, cs)
-    err = subprocess.run(["git", "branch", "-D", f"{bname}"], cwd=sdir,
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.PIPE, check=False)
-    if err.returncode != 0 and f"'{bname}' not found" not in str(err.stderr):
-        raise RuntimeError(f"Failed to delete branch {bname}:\n{err.stderr}\n")
-
-
-def apply_patch(patch, sdir):
-    # Try to apply the patch first with git-am.
-    # Beware that git-am will not work in all cases,
-    # as it is more strict than patch(1).
-    err = subprocess.run(["git", "am", patch],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         cwd=sdir, check=False)
-    if err.returncode == 0:
-        return True
-
-    # Failed to apply the patch with git-am, so now we are in
-    # a conflict state. Fallback to patch(1) and hope for the best!
-    # If patch(1) resolved the conflict, commit the changes and continue
-    # with git-am. Otherwise, exit so that the user can manually fix it.
-    err = subprocess.run(["patch", "-s", "-f", "-p1", "-i", patch],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         cwd=sdir, check=False)
-    if err.returncode != 0:
-        return False
-
-    subprocess.run(["git", "add", "."],
-                   stdout=subprocess.DEVNULL,
-                   stderr=subprocess.DEVNULL,
-                   cwd=sdir, check=False)
-
-    subprocess.run(["git", "am", "--continue"],
-                   stdout=subprocess.DEVNULL,
-                   stderr=subprocess.DEVNULL,
-                   cwd=sdir, check=False)
-
-    return True
-
-
-def apply_all_patches(lp_name, cs):
-    sdir = cs.get_src_dir()
-    bname = get_lp_branch(lp_name, cs)
-    err = subprocess.run(["git", "checkout", "-B", bname],
-                         cwd=sdir,
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         check=False)
-    if err.returncode != 0:
-        raise RuntimeError(f"Failed to create branch {bname}. Aborting")
-
-    dirs = cs.get_candidate_patches_dirs()
-    available_patch_dirs = [Path(get_patches_dir(lp_name))/d for d in dirs]
-
-    # Pick the first directory in available_patch_dirs that exists
-    patch_dir = None
-    while available_patch_dirs:
-        candidate_patch_dir = available_patch_dirs.pop(0)
-        if candidate_patch_dir.exists():
-            patch_dir = candidate_patch_dir
-            break
-    assert patch_dir, "Couldn't find a patch directory"
-
-    # Get the patches that need to be applied for the current codestream
-    required_patches = set(cs.get_required_patches())
-
-    logging.info("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, patch_dir)
-    # Here for the ordering we rely on the patches being previouly renamed with a prefix
-    for patch in sorted(patch_dir.iterdir()):
-        if not str(patch).endswith(".patch"):
-            continue
-
-        # Skip if the patch is not required for the current codestream
-        patch_name = patch.name.split("-",1)[1] # Drop the prefix from the patch
-        if patch_name not in required_patches:
-            logging.info("\tDropping %s", patch_name)
-            continue
-
-        logging.info("\tApplying %s", patch_name)
-        if not apply_patch(str(patch), sdir):
-            raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): "
-                f"Failed to apply patch {patch_name}. Aborting\n"
-                f"For more information go to: {sdir}")
-
-        required_patches.discard(patch_name)
-
-    assert not required_patches, "Some required patches have not been applied"
 
 
 def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):

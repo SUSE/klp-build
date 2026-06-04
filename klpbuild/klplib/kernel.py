@@ -283,3 +283,100 @@ def file_exists_in_tag(kernel_version, file_path):
 def read_file_in_tag(kernel_version, file_path):
     return (get_kernel_tag_path(kernel_version) / file_path).read_text()
 
+
+def abort_patch():
+    subprocess.run(
+        ["git", "am", "--abort"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=__get_kernel(),
+        check=False,
+    )
+
+
+def __checkout_tag(kernel_version):
+    err = subprocess.run(
+        ["git", "checkout", "-f", f"rpm-{kernel_version}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=__get_kernel(),
+        check=False,
+    )
+    if err.returncode != 0:
+        raise RuntimeError(f"Failed to switch to rpm-{kernel_version} tag. Aborting\n")
+
+
+def create_lp_branch(lp_name, cs):
+    __checkout_tag(cs.kernel)
+    branch = __lp_branch_name(lp_name, cs)
+    err = subprocess.run(
+        ["git", "checkout", "-B", branch],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=__get_kernel(),
+        check=False,
+    )
+    if err.returncode != 0:
+        raise RuntimeError(f"Failed to create branch {branch}. Aborting")
+
+
+def delete_lp_branch(lp_name, cs):
+    __checkout_tag(cs.kernel)
+    branch = __lp_branch_name(lp_name, cs)
+    err = subprocess.run(
+        ["git", "branch", "-D", branch],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        cwd=__get_kernel(),
+        check=False,
+    )
+    if err.returncode != 0 and f"'{branch}' not found" not in str(err.stderr):
+        raise RuntimeError(f"Failed to delete branch {branch}:\n{err.stderr}\n")
+
+
+def apply_patch(patch):
+    sdir = __get_kernel()
+    # Try to apply the patch first with git-am.
+    # Beware that git-am will not work in all cases,
+    # as it is more strict than patch(1).
+    err = subprocess.run(
+        ["git", "am", patch],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=sdir,
+        check=False,
+    )
+    if err.returncode == 0:
+        return True
+
+    # Failed to apply the patch with git-am, so now we are in
+    # a conflict state. Fallback to patch(1) and hope for the best!
+    # If patch(1) resolved the conflict, commit the changes and continue
+    # with git-am. Otherwise, exit so that the user can manually fix it.
+    err = subprocess.run(
+        ["patch", "-s", "-f", "-p1", "-i", patch],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=sdir,
+        check=False,
+    )
+    if err.returncode != 0:
+        return False
+
+    subprocess.run(
+        ["git", "add", "."],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=sdir,
+        check=False,
+    )
+
+    subprocess.run(
+        ["git", "am", "--continue"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=sdir,
+        check=False,
+    )
+
+    return True
