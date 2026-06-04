@@ -10,7 +10,6 @@ from pathlib import Path
 from klpbuild.klplib.utils import classify_codestreams_str,ARCHS
 from klpbuild.klplib.ibs import download_cs_rpms, verify_rpm
 from klpbuild.klplib.config import get_user_path
-from klpbuild.klplib.kernel_tree import  cleanup_obsolete_trees
 
 def filter_obsolete_directories(target_path, valid_kerns):
     """
@@ -67,7 +66,6 @@ def cleanup_obsolete_data(valid_codestreams):
         except OSError as e:
             logging.error("Error removing %s: %s", p, e)
 
-    cleanup_obsolete_trees(valid_codestreams)
 
 
 def download_missing_cs_data(codestreams):

@@ -14,7 +14,7 @@ from functools import wraps
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
-from klpbuild.klplib.kernel_tree import (get_commit_data,
+from klpbuild.klplib.kernel import (get_commit_data,
                                          get_commit_body,
                                          find_commit)
 
