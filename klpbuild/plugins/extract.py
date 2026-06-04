@@ -16,11 +16,10 @@ from collections import OrderedDict
 from pathlib import Path
 from pathlib import PurePath
 from threading import Lock
-from filelock import FileLock
-
 from natsort import natsorted
 
 from klpbuild.klplib import utils
+from klpbuild.klplib.utils import data_lock
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_list
 from klpbuild.klplib.config import get_user_settings
@@ -754,9 +753,7 @@ def lp_out_cleanup(cs, lp_dat, lp_out, sdir):
 
 
 def extract(lp_name, lp_filter, no_patches, avoid_ext):
-    sdir_lock = FileLock(utils.get_datadir()/"data.lock")
-
-    with sdir_lock:
+    with data_lock():
         start_extract(lp_name, lp_filter, no_patches, avoid_ext)
 
 

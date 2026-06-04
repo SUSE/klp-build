@@ -31,7 +31,6 @@ setuptools.setup(
         "natsort",
         "osc-tiny",
         "requests",
-        "filelock",
         "pyelftools",
         "zstandard",
         "python-bugzilla",

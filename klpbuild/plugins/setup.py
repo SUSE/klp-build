@@ -17,6 +17,7 @@ from klpbuild.klplib.codestreams_data import (
 )
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.templ import generate_commit_msg_file
+from klpbuild.klplib.utils import data_lock
 from klpbuild.plugins.scan import scan
 
 PLUGIN_CMD = "setup"
@@ -111,7 +112,8 @@ def run(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
                      conf_mod_file_funcs)
 
     setup_archs(codestreams)
-    setup_project_files(lp_name, codestreams, full_checks)
+    with data_lock():
+        setup_project_files(lp_name, codestreams, full_checks)
 
 
 def setup_manual(codestreams, archs, conf, mod,
