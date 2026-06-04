@@ -3,8 +3,6 @@
 # Copyright (C) 2025 SUSE
 # Author: Vincenzo Mezzela <vincenzo.mezzela@suse.com>
 
-from klpbuild.klplib.kernel_tree import cleanup_kernel_trees
-
 PLUGIN_CMD = "clean-sources"
 
 def register_argparser(subparser):
@@ -14,4 +12,4 @@ def register_argparser(subparser):
 
 
 def run():
-    cleanup_kernel_trees()
+    pass

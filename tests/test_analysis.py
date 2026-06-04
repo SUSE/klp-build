@@ -7,7 +7,7 @@ import logging
 
 from klpbuild.klplib.affected_file import AffectedConfig, AffectedFile, AffectedModule
 from klpbuild.klplib.codestream import Codestream
-from klpbuild.klplib.kernel_tree import get_commit_body
+from klpbuild.klplib.kernel import get_commit_body
 from klpbuild.klplib.analysis import (
     __extract_functions,
     __analyse_cs_files,
