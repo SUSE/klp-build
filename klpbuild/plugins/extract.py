@@ -24,6 +24,10 @@ from klpbuild.klplib import utils
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_list
 from klpbuild.klplib.config import get_user_settings
+from klpbuild.klplib.kernel import (
+    get_lp_branch_path, get_kernel_tag_path,
+    abort_patch, create_lp_branch, delete_lp_branch, apply_patch,
+)
 from klpbuild.klplib.templ import generate_livepatches
 
 PLUGIN_CMD = "extract"
@@ -146,8 +150,13 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         else:
             raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
 
+        # Use -C/O= to point make at the source tree directly, bypassing
+        # the obj dir wrapper Makefile that hardcodes a relative include
+        # path to the (not present) RPM-installed source.
         make_args = [
             "make",
+            "-C", str(sdir),
+            f"O={odir}",
             "-sn",
             "--ignore-errors",
             f"CC={cc}",
@@ -167,7 +176,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         ofname = Path(filename.parent, ofname)
 
         try:
-            completed = subprocess.check_output(make_args, cwd=odir,
+            completed = subprocess.check_output(make_args,
                                                 stderr=f).decode().strip()
             f.write("Full output of the make command:\n")
             f.write(str(completed))
@@ -354,7 +363,7 @@ def get_klpp_symbols(out_dir, lp_out):
     return klpp_syms
 
 
-def get_cmd_from_json(cs, fname):
+def get_cmd_from_json(cs, fname, sdir):
     cc_file = cs.get_obj_dir()/"compile_commands.json"
 
     # Older codestreams doens't support compile_commands.json, so use make for them
@@ -369,10 +378,9 @@ def get_cmd_from_json(cs, fname):
             output = d["command"]
             # The arguments found on the file point to '..', since they are generated
             # when the kernel is compiled. Replace the first '..' on each file
-            # path by the codestream kernel source directory since klp-ccp needs to
-            # reach the files.
+            # path by the source directory since klp-ccp needs to reach the files.
             cmd = process_make_output(output)
-            return cmd.replace(" ..", f" {str(cs.get_src_dir())}").replace("-I..", f"-I{str(cs.get_src_dir())}")
+            return cmd.replace(" ..", f" {str(sdir)}").replace("-I..", f"-I{str(sdir)}")
 
     raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
 
@@ -511,7 +519,7 @@ def group_equal_files(lp_name, working_cs):
         logging.info("\t%s", group)
 
 
-def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
+def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir):
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
     funcs = ",".join(fdata["symbols"])
@@ -566,7 +574,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     env["KCP_MOD_SYMVERS"] = str(Path(cs.get_boot_dir(), f'{cs.get_boot_filename("symvers")}.gz'))
     env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
     env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.preferred_arch([cs]))/cs.get_mod(obj))
-    env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
+    env["KCP_KBUILD_SDIR"] = str(sdir)
     env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
     env["KCP_WORK_DIR"] = str(out_dir)
     env["KCP_READELF"] = "readelf"
@@ -659,11 +667,15 @@ def parse_ccp_warnings(f, start_pos, cs, fname):
                 handler(match, cs, fname)
 
 
-def process(lp_name, total, args, avoid_ext):
+def process(lp_name, total, args, avoid_ext, no_patches):
     i, make_lock, fname, cs, fdata = args
 
-    sdir = cs.get_src_dir()
     odir = cs.get_obj_dir()
+
+    if not no_patches and cs.needs_patches():
+        sdir = get_lp_branch_path(lp_name, cs)
+    else:
+        sdir = get_kernel_tag_path(cs.kernel)
 
     # The header text has two tabs
     cs_info = cs.full_cs_name().ljust(15, " ")
@@ -674,18 +686,15 @@ def process(lp_name, total, args, avoid_ext):
     out_dir = cs.get_ccp_work_dir(lp_name, fname)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # create symlink to the respective codestream file
-    os.symlink(Path(sdir, fname), Path(out_dir, Path(fname).name))
-
     # Make can regenerate fixdep for each file being processed per
     # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
     # calls. Make is pretty fast, so there isn't a real slow down here.
-    cmd = get_cmd_from_json(cs, fname)
+    cmd = get_cmd_from_json(cs, fname, sdir)
     if not cmd:
         with make_lock:
             cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
-    args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
+    args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir)
 
     # Detect and set ibt information. It will be used in the TemplateGen
     if '-fcf-protection' in cmd or cs.needs_ibt():
@@ -745,7 +754,7 @@ def lp_out_cleanup(cs, lp_dat, lp_out, sdir):
 
 
 def extract(lp_name, lp_filter, no_patches, avoid_ext):
-    sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
+    sdir_lock = FileLock(utils.get_datadir()/"data.lock")
 
     with sdir_lock:
         start_extract(lp_name, lp_filter, no_patches, avoid_ext)
@@ -786,7 +795,7 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
     with ThreadPoolExecutor(max_workers=workers) as executor:
         try:
             futures = executor.map(process, repeat(lp_name), repeat(len(args)),
-                                   args, repeat(avoid_ext))
+                                   args, repeat(avoid_ext), repeat(no_patches))
             for future in futures:
                 if future:
                     logging.error(future)
