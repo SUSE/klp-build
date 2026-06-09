@@ -3,9 +3,11 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
+import dataclasses
 import logging
 import concurrent.futures
 import tabulate
+from dataclasses import dataclass
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.analysis import (
@@ -22,6 +24,17 @@ from klpbuild.klplib.bugzilla import (
         is_bug_dropped, get_bug_dep,
         is_bug_embargoed,
         is_bug_fixed)
+
+@dataclass
+class JobResult:
+    status: str = "Not-Fixed"
+    archs: str = "None"
+    eol: str = "n/a"
+    affected: str = "No"
+
+    def __iter__(self):
+        return dataclasses.astuple(self).__iter__()
+
 
 PLUGIN_CMD = "scan"
 
@@ -88,38 +101,39 @@ def scan_bugzilla():
 
 
 def scan_job(bug, cve):
-    affected = "No"
-    status = "Not-Fixed"
-    affected_archs = "None"
-    eol = "n/a"
+    result = JobResult()
+
+    dep = get_bug_dep(bug)
+    if not dep:
+        result.status = "No-parent"
+        return result
+
+    if is_bug_dropped(dep):
+        result.status = "Dropped"
+        return result
+
+    if is_bug_fixed(dep):
+        result.status = "Fixed(0)"
 
     patches, _, _, affected_cs = scan(cve, None, None, False)
 
-    # Check if parent bug has been discarded or
-    # marked as already fixed.
-    dep = get_bug_dep(bug)
-    if is_bug_dropped(dep):
-        status = "Dropped"
-    elif is_bug_fixed(dep):
-        status = "Fixed(0)"
-
     npatches = len(set(f for _, files in patches.items() for f in files))
     if npatches:
-        status = f"Fixed({npatches})"
+        result.status = f"Fixed({npatches})"
 
     if dep and "security-team" not in dep.assigned_to:
-        status = f"Incomplete({npatches})"
+        result.status = f"Incomplete({npatches})"
 
     if affected_cs:
-        affected = utils.classify_codestreams_str(affected_cs)
-        eol = utils.get_lp_eol(affected_cs)
+        result.affected = utils.classify_codestreams_str(affected_cs)
+        result.eol = utils.get_lp_eol(affected_cs)
 
     # All = ppc64le, s390x and x86_64
     # None = klp-build failed to determine the CONFIGs.
     if (archs := utils.affected_archs(affected_cs)):
-        affected_archs = "All" if set(archs) == utils.ARCHS else ','.join(archs)
+        result.archs = "All" if set(archs) == utils.ARCHS else ','.join(archs)
 
-    return status, affected_archs, eol, affected
+    return result
 
 
 def scan(cve, conf, lp_filter, download, archs=None, savedir=None, extra_patches=None):
