@@ -76,16 +76,21 @@ def download_built_rpms(lp_name, lp_filter):
 
 
 def prepare_tests(lp_name, lp_filter):
+    test_src = get_tests_path(lp_name)
+    if test_src and not os.access(test_src, os.X_OK):
+        logging.error("Script %s has no execution bit set. Aborting", test_src)
+        sys.exit(1)
+
     # Download all built rpms
     download_built_rpms(lp_name, lp_filter)
 
-    test_src = get_tests_path(lp_name)
+    tests_dir = get_workdir(lp_name, True) / "tests"
     run_test = importlib.resources.files("scripts") / "run-kgr-test.sh"
 
     logging.info("Validating the downloaded RPMs...")
 
     for arch in ARCHS:
-        tests_path = get_workdir(lp_name)/"tests"/arch
+        tests_path = tests_dir / arch
         test_arch_path = tests_path/lp_name
 
         # Remove previously created directory and archive
@@ -101,7 +106,7 @@ def prepare_tests(lp_name, lp_filter):
         logging.info("Checking %s symbols...", arch)
         build_cs = []
         for cs in filter_codestreams(lp_filter, get_codestreams_list()):
-            if arch not in cs.archs:
+            if arch not in cs.get_default_archs():
                 continue
 
             rpm_dir = Path(cs.get_ccp_dir(lp_name), arch, "rpm")
@@ -110,11 +115,12 @@ def prepare_tests(lp_name, lp_filter):
                 continue
 
             # TODO: there will be only one rpm, format it directly
-            rpm = os.listdir(rpm_dir)
-            if len(rpm) > 1:
-                raise RuntimeError(f"ERROR: {cs.full_cs_name()}/{arch}. {len(rpm)} rpms found. Excepting to find only one")
 
-            for rpm in os.listdir(rpm_dir):
+            rpms = [rpm for rpm in os.listdir(rpm_dir) if rpm.endswith(".rpm")]
+            if len(rpms) > 1:
+                raise RuntimeError(f"ERROR: {cs.full_cs_name()}/{arch}. {len(rpms)} rpms found. Excepting to find only one")
+
+            for rpm in rpms:
                 # Check for dependencies
                 validate_livepatch_module(cs, arch, rpm_dir, rpm)
 

@@ -54,24 +54,89 @@ Download all the missing supported codestreams data.
 .TP
 .B --force
 Re-download also codestream that are not missing.
+.TP
+.B --cleanup-obsolete
+Clean up the obsolete data generated for unsupported code streams.
+.TP
+.B --update
+Download the missing codestreams data and clean up the obsolete data. It has the same result as
+--download and --cleanup-obsolete.
+.TP
+.B --verify-all
+Verify the integrity of all the downloaded RPM packages.
 .RE
 .TP
 .B scan
 In the scan,
 .B klp-build
-does a shallow analysis of the given CVE, searching for already patched codestreams
-and reporting those that most likley are still affected by the bug.
-This subcommand does not store any data, as it is mainly targeted for automation
-and not for livepatch development. For the latter see the
-.B setup
-subcommand.
+does a bulk analysis of all the pending CVEs meant to be livepatched, as
+indicated in SUSE's Bugzilla. Once completed, a full report is generated
+and printed in stdout with all the bugs information. Example report:
+.TP
+.PP
+.EX
+     ID  CVE         SUBSYSTEM       CVSS    PRIORITY      CLASSIFICATION    STATUS         AFFECTED
+-------  ----------  ------------  ------   ----------   ----------------  -------------  --------------------
+122xxxx  2021-xxxxx  scsi             7.8    Medium         complex          Incomplete(0)  No
+122xxxx  2024-xxxxx  drm/amdgpu       7.8    Medium         trivial          Fixed(3)       15.6rtu0 15.6u0
+122xxxx  2024-xxxxx  iommu/vt-d       7.8    High           None             Fixed(1)       15.6rtu0 15.6u0-1
+.EE
+.PP
 .RS 7
+Most of the fields are self-explanatory except for perhaps
+the
+.B status
+and
+.B affected
+ones.
+.TP
+.B status:
+*
+.I Fixed(n)
+Bug has been fixed in all the vulnerable SLEs.
+.sp
+*
+.I Incomplete(n)
+Most likely someone is working on the bug.
+.sp
+*
+.I Not-Fixed
+No one has started working on the bug yet. Or the bug has been discarded,
+but it cannot be confirmed by
+.B klp-build
+alone.
+.sp
+*
+.I Dropped
+Bug has been discarded with 100% certainty, so no livepatch needed.
+.sp
+.I n
+is the total number of backports for this specific CVE.
+.sp
+.B status
+is derived from the available information in bugzilla, and as such
+it might be incorrect and should be manually verified. That being said, in most cases
+the reported information is realiable enough to be used as a hint.
+.LP
+.B affected:
+List of codestreams still affected by the bug that need to be livepatched.
+.I No
+otherwise.
+.PP
+This subcommand does not store any data, as it is mainly targeted for automation
+and as a first step during livepatch development.
+.PP
+Optional arguments:
 .TP
 .BI --cve " CVE"
-The CVE to be analyzed.
+If passed, scan will just analyse the given CVE.
 .TP
 .B --download
 Download missing codestreams data.
+.TP
+.BI --conf " CONF"
+Helps to check only the codestreams that have this config set.
+Not compatible with the automated patch analysis phase.
 .RE
 .TP
 .B setup
@@ -79,18 +144,32 @@ During the setup,
 .B klp-build
 analysis each codestream in order to identify those affected by
 the indicated CVE. Note that in this phase a lot of per-codestream
-data is generated and stored for future use.
+data is generated and stored for future use. By default,
+.B setup
+retrieves all the technical information (files, functions, configs,
+modules and archs) from the report generated during the
+.B scan.
+In case the report is incorrect, the values can be passed manually
+with the optional arguments.
 .RS 7
 .TP
-.BI --cve " CVE"
-The CVE assigned to this livepatch.
-.TP
+Optional arguments:
+.PP
 .BI --conf " CONF"
 The kernel CONFIG used to build the object to be livepatched.
 .TP
 .B --no-check
 Do not check for already patched codestreams, do the setup for
 all non filtered codestreams.
+.TP
+.B --full-checks
+Enables advanced checks that verify if the symbol can be livepatched. Enabling
+this option incurs in slowdowns since it has to check if the symbols being
+livepatched are in the ftrace ELF sections of vmlinux, in all supported
+architectures of each affected codestream.
+
+The checks are done only on symbols that come from vmlinux. Module checks are
+planned to be added in the future.
 .TP
 .BI --codestreams " CODESTREAMS"
 Codestreams affected by the CVE. Can be used as a regex, like,
@@ -120,6 +199,13 @@ will be livepatched instead.
 .TP
 .BI --archs " {ppc64le,s390x,x86_64} [{ppc64le,s390x,x86_64} ...]"
 Supported architectures for this livepatch.
+.TP
+.BI --add-patches " PATCH [PATCH ...]"
+Path(s) of additional patches from kernel-source (e.g.\&
+.IR patches.suse/some-fix.patch ).
+Can specify multiple patches.
+These patches will be checked per-codestream and applied before CVE patches
+when present on the branch.
 .RE
 .TP
 .B extract
@@ -128,8 +214,6 @@ In this phase
 creates the livepatch for each affected codestream based on the data generated
 during the
 .BR setup "."
-Results may differ greatly depending on the back-end tool selected for the
-livepatch creation.
 .RS 7
 .TP
 .BI --avoid-ext " AVOID_EXT [AVOID_EXT ...]"
@@ -137,11 +221,21 @@ Functions to be copied into the livepatch instead of externalizing them.
 Useful to make sure to include symbols that are optimized in
 different architectures.
 .TP
-.B --apply-patches
-Apply patches if they exist.
+.B --no-patches
+Do not apply the patches even if they exist.
+.RE
 .TP
-.BI --codestreams " CODESTREAMS CODESTREAMS"
-Apply diff on two different codestreams.
+.B commit
+Commit the extracted livepatches to kgraft-patches (see the
+.BR "SEE ALSO" " section)."
+It organizes the codestreams as per indicated in the
+.I groups
+file. Each codestream group will have a corresponding
+branch in the repository.
+.RS 7
+.TP
+.BI "-f, --force"
+Overwrite existing livepatches and branches in the repository.
 .RE
 .TP
 .B format-patches
@@ -151,6 +245,9 @@ Extract patches from kgraft-patches (see the
 .TP
 .BI "-v , --version" " VERSION"
 Version to be added, like vX.
+.TP
+.BI "--no-test"
+Skip the test script.
 .RE
 .TP
 .B cs-diff
@@ -165,7 +262,7 @@ Generates a tar archive per supported architecture containing
 scripts and files that can later be used to run tests in the desired test benchs.
 .TP
 .B push
-Push the generated livetpatch packages to SUSE's Build Service.
+Push and commit the generated livetpatch packages to SUSE's Build Service.
 By doing so,
 .B klp-build
 can automate the building phase for each codestream and architecture.
@@ -173,6 +270,10 @@ can automate the building phase for each codestream and architecture.
 .TP
 .B --wait
 Wait until all codestreams builds are finished.
+.TP
+.B --fast
+Filter only one codestream from each product. It makes testing a livepatch easier
+than appying a random filter to select one a few codestreams.
 .RE
 .TP
 .B status
@@ -205,6 +306,20 @@ Default directory where the livepatch data will be
 placed, including the data generated by the different stages of the livepatch
 creation
 .TP
+.I ~/klp/livepatches/ccp/groups
+File containing the list of codestreams that
+.B extract
+successfully created a livepatch for.
+The codestreams
+are presented in a "grouped" format,
+where each line represents a unique group of
+codestreams.
+.B klp-build
+groups the codestream based on the generated
+livepatches differences. Therefore, within
+the same group, all codestreams share the
+same content and files
+.TP
 .I ~/klp/data
 Default directory where the dowloaded source code will be placed
 .SH EXAMPLES
@@ -219,9 +334,16 @@ kernel module
 .IP
 $
 .B klp-build
+setup --name bsc1197597 --cve 2022-1048 --filter '15.5' --archs x86_64 ppc64le
+.PP
+Or if the automated setup is incorrected, the information can be
+passed manually:
+.IP
+$
+.B klp-build
 setup --name bsc1197597 --cve 2022-1048 --mod snd-pcm --conf
 CONFIG_SND_PCM --file-funcs sound/core/pcm.c snd_pcm_attach_substream
-snd_pcm_detach_substream --codestreams '15.5' --archs x86_64 ppc64le
+snd_pcm_detach_substream --filter '15.5' --archs x86_64 ppc64le
 .PP
 Compare two codestreams:
 .IP

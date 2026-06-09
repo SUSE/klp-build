@@ -5,21 +5,22 @@
 
 import logging
 
+from pathlib import PurePosixPath
 from collections import defaultdict
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.file2config import find_configs_for_files
-from klpbuild.klplib.ksrc import KERNEL_BRANCHES, get_patch_files
+from klpbuild.klplib.ksrc import get_patches_files
 
 
-def analyse_files(cs_list, sle_patches):
+def analyse_files(cs_list):
     '''
     Function that analyses, per codestream, each of the files modified
     by the backported patches.
     For each of the files it retrieves the corresponding kernel module
-    and config.
+    config and modified functions.
     Lastly, it returns back a report grouping the codestreams by files,
-    modules and configs.
+    modules, configs and modified functions.
 
     Args:
         cs_list (list): List of affected codestreams.
@@ -29,23 +30,26 @@ def analyse_files(cs_list, sle_patches):
     report = defaultdict(list)
 
     for cs in cs_list:
-            bc = cs.base_cs_name()
-            patches = sle_patches[bc]
-            branch = KERNEL_BRANCHES[bc]
-            files = get_patch_files(patches, branch)
-            fconfigs, _, missing = find_configs_for_files(cs, files)
+        patches = [f"patches.suse/{p}" for p in cs.get_required_patches()]
+        branch = cs.get_base_branch()
 
-            for file in missing:
-                key = f"{file}::"
-                if cs not in report[key]:
-                    report[key].append(cs)
+        files_funcs = get_patches_files(patches, branch)
+        files_path = files_funcs.keys()
+        files_conf, _ = find_configs_for_files(cs, files_path)
 
-            for file, dat in fconfigs.items():
-                key = f"{file}:{dat['config']}:{dat['obj']}"
-                if cs not in report[key]:
-                    report[key].append(cs)
+        for file, funcs in files_funcs.items():
+            conf = files_conf.get(file, {})
+            if conf:
+                cs.files[file] = {'symbols': list(funcs)}
+                cs.files[file].update(conf)
+                key = f"{file}:{conf['conf']}:{conf['module']}:{sorted(funcs)}"
+            else:
+                key = f"{file}:::"
+                logging.warning("%s: Failed to find a config for %s",
+                                cs.full_cs_name(), file)
 
-            cs.files.update(fconfigs)
+            if cs not in report[key]:
+                report[key].append(cs)
 
     return report
 
@@ -58,13 +62,14 @@ def print_files(report):
         file = key.split(':')[0]
 
         if not cs.files or file not in cs.files:
-            logging.info(f"{cs_str}:\nFILE: {file}\n")
+            logging.info("%s:\nFILE: %s\n", cs_str, file)
             continue
 
-        conf = cs.files[file]['config']
-        obj = cs.files[file]['obj']
-        logging.info("%s:\nFILE: %s\nCONF: %s\nOBJ: %s\n",
-                     cs_str, file, conf, obj)
+        conf = cs.files[file]['conf']
+        obj = cs.files[file]['module']
+        funcs = cs.files[file]['symbols']
+        logging.info("%s:\nFILE: %s\nCONF: %s\nOBJ: %s\nFUNCS: %s\n",
+                     cs_str, file, conf, obj, ', '.join(funcs))
 
 
 def analyse_configs(cs_list):
@@ -82,14 +87,10 @@ def analyse_configs(cs_list):
     report = defaultdict(list)
 
     for cs in cs_list:
-        for _, dat in cs.files.items():
-            conf = dat['config']
-            if conf in cs.configs:
-                continue
-
-            cs.configs[conf] = cs.get_all_configs(conf)
-
-            key = f"{conf}:{cs.configs[conf]}"
+        configs = {dat['conf'] for _, dat in cs.files.items()}
+        cs.set_configs(configs)
+        for conf, archs in cs.configs.items():
+            key = f"{conf}:{archs}"
             if cs not in report[key]:
                 report[key].append(cs)
 
@@ -126,7 +127,7 @@ def filter_unset_configs(cs_list):
         isset = [conf for conf, archs in cs.configs.items() if archs]
         if not isset:
             unset_cs.append(cs)
-            unset_conf += [conf for conf in cs.configs]
+            unset_conf += list(cs.configs)
 
     for cs in unset_cs:
         cs_list.remove(cs)
@@ -150,8 +151,8 @@ def analyse_kmodules(cs_list):
 
     for cs in cs_list:
         for _, dat in cs.files.items():
-            conf = dat['config']
-            mod = dat['obj']
+            conf = dat['conf']
+            mod = dat['module']
             if mod in cs.modules:
                 continue
 
@@ -160,7 +161,11 @@ def analyse_kmodules(cs_list):
                            cs.configs[conf].items()]:
                 continue
 
-            supported = cs.is_module_supported(mod)
+            supported, blacklisted = cs.is_module_supported(mod)
+            if blacklisted:
+                logging.warning("%s: Module '%s' is not supported by klp-build.",
+                                cs.full_cs_name(), PurePosixPath(mod).name)
+
             cs.modules[mod] = supported
             key = f"{mod}:{supported}"
             if cs not in report[key]:
@@ -192,8 +197,10 @@ def filter_unsupported_kmodules(cs_list):
         if not supported:
             unset_cs.append(cs)
 
+        # Cleanup for future re-use
+        cs.modules.clear()
+
     for cs in unset_cs:
         cs_list.remove(cs)
 
     return unset_cs
-

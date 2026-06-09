@@ -28,6 +28,12 @@ from klpbuild.klplib.templ import generate_livepatches
 
 PLUGIN_CMD = "extract"
 
+UNSUPPORTED_MACROS = [
+        "__KERNEL__",
+        "MODULE",
+        "KBUILD_MODNAME",
+        r"__has_attribute\("
+        ]
 
 def register_argparser(subparser):
     extract_opts = subparser.add_parser(
@@ -47,12 +53,12 @@ def register_argparser(subparser):
         "different architectures",
     )
     extract_opts.add_argument(
-        "--apply-patches", action="store_true", help="Apply patches if they exist"
+        "--no-patches", action="store_true", help="Do not apply patches if they exist"
     )
 
 
-def run(lp_name, lp_filter, apply_patches, avoid_ext):
-    return extract(lp_name, lp_filter, apply_patches, avoid_ext)
+def run(lp_name, lp_filter, no_patches, avoid_ext):
+    return extract(lp_name, lp_filter, no_patches, avoid_ext)
 
 
 def get_cs_code(lp_name, working_cs):
@@ -61,6 +67,8 @@ def get_cs_code(lp_name, working_cs):
     # Mount the cs_files dict
     for cs in working_cs:
         cs_files.setdefault(cs.full_cs_name(), [])
+
+        arch = utils.preferred_arch([cs])
 
         for fpath in cs.get_lp_dir(lp_name).iterdir():
             fname = fpath.name
@@ -72,10 +80,12 @@ def get_cs_code(lp_name, working_cs):
                 src = re.sub(r'#include ".+compiler\-version\.h"\n', "", src)
                 # Since RT variants, there is now an definition for auto_type
                 src = src.replace(r"#define __auto_type int\n", "")
+                # Do not compare the klp-ccp comments
+                src = re.sub(r"klp-ccp: .+\.[hc]", "", src)
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f"{utils.get_datadir(utils.ARCH)}.+{fname}", "", src)
+                src = re.sub(f"{utils.get_datadir(arch)}.+{fname}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(r"\.lineno = \d+,", "", src)
@@ -104,8 +114,7 @@ def process_make_output(output):
     # outer quotes
     output = output.replace("'", "")
 
-    # Remove the compiler name used to compile the object. TODO: resolve
-    # when clang is used, or other cross-compilers.
+    # Remove the compiler name used to compile the object.
     output = re.sub(r'^gcc(-\d+)?\s+', '', output)
 
     # also remove double quotes from macros like -D"KBUILD....=.."
@@ -201,7 +210,77 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         return ret
 
 
-def get_symbol_list(out_dir):
+def get_missing_ext_symbols(working_cs):
+    '''
+    Find the symbols that were not externalized and report those that
+    can be unexternalized.
+    '''
+    missing_syms = OrderedDict()
+    unext_syms = set()
+
+    # Iterate over each codestream, getting each file processed, and all
+    # externalized symbols of this file
+    for cs in working_cs:
+        # Map all symbols related to each obj, to make it check the symbols
+        # only once per object
+        obj_syms = {}
+        for fdata in cs.files.values():
+            for obj, syms in fdata["ext_symbols"].items():
+                obj_syms.setdefault(obj, [])
+                obj_syms[obj].extend(syms)
+
+        for obj, syms in obj_syms.items():
+            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
+            for arch, arch_syms in missing.items():
+                blacklisted = re.findall(r"((?:__SCT__|__SCK__|__traceiter)\w+)",
+                                         ' '.join(arch_syms))
+                whitelisted = set(blacklisted) ^ set(arch_syms)
+                if whitelisted:
+                    unext_syms.update(whitelisted)
+                if blacklisted:
+                    missing_syms.setdefault(arch, {})
+                    missing_syms[arch].setdefault(obj, {})
+                    missing_syms[arch][obj].setdefault(cs.full_cs_name(), [])
+                    missing_syms[arch][obj][cs.full_cs_name()].extend(blacklisted)
+
+    return missing_syms, unext_syms
+
+
+def fix_ext_symbols(cs, lp_dat, lp_out):
+    '''
+    Fix klp-ccp mistakes on non-ibt livepatches:
+        - Drop any duplicated externalized symbol declaration generated
+          by klp-ccp. This is a workaround for:
+          https://github.com/SUSE/klp-ccp/issues/13
+        - Refactor percpu externalized symbols declaration. Default one
+          crashes at runtime.
+    '''
+
+    # Only happens with non-ibt codestreams for now
+    if cs.needs_ibt():
+        return lp_out
+
+    for sym_list in lp_dat["ext_symbols"].values():
+        for s in sym_list:
+            # Keep only static declarations
+            lp_out = re.sub(rf"^(?!static|\s|#)\w[^;:()=]+\(\*klpe_{s}\)[^;:=]*;",
+                            '', lp_out, flags=re.MULTILINE)
+
+
+    # From:
+    # - static __attribute__((section(".data..percpu" ""))) __typeof__(int)
+    #   (*klpe_example);
+    # To:
+    # + static int __percpu (*klpe_example);
+    lp_out = re.sub(r'^static __attribute__\(\(section\(".data..percpu" '
+                    r'""\)\)\).*__typeof__\((.*)\) (.*)$',
+                    r'static \1 __percpu \2', lp_out,
+                    flags=re.MULTILINE)
+
+    return lp_out
+
+
+def get_ext_symbols(out_dir):
     # Generate the list of exported symbols
     exts = []
 
@@ -234,6 +313,44 @@ def get_symbol_list(out_dir):
         symbols[mod].append(sym)
 
     return symbols
+
+
+def get_klpp_symbols(out_dir, lp_out):
+    fpath = Path(out_dir, "patched_funcs")
+    if not fpath.exists():
+        raise RuntimeError(f"File not found: {fpath}")
+
+    with open(lp_out) as f:
+        lp_code = f.read()
+
+    klpp_syms = {}
+    with open(fpath) as f:
+        # Each line is a symbol patched by klp-ccp
+        for sym in f:
+            sym = sym.strip()
+            # Create a regex for finding the klpp_{sym} function
+            # declaration and definition.
+            rfmt = fr"(static\s+)(([\w\*]\s*)*klpp_{sym}\s*\((?:[^()]*|\([^()]*\))*\))"
+            regex = re.compile(rfmt, re.S)
+
+            # Search and save the function prototype for later use
+            m = regex.search(lp_code)
+            if not m:
+                logging.warning("Failed to find klpp_%s in %s", sym, lp_out)
+                continue
+            klpp_proto = re.sub(r'\s+', ' ', m.group(2)).strip() + ';'
+            # Remove the attributes left by klp-ccp, since they don't mean much
+            # for kernel modules
+            klpp_proto = re.sub(r' __(init|exit)', ' ', klpp_proto)
+            klpp_syms.update({sym: klpp_proto})
+
+            # Remove the 'static' keyword in the prototypes, if any
+            lp_code = regex.sub(r'\2', lp_code)
+
+    with open(lp_out, "w") as f:
+        f.write(lp_code)
+
+    return klpp_syms
 
 
 def get_cmd_from_json(cs, fname):
@@ -345,84 +462,124 @@ def group_equal_files(lp_name, working_cs):
         logging.info("\t%s", group)
 
 
-def quilt_log_path(lp_name, apply_patches):
-    if apply_patches:
-        return get_patches_dir(lp_name)/"quilt.log"
-
-    return "/dev/null"
+def get_lp_branch(lp_name, cs):
+    return lp_name + "_" + cs.full_cs_name()
 
 
-def remove_patches(lp_name, cs, apply_patches):
-    sdir = cs.get_src_dir()
-    # Check if there were patches applied previously
-    patches_dir = Path(sdir, "patches")
-    if not patches_dir.exists():
-        return
+def remove_patches(lp_name, cs):
+    '''
+    Remove any leftovers from previous operations.
+    '''
 
-    with open(quilt_log_path(lp_name, apply_patches), "a") as f:
-        f.write(f"\nRemoving patches from {cs.full_cs_name()}({cs.kernel})\n")
-        err = subprocess.run(["quilt", "pop", "-a"], cwd=sdir, stderr=f, stdout=f, check=False)
-
-    if err.returncode not in [0, 2]:
-        raise RuntimeError(f"{cs.full_cs_name()}: quilt pop failed on {sdir}: ({err.returncode}) {err.stderr}")
-
-    shutil.rmtree(patches_dir, ignore_errors=True)
-    shutil.rmtree(Path(sdir, ".pc"), ignore_errors=True)
-
-
-def apply_all_patches(lp_name, cs, apply_patches):
-    dirs = []
-
-    if cs.rt:
-        dirs.extend([f"{cs.sle}.{cs.sp}rtu{cs.update}", f"{cs.sle}.{cs.sp}rt"])
-
-    dirs.extend([f"{cs.sle}.{cs.sp}u{cs.update}", f"{cs.sle}.{cs.sp}"])
-
-    if cs.sle == 15 and cs.sp < 4:
-        dirs.append("cve-5.3")
-    elif cs.sle == 15 and cs.sp <= 5:
-        dirs.append("cve-5.14")
-
-    patch_dirs = []
-
-    for d in dirs:
-        patch_dirs.append(Path(get_patches_dir(lp_name), d))
-
-    patched = False
     sdir = cs.get_src_dir()
 
-    with open(quilt_log_path(lp_name, apply_patches), "a") as f:
-        for pdir in patch_dirs:
-            if not pdir.exists():
-                f.write(f"\nPatches dir {pdir} doesnt exists\n")
-                continue
+    # Abort any pending git-am from previous extractions.
+    subprocess.run(["git", "am", "--abort"],
+                   stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL,
+                   cwd=sdir, check=False)
 
-            f.write(f"\nApplying patches on {cs.full_cs_name()}({cs.kernel}) from {pdir}\n")
-            for patch in sorted(pdir.iterdir(), reverse=True):
-                if not str(patch).endswith(".patch"):
-                    continue
+    # Switch to the original kernel branch. Even if that requires
+    # dropping any local changes.
+    err = subprocess.run(["git", "checkout", "-f", f"rpm-{cs.kernel}"],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         cwd=sdir, check=False)
+    if err.returncode != 0:
+        raise RuntimeError(f"Failed to switch to rpm-{cs.kernel} branch. Aborting\n")
 
-                err = subprocess.run(["quilt", "import", str(patch)], cwd=sdir,
-                                     stderr=f, stdout=f, check=False)
-                if err.returncode != 0:
-                    f.write("\nFailed to import patches, remove applied and try again\n")
-                    f.flush()
-                    remove_patches(lp_name, cs, apply_patches)
+    # Delete any branch related to this livepatch.
+    # We need to start in a clean state.
+    bname = get_lp_branch(lp_name, cs)
+    err = subprocess.run(["git", "branch", "-D", f"{bname}"], cwd=sdir,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.PIPE, check=False)
+    if err.returncode != 0 and f"'{bname}' not found" not in str(err.stderr):
+        raise RuntimeError(f"Failed to delete branch {bname}:\n{err.stderr}\n")
 
-            err = subprocess.run(["quilt", "push", "-a"], cwd=sdir,
-                                 stderr=f, stdout=f, check=False)
-            if err.returncode != 0:
-                f.write("\nFailed to apply patches, remove applied and try again\n")
-                f.flush()
-                remove_patches(lp_name, cs, apply_patches)
-                continue
 
-            patched = True
-            # Stop the loop in the first dir that we find patches.
+def apply_patch(patch, sdir):
+    # Try to apply the patch first with git-am.
+    # Beware that git-am will not work in all cases,
+    # as it is more strict than patch(1).
+    err = subprocess.run(["git", "am", patch],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         cwd=sdir, check=False)
+    if err.returncode == 0:
+        return True
+
+    # Failed to apply the patch with git-am, so now we are in
+    # a conflict state. Fallback to patch(1) and hope for the best!
+    # If patch(1) resolved the conflict, commit the changes and continue
+    # with git-am. Otherwise, exit so that the user can manually fix it.
+    err = subprocess.run(["patch", "-s", "-f", "-p1", "-i", patch],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         cwd=sdir, check=False)
+    if err.returncode != 0:
+        return False
+
+    subprocess.run(["git", "add", "."],
+                   stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL,
+                   cwd=sdir, check=False)
+
+    subprocess.run(["git", "am", "--continue"],
+                   stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL,
+                   cwd=sdir, check=False)
+
+    return True
+
+
+def apply_all_patches(lp_name, cs):
+    sdir = cs.get_src_dir()
+    bname = get_lp_branch(lp_name, cs)
+    err = subprocess.run(["git", "checkout", "-B", bname],
+                         cwd=sdir,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         check=False)
+    if err.returncode != 0:
+        raise RuntimeError(f"Failed to create branch {bname}. Aborting")
+
+    dirs = cs.get_candidate_patches_dirs()
+    available_patch_dirs = [Path(get_patches_dir(lp_name))/d for d in dirs]
+
+    # Pick the first directory in available_patch_dirs that exists
+    patch_dir = None
+    while available_patch_dirs:
+        candidate_patch_dir = available_patch_dirs.pop(0)
+        if candidate_patch_dir.exists():
+            patch_dir = candidate_patch_dir
             break
+    assert patch_dir, "Couldn't find a patch directory"
 
-    if not patched:
-        raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): Failed to apply patches. Aborting")
+    # Get the patches that need to be applied for the current codestream
+    required_patches = set(cs.get_required_patches())
+
+    logging.info("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, patch_dir)
+    # Here for the ordering we rely on the patches being previouly renamed with a prefix
+    for patch in sorted(patch_dir.iterdir()):
+        if not str(patch).endswith(".patch"):
+            continue
+
+        # Skip if the patch is not required for the current codestream
+        patch_name = patch.name.split("-",1)[1] # Drop the prefix from the patch
+        if patch_name not in required_patches:
+            logging.info("\tDropping %s", patch_name)
+            continue
+
+        logging.info("\tApplying %s", patch_name)
+        if not apply_patch(str(patch), sdir):
+            raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): "
+                f"Failed to apply patch {patch_name}. Aborting\n"
+                f"For more information go to: {sdir}")
+
+        required_patches.discard(patch_name)
+
+    assert not required_patches, "Some required patches have not been applied"
 
 
 def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
@@ -452,6 +609,13 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
         "-mharden-sls=all",
         "-fmin-function-alignment=16",
         "-Wno-dangling-pointer",
+        # s390x arguments
+        "-mbackchain",
+        "-mpacked-stack",
+        "-mindirect-branch-table",
+        "-mhotpatch=0,3",
+        "-march=z196",
+        "-mtune=z13",
     ]:
         cmd = cmd.replace(opt, "")
 
@@ -467,11 +631,12 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
 
     # Needed, otherwise threads would interfere with each other
     env = os.environ.copy()
+    obj = cs.get_file_mod(fname)
 
     env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt() else "0"
-    env["KCP_MOD_SYMVERS"] = str(cs.get_boot_file("symvers"))
+    env["KCP_MOD_SYMVERS"] = str(Path(cs.get_boot_dir(), f'{cs.get_boot_filename("symvers")}.gz'))
     env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
-    env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.ARCH)/cs.get_mod(fdata["module"]))
+    env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.preferred_arch([cs]))/cs.get_mod(obj))
     env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
     env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
     env["KCP_WORK_DIR"] = str(out_dir)
@@ -529,6 +694,42 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     return ccp_args, env
 
 
+def _warn_optimized_clone(match, cs, fname):
+    opt_symbol_name = match.group(1)
+    symbol_name = opt_symbol_name.split(".")[0]
+    logging.warning("%s:%s: Symbol %s contains optimized clone: %s",
+                    cs.full_cs_name(), fname, symbol_name, opt_symbol_name)
+    logging.warning("Make sure to patch all the callers of %s.", symbol_name)
+
+
+def _warn_ipa_removed(match, cs, fname):
+    symbol_name = match.group(1)
+    logging.warning("%s:%s: Unable to verify if %s symbol is inlined or not."
+                    " Please check manually.",
+                    cs.full_cs_name(), fname, symbol_name)
+
+
+def _collect_dup_symbol(match, cs, fname):
+    cs.files[fname].setdefault("dup_symbols", [])
+    cs.files[fname]["dup_symbols"].append(match.group(1))
+
+
+CCP_WARNING_SPECS = [
+    (r'warning: optimized function "([^"]+)" in callgraph', _warn_optimized_clone),
+    (r'warning: "([^"]+)" symbol found in ELF but IPA says removed', _warn_ipa_removed),
+    (r'conflicting definitions for symbol "([\w_]+)" found in ELF', _collect_dup_symbol),
+]
+
+
+def parse_ccp_warnings(f, start_pos, cs, fname):
+    f.seek(start_pos)
+    for line in f:
+        for pattern, handler in CCP_WARNING_SPECS:
+            match = re.search(pattern, line)
+            if match:
+                handler(match, cs, fname)
+
+
 def process(lp_name, total, args, avoid_ext):
     i, make_lock, fname, cs, fdata = args
 
@@ -555,9 +756,6 @@ def process(lp_name, total, args, avoid_ext):
         with make_lock:
             cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
-    if " -pg " not in cmd:
-        logging.warning("%s:%s is not compiled with livepatch support (-pg flag)", cs.full_cs_name(), fname)
-
     args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
 
     # Detect and set ibt information. It will be used in the TemplateGen
@@ -578,58 +776,54 @@ def process(lp_name, total, args, avoid_ext):
         except Exception as exc:
             raise RuntimeError(f"Error when processing {cs.full_cs_name()}:{fname}. Check file {out_log} for details.") from exc
 
-        # Look for optimized function warnings in the output of the command
-        f.seek(start_pos)
-        symbol_pattern = r'warning: optimized function "([^"]+)" in callgraph'
-        for line in f:
-            match = re.search(symbol_pattern, line)
-            if match:
-                opt_symbol_name = match.group(1)
-                symbol_name = opt_symbol_name.split(".")[0]
-                logging.warning("Warning when processing %s:%s: "
-                                "Symbol %s contains optimized clone: %s",
-                                cs.full_cs_name(), fname, symbol_name, opt_symbol_name)
-                logging.warning("Make sure to patch all the callers of %s.", symbol_name)
-
-    # Look for conflicting/duplicated symbols
-    with open(out_log) as f:
-        msg_pat = r'conflicting definitions for symbol "([\w_]+)" found in ELF'
-        syms = re.findall(msg_pat, f.read())
-        if len(syms) > 0:
-            cs.files[fname]["dup_symbols"] = syms
-
-    cs.files[fname]["ext_symbols"] = get_symbol_list(out_dir)
+        parse_ccp_warnings(f, start_pos, cs, fname)
 
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
-    # Remove the local path prefix of the klp-ccp generated comments
-    # Open the file, read, seek to the beginning, write the new data, and
-    # then truncate (which will use the current position in file as the
-    # size)
-    with open(str(lp_out), "r+") as f:
+    cs.files[fname]["ext_symbols"] = get_ext_symbols(out_dir)
+    cs.files[fname]["klpp_symbols"] = get_klpp_symbols(out_dir, lp_out)
+
+    lp_out_cleanup(cs, cs.files[fname], lp_out, sdir)
+
+
+def lp_out_cleanup(cs, lp_dat, lp_out, sdir):
+    """
+    Open the file, read, seek to the beginning, write the new data, and
+    then truncate (which will use the current position in file as the
+    size).
+    - Remove the local path prefix of the klp-ccp generated comments.
+    - Remove #includes with local path prefix. Leftovers headers from klp-ccp.
+    - Remove unsupported macro definitions.
+    - Remove the attributes left by klp-ccp, since they don't mean much for
+      kernel modules.
+    - Fix externalized symbols declaration.
+    - Remove big chunks of empty lines.
+    """
+    macros = '|'.join(UNSUPPORTED_MACROS)
+    orig_file = f"{lp_out}.orig"
+    with open(str(lp_out), "r+") as f, open(str(orig_file), "w") as orig:
         file_buf = f.read()
+        orig.write(file_buf)
         f.seek(0)
-        f.write(file_buf.replace(f"from {str(sdir)}/", "from "))
+        file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
+        file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
+        file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
+        file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
+        file_buf = fix_ext_symbols(cs, lp_dat, file_buf)
+        file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
+        f.write(file_buf)
         f.truncate()
 
 
-def extract(lp_name, lp_filter, apply_patches, avoid_ext):
+def extract(lp_name, lp_filter, no_patches, avoid_ext):
     sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
 
     with sdir_lock:
-        start_extract(lp_name, lp_filter, apply_patches, avoid_ext)
+        start_extract(lp_name, lp_filter, no_patches, avoid_ext)
 
 
-def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
-    if not utils.get_workdir(lp_name).exists():
-        raise ValueError(f"{utils.get_workdir(lp_name)} not created. Run the setup subcommand first")
-
-    logging.info("Work directory: %s", utils.get_workdir(lp_name))
-
-    # Clean any previous logs
-    if apply_patches:
-        with open(quilt_log_path(lp_name, apply_patches), "w") as f:
-            f.truncate()
+def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
+    logging.info("Work directory: %s", utils.get_workdir(lp_name, True))
 
     working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
 
@@ -645,11 +839,11 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
     for cs in working_cs:
         # remove any previously generated files and leftover patches
         shutil.rmtree(cs.get_ccp_dir(lp_name), ignore_errors=True)
-        remove_patches(lp_name, cs, apply_patches)
+        remove_patches(lp_name, cs)
 
         # Apply patches before the LPs were created
-        if apply_patches:
-            apply_all_patches(lp_name, cs, apply_patches)
+        if not no_patches:
+            apply_all_patches(lp_name, cs)
 
         for fname, fdata in cs.files.items():
             args.append((i, make_lock, fname, cs, fdata))
@@ -673,13 +867,12 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
     # Save the ext_symbols set by execute
     store_codestreams(lp_name, working_cs)
 
-    # TODO: change the templates so we generate a similar code than we
-    # already do for SUSE livepatches
     # Create the livepatches per codestream
     for cs in working_cs:
         generate_livepatches(lp_name, cs)
-
-    group_equal_files(lp_name, working_cs)
+        # Cleanup patches after the LPs were created if they were applied
+        if not no_patches:
+            remove_patches(lp_name, cs)
 
     logging.info("\nChecking duplicated symbols...")
 
@@ -693,35 +886,26 @@ def start_extract(lp_name, lp_filter, apply_patches, avoid_ext):
 
     logging.info("\nChecking the externalized symbols in other architectures...")
 
-    missing_syms = OrderedDict()
+    missing, unext = get_missing_ext_symbols(working_cs)
+    if unext:
+        logging.info("\nUnexternalyzing symbols:\n%s\n", ', '.join(unext))
+        start_extract(lp_name, lp_filter, no_patches,
+                      avoid_ext + list(unext))
+        sys.exit(0)
 
-    # Iterate over each codestream, getting each file processed, and all
-    # externalized symbols of this file
-    for cs in working_cs:
-        # Cleanup patches after the LPs were created if they were applied
-        if apply_patches:
-            remove_patches(lp_name, cs, apply_patches)
-
-        # Map all symbols related to each obj, to make it check the symbols
-        # only once per object
-        obj_syms = {}
-        for f, fdata in cs.files.items():
-            for obj, syms in fdata["ext_symbols"].items():
-                obj_syms.setdefault(obj, [])
-                obj_syms[obj].extend(syms)
-
-        for obj, syms in obj_syms.items():
-            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True)
-            if missing:
-                for arch, arch_syms in missing.items():
-                    missing_syms.setdefault(arch, {})
-                    missing_syms[arch].setdefault(obj, {})
-                    missing_syms[arch][obj].setdefault(cs.full_cs_name(), [])
-                    missing_syms[arch][obj][cs.full_cs_name()].extend(arch_syms)
-
-    if missing_syms:
+    if missing:
         with open(utils.get_workdir(lp_name)/"missing_syms", "w") as f:
-            f.write(json.dumps(missing_syms, indent=4))
+            f.write(json.dumps(missing, indent=4))
 
         logging.warning("Symbols not found:")
-        logging.warning(json.dumps(missing_syms, indent=4))
+        logging.warning(json.dumps(missing, indent=4))
+
+    group_equal_files(lp_name, working_cs)
+
+    pref_archs = utils.preferred_arch(working_cs)
+    if 'x86_64' not in pref_archs:
+        logging.warning("ATTENTION! The current livepatch doesn't affect x86_64. "
+                        "klp-ccp doesn't officially support other architectures "
+                        "besides x86, meaning that it can generate wrong code.")
+
+    logging.info("\nDone. Extract finished.")

@@ -5,37 +5,45 @@ import inspect
 import logging
 import pytest
 
-from klpbuild.plugins.setup import setup, setup_file_funcs
-from tests.utils import get_codestreams_file
+from klpbuild.plugins.setup import run as setup, setup_manual
+from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib import utils
+from tests.utils import get_codestreams_file
 
-CS = "15.5u19"
-DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_TUN", "no_check": True}
+CS = "15.5u30"
+DEFAULT_DATA = {"lp_filter": CS, "conf": "CONFIG_TUN", "no_check": True}
 
 
 def test_missing_file_funcs():
     with pytest.raises(ValueError, match=r"You need to specify at least one of the file-funcs variants!"):
-        setup_file_funcs(None, None, [], [], [])
+        setup_manual({}, utils.ARCHS, None, None, [], [], [])
 
 
-def test_missing_conf_prefix():
-    with pytest.raises(ValueError, match=r"Please specify --conf with CONFIG_ prefix"):
-        setup_file_funcs("TUN", None, [], [], [])
+def test_missing_conf_prefix(caplog):
+    with pytest.raises(SystemExit):
+        file_funcs = [["drivers/net/tuna.c", "tun_chr_ioctl", "tun_free_netdev"]]
+        setup_manual([Codestream(CS)], utils.ARCHS, "TUN", None, file_funcs, [], [])
+    assert "Invalid config 'TUN': Missing CONFIG_ prefix" in caplog.text
 
 
 def test_file_funcs_ok():
     # Check for multiple variants of file-funcs
-    assert setup_file_funcs("CONFIG_TUN", "tun", [
-                                  ["drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]], [], []) == \
-        {"drivers/net/tun.c": {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}}
+    cs = Codestream(CS)
 
-    assert setup_file_funcs("CONFIG_TUN", None, [],
-                                  [["tun", "drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]], []) == \
-        {"drivers/net/tun.c": {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}}
+    setup_manual([cs], utils.ARCHS, "CONFIG_TUN", "tun",
+                 [["drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]], [], [])
+    assert cs.files["drivers/net/tun.c"] == \
+            {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}
 
-    assert setup_file_funcs(None, None, [], [],
-                                  [["CONFIG_TUN", "tun", "drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]]) == \
-        {"drivers/net/tun.c": {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}}
+    setup_manual([cs], utils.ARCHS, "CONFIG_TUN", "tun", [],
+                 [["tun", "drivers/net/tun1.c", "tun_chr_ioctl", "tun_free_netdev"]], [])
+    assert cs.files["drivers/net/tun1.c"] == \
+            {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}
+
+    setup_manual([cs], utils.ARCHS, "CONFIG_TUN", "tun", [], [],
+                 [["CONFIG_TUN", "tun", "drivers/net/tun2.c", "tun_chr_ioctl", "tun_free_netdev"]])
+    assert cs.files["drivers/net/tun2.c"] == \
+            {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}
 
 
 def test_non_existent_file():
@@ -49,6 +57,7 @@ def test_non_existent_file():
             "file_funcs" : [["drivers/net/tuna.c", "tun_chr_ioctl", "tun_free_netdev"]],
             "mod_file_funcs" : [],
             "conf_mod_file_funcs" : [],
+            "full_checks": False,
             **DEFAULT_DATA
         }
         setup(**setup_args)
@@ -66,6 +75,7 @@ def test_non_existent_module():
             "file_funcs" : [["drivers/net/tun.c", "tun_chr_ioctll", "tun_free_netdev"]],
             "mod_file_funcs" : [],
             "conf_mod_file_funcs" : [],
+            "full_checks": False,
             **DEFAULT_DATA
         }
         setup(**setup_args)
@@ -83,18 +93,20 @@ def test_invalid_sym(caplog):
             "file_funcs" : [["drivers/net/tun.c", "tun_chr_ioctll", "tun_free_netdev"]],
             "mod_file_funcs" : [],
             "conf_mod_file_funcs" : [],
+            "full_checks": False,
             **DEFAULT_DATA
         }
         setup(**setup_args)
 
-    assert "Symbols tun_chr_ioctll not found on tun" in caplog.text
+    # As the symbol is not found on any arch, don't print any message
+    assert "Symbols tun_chr_ioctll not found on tun" not in caplog.text
 
 
 def test_valid_micro_patchid():
     # Make sure that patchid is informed for SLE MICRO
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    micro_cs = "6.0u2"
-    micro_data = {"cve": None, "lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": True}
+    micro_cs = "6.0u11"
+    micro_data = {"lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": True}
 
     setup_args = {
         "lp_name" : lp,
@@ -103,6 +115,7 @@ def test_valid_micro_patchid():
         "file_funcs" : [["drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]],
         "mod_file_funcs" : [],
         "conf_mod_file_funcs" : [],
+        "full_checks": False,
         **micro_data
     }
     setup(**setup_args)
@@ -115,55 +128,121 @@ def test_valid_micro_patchid():
 def test_valite_conf_mod_file_funcs():
     # Check that passing mod-file-funcs can create entries differently from general
     # --module and --file-funcs
-    ffuncs = setup_file_funcs("CONFIG_NET_SCH_QFQ", "sch_qfq", [["net/sched/sch_qfq.c", "qfq_change_class"]], [
-                                    ["btsdio", "drivers/bluetooth/btsdio.c", "btsdio_probe", "btsdio_remove"]], [])
+    cs = Codestream(CS)
+    setup_manual([cs], utils.ARCHS, "CONFIG_NET_SCH_QFQ", "sch_qfq",
+                 [["net/sched/sch_qfq.c", "qfq_change_class"]],
+                 [["btsdio", "drivers/bluetooth/btsdio.c",
+                   "btsdio_probe", "btsdio_remove"]], [])
 
-    sch = ffuncs["net/sched/sch_qfq.c"]
-    bts = ffuncs["drivers/bluetooth/btsdio.c"]
+    sch = cs.files["net/sched/sch_qfq.c"]
+    bts = cs.files["drivers/bluetooth/btsdio.c"]
     assert sch["conf"] == bts["conf"]
     assert sch["module"] == "sch_qfq"
     assert bts["module"] == "btsdio"
 
-    ffuncs = setup_file_funcs("CONFIG_NET_SCH_QFQ", "sch_qfq",
-                                    [["net/sched/sch_qfq.c", "qfq_change_class"]], [],
-                                    [["CONFIG_BT_HCIBTSDIO", "btsdio",
-                                        "drivers/bluetooth/btsdio.c", "btsdio_probe", "btsdio_remove"]])
+    setup_manual([cs], utils.ARCHS, "CONFIG_NET_SCH_QFQ", "sch_qfq",
+                 [["net/sched/sch_qfq.c", "qfq_change_class"]], [],
+                 [["CONFIG_BT_HCIBTSDIO", "btsdio",
+                   "drivers/bluetooth/btsdio.c", "btsdio_probe", "btsdio_remove"]])
 
-    sch = ffuncs["net/sched/sch_qfq.c"]
-    bts = ffuncs["drivers/bluetooth/btsdio.c"]
+    sch = cs.files["net/sched/sch_qfq.c"]
+    bts = cs.files["drivers/bluetooth/btsdio.c"]
     assert sch["conf"] == "CONFIG_NET_SCH_QFQ"
     assert sch["module"] == "sch_qfq"
     assert bts["conf"] == "CONFIG_BT_HCIBTSDIO"
     assert bts["module"] == "btsdio"
 
 
-def test_valite_conf_unsupported_arch():
+def test_symbol_with_noinstr(caplog):
     # Make sure we error out in the case of a configuration entry that is not enabled
     # on a codestream
+    # Make sure that we detect when a symbol cannot be patched on setup phase
     lp = "bsc_" + inspect.currentframe().f_code.co_name
 
-    # CONFIG_HID is not enabled on s390x, so setup should fail here
-    LP_DEFAULT_DATA = {"cve": None, "lp_filter": CS, "conf": "CONFIG_HID", "no_check": True}
-    with pytest.raises(RuntimeError, match=rf"{CS}: CONFIG_HID not set on s390x"):
-        setup_args = {
-            "lp_name": lp,
-            "archs": utils.ARCHS,
-            "module": "vmlinux",
-            "file_funcs": [["drivers/hid/hid-core.c", "hid_alloc_report_buf"]],
-            "mod_file_funcs": [],
-            "conf_mod_file_funcs": [],
-            **LP_DEFAULT_DATA
-        }
-        setup(**setup_args)
+    lp_default_data = {"lp_filter": CS, "conf": "CONFIG_SUSE_KERNEL", "no_check": True}
+    for arch in ["x86_64", "ppc64le", "s390x"]:
+        with pytest.raises(SystemExit):
+            setup_args = {
+                "lp_name": lp,
+                "archs": [arch],
+                "module": "vmlinux",
+                "file_funcs": [["kernel/time/timekeeping.c", "__ktime_get_real_seconds"]],
+                "mod_file_funcs": [],
+                "conf_mod_file_funcs": [],
+                "full_checks": True,
+                **lp_default_data
+            }
+            setup(**setup_args)
 
-    # It shoudl succeed when s390x is removed from the setup command
+    assert "Symbol __ktime_get_real_seconds has tracing disabled." in caplog.text
+
+
+def test_symbol_with_noinstr_ibt():
+    # IBT enabled kernels can have functions with an offset shifted by 4 bytes
+    # when the funciton has ENDBR instructions. Make sure klp-build handles it
+    # correctly
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+
+    lp_default_data = {"lp_filter": "16.0rtu1", "conf": "CONFIG_IO_URING", "no_check": True}
     setup_args = {
         "lp_name": lp,
-        "archs": ["x86_64", "ppc64le"],
+        "archs": ["x86_64"],
         "module": "vmlinux",
-        "file_funcs": [["drivers/hid/hid-core.c", "hid_alloc_report_buf"]],
+        "file_funcs": [["io_uring", "io_link_skb"]],
         "mod_file_funcs": [],
         "conf_mod_file_funcs": [],
-        **LP_DEFAULT_DATA
+        "full_checks": False,
+        **lp_default_data
     }
     setup(**setup_args)
+
+
+def test_boot_dir():
+    cs = Codestream("16.0rtu0", kernel="6.12.0-160000.11")
+    # For SLFO codestreams, we get the boot files from the usr/lib/modules
+    assert "modules" in str(cs.get_boot_dir())
+
+    cs = Codestream("15.7u5", kernel="6.4.0-150700.53.19.1")
+    # In the old method, we need to point to /boot inside the codestream data
+    assert "boot" in str(cs.get_boot_dir())
+
+
+def test_boot_dir_and_filenames():
+    cs = Codestream("16.0rtu0", kernel="6.12.0-160000.11")
+    # For SLFO codestreams, we get the boot files from the usr/lib/modules
+    assert "modules" in str(cs.get_boot_dir())
+    # For SLFO codestreams, the filenames of the boot files do not contain the
+    # kernel version suffix
+    assert "config" == cs.get_boot_filename("config")
+    assert "symvers" == cs.get_boot_filename("symvers")
+    assert "vmlinux" == cs.get_boot_filename("vmlinux")
+
+    cs = Codestream("15.7u5", kernel="6.4.0-150700.53.19.1")
+    # In the old method, we need to point to /boot inside the codestream data
+    assert "boot" in str(cs.get_boot_dir())
+    # We older codestreams the boot files contains the kernel version as
+    # suffix
+    assert "config-6.4.0" in cs.get_boot_filename("config")
+    assert "symvers-6.4.0" in cs.get_boot_filename("symvers")
+    assert "vmlinux-6.4.0" in cs.get_boot_filename("vmlinux")
+
+
+def test_get_mod_file_path():
+    cs = Codestream("15.7u5", kernel="6.4.0-150700.53.19")
+    assert "kernel/net/bluetooth/bluetooth" == str(cs.get_mod_file_path("x86_64", "bluetooth"))
+    assert "kernel/net/bluetooth/bluetooth" == str(cs.get_mod_file_path("x86_64", "net/bluetooth/bluetooth"))
+
+
+def test_find_obj_path():
+    cs = Codestream("15.7u5", kernel="6.4.0-150700.53.19")
+    assert "lib/modules/6.4.0-150700.53.19-default/kernel/net/bluetooth/bluetooth.ko.zst" == str(
+        cs.find_obj_path("x86_64", "bluetooth")
+    )
+    assert "lib/modules/6.4.0-150700.53.19-default/kernel/net/bluetooth/bluetooth.ko.zst" == str(
+        cs.find_obj_path("x86_64", "net/bluetooth/bluetooth")
+    )
+
+    cs = Codestream("16.0u0", kernel="6.12.0-160000.5")
+    assert "usr/lib/modules/6.12.0-160000.5-default/kernel/net/bluetooth/bluetooth.ko.zst" == str(
+        cs.find_obj_path("x86_64", "net/bluetooth/bluetooth")
+    )

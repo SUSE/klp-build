@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from operator import itemgetter
 from pathlib import Path
 
@@ -131,18 +132,6 @@ def get_cs_packages(cs_list, dest):
                 else:
                     rpm = file[0]
 
-                # Download all packages for the HOST arch
-                # For the others only download kernel-default
-                if arch != ARCH and not re.search(r"kernel-default-\d", rpm):
-                    continue
-
-                # Extract the source and kernel-devel in the current
-                # machine arch to make it possible to run klp-build in
-                # different architectures
-                if "kernel-default-devel" in rpm:
-                    if arch != ARCH:
-                        continue
-
                 rpms.append(RPMData(i, osc, cs, cs.get_project_name(),
                                     cs.get_repo(), arch, cs.get_package_name(),
                                     rpm, dest))
@@ -152,7 +141,7 @@ def get_cs_packages(cs_list, dest):
 
 
 def find_missing_symbols(cs, arch, lp_mod_path):
-    vmlinux_path = cs.get_boot_file("vmlinux", arch)
+    vmlinux_path = get_datadir(arch) / cs.find_obj_path(arch, "vmlinux")
     vmlinux_syms = get_all_symbols_from_object(vmlinux_path, True)
 
     # Get list of UNDEFINED symbols from the livepatch module
@@ -184,19 +173,48 @@ def validate_livepatch_module(cs, arch, rpm_dir, rpm):
     shutil.rmtree(Path(rpm_dir, "lib"), ignore_errors=True)
 
 
+def verify_rpm(rpm_path):
+    ret = subprocess.run(["rpm", "-K", "--nosignature", str(rpm_path)],
+                            capture_output=True, text=True)
+    if ret.returncode != 0:
+        logging.error("RPM verification failed for %s", rpm_path)
+        return False
+    logging.debug("RPM verification passed for %s", rpm_path)
+    return True
+
+
 def download_binary_rpms(data: RPMData, total: int):
-    try:
-        data.osc.build.download_binary(data.prj, data.repo,
-                                       data.arch, data.pkg, data.rpm,
-                                       data.dest)
-        logging.info("(%d/%d) %s %s: ok", data.index, total,
-                     data.cs.full_cs_name(), data.rpm)
-    except OSError as e:
-        if e.errno == errno.EEXIST:
+
+    rpm_path = data.dest / data.rpm
+
+    if rpm_path.exists():
+        if not verify_rpm(rpm_path):
+            rpm_path.unlink(missing_ok=True)
+        else:
             logging.info("(%d/%d) %s %s: already downloaded. skipping",
                          data.index, total, data.cs.full_cs_name(), data.rpm)
-        else:
-            raise RuntimeError(f"download error on {data.cs.get_project_name()}: {data.rpm}") from e
+            return
+
+    max_tries = 3
+    for tries in range(1, max_tries + 1):
+        try:
+            data.osc.build.download_binary(data.prj, data.repo,
+                                           data.arch, data.pkg, data.rpm,
+                                           data.dest)
+            if not verify_rpm(rpm_path):
+                rpm_path.unlink(missing_ok=True)
+                raise RuntimeError(f"RPM verification failed: {data.rpm}")
+
+            logging.info("(%d/%d) %s %s: ok", data.index, total,
+                         data.cs.full_cs_name(), data.rpm)
+            return
+        except OSError as e:
+            if tries < max_tries:
+                logging.info("(%d/%d) %s %s: download failed (attempt %d/%d), retrying in 2s...",
+                                data.index, total, data.cs.full_cs_name(), data.rpm, tries, max_tries)
+                time.sleep(2)
+            else:
+                raise RuntimeError(f"download error on {data.cs.get_project_name()}: {data.rpm}") from e
 
 
 def download_and_extract(data, total):
@@ -270,25 +288,9 @@ def download_cs_rpms(cs_list):
     # Create a list of paths pointing to lib/modules for each downloaded
     # codestream
     for cs in cs_list:
-        for arch in cs.archs:
-            # Extract modules and vmlinux files that are compressed
-            mod_path = cs.get_mod_path(arch)
-            logging.info("extracting %s:%s in %s", arch, cs.full_cs_name(), str(mod_path))
-            for fext, ecmd in [("zst", "unzstd --rm -f -d"), ("xz", "xz --quiet -d -k")]:
-                cmd = rf'find {mod_path} -name "*.{fext}" -exec {ecmd} --quiet {{}} \;'
-                subprocess.check_output(cmd, shell=True)
-
-            # Extract gzipped files per arch
-            files = ["vmlinux", "symvers"]
-            for f in files:
-                f_path = cs.get_boot_file(f"{f}.gz", arch)
-                # ppc64le doesn't gzips vmlinux
-                if f_path.exists():
-                    logging.info("extracting %s:%s:%s", arch, cs.full_cs_name(), f)
-                    subprocess.check_output(rf'gzip -k -d -f {f_path}', shell=True)
-
         # Use the SLE .config
-        shutil.copy(cs.get_boot_file("config"), Path(cs.get_obj_dir(), ".config"))
+        shutil.copy(Path(cs.get_boot_dir(), cs.get_boot_filename("config")),
+                    Path(cs.get_obj_dir(), ".config"))
 
         # Recreate the build link to enable us to test the generated LP
         mod_path = cs.get_kernel_build_path(ARCH)

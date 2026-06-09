@@ -6,7 +6,7 @@
 import logging
 
 from klpbuild.klplib.cmd import add_arg_lp_filter
-from klpbuild.klplib.data import download_missing_cs_data, download_cs_data
+from klpbuild.klplib.data import download_missing_cs_data, download_cs_data, cleanup_obsolete_data, verify_all_rpms
 from klpbuild.klplib.supported import get_supported_codestreams
 from klpbuild.klplib.utils import filter_codestreams
 
@@ -18,20 +18,29 @@ def register_argparser(subparser):
     )
 
     add_arg_lp_filter(fmt)
-    fmt.add_argument("--download", required=True, action="store_true",
+    fmt.add_argument("--download", required=False, action="store_true",
                      help="Download all the missing supported codestreams data")
     fmt.add_argument("--force",action="store_true",
                      help="Re-download also codestream that are not missing")
+    fmt.add_argument("--cleanup-obsolete", required=False, action="store_true",
+                     help="Cleanup the obsolete files and directories")
+    fmt.add_argument("--update", required=False, action="store_true",
+                     help="Do the job of --download and --cleanup-obsolete")
+    fmt.add_argument("--verify-all", required=False, action="store_true",
+                     help="Verify the integrity of all downloaded RPM packages")
 
-
-def run(download, force, lp_filter):
+def run(download, force, cleanup_obsolete, update, verify_all, lp_filter):
     supported_codestreams =  get_supported_codestreams()
     filtered_codestreams = filter_codestreams(lp_filter, supported_codestreams)
 
-    if download:
+    if download or update:
         if force:
             download_cs_data(filtered_codestreams)
         else:
             download_missing_cs_data(filtered_codestreams)
-    else:
-        logging.error("Use --download")
+    if cleanup_obsolete or update:
+        cleanup_obsolete_data(supported_codestreams)
+    if verify_all:
+        verify_all_rpms()
+    if not (download or cleanup_obsolete or update or verify_all):
+        logging.error("Use --download, --cleanup-obsolete, --update or --verify-all for this command")

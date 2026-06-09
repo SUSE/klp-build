@@ -9,12 +9,14 @@ import subprocess
 import sys
 from pathlib import Path
 from pathlib import PurePath
-
+from multiprocessing import Lock
 from functools import wraps
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.config import get_user_path
-from klpbuild.klplib.kernel_tree import get_commit_data
+from klpbuild.klplib.kernel_tree import (get_commit_data,
+                                         get_commit_body,
+                                         find_commit)
 
 KERNEL_BRANCHES = {
     "12.5": "SLE12-SP5",
@@ -41,11 +43,13 @@ KERNEL_BRANCHES = {
 }
 
 
-__kernel_source_tags_are_fetched = False
+__KERNEL_SOURCE_TAGS_ARE_FETCHED = False
+__kernel_source_fetch_lock = Lock()
 def __check_kernel_source_tags_are_fetched(func):
     """
-    This decorator checks whether the kernel-source tags are fetched. If not,
-    it fetches them the configuration and then calls the wrapped function.
+    This decorator ensures the kernel-source tags are retrieved only once
+    and in a thread-safe manner. If tags need to be fetched, it does so
+    by calling the wrapped function.
 
     Args:
         func (function): The function to be wrapped.
@@ -55,10 +59,12 @@ def __check_kernel_source_tags_are_fetched(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        global __kernel_source_tags_are_fetched
-        if not __kernel_source_tags_are_fetched:
-            __fetch_kernel_branches()
-            __kernel_source_tags_are_fetched = True
+        global __KERNEL_SOURCE_TAGS_ARE_FETCHED
+
+        with __kernel_source_fetch_lock:
+            if not __KERNEL_SOURCE_TAGS_ARE_FETCHED:
+                __fetch_kernel_branches()
+                __KERNEL_SOURCE_TAGS_ARE_FETCHED = True
         return func(*args, **kwargs)
     return wrapper
 
@@ -75,35 +81,106 @@ def __fetch_kernel_branches():
                           "--quiet", "--atomic", "--force", "--tags"],
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
+                         check=False,
                          text=True)
     if ret.returncode:
         logging.info("Fetch failed\n%s", ret.stderr)
 
 
-def get_patch_files(patches, branch):
+def get_commit_patch(commit):
+    kern_src = get_user_path('kernel_src_dir')
+    ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
+                                   "diff-tree", "--no-commit-id",
+                                   "--name-only", commit,
+                                   "-r"]).decode().splitlines()
+    return ret
+
+
+def get_patch_kernel_commit(patch, branch):
     """
-    Get the kernel files that have been modified by the give list of patches.
+    Return the commit in kernel.git correspondig to the patch.
+    """
+    kernel_commit = ''
+    s = get_patch_subject(patch, branch)
+
+    for skip in range(0, 3):
+        if not (kernel_commit := find_commit(s, branch, skip)):
+            break
+        # Verify that the found kernel commit actually corresponds
+        # to this patch: Check the 'suse-commit' in the commit msg.
+        # This new suse-commit should have introduced the patch in
+        # kernel-source. If it did not, then it was a false-positive,
+        # skip it, and try with the next found kernel commit.
+        # This is a very corner case, so try at most 3 times.
+        _, _, suse_commit = get_commit_data(kernel_commit)
+        if patch in get_commit_patch(suse_commit):
+            break
+
+    return kernel_commit
+
+
+def __get_patch_files(patch, branch):
+    """
+    Return the files modified by the given patch.
+    """
+
+    kern_src = get_user_path('kernel_src_dir')
+    files = []
+
+    ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
+                                   "grep", "-Ih", "^+++",
+                                   f"remotes/origin/{branch}:{patch}"]).decode()
+    for l in ret.splitlines():
+        # Remove the first caracters "+++ [a,b]/" in the line. Leftovers
+        # from the patch's diff.
+        files.append(l[6:])
+
+    return sorted(set(files))
+
+
+def get_patches_files(patches, branch):
+    """
+    Get the kernel files and functions that have been modified by the given
+    list of patches.
 
     Args:
         patches (list): Input list of patches to analyse.
         branch (str): Branch where to locate the given patches.
 
     returns:
-        List: Return the files modified by the given patches.
+        List: Return the files and functions modified by the given patches.
     """
+
+    files = {}
+    for p in patches:
+        kernel_commit = get_patch_kernel_commit(p, branch)
+        for f in __get_patch_files(p, branch):
+            if f not in files:
+                files[f] = set()
+            if not kernel_commit:
+                continue
+
+            raw = get_commit_body(kernel_commit, f)
+            # Get the modified functions' name
+            funcs = re.findall(r"\s*(\w+)\s*\([^(]*\)\n\+*\s*{\n", raw)
+            files[f].update(set(funcs))
+
+    return files
+
+
+def get_patch_subject(patch, branch):
+    """
+    Get the subject field in the patch.
+    """
+
     kern_src = get_user_path('kernel_src_dir')
 
-    files = []
-    for p in patches:
-        ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
-                                       "grep", "-Ih", "^+++",
-                                       f"remotes/origin/{branch}:{p}"]).decode()
-        for l in ret.splitlines():
-            # Remove the first caracters "+++ [a,b]/" in the line. Leftovers
-            # from the patch's diff.
-            files.append(l[6:])
+    ret = subprocess.check_output(["/usr/bin/git", "-C", kern_src,
+                                   "grep", "-Ih", "^Subject:",
+                                   f"remotes/origin/{branch}:{patch}"]).decode()
+    subj = re.sub(r"Subject:\s*(\[PATCH.*\])?", "", ret)
 
-    return sorted(set(files))
+    return subj.strip()
 
 
 def store_patch(pfile, patch, savedir, savedir_idx, bc):
@@ -147,12 +224,14 @@ def get_branch_patches(cve, mbranch):
 
 
 @__check_kernel_source_tags_are_fetched
-def get_patches(cve, savedir=None):
+def get_patches(cve, savedir=None, extra_patches=None):
+    if extra_patches is None:
+        extra_patches = []
+
     logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
-    # Store all patches from each branch and upstream
+    # Store all patches from each branch
     patches = {}
-    patches["upstream"] = []
     # Temporal list of upstream commits
     upstream = set()
 
@@ -171,6 +250,20 @@ def get_patches(cve, savedir=None):
         patches[bc] = []
 
         idx = 0
+
+        # Handle extra patches: read them from the branch and store
+        # them before the CVE patches so they get applied first.
+        for extra_patch in extra_patches:
+            pfile = ksrc_read_branch_file(mbranch, extra_patch)
+            if pfile:
+                idx += 1
+                if savedir:
+                    store_patch(pfile, extra_patch, savedir, idx, bc)
+                patches[bc].append(extra_patch)
+                logging.debug("\textra patch %s found in %s", extra_patch, mbranch)
+            else:
+                logging.debug("\textra patch %s not found in %s", extra_patch, mbranch)
+
         for patch in get_branch_patches(cve, mbranch):
             if patch.strip().startswith("#"):
                 continue
@@ -189,12 +282,11 @@ def get_patches(cve, savedir=None):
             # upstream fix, and is using a different way to mimic the fix.
             # In this case add a note for the livepatch author to fill the
             # blank when finishing the livepatch
-            ups = ""
             m = re.search(r"Git-commit: ([\w]+)", pfile)
             if m:
                 c = m.group(1)[:12]
-                d, msg = get_commit_data(c, upstream_patches_dir)
-                upstream.add((d, c, msg))
+                d, msg, _ = get_commit_data(c, upstream_patches_dir)
+                upstream.add((d, c, msg, f'{c} ("{msg}")'))
 
             patches[bc].append(patch)
 
@@ -202,10 +294,7 @@ def get_patches(cve, savedir=None):
     patches["16.0rt"] = patches["16.0"][:]
 
     for key, bc_patches in patches.items():
-        if key == "upstream":
-            continue
-
-        logging.info(f"{key}: {KERNEL_BRANCHES[key]}")
+        logging.info("%s: %s", key, KERNEL_BRANCHES[key])
 
         if not bc_patches:
             logging.info("None")
@@ -213,55 +302,13 @@ def get_patches(cve, savedir=None):
             logging.info(c)
         logging.info("")
 
-    logging.info(f"upstream")
-    for _, c, msg in sorted(upstream):
-        fmt = f'{c} ("{msg}")'
-        patches["upstream"].append(fmt)
-        logging.info(fmt)
+    logging.info("upstream")
+    upslogs = [log for _, _, _, log in sorted(upstream)]
+    logging.info("\n".join(upslogs))
 
     logging.info("")
 
-    return patches
-
-
-def get_patched_kernels(codestreams, patches):
-    if not patches:
-        return []
-
-    logging.info("Searching for already patched codestreams...")
-
-    kernels = set()
-
-    for cs in codestreams:
-        bc = cs.full_cs_name().split("u")[0]
-        suse_patches = patches[bc]
-        if not suse_patches:
-            continue
-
-        # Proceed to analyse each codestream's kernel
-        kernel = cs.kernel
-
-        logging.debug(f"\n{cs.full_cs_name()} ({kernel}):")
-        for patch in suse_patches:
-            if not ksrc_read_rpm_file(kernel, patch):
-                break
-            logging.debug(f"{patch}")
-        else:
-            kernels.add(kernel)
-
-    logging.debug("")
-
-    return kernels
-
-
-def cs_is_affected(cs, cve, patches):
-    # We can only check if the cs is affected or not if the CVE was informed
-    # (so we can get all commits related to that specific CVE). Otherwise we
-    # consider all codestreams as affected.
-    if not cve:
-        return True
-
-    return len(patches[cs.base_cs_name()]) > 0
+    return upslogs, patches
 
 
 def ksrc_read_rpm_file(kernel_version, file_path):
@@ -276,7 +323,7 @@ def __read_file(ref, file_path):
     ksrc_dir = get_user_path("kernel_src_dir")
 
     ret = subprocess.run(["git", "-C", ksrc_dir, "show",
-                          f"{ref}:{file_path}"],
+                          f"{ref}:{file_path}"], check=False,
                          capture_output=True, text=True)
     return ret.stdout
 
@@ -291,21 +338,28 @@ def ksrc_is_module_supported(module, kernel):
         kernel (sr): Kernel version.
 
     returns:
-        Return True if supported. False otherwise.
+        Return True if supported and False otherwise.
+        Return True if blacklisted and False otherwise.
         """
-    UNSUPPORTED_MARKERS = {
+    unsupported_markers = {
         "-",
         "+external",
         "-!optional"
     }
 
+    supported_markers = {
+        "+base",
+    }
+
     mpath = module
     prev = ""
     idx = 1
+    blacklisted = False
+    supported = True
 
     out = ksrc_read_rpm_file(kernel, "supported.conf").splitlines()
     if not out:
-        return False
+        return False, False
 
     # Try the following path combinations to see if it matches with
     # any rule in the supported.conf:
@@ -314,7 +368,7 @@ def ksrc_is_module_supported(module, kernel):
     #   my/kernel/*
     #   my/*
     while mpath != prev:
-        r = re.compile(rf"^([-+]!?\w*)?\s+{mpath}")
+        r = re.compile(rf"^([-+]!?[\w\-]*)?\s+{mpath}(?:\s+#.*)?$")
         matches = [m for line in out if (m := r.match(line))]
 
         # Try more generic path if we don't match
@@ -327,16 +381,23 @@ def ksrc_is_module_supported(module, kernel):
         # At this point we've surely matched. Check if we support it or not.
         markers = [marker for match in matches if (marker := match.group(1))]
         if len(markers) > 1:
-            raise RuntimeError(f"ERROR: matched more than one line in {kernel}:supported.conf")
+            raise RuntimeError(f"ERROR: {mpath} matched more than one line in {kernel}:supported.conf")
 
         # Line has matched but there's no marker -> module is supported
         if not markers:
-            return True
+            break
+
+        # Blacklisted, but supported for livepatching.
+        if re.match(r"\+.*-kmp", markers[0]):
+            blacklisted = True
 
         # Check if any marker belongs to UNSUPPORTED_MARKERS
-        if markers[0] in UNSUPPORTED_MARKERS:
-            return False
+        elif markers[0] in unsupported_markers:
+            supported = False
 
-        raise RuntimeError(f"ERROR: marker {marker} in {kernel}:supported.conf is not known!")
+        elif markers[0] not in supported_markers:
+            raise RuntimeError(f"ERROR: {mpath} marker {marker} in {kernel}:supported.conf is not known!")
 
-    return True
+        break
+
+    return supported, blacklisted

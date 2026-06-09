@@ -3,25 +3,33 @@
 # Copyright (C) 2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import bisect
 import re
 import subprocess
+import sys
 import tempfile
+import logging
+
+from pathlib import Path, PurePath
+from importlib import resources
 
 from pathlib import Path, PurePath
 from importlib import resources
 
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
-from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_all_symbols_from_object, get_datadir
+from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_elf_object, get_datadir, preferred_arch
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
+from klpbuild.klplib.ksrc import KERNEL_BRANCHES
 
 class Codestream:
     __slots__ = ("__name", "sle", "sp", "update", "rt", "is_micro", "is_slfo",
-                 "__project", "patchid", "kernel", "archs", "files", "modules",
-                 "repo", "configs")
+                 "__project", "patchid", "kernel", "eol", "archs", "files",
+                 "modules", "repo", "configs", "required_patches")
 
-    def __init__(self, name, project="", patchid="", kernel="",
-                 archs=None, files=None, modules=None, configs=None):
+    def __init__(self, name, project="", patchid="", kernel="", eol="",
+                 archs=None, files=None, modules=None, configs=None,
+                 required_patches=None):
 
         self.__name = name
 
@@ -41,29 +49,35 @@ class Codestream:
         self.__project = project
         self.patchid = patchid
         self.kernel = kernel
+        self.eol = eol
 
-        self.archs = archs if archs is not None else self.__get_default_archs()
+        self.archs = set(archs) if archs is not None else self.get_default_archs()
         self.files = files if files is not None else {}
         self.modules = modules if modules is not None else {}
         self.configs = configs if configs is not None else {}
 
+        self.required_patches = required_patches if required_patches is not None else []
+
 
     @classmethod
     def from_data(cls, data):
-        return cls(data["name"],data["project"], data["patchid"],
-                   data["kernel"], data["archs"], data["files"],
-                   data["modules"], data["configs"])
+        return cls(data["name"], data["project"], data["patchid"],
+                   data["kernel"], data["eol"], data["archs"], data["files"],
+                   data["modules"], data["configs"], data["required_patches"])
 
     def to_data(self):
+        # archs needs to be turned into a list, since a set is not serializable
         return {
                 "name": self.__name,
                 "project": self.__project,
                 "patchid": self.patchid,
                 "kernel" : self.kernel,
-                "archs" : self.archs,
+                "eol" : self.eol,
+                "archs": list(self.archs),
                 "files" : self.files,
                 "modules" : self.modules,
                 "configs" : self.configs,
+                "required_patches" : self.required_patches
                 }
 
     def __eq__(self, cs):
@@ -72,23 +86,34 @@ class Codestream:
                 self.update == cs.update and \
                 self.rt == cs.rt
 
+    def __str__(self):
+        return self.full_cs_name()
 
-    def get_src_dir(self, arch=ARCH, init=True):
+    def get_src_dir(self, arch=None, init=True):
         # Before sle16, only -rt codestreams have a suffix for source directory
         has_rt_suffix = self.rt and self.sle < 16
         name = self.get_full_kernel_name() if has_rt_suffix else self.kernel
+
+        if not arch:
+            arch = preferred_arch([self])
+
         src_dir = get_datadir(arch)/"usr"/"src"/f"linux-{name}"
         if init:
             init_cs_kernel_tree(self.kernel, src_dir)
         return src_dir
 
+    def get_obj_dir(self, arch=None):
+        if not arch:
+            arch = preferred_arch([self])
 
-    def get_obj_dir(self):
-        return Path(f"{self.get_src_dir(ARCH, init=False)}-obj", ARCH, self.get_kernel_type())
+        return Path(f"{self.get_src_dir(arch, init=False)}-obj", arch, self.get_kernel_type())
 
+    def get_ipa_file(self, fname, arch=None):
 
-    def get_ipa_file(self, fname):
-        return Path(self.get_obj_dir(), f"{fname}.000i.ipa-clones")
+        if not arch:
+            arch = preferred_arch([self])
+
+        return Path(self.get_obj_dir(arch), f"{fname}.000i.ipa-clones")
 
     def get_config_content(self, arch=ARCH):
         """
@@ -124,15 +149,36 @@ class Codestream:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             return result.stdout
 
+    def get_boot_dir(self, arch=None):
+        """
+        Return the directory containing the boot files for the current
+        codestream.
+        """
+        if not arch:
+            arch = preferred_arch([self])
 
-    def get_boot_file(self, file, arch=ARCH):
-        assert file.startswith("vmlinux") or file.startswith("config") or file.startswith("symvers")
         if self.is_slfo:
-            return Path(self.get_mod_path(arch), file)
+            return self.get_mod_path(arch)
 
-        # Strip the suffix from the filename so we can add the kernel version in the middle
-        fname = f"{Path(file).stem}-{self.get_full_kernel_name()}{Path(file).suffix}"
-        return get_datadir(arch)/"boot"/fname
+        return get_datadir(arch) / "boot"
+
+    def get_boot_filename(self, file):
+        """
+        Files like vmlinux, config and symvers can have different names
+        depending which codestream there are. Return the expected names of the
+        files in the current codestream.
+
+        On SLFO, the filename are don't contain any suffixes, like kernel
+        versions, because they live inside usr/lib/modules directory. For
+        older codestreams we need to append the current kernel version to the
+        file, because all config, symvers and vmlinux live in the same /boot
+        directory.
+        """
+
+        if self.is_slfo:
+            return file
+
+        return f"{file}-{self.get_full_kernel_name()}"
 
     def get_repo(self):
         if self.update == 0 or self.is_slfo:
@@ -159,33 +205,37 @@ class Codestream:
 
         return self.__project
 
-    def __get_default_archs(self):
+    def get_default_archs(self):
         # RT is supported only on x86_64 at the moment
         if self.rt:
-            return ["x86_64"]
-        # MICRO 6.0 doesn't support ppc64le
-        elif self.is_micro:
-            return ["x86_64", "s390x"]
-        # We support all architecture for all other codestreams
-        return ["x86_64", "s390x", "ppc64le"]
+            return {"x86_64"}
 
+        # MICRO 6.0 doesn't support ppc64le
+        if self.is_micro:
+            return {"s390x", "x86_64"}
+
+        # We support all architecture for all other codestreams
+        return {"ppc64le", "s390x", "x86_64"}
 
     def set_files(self, files):
         self.files = files
 
+    def set_configs(self, configs):
+        self.configs = {conf: self.get_all_configs(conf) for conf in configs}
+
+    def set_archs(self, archs):
+        self.archs = set(archs) & self.get_default_archs()
 
     def get_kernel_type(self, suffix=False):
         dash = "-" if suffix else ""
         suffix = "rt" if self.rt else "default"
         return dash + suffix
 
-
     def get_full_kernel_name(self):
         """Returns the kernel name with flavor suffix"""
         # some kernel versions already have the suffix, some other don't
         ktype = "" if "-rt" in self.kernel else self.get_kernel_type(suffix=True)
         return self.kernel + ktype
-
 
     def base_cs_name(self):
         """
@@ -210,7 +260,7 @@ class Codestream:
         Returns:
             Path: The path to the ccp directory of the current codestream.
         """
-        return get_workdir(lp_name)/"ccp"/self.full_cs_name()
+        return get_workdir(lp_name, True) / "ccp" / self.full_cs_name()
 
 
     def get_lp_dir(self, lp_name):
@@ -286,6 +336,16 @@ class Codestream:
 
         return pkg
 
+
+    def get_base_branch(self):
+        return KERNEL_BRANCHES[self.base_cs_name()]
+
+
+    def has_patch(self, patch):
+        kernel_version = self.kernel
+        return bool(ksrc_read_rpm_file(kernel_version, patch))
+
+
     def needs_ibt(self):
         return self.is_slfo or (self.sle == 15 and self.sp >= 6)
 
@@ -294,7 +354,10 @@ class Codestream:
     def is_mod_mutex(self):
         return not self.is_slfo and (self.sle < 15 or (self.sle == 15 and self.sp < 4))
 
-    def get_mod_path(self, arch):
+    def get_mod_path(self, arch=None):
+        if not arch:
+            arch = preferred_arch([self])
+
         # Micro already has support for usrmerge
         if self.is_slfo:
             mod_path = Path("usr", "lib")
@@ -308,6 +371,17 @@ class Codestream:
     def get_mod(self, mod):
         return self.modules[mod]
 
+
+    def get_file_mod(self, file, arch=None):
+        fdat = self.files[file]
+
+        if not arch:
+            arch = preferred_arch([self])
+
+        conf_arch = self.configs[fdat["conf"]][arch]
+        return "vmlinux" if conf_arch == 'y' else fdat["module"]
+
+
     def is_module_supported(self, mod):
         return ksrc_is_module_supported(mod, self.kernel)
 
@@ -316,13 +390,16 @@ class Codestream:
     def get_kernel_build_path(self, arch):
         return Path(self.get_mod_path(arch), "build")
 
-
     def get_all_configs(self, conf):
         """
         Get the config value for all supported architectures of a codestream. If
         the configuration is not set the return value will be an empty dict.
         """
         configs = {}
+
+        if conf and not conf.startswith("CONFIG_"):
+            logging.error("Invalid config '%s': Missing CONFIG_ prefix", conf)
+            sys.exit(1)
 
         for arch in self.archs:
             kconf = self.get_config_content(arch)
@@ -333,102 +410,176 @@ class Codestream:
 
         return configs
 
-    def validate_config(self, archs, conf, mod):
-        configs = {}
-        cs_config = self.get_all_configs(conf)
+    def get_mod_file_path(self, arch, mod):
+        """
+        Getting the path to a module can be tricky, given how setup is invoked.
+        When --conf and --module are specified, the mod name is only a filename,
+        but when using the auto detection, the mod name is an entire path with
+        the module name.
+        """
+        # Module name use underscores, but the final module object uses hyphens.
+        mod = mod.replace("_", "[-_]")
 
-        # Validate only the specified architectures, but check if the codestream
-        # is supported on that arch (like RT that is currently supported only on
-        # x86_64)
-        for arch in archs:
-            # Check if the desired CONFIG entry is set on the codestreams's supported
-            # architectures, by iterating on the specified architectures from the setup command.
-            if arch not in self.archs:
-                continue
+        # If the module is a path, we can return immediatly since we know where
+        # to find the module, but we need to prepend the kernel directory.
+        if "/" in mod:
+            return Path("kernel", mod)
 
-            try:
-                conf_entry = cs_config.pop(arch)
-            except KeyError as exc:
-                raise RuntimeError(f"{self.full_cs_name()}: {conf} not set on {arch}. Aborting") from exc
+        # If the setup subcommand was informing the module, here the module
+        # name will only contain the name, otherwise it will contain the path
+        # to the module.
+        mod_path = self.get_mod_path(arch)
+        with open(Path(mod_path, "modules.order")) as f:
+            obj_match = re.search(rf"([\w\/\-]+\/{mod})\.ko", f.read())
+            if not obj_match:
+                raise RuntimeError(f"{self.full_cs_name()}-{arch} ({self.kernel}): Module not found: {mod}")
 
-            if conf_entry == "m" and mod == "vmlinux":
-                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as module, but no module was specified")
-            if conf_entry == "y" and mod != "vmlinux":
-                raise RuntimeError(f"{self.full_cs_name()}:{arch} ({self.kernel}): Config {conf} is set as builtin, but a module {mod} was specified")
+        return Path(obj_match.group(1))
 
-            configs.setdefault(conf_entry, [])
-            configs[conf_entry].append(f"{self.full_cs_name()}:{arch}")
+    def __search_obj_in_dir(self, fdir, fname):
+        file_path = list(fdir.glob(f"{fname}.*"))
 
-        # Validate if we have different settings for the same config on
-        # different architecures, like having it as builtin on one and as a
-        # module on a different arch.
-        if len(configs.keys()) > 1:
-            print(configs["y"])
-            print(configs["m"])
-            raise RuntimeError(f"{self.full_cs_name()}: Configuration mismatach between codestreams. Aborting.")
+        # The given file doesn't have an extension, so try again without it
+        if len(file_path) == 0:
+            file_path = list(fdir.glob(f"{fname}"))
+
+        # Make sure that we don't find duplicated files
+        assert len(file_path) == 1
+        return file_path[0]
 
     def find_obj_path(self, arch, mod):
         # Return the path if the modules was previously found for ARCH, or refetch if
         # the obejct is for a different architecture
-        obj = self.modules.get(mod, "")
-        if obj:
-            assert self.kernel in str(obj)
-            return obj
+        if is_mod(mod):
+            obj = self.modules.get(mod, "")
+            if obj:
+                assert self.kernel in str(obj)
+                return obj
 
-        # We already know the path to vmlinux, so return it
+        # If the module cache failed or if mod is vmlinux, we need to find the
+        # path to the object
         if not is_mod(mod):
-            return self.get_boot_file("vmlinux", arch).relative_to(get_datadir(arch))
+            fpath = Path(self.get_boot_dir(arch), self.get_boot_filename("vmlinux"))
+        else:
+            fpath = Path(self.get_mod_path(arch), self.get_mod_file_path(arch, mod))
 
-        # Module name use underscores, but the final module object uses hyphens.
-        mod = mod.replace("_", "[-_]")
+        fmod = self.__search_obj_in_dir(fpath.parent, fpath.name)
 
-        mod_path = self.get_mod_path(arch)
-        with open(Path(mod_path, "modules.order")) as f:
-            obj_match = re.search(rf"([\w\/\-]+\/{mod}\.k?o)", f.read())
-            if not obj_match:
-                raise RuntimeError(f"{self.full_cs_name()}-{arch} ({self.kernel}): Module not found: {mod}")
+        assert fmod.exists(), f"Module {str(fmod)} doesn't exists. Aborting"
 
-        # modules.order will show the module with suffix .o, so make sure the extension.
-        obj_path = mod_path/(PurePath(obj_match.group(1)).with_suffix(".ko"))
-        # Make sure that the .ko file exists
-        assert obj_path.exists(), f"Module {str(obj_path)} doesn't exists. Aborting"
-
-        return obj_path.relative_to(get_datadir(arch))
-
+        return fmod.relative_to(get_datadir(arch))
 
     def lp_out_file(self, lp_name, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f"{lp_name}_{fpath}"
 
+    def __check_patchable_sym(self, arch, name, sym, trace_addrs):
+        val = sym["st_value"]
 
-    # Cache the symbols using the object path. It differs for each
-    # codestream and architecture
+        # For IBT enabled kernels, some functions might have ENDBR instructions
+        # at the first offset of the symbol. To make the check catch all cases,
+        # always check for the trace addr and also the same trace addr - 4, to
+        # match the symbol table on functions that don't have the IBT enabled.
+        for val in [sym["st_value"], sym["st_value"] + 4]:
+            pos = bisect.bisect_left(trace_addrs, val)
+
+            # Check if the symbol was found
+            if pos != len(trace_addrs) and trace_addrs[pos] == val:
+                return
+
+        logging.error("%s-%s (%s): Symbol %s has tracing disabled.", self.full_cs_name(), arch, self.kernel, name)
+        sys.exit(1)
+
+    # On ppc64le the trace_address points to symbol descriptor table, and not
+    # the symbol itself, so we need to check for the address range
+    def __check_patchable_sym_ppc64le(self, arch, name, sym, trace_addrs):
+        code_start = sym["st_value"]
+        code_end = code_start + sym["st_size"]
+
+        pos = bisect.bisect_left(trace_addrs, code_start)
+        if pos == len(trace_addrs) or trace_addrs[pos] > code_end:
+            logging.error("%s-%s (%s): Symbol %s has tracing disabled.",  self.full_cs_name(),
+                          arch, self.kernel, name)
+            sys.exit(1)
+
+    def __get_trace_addresses(self, arch, elf_obj):
+        # Get all addresses related to the functions that can be traced/livepatched
+        # and populate an array for later inspection
+        symtab = elf_obj.get_section_by_name(".symtab")
+
+        start_mcount = symtab.get_symbol_by_name("__start_mcount_loc")[0]
+        stop_mcount = symtab.get_symbol_by_name("__stop_mcount_loc")[0]
+
+        sec = elf_obj.get_section(start_mcount["st_shndx"])
+
+        start = start_mcount["st_value"] - sec["sh_addr"]
+        stop = stop_mcount["st_value"] - sec["sh_addr"]
+
+        order = "big" if arch == "s390x" else "little"
+
+        sec_data = sec.data()[start:stop]
+        syms = []
+
+        for i in range(0, len(sec_data), 8):
+            ptr = sec_data[i:i+8]
+
+            data = int.from_bytes(ptr, byteorder=order)
+            if data > 0:
+                syms.append(data)
+
+        syms.sort()
+
+        return syms
+
     # Return all the symbols not found per arch/obj
-    def __check_symbol(self, arch, mod, symbols, cache):
-        name = self.full_cs_name()
-
-        cache.setdefault(arch, {})
-        cache[arch].setdefault(name, {})
-
-        if not cache[arch][name].get(mod, ""):
-            obj = get_datadir(arch)/self.find_obj_path(arch, mod)
-            cache[arch][name][mod] = get_all_symbols_from_object(obj, True)
-
+    def __check_symbol(self, arch, mod, symbols, check_patchable):
         ret = []
 
-        for symbol in symbols:
-            nsyms = cache[arch][name][mod].count(symbol)
-            if nsyms == 0:
-                ret.append(symbol)
+        obj = get_datadir(arch) / self.find_obj_path(arch, mod)
+        elf_obj = get_elf_object(obj)
 
-            elif nsyms > 1:
-                print(f"WARNING: {self.full_cs_name()}-{arch} ({self.kernel}): symbol {symbol} duplicated on {mod}")
+        trace_addrs = []
+
+        # Get the addresses of the traceable objects on vmlinux
+        if not is_mod(mod) and check_patchable:
+            trace_addrs = self.__get_trace_addresses(arch, elf_obj)
+
+        symtab = elf_obj.get_section_by_name(".symtab")
+
+        for symbol in symbols:
+            syms = symtab.get_symbol_by_name(symbol)
+            # can return None is the symbol is not found, or a list if the symbol
+            # is not unique
+            if not syms:
+                ret.append(symbol)
+                continue
+
+            if len(syms) > 1:
+                logging.warning("%s-%s (%s): symbol %s duplicated on %s", self.full_cs_name(), arch, self.kernel, symbol, mod)
 
             # If len(syms) == 1 means that we found a unique symbol, which is
-            # what we expect, and nothing need to be done.
+            # what we expect
+
+            # Check if the symbol itself can be traced. There are cases where
+            # the symbol is found, but it was instructed to not be possible
+            # to trace, so we can't livepatch it either
+            # For now only check this on vmlinux. The support for modules
+            # required applying relocation, which is far more complicated.
+            #
+            # This method is called on setup and extraction phase, but check
+            # is only necessary for setup, since the extractor knows if a symbol
+            # is traceable or not.
+            #
+            # TODO: implement support for modules as well
+            if trace_addrs:
+                # The symbol is unique, so we can grab the first entry safely
+                if arch in ["x86_64", "s390x"]:
+                    self.__check_patchable_sym(arch, symbol, syms[0], trace_addrs)
+
+                else:
+                    self.__check_patchable_sym_ppc64le(arch, symbol, syms[0], trace_addrs)
 
         return ret
-
 
     # This functions is used to check if the symbols exist in the module that
     # will be livepatched. In this case skip_on_host argument will be false,
@@ -438,9 +589,7 @@ class Codestream:
     # It is also used when we want to check if a symbol externalized in one
     # architecture exists in the other supported ones. In this case skip_on_host
     # will be True, since we trust the decisions made by the extractor tool.
-    def check_symbol_archs(self, lp_archs, mod, symbols, skip_on_host):
-        cache = {}
-
+    def check_symbol_archs(self, lp_archs, mod, symbols, skip_on_host, check_patchable):
         arch_sym = {}
         # Validate only architectures supported by the codestream
         for arch in self.archs:
@@ -452,12 +601,11 @@ class Codestream:
                 continue
 
             # Assign the not found symbols on arch
-            syms = self.__check_symbol(arch, mod, symbols, cache)
+            syms = self.__check_symbol(arch, mod, symbols, check_patchable)
             if syms:
                 arch_sym[arch] = syms
 
         return arch_sym
-
 
     def check_file_exists(self, file):
         return file_exists_in_tag(self.kernel, file)
@@ -465,3 +613,33 @@ class Codestream:
     def read_file(self, file):
         return read_file_in_tag(self.kernel, file)
 
+    def add_required_patch(self, patch):
+        patch_name = Path(patch).name
+        self.required_patches.append(patch_name)
+
+    def get_required_patches(self):
+        return self.required_patches[:]
+
+    def needs_patches(self):
+        return bool(self.required_patches)
+
+    def get_candidate_patches_dirs(self):
+        """
+        Returns the list of names of the directories containing the patches to
+        be applied for the current codestream ordered by priority.
+
+        Beware, the entries do not represent the full path.
+        """
+        dirs = []
+
+        if self.rt:
+            dirs.extend([f"{self.sle}.{self.sp}rtu{self.update}", f"{self.sle}.{self.sp}rt"])
+
+        dirs.extend([f"{self.sle}.{self.sp}u{self.update}", f"{self.sle}.{self.sp}"])
+
+        if self.sle == 15 and self.sp < 4:
+            dirs.append("cve-5.3")
+        elif self.sle == 15 and self.sp <= 5:
+            dirs.append("cve-5.14")
+
+        return dirs

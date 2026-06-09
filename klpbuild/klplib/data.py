@@ -4,14 +4,76 @@
 # Authors: Vincenzo Mezzela <vincenzo.mezzela@suse.com>
 
 import logging
+import shutil
+from pathlib import Path
 
-from klpbuild.klplib.utils import classify_codestreams_str
-from klpbuild.klplib.ibs import download_cs_rpms
+from klpbuild.klplib.utils import classify_codestreams_str,ARCHS
+from klpbuild.klplib.ibs import download_cs_rpms, verify_rpm
+from klpbuild.klplib.config import get_user_path
+from klpbuild.klplib.kernel_tree import  cleanup_obsolete_trees
+
+def filter_obsolete_directories(target_path, valid_kerns):
+    """
+    check the path including the kernel version is valid or not
+    """
+    ret_paths = []
+
+    if not target_path.exists():
+        return []
+
+    # Iterate through subdirectories/files in the target path
+    for item in target_path.iterdir():
+        item_str = item.name # Use the name of the folder, not the full path string
+
+        # Check if any valid kernel version string exists within this folder name
+        is_valid = any(k in item_str for k in valid_kerns)
+        if not is_valid:
+            ret_paths.append(item)
+
+    return ret_paths
+
+def cleanup_obsolete_data(valid_codestreams):
+    """
+    Remove obsolete rpm packages and extracted sources
+    """
+    obsolete_paths = []
+
+    valid_kerns = [cs.kernel for cs in valid_codestreams]
+    # The paths we going through:
+    # $data_dir/kernel-rpms
+    # $data_dir/$arch/boot/
+    # $data_dir/$arch/lib/modules
+    # $data_dir/$arch/usr/lib/modules
+
+    data_dir = get_user_path("data_dir")
+    for arch in ARCHS:
+        for d in ["boot", "lib/modules", "usr/lib/modules"]:
+            dest_dir = data_dir/arch/d
+            if dest_dir.exists():
+                obsolete_paths.extend(filter_obsolete_directories(dest_dir, valid_kerns))
+    # check the special dir
+    rpm_dir = data_dir/"kernel-rpms"
+    if rpm_dir.exists():
+        obsolete_paths.extend(filter_obsolete_directories(rpm_dir, valid_kerns))
+
+    # do the cleanup
+    for p in obsolete_paths:
+        try:
+            if p.is_dir():
+                shutil.rmtree(p)
+            else:
+                p.unlink() # Delete file if it's an RPM and not a directory
+            logging.info("Removed obsolete path: %s", p)
+        except OSError as e:
+            logging.error("Error removing %s: %s", p, e)
+
+    cleanup_obsolete_trees(valid_codestreams)
 
 
 def download_missing_cs_data(codestreams):
     cs_to_download = __get_cs_missing_data(codestreams)
-    download_cs_data(cs_to_download)
+    if cs_to_download:
+        download_cs_data(cs_to_download)
 
 
 def download_cs_data(codestreams):
@@ -21,9 +83,43 @@ def download_cs_data(codestreams):
     logging.info("Done.")
 
 
+def verify_all_rpms():
+    rpm_dir = get_user_path("data_dir") / "kernel-rpms"
+    if not rpm_dir.exists():
+        logging.error("RPM directory %s does not exist", rpm_dir)
+        return
+
+    rpms = sorted(rpm_dir.glob("*.rpm"))
+    if not rpms:
+        logging.info("No RPM files found in %s", rpm_dir)
+        return
+
+    logging.info("Verifying %d RPM files...", len(rpms))
+    failed = []
+    for r in rpms:
+        if not verify_rpm(r):
+            failed.append(r)
+            r.unlink()
+            logging.info("Deleted corrupted RPM: %s", r.name)
+
+    if failed:
+        logging.error("%d RPM(s) failed verification and were deleted", len(failed))
+    else:
+        logging.info("All RPMs passed verification")
+
+
+def __cs_is_missing_data(cs):
+    '''
+    Verify that the vmlinux for each supported arch exists.
+    '''
+    for arch in cs.archs:
+        try:
+            cs.find_obj_path(arch, "vmlinux")
+        except AssertionError:
+            # Assert triggered: vmlinux was not found
+            return True
+    return False
+
+
 def __get_cs_missing_data(codestreams):
-    return [cs for cs in codestreams if __is_cs_data_missing(cs)]
-
-
-def __is_cs_data_missing(cs):
-    return not cs.get_boot_file("config").exists()
+    return [cs for cs in codestreams if __cs_is_missing_data(cs)]

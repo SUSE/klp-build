@@ -23,6 +23,7 @@ def test_find_obj_path_arch():
         "project": "SUSE:Maintenance:34200",
         "patchid": "",
         "kernel": "5.14.21-150500.55.68",
+        "eol": "2025-11-09",
         "archs": [
             "x86_64",
             "s390x",
@@ -59,7 +60,8 @@ def test_find_obj_path_arch():
         "repo": "SUSE_SLE-15-SP5_Update",
         "configs": {
             "CONFIG_NET_SCH_TAPRIO": {"x86_64":"m","ppc64le":"m","s390x":"m"}
-            }
+            },
+        "required_patches" : ""
     })
 
     for arch in ARCHS:

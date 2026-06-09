@@ -4,6 +4,8 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
+set -eo pipefail
+
 LPS=" -r built "
 
 if [ "$1" == "--no-lp" ]; then
@@ -32,7 +34,7 @@ if [ ! -f "$TEST_SCRIPT" ]; then
 fi
 
 # Check multiple places where an updated version of the VMs can be found
-for VMSDIR in "$(realpath ../kgr-test/vms)" "$HOME/klp/kgr-test/vms" "$HOME/kgr-test/vms" "$HOME/vms" "/home/nstange/vms"; do
+for VMSDIR in "$(realpath ../kgr-test/vms)" "$HOME/klp/kgr-test/vms" "$HOME/kgr-test/vms" "$HOME/vms" "/home/klp/kgr-test/vms"; do
 	if [ -d "$VMSDIR" ]; then
 		echo "Using VMS from $VMSDIR"
 		break
@@ -61,7 +63,7 @@ else
 	JOBS=1
 fi
 
-for KGR_TEST_PATH in "$(realpath ../kgr-test/)" "$HOME/klp/kgr-test/" "/home/nstange/kgr-test"; do
+for KGR_TEST_PATH in "$(realpath ../kgr-test/)" "$HOME/klp/kgr-test/" "/home/klp/kgr-test/"; do
 	if [ -d "$KGR_TEST_PATH" ]; then
 		echo "Using kgr-test from $KGR_TEST_PATH"
 		break

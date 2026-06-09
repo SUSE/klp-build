@@ -10,7 +10,7 @@ import logging
 import os
 
 
-_loaded = False
+_LOADED = False
 _config = ConfigParser()
 
 
@@ -27,10 +27,10 @@ def __check_config_is_loaded(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        global _loaded
-        if not _loaded:
+        global _LOADED
+        if not _LOADED:
             __load_user_conf()
-            _loaded = True
+            _LOADED = True
         return func(*args, **kwargs)
     return wrapper
 
@@ -150,7 +150,7 @@ def __load_user_conf():
     """
     user_conf_file = __get_user_conf_file()
     if not user_conf_file.is_file():
-        logging.warning("Warning: user configuration file not found")
+        logging.warning("User configuration file not found")
         __setup_user_env(Path.home()/"klp")
 
     logging.debug("Loading user configuration from '%s'", user_conf_file)

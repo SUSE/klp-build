@@ -7,6 +7,9 @@ from pathlib import Path
 import copy
 import logging
 import re
+
+from multiprocessing import Lock
+
 import requests
 
 from klpbuild.klplib import utils
@@ -16,8 +19,28 @@ SUPPORTED_CS_URL = "https://gitlab.suse.de/live-patching/sle-live-patching-data/
 SUSE_CERT = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
 
 __supported_codestreams_cache = []
+__SUPPORTED_CODESTREAMS_FETCHED = False
+__supported_codestreams_lock = Lock()
+
 
 def get_supported_codestreams():
+    """
+    Download and parse the list of supported codestreams in a thread-safe way.
+
+    Returns:
+        list[Codestream]: A list of supported codestreams.
+    """
+
+    # (Non-blocking read) Return cached list if present.
+    if __SUPPORTED_CODESTREAMS_FETCHED:
+        return copy.deepcopy(__supported_codestreams_cache)
+
+    # Lock access and fetch the list.
+    with __supported_codestreams_lock:
+        return __get_supported_codestreams()
+
+
+def __get_supported_codestreams():
     """
     Download and parse the list of supported codestreams.
 
@@ -25,19 +48,20 @@ def get_supported_codestreams():
         list[Codestream]: A list of supported codestreams.
     """
     global __supported_codestreams_cache
+    global __SUPPORTED_CODESTREAMS_FETCHED
 
-    # Return cached list if present
-    if __supported_codestreams_cache:
+    # In case a reader got locked while the cache was still being written.
+    # Return cached list.
+    if __SUPPORTED_CODESTREAMS_FETCHED:
         return copy.deepcopy(__supported_codestreams_cache)
 
     __supported_codestreams_cache = []
     lines = __download_supported_file() if not utils.in_test_mode() else __load_supported_file()
 
     for line in lines:
-        # remove the last two columns, which are dates of the line
-        # and add a fifth field with the forth one + rpm- prefix, and
-        # remove the build counter number
-        full_cs, proj, kernel_full, _, _ = line.split(",")
+        full_cs, proj, kernel_full, eol, eol_ltss = line.split(",")
+        if eol_ltss.strip():
+            eol = eol_ltss
 
         kernel = re.sub(r"\.\d+$", "", kernel_full)
 
@@ -46,13 +70,14 @@ def get_supported_codestreams():
         if "/" in proj:
             proj, patchid = proj.split("/")
 
-        cs = __codestream_from_supported(full_cs, proj, patchid, kernel)
+        cs = __codestream_from_supported(full_cs, proj, patchid, kernel, eol)
         __supported_codestreams_cache.append(cs)
 
+    __SUPPORTED_CODESTREAMS_FETCHED = True
     return copy.deepcopy(__supported_codestreams_cache)
 
 
-def __codestream_from_supported(cs, proj, patchid, kernel):
+def __codestream_from_supported(cs, proj, patchid, kernel, eol):
     # Parse SLE15-SP2_Update_25 to 15.2u25
     rt = "rt" if "-RT" in cs else ""
     sp = "0"
@@ -72,7 +97,7 @@ def __codestream_from_supported(cs, proj, patchid, kernel):
         assert False, "codestream name should contain either SLE or MICRO!"
 
     cs_name = f"{sle}.{sp}{rt}u{update}"
-    return Codestream(cs_name, proj, patchid, kernel)
+    return Codestream(cs_name, proj, patchid, kernel, eol)
 
 
 def __load_supported_file():

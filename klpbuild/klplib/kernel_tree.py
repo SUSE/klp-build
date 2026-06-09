@@ -7,19 +7,21 @@ import logging
 import os
 import shutil
 import subprocess
+import re
 
+from multiprocessing import Lock
 from functools import wraps
 from pathlib import Path
 from klpbuild.klplib.config import get_user_path
 from klpbuild.klplib.utils import ARCH
 
-__kernel_tags_are_fetched = False
-
+__KERNEL_TAGS_ARE_FETCHED = False
+__kernel_fetch_lock = Lock()
 
 def __check_kernel_tags_are_fetched(func):
     """
-    This decorator checks whether the kernel tags are fetched. If not, it
-    fetches them the configuration and then calls the wrapped function.
+    This decorator checks whether the kernel tags are fetched in a thread-safe
+    way. If not, it fetches them the configuration and then calls the wrapped function.
 
     Args:
         func (function): The function to be wrapped.
@@ -29,10 +31,12 @@ def __check_kernel_tags_are_fetched(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        global __kernel_tags_are_fetched
-        if not __kernel_tags_are_fetched:
-            __fetch_kernel_tree_tags()
-            __kernel_tags_are_fetched = True
+        global __KERNEL_TAGS_ARE_FETCHED
+
+        with __kernel_fetch_lock:
+            if not __KERNEL_TAGS_ARE_FETCHED:
+                __fetch_kernel_tree_tags()
+                __KERNEL_TAGS_ARE_FETCHED = True
         return func(*args, **kwargs)
     return wrapper
 
@@ -52,7 +56,8 @@ def __fetch_kernel_tree_tags():
         logging.info("Failed to update kernel tree tags\n%s", ret.stderr)
 
 
-# Currently this function returns the date of the patch and its subject
+# Currently this function returns the date of the patch, its subject
+# and the hash of the corresponding commit in kernel-source.
 @__check_kernel_tags_are_fetched
 def get_commit_data(commit, savedir=None):
 
@@ -65,13 +70,69 @@ def get_commit_data(commit, savedir=None):
     date = head[0]
     title = head[1]
     body = ret[1:]
+    suse_commit = re.search(r"suse-commit:\s*([a-z0-9]{40})|$",
+                            '\n'.join(body)).group(1)
 
     # Save the upstream commit if requested
     if savedir:
         with open(Path(savedir, f"{commit}.patch"), "w") as f:
             f.write('\n'.join(body))
 
-    return date, title
+    return date, title, suse_commit
+
+
+@__check_kernel_tags_are_fetched
+def get_commit_body(commit, file_path):
+    """
+    Get the changes done to the given file in a specific commit.
+    For each change, the whole function is returned as context.
+    """
+
+    kernel_tree = get_user_path("kernel_dir")
+
+    ret = subprocess.run(["git", "-C", kernel_tree, "show", "-W",
+                          "--pretty='%b'", commit, "--", file_path],
+                         check=True, capture_output=True, text=True)
+    return ret.stdout
+
+
+@__check_kernel_tags_are_fetched
+def find_commit(subject, branch, skip=0):
+    """
+    Find a commit by subject. Skip, if specified, the first 'n'
+    found commits.
+
+    Returns:
+        - (str) Commit hash on success.
+        - None otherwise.
+    """
+
+    kernel_tree = get_user_path("kernel_dir")
+
+    while True:
+        try:
+            ret = subprocess.run(["git", "-C", kernel_tree, "log", "-n1",
+                                  f"--grep=^{subject}",
+                                  rf"--grep=-\s*{subject}",
+                                  "--pretty='%h'",
+                                  f"--skip={skip}",
+                                  f"remotes/origin/{branch}"],
+                                 capture_output=True, check=False,
+                                 text=True, timeout=1)
+            return ret.stdout.replace("'","").strip()
+        except subprocess.TimeoutExpired:
+            # Sometimes the subject doesn't match due to unexpected line breaks in
+            # the commit's subject.
+            # Unfortunatly, git-log cannot grep more than one line at a time, so
+            # as workaround we have to trim long subjects and re-try.
+            if len(subject) <= 40:
+                break
+            # Cut off the last two words of the subject.
+            subject = subject.rsplit(' ', 2)[0]
+
+    logging.debug("Failed to find the kernel commit for '%s'", subject)
+
+    return None
 
 
 @__check_kernel_tags_are_fetched
@@ -100,6 +161,20 @@ def init_cs_kernel_tree(kernel_version, outdir):
             "add", outdir, "--checkout", kernel_tree_git_tag
         ], stderr=subprocess.PIPE)
 
+def cleanup_obsolete_trees(codestreams):
+    """
+    Remove obsolete kernel source trees.
+    """
+    kernel_tree = get_user_path("kernel_dir")
+    worktrees = __get_active_worktrees(kernel_tree)
+    valid_kerns = [cs.kernel for cs in codestreams]
+
+    for wt in worktrees:
+        wt_str = Path(wt).name # Use the name of the folder, not the full path string
+        is_valid = any(k in wt_str for k in valid_kerns)
+        if not is_valid:
+            logging.info("Removing worktree %s", wt)
+            __remove_worktree(kernel_tree, wt)
 
 def cleanup_kernel_trees():
     """
@@ -173,12 +248,15 @@ def __get_active_worktrees(kernel_tree):
 
 
 def __remove_worktree(kernel_tree, worktree_dir):
-    subprocess.check_output(["/usr/bin/git", "-C", kernel_tree, "worktree",
-                             "remove", worktree_dir, "-f", "-f"],
-                            stderr=subprocess.PIPE)
+    try:
+        subprocess.check_output(["/usr/bin/git", "-C", kernel_tree, "worktree",
+                                 "remove", worktree_dir, "-f", "-f"],
+                                stderr=subprocess.PIPE)
 
-    if os.path.isdir(worktree_dir):
-        shutil.rmtree(worktree_dir)
+        if os.path.isdir(worktree_dir):
+            shutil.rmtree(worktree_dir)
+    except (subprocess.CalledProcessError, OSError) as e:
+        logging.info("Error removing %s: %s", worktree_dir, e)
 
 
 def __prune_worktrees(kernel_tree):
