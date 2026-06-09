@@ -120,7 +120,7 @@ def test_templ_without_externalized_vars():
 # CVE is not all architectures supported by the given codestream.
 def test_is_enabled_only_on_cs_arcs():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u5"
+    cs = "6.0u11"
 
     setup_args = {
         "lp_name": lp,
