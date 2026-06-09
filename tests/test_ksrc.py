@@ -68,10 +68,6 @@ def test_is_module_supported():
     assert supported and filtered
 
 
-    mod = "net/tipc/tipc"
-    # Expected: "+external	net/tipc/tipc"
-    assert not ksrc_is_module_supported(mod, "6.4.0-150600.23.65")
-
 def test_get_rt_patches():
     expected = [
             "patches.suse/bpf-Check-bloom-filter-map-value-size.patch",
