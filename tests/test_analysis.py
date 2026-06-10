@@ -5,11 +5,11 @@
 
 import logging
 
+from klpbuild.klplib.affected_file import AffectedConfig, AffectedFile, AffectedModule
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.kernel_tree import get_commit_body
 from klpbuild.klplib.analysis import (
     __extract_functions,
-    __get_arch_config,
     __analyse_cs_files,
     analyse_configs,
     analyse_kmodules,
@@ -188,21 +188,26 @@ def test_extract_functions_balanced_braces_in_body():
     assert __extract_functions([diff]) == {"braces"}
 
 
-# ── __get_arch_config ─────────────────────────────────────────────────────────
+# ── AffectedConfig.get_arch (replaces removed __get_arch_config) ──────────────
 
 def test_get_arch_config_existing():
-    assert __get_arch_config({"x86_64": "m", "s390x": "y"}, "x86_64") == "m"
+    cfg = AffectedConfig("CONFIG_FOO", {"x86_64": "m", "s390x": "y"})
+    assert cfg.get_arch("x86_64").value == "m"
 
 
 def test_get_arch_config_missing():
-    assert __get_arch_config({"x86_64": "m"}, "ppc64le") == "n"
+    cfg = AffectedConfig("CONFIG_FOO", {"x86_64": "m"})
+    assert cfg.get_arch("ppc64le").value == "n"
 
 
 # ── filter_unset_configs ──────────────────────────────────────────────────────
 
 def test_filter_unset_configs_removes_unset():
-    cs_set = FakeCS({}, configs={"CONFIG_A": {"x86_64": "m"}})
-    cs_unset = FakeCS({}, configs={"CONFIG_B": {}, "CONFIG_C": {}})
+    cs_set = FakeCS(configs={"CONFIG_A": AffectedConfig("CONFIG_A", {"x86_64": "m"})})
+    cs_unset = FakeCS(configs={
+        "CONFIG_B": AffectedConfig("CONFIG_B"),
+        "CONFIG_C": AffectedConfig("CONFIG_C"),
+    })
     cs_list = [cs_set, cs_unset]
     unset_cs, unset_conf = filter_unset_configs(cs_list)
     assert cs_unset in unset_cs
@@ -213,7 +218,7 @@ def test_filter_unset_configs_removes_unset():
 
 
 def test_filter_unset_configs_keeps_all_set():
-    cs = FakeCS({}, configs={"CONFIG_A": {"x86_64": "m"}})
+    cs = FakeCS(configs={"CONFIG_A": AffectedConfig("CONFIG_A", {"x86_64": "m"})})
     cs_list = [cs]
     unset_cs, unset_conf = filter_unset_configs(cs_list)
     assert not unset_cs
@@ -222,7 +227,7 @@ def test_filter_unset_configs_keeps_all_set():
 
 
 def test_filter_unset_configs_skips_empty_configs():
-    cs = FakeCS({}, configs={})
+    cs = FakeCS(configs={})
     cs_list = [cs]
     unset_cs, unset_conf = filter_unset_configs(cs_list)
     assert not unset_cs
@@ -230,8 +235,8 @@ def test_filter_unset_configs_skips_empty_configs():
 
 
 def test_filter_unset_configs_deduplicates_conf_names():
-    cs1 = FakeCS({}, cs_name="a", configs={"CONFIG_X": {}})
-    cs2 = FakeCS({}, cs_name="b", configs={"CONFIG_X": {}})
+    cs1 = FakeCS(cs_name="a", configs={"CONFIG_X": AffectedConfig("CONFIG_X")})
+    cs2 = FakeCS(cs_name="b", configs={"CONFIG_X": AffectedConfig("CONFIG_X")})
     cs_list = [cs1, cs2]
     _, unset_conf = filter_unset_configs(cs_list)
     assert unset_conf == ["CONFIG_X"]
@@ -239,8 +244,17 @@ def test_filter_unset_configs_deduplicates_conf_names():
 
 # ── filter_unsupported_kmodules ───────────────────────────────────────────────
 
+def _make_module(name, supported):
+    m = AffectedModule(name)
+    m.supported = supported
+    return m
+
+
 def test_filter_unsupported_kmodules_removes_unsupported():
-    cs = FakeCS({}, modules={"mod_a": False, "mod_b": False})
+    cs = FakeCS(modules={
+        "mod_a": _make_module("mod_a", False),
+        "mod_b": _make_module("mod_b", False),
+    })
     cs_list = [cs]
     unset = filter_unsupported_kmodules(cs_list)
     assert cs in unset
@@ -248,22 +262,23 @@ def test_filter_unsupported_kmodules_removes_unsupported():
 
 
 def test_filter_unsupported_kmodules_keeps_supported():
-    cs = FakeCS({}, modules={"mod_a": True})
+    cs = FakeCS(modules={"mod_a": _make_module("mod_a", True)})
     cs_list = [cs]
     unset = filter_unsupported_kmodules(cs_list)
     assert not unset
     assert cs in cs_list
 
 
-def test_filter_unsupported_kmodules_clears_modules():
-    cs = FakeCS({}, modules={"mod_a": True})
+def test_filter_unsupported_kmodules_preserves_modules():
+    cs = FakeCS(modules={"mod_a": _make_module("mod_a", True)})
     cs_list = [cs]
     filter_unsupported_kmodules(cs_list)
-    assert cs.modules == {}
+    assert "mod_a" in cs.modules
+    assert cs.modules["mod_a"].supported is True
 
 
 def test_filter_unsupported_kmodules_skips_no_modules():
-    cs = FakeCS({}, modules={})
+    cs = FakeCS(modules={})
     cs_list = [cs]
     unset = filter_unsupported_kmodules(cs_list)
     assert not unset
@@ -278,9 +293,9 @@ def test_analyse_cs_files_populates_files():
     report = __analyse_cs_files(cs, {"net/tls/tls_main.c": [diff]})
     assert "net/tls/tls_main.c" in cs.files
     entry = cs.files["net/tls/tls_main.c"]
-    assert entry["conf"]
-    assert entry["module"]
-    assert len(entry["symbols"]) > 0
+    assert entry.config_name
+    assert entry.module_name
+    assert len(entry.affected_symbols) > 0
     assert len(report) == 1
 
 
@@ -296,14 +311,14 @@ def test_analyse_cs_files_no_config_logs_warning(caplog):
 
 def test_analyse_configs_groups_by_config():
     cs1 = FakeCS(
-        {"net.c": {"conf": "CONFIG_NET", "module": "net.o"}},
+        {"net.c": AffectedFile("net.c", config_name="CONFIG_NET", module_name="net.o")},
         cs_name="15.4u0",
-        configs={"CONFIG_NET": {"x86_64": "m"}},
+        configs={"CONFIG_NET": AffectedConfig("CONFIG_NET", {"x86_64": "m"})},
     )
     cs2 = FakeCS(
-        {"net.c": {"conf": "CONFIG_NET", "module": "net.o"}},
+        {"net.c": AffectedFile("net.c", config_name="CONFIG_NET", module_name="net.o")},
         cs_name="15.5u0",
-        configs={"CONFIG_NET": {"x86_64": "m"}},
+        configs={"CONFIG_NET": AffectedConfig("CONFIG_NET", {"x86_64": "m"})},
     )
     report = analyse_configs([cs1, cs2])
     assert len(report) == 1
@@ -315,14 +330,14 @@ def test_analyse_configs_groups_by_config():
 
 def test_analyse_configs_separates_different_archs():
     cs1 = FakeCS(
-        {"net.c": {"conf": "CONFIG_NET", "module": "net.o"}},
+        {"net.c": AffectedFile("net.c", config_name="CONFIG_NET", module_name="net.o")},
         cs_name="15.4u0",
-        configs={"CONFIG_NET": {"x86_64": "m"}},
+        configs={"CONFIG_NET": AffectedConfig("CONFIG_NET", {"x86_64": "m"})},
     )
     cs2 = FakeCS(
-        {"net.c": {"conf": "CONFIG_NET", "module": "net.o"}},
+        {"net.c": AffectedFile("net.c", config_name="CONFIG_NET", module_name="net.o")},
         cs_name="15.5u0",
-        configs={"CONFIG_NET": {"x86_64": "y"}},
+        configs={"CONFIG_NET": AffectedConfig("CONFIG_NET", {"x86_64": "y"})},
     )
     report = analyse_configs([cs1, cs2])
     assert len(report) == 2
@@ -330,9 +345,9 @@ def test_analyse_configs_separates_different_archs():
 
 def test_analyse_configs_no_duplicate_cs_in_report():
     cs = FakeCS(
-        {"a.c": {"conf": "CONFIG_A", "module": "a.o"},
-         "b.c": {"conf": "CONFIG_A", "module": "b.o"}},
-        configs={"CONFIG_A": {"x86_64": "m"}},
+        {"a.c": AffectedFile("a.c", config_name="CONFIG_A", module_name="a.o"),
+         "b.c": AffectedFile("b.c", config_name="CONFIG_A", module_name="b.o")},
+        configs={"CONFIG_A": AffectedConfig("CONFIG_A", {"x86_64": "m"})},
     )
     report = analyse_configs([cs])
     key = list(report.keys())[0]
@@ -343,40 +358,43 @@ def test_analyse_configs_no_duplicate_cs_in_report():
 
 def test_analyse_kmodules_checks_module_support():
     cs = FakeCS(
-        {"net.c": {"conf": "CONFIG_NET", "module": "net/core/net.o"}},
-        configs={"CONFIG_NET": {"x86_64": "m"}},
+        {"net.c": AffectedFile("net.c", config_name="CONFIG_NET", module_name="net/core/net.o")},
+        configs={"CONFIG_NET": AffectedConfig("CONFIG_NET", {"x86_64": "m"})},
         supported={"net/core/net.o": (True, False)},
     )
     report = analyse_kmodules([cs])
     assert "net/core/net.o" in cs.modules
-    assert cs.modules["net/core/net.o"] is True
+    assert cs.modules["net/core/net.o"].supported is True
     assert len(report) == 1
 
 
 def test_analyse_kmodules_skips_builtin():
     cs = FakeCS(
-        {"net.c": {"conf": "CONFIG_NET", "module": "net/core/net.o"}},
-        configs={"CONFIG_NET": {"x86_64": "y"}},
+        {"net.c": AffectedFile("net.c", config_name="CONFIG_NET", module_name="net/core/net.o")},
+        configs={"CONFIG_NET": AffectedConfig("CONFIG_NET", {"x86_64": "y"})},
     )
     report = analyse_kmodules([cs])
     assert "net/core/net.o" not in cs.modules
     assert len(report) == 0
 
 
-def test_analyse_kmodules_skips_already_tracked():
+def test_analyse_kmodules_already_tracked_reuses_module():
     cs = FakeCS(
-        {"net.c": {"conf": "CONFIG_NET", "module": "net/core/net.o"}},
-        configs={"CONFIG_NET": {"x86_64": "m"}},
-        modules={"net/core/net.o": True},
+        {"net.c": AffectedFile("net.c", config_name="CONFIG_NET", module_name="net/core/net.o")},
+        configs={"CONFIG_NET": AffectedConfig("CONFIG_NET", {"x86_64": "m"})},
+        modules={"net/core/net.o": _make_module("net/core/net.o", True)},
     )
     report = analyse_kmodules([cs])
-    assert len(report) == 0
+    # The module is re-evaluated and reported (setdefault reuses the existing
+    # AffectedModule), so it appears in the report.
+    assert len(report) == 1
+    assert cs.modules["net/core/net.o"].supported is True
 
 
 def test_analyse_kmodules_warns_blacklisted(caplog):
     cs = FakeCS(
-        {"drv.c": {"conf": "CONFIG_DRV", "module": "drivers/drv.o"}},
-        configs={"CONFIG_DRV": {"x86_64": "m"}},
+        {"drv.c": AffectedFile("drv.c", config_name="CONFIG_DRV", module_name="drivers/drv.o")},
+        configs={"CONFIG_DRV": AffectedConfig("CONFIG_DRV", {"x86_64": "m"})},
         supported={"drivers/drv.o": (False, True)},
     )
     with caplog.at_level(logging.WARNING):

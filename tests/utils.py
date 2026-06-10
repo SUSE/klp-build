@@ -6,22 +6,24 @@
 from pathlib import Path
 import json
 
+from klpbuild.klplib.affected_file import AffectedConfig, AffectedFile, AffectedModule
 from klpbuild.klplib.utils import get_workdir
 
 
 class FakeCS:
-    def __init__(self, files, cs_name="15.4u0", ibt=False, mods=None,
+    def __init__(self, files=None, cs_name="15.4u0", ibt=False, mods=None,
                  configs=None, modules=None, patches=None, branch="main",
                  supported=None):
-        self.files = files
+        self.files: dict[str, AffectedFile] = files or {}
         self._cs_name = cs_name
         self._ibt = ibt
         self._mods = mods or {}
-        self.configs = configs or {}
-        self.modules = modules if modules is not None else {}
+        self.configs: dict[str, AffectedConfig] = configs or {}
+        self.modules: dict[str, AffectedModule] = modules or {}
         self._patches = patches or []
         self._branch = branch
         self._supported = supported or {}
+        self._mod_cache: dict[str, AffectedModule] = {}
 
     def full_cs_name(self):
         return self._cs_name
@@ -32,8 +34,17 @@ class FakeCS:
     def lp_out_file(self, lp, f):
         return f"{lp}_{f.replace('/', '_').replace('-', '_')}"
 
-    def get_file_mod(self, f):
-        return self._mods.get(f, "vmlinux")
+    def get_file_mod(self, f, arch=None):
+        # Mirrors Codestream.get_file_mod: returns an AffectedModule, with the
+        # same instance returned across calls so cache_obj_path mutations stay
+        # visible (matching Codestream.modules.setdefault semantics).
+        name = self._mods.get(f, AffectedModule.VMLINUX)
+        if name not in self._mod_cache:
+            self._mod_cache[name] = (
+                AffectedModule.vmlinux() if name == AffectedModule.VMLINUX
+                else AffectedModule(name)
+            )
+        return self._mod_cache[name]
 
     def get_required_patches(self):
         return self._patches
@@ -44,7 +55,7 @@ class FakeCS:
     def set_configs(self, config_names):
         for c in config_names:
             if c not in self.configs:
-                self.configs[c] = {}
+                self.configs[c] = AffectedConfig(c)
 
     def is_module_supported(self, mod):
         return self._supported.get(mod, (True, False))

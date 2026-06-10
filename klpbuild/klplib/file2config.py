@@ -9,11 +9,13 @@ import re
 
 from pathlib import Path
 
+from klpbuild.klplib.affected_file import AffectedModule, ConfigState
+
 
 archs_config = {
-        's390x': {'conf': "CONFIG_S390", 'module': 'vmlinux'},
-        'x86_64': {'conf': "CONFIG_X86_64", 'module': 'vmlinux'},
-        'ppc64le': {'conf': "CONFIG_PPC64", 'module': 'vmlinux'},
+        's390x': {'conf': "CONFIG_S390", 'module': AffectedModule.VMLINUX},
+        'x86_64': {'conf': "CONFIG_X86_64", 'module': AffectedModule.VMLINUX},
+        'ppc64le': {'conf': "CONFIG_PPC64", 'module': AffectedModule.VMLINUX},
 }
 
 
@@ -89,7 +91,7 @@ def _find_config(cs, base_dir, relative_obj_path, deep):
         return None, ""
 
     if Path(".") == base_dir:
-        return "CONFIG_SUSE_KERNEL", "vmlinux"
+        return "CONFIG_SUSE_KERNEL", AffectedModule.VMLINUX
 
     lines = _load_makefile(cs, Path(base_dir, "Kbuild"))
     if not lines:
@@ -207,8 +209,8 @@ def find_file_config(cs, path):
     # the given file path.
     elif path.startswith("arch"):
         arch = _get_arch_in_path(path)
-        archs = cs.get_all_configs(config)
-        if arch and (len(archs) != 1 or not archs.get(arch)):
+        cfg = cs.get_all_configs(config)
+        if arch and (len(cfg.archs()) != 1 or cfg.get_arch(arch) is ConfigState.NOT_SET):
             return archs_config[arch]['conf'], archs_config[arch]['module']
 
     if not config or not config.startswith('CONFIG_'):

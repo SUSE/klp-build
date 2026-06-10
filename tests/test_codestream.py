@@ -31,11 +31,13 @@ def test_find_obj_path_arch():
         ],
         "files": {
             "net/sched/sch_taprio.c": {
-                "module": "sch_taprio",
-                "conf": "CONFIG_NET_SCH_TAPRIO",
-                "symbols": [
+                "module_name": "sch_taprio",
+                "config_name": "CONFIG_NET_SCH_TAPRIO",
+                "affected_symbols": [
                         "taprio_change"
                 ],
+                "ibt": False,
+                "dup_symbols": [],
                 "ext_symbols": {
                     "sch_taprio": [
                         "advance_sched",
@@ -51,11 +53,24 @@ def test_find_obj_path_arch():
                         "taprio_policy",
                         "taprio_set_picos_per_byte"
                     ]
-                }
+                },
+                "klpp_symbols": {}
             }
         },
         "modules": {
-            "sch_taprio": "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko"
+            "sch_taprio": {
+                "supported": True,
+                "blacklisted": False,
+                "obj_paths": {
+                    # The bug this test guards against is find_obj_path
+                    # returning a path that contains the arch name (because
+                    # the cache used to be arch-blind). Cache the same
+                    # arch-relative path under each arch key.
+                    "x86_64":  "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
+                    "ppc64le": "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
+                    "s390x":   "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
+                }
+            }
         },
         "repo": "SUSE_SLE-15-SP5_Update",
         "configs": {
