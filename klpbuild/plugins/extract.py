@@ -21,6 +21,7 @@ from filelock import FileLock
 from natsort import natsorted
 
 from klpbuild.klplib import utils
+from klpbuild.klplib.affected_file import AffectedFile, AffectedModule
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_list
 from klpbuild.klplib.config import get_user_settings
@@ -226,7 +227,7 @@ def get_missing_ext_symbols(working_cs):
         # only once per object
         obj_syms = {}
         for fdata in cs.files.values():
-            for obj, syms in fdata["ext_symbols"].items():
+            for obj, syms in fdata.ext_symbols.items():
                 obj_syms.setdefault(obj, [])
                 obj_syms[obj].extend(syms)
 
@@ -247,7 +248,7 @@ def get_missing_ext_symbols(working_cs):
     return missing_syms, unext_syms
 
 
-def fix_ext_symbols(cs, lp_dat, lp_out):
+def fix_ext_symbols(cs, fdata: AffectedFile, lp_out):
     '''
     Fix klp-ccp mistakes on non-ibt livepatches:
         - Drop any duplicated externalized symbol declaration generated
@@ -261,7 +262,7 @@ def fix_ext_symbols(cs, lp_dat, lp_out):
     if cs.needs_ibt():
         return lp_out
 
-    for sym_list in lp_dat["ext_symbols"].values():
+    for sym_list in fdata.ext_symbols.values():
         for s in sym_list:
             # Keep only static declarations
             lp_out = re.sub(rf"^(?!static|\s|#)\w[^;:()=]+\(\*klpe_{s}\)[^;:=]*;",
@@ -299,8 +300,6 @@ def get_ext_symbols(out_dir):
                 _, sym, var, mod = l.split(" ")
                 # Module names should not use dashes
                 mod = mod.replace("-", "_")
-                if not utils.is_mod(mod):
-                    mod = "vmlinux"
 
                 exts.append((sym, var, mod))
 
@@ -586,7 +585,7 @@ def apply_all_patches(lp_name, cs):
 def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
-    funcs = ",".join(fdata["symbols"])
+    funcs = ",".join(sorted(fdata.affected_symbols))
 
     ccp_args = [str(shutil.which("klp-ccp")), "-P", "suse.KlpPolicy",
                 "--compiler=x86_64-gcc-9.1.0", "-i", f"{funcs}", "-o",
@@ -632,12 +631,18 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
 
     # Needed, otherwise threads would interfere with each other
     env = os.environ.copy()
-    obj = cs.get_file_mod(fname)
+    arch = utils.preferred_arch([cs])
+    obj = cs.get_file_mod(fname, arch)
+
+    # ``find_obj_path`` resolves and caches the per-arch path on ``obj``; we
+    # rely on the path having been populated earlier (during setup), but call
+    # it here as a safety net so a missing cache entry does not crash.
+    obj_path = obj.get_obj_path(arch) or str(cs.find_obj_path(arch, obj.name))
 
     env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt() else "0"
     env["KCP_MOD_SYMVERS"] = str(Path(cs.get_boot_dir(), f'{cs.get_boot_filename("symvers")}.gz'))
     env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
-    env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.preferred_arch([cs]))/cs.get_mod(obj))
+    env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(arch) / obj_path)
     env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
     env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
     env["KCP_WORK_DIR"] = str(out_dir)
@@ -711,8 +716,7 @@ def _warn_ipa_removed(match, cs, fname):
 
 
 def _collect_dup_symbol(match, cs, fname):
-    cs.files[fname].setdefault("dup_symbols", [])
-    cs.files[fname]["dup_symbols"].append(match.group(1))
+    cs.files[fname].dup_symbols.append(match.group(1))
 
 
 CCP_WARNING_SPECS = [
@@ -761,7 +765,7 @@ def process(lp_name, total, args, avoid_ext):
 
     # Detect and set ibt information. It will be used in the TemplateGen
     if '-fcf-protection' in cmd or cs.needs_ibt():
-        cs.files[fname]["ibt"] = True
+        cs.files[fname].ibt = True
 
     out_log = Path(out_dir, "ccp.out.txt")
     with open(out_log, "w+") as f:
@@ -781,13 +785,13 @@ def process(lp_name, total, args, avoid_ext):
 
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
-    cs.files[fname]["ext_symbols"] = get_ext_symbols(out_dir)
-    cs.files[fname]["klpp_symbols"] = get_klpp_symbols(out_dir, lp_out)
+    cs.files[fname].ext_symbols = get_ext_symbols(out_dir)
+    cs.files[fname].klpp_symbols = get_klpp_symbols(out_dir, lp_out)
 
     lp_out_cleanup(cs, cs.files[fname], lp_out, sdir)
 
 
-def lp_out_cleanup(cs, lp_dat, lp_out, sdir):
+def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir):
     """
     Open the file, read, seek to the beginning, write the new data, and
     then truncate (which will use the current position in file as the
@@ -810,7 +814,7 @@ def lp_out_cleanup(cs, lp_dat, lp_out, sdir):
         file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
-        file_buf = fix_ext_symbols(cs, lp_dat, file_buf)
+        file_buf = fix_ext_symbols(cs, fdata, file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
@@ -880,10 +884,10 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
     # Check for duplicated symbols spotted by klp-ccp
     for cs in working_cs:
         for f, fdata in cs.files.items():
-            if fdata.get("dup_symbols"):
+            if fdata.dup_symbols:
                 logging.warning("%s:%s: Duplicated symbols (check the sympos):",
                                 cs.full_cs_name(), f)
-                logging.warning("\t%s", ", ".join(fdata.get("dup_symbols")))
+                logging.warning("\t%s", ", ".join(fdata.dup_symbols))
 
     logging.info("\nChecking the externalized symbols in other architectures...")
 

@@ -11,6 +11,7 @@ import pytest
 
 import tests.utils as tests_utils
 from klpbuild.klplib import utils
+from klpbuild.klplib.affected_file import AffectedFile
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.plugins.extract import (
@@ -23,6 +24,13 @@ from klpbuild.plugins.extract import (
 )
 from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS
+
+
+def _make_fdata(ext_symbols=None):
+    """Create an AffectedFile with ext_symbols set for testing."""
+    f = AffectedFile("test.c")
+    f.ext_symbols = ext_symbols or {}
+    return f
 
 
 def test_get_klpp_symbols_missing_patched_funcs(tmp_path):
@@ -239,9 +247,9 @@ def test_detect_opt_clone(caplog):
 def test_fix_ext_symbols_ibt_returns_unchanged():
     """IBT codestreams bypass all fixups and return lp_out as-is."""
     cs = Codestream("15.6u0")  # needs_ibt() == True
-    lp_dat = {"ext_symbols": {"vmlinux": ["my_func"]}}
+    fdata = _make_fdata({"vmlinux": ["my_func"]})
     lp_out = "int (*klpe_my_func)(void);\nstatic int (*klpe_my_func)(void);\n"
-    assert fix_ext_symbols(cs, lp_dat, lp_out) == lp_out
+    assert fix_ext_symbols(cs, fdata, lp_out) == lp_out
 
 
 def test_fix_ext_symbols_removes_duplicate_non_static_decls():
@@ -251,13 +259,13 @@ def test_fix_ext_symbols_removes_duplicate_non_static_decls():
     declaration must survive intact.
     """
     cs = Codestream("15.4u0")
-    lp_dat = {"ext_symbols": {"vmlinux": ["foo"]}}
+    fdata = _make_fdata({"vmlinux": ["foo"]})
     lp_out = (
         "int (*klpe_foo)(void);\n"   # duplicate #1 – must be removed
         "int (*klpe_foo)(void);\n"   # duplicate #2 – must be removed
         "static int (*klpe_foo)(void);\n"  # real declaration – must survive
     )
-    result = fix_ext_symbols(cs, lp_dat, lp_out)
+    result = fix_ext_symbols(cs, fdata, lp_out)
     assert result.count("(*klpe_foo)") == 1
     assert "static int (*klpe_foo)(void);" in result
 
@@ -266,9 +274,9 @@ def test_fix_ext_symbols_hash_prefixed_line_not_removed():
     """Lines starting with '#' (e.g. macro definitions) are protected by the
     negative lookahead and must not be erased."""
     cs = Codestream("15.4u0")
-    lp_dat = {"ext_symbols": {"vmlinux": ["foo"]}}
+    fdata = _make_fdata({"vmlinux": ["foo"]})
     lp_out = "#define WRAP int (*klpe_foo)(void);\n"
-    result = fix_ext_symbols(cs, lp_dat, lp_out)
+    result = fix_ext_symbols(cs, fdata, lp_out)
     assert "#define WRAP int (*klpe_foo)(void);" in result
 
 
@@ -276,9 +284,9 @@ def test_fix_ext_symbols_indented_decl_not_removed():
     """Declarations that start with whitespace (indented) are protected by the
     negative lookahead and must be left untouched."""
     cs = Codestream("15.4u0")
-    lp_dat = {"ext_symbols": {"vmlinux": ["foo"]}}
+    fdata = _make_fdata({"vmlinux": ["foo"]})
     lp_out = "\tint (*klpe_foo)(void);\n"
-    result = fix_ext_symbols(cs, lp_dat, lp_out)
+    result = fix_ext_symbols(cs, fdata, lp_out)
     assert "(*klpe_foo)" in result
 
 
@@ -286,9 +294,9 @@ def test_fix_ext_symbols_symbol_name_is_exact():
     """The regex anchors on 'klpe_{sym}' exactly; a symbol whose name is a
     prefix of another must not accidentally remove the longer one."""
     cs = Codestream("15.4u0")
-    lp_dat = {"ext_symbols": {"vmlinux": ["foo"]}}
+    fdata = _make_fdata({"vmlinux": ["foo"]})
     lp_out = "int (*klpe_foo)(void);\nint (*klpe_foobar)(void);\n"
-    result = fix_ext_symbols(cs, lp_dat, lp_out)
+    result = fix_ext_symbols(cs, fdata, lp_out)
     assert "(*klpe_foo)" not in result
     assert "(*klpe_foobar)" in result
 
@@ -297,18 +305,18 @@ def test_fix_ext_symbols_multi_word_type_removed():
     """Non-static declarations with multi-word types (e.g. 'unsigned long')
     are still matched and removed."""
     cs = Codestream("15.4u0")
-    lp_dat = {"ext_symbols": {"vmlinux": ["counter"]}}
+    fdata = _make_fdata({"vmlinux": ["counter"]})
     lp_out = "unsigned long (*klpe_counter)(int x);\n"
-    result = fix_ext_symbols(cs, lp_dat, lp_out)
+    result = fix_ext_symbols(cs, fdata, lp_out)
     assert "(*klpe_counter)" not in result
 
 
 def test_fix_ext_symbols_multi_module_all_processed():
     """Symbols listed under different modules in ext_symbols are all cleaned up."""
     cs = Codestream("15.4u0")
-    lp_dat = {"ext_symbols": {"vmlinux": ["foo"], "nfnetlink": ["bar"]}}
+    fdata = _make_fdata({"vmlinux": ["foo"], "nfnetlink": ["bar"]})
     lp_out = "int (*klpe_foo)(void);\nint (*klpe_bar)(void);\n"
-    result = fix_ext_symbols(cs, lp_dat, lp_out)
+    result = fix_ext_symbols(cs, fdata, lp_out)
     assert "(*klpe_foo)" not in result
     assert "(*klpe_bar)" not in result
 
@@ -317,9 +325,9 @@ def test_fix_ext_symbols_percpu_scalar_type():
     """Percpu __attribute__ declaration with a scalar type is rewritten to
     'static TYPE __percpu VAR'."""
     cs = Codestream("15.4u0")
-    lp_dat = {"ext_symbols": {}}
+    fdata = _make_fdata({})
     lp_out = 'static __attribute__((section(".data..percpu" ""))) __typeof__(int) (*klpe_example);\n'
-    result = fix_ext_symbols(cs, lp_dat, lp_out)
+    result = fix_ext_symbols(cs, fdata, lp_out)
     assert "static int __percpu (*klpe_example);" in result
     assert "__attribute__" not in result
 
@@ -328,9 +336,9 @@ def test_fix_ext_symbols_percpu_struct_pointer_type():
     """Percpu __attribute__ declaration with a struct-pointer type is rewritten
     correctly; the full type including '*' ends up before __percpu."""
     cs = Codestream("15.4u0")
-    lp_dat = {"ext_symbols": {}}
+    fdata = _make_fdata({})
     lp_out = 'static __attribute__((section(".data..percpu" ""))) __typeof__(struct foo *) (*klpe_bar);\n'
-    result = fix_ext_symbols(cs, lp_dat, lp_out)
+    result = fix_ext_symbols(cs, fdata, lp_out)
     assert "static struct foo * __percpu (*klpe_bar);" in result
     assert "__attribute__" not in result
 
@@ -414,7 +422,7 @@ def _make_lp_out(tmp_path, content):
 def test_lp_out_cleanup_creates_orig_file(tmp_path):
     """A .orig backup is written next to the livepatch file."""
     lp_out = _make_lp_out(tmp_path, "content\n")
-    lp_out_cleanup(Codestream("15.4u0"), {"ext_symbols": {}}, lp_out, tmp_path)
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
     assert (tmp_path / "livepatch.c.orig").exists()
 
 
@@ -422,7 +430,7 @@ def test_lp_out_cleanup_orig_preserves_original_content(tmp_path):
     """The .orig file contains the unmodified original content."""
     original = "static __init int foo(void) {}\n"
     lp_out = _make_lp_out(tmp_path, original)
-    lp_out_cleanup(Codestream("15.4u0"), {"ext_symbols": {}}, lp_out, tmp_path)
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
     assert (tmp_path / "livepatch.c.orig").read_text() == original
 
 
@@ -430,7 +438,7 @@ def test_lp_out_cleanup_removes_local_path_from_comments(tmp_path):
     """'from {sdir}/' prefixes in klp-ccp comments are stripped."""
     sdir = tmp_path / "kernel"
     lp_out = _make_lp_out(tmp_path, f"/* klp-ccp: from {sdir}/drivers/net/foo.c */\n")
-    lp_out_cleanup(Codestream("15.4u0"), {"ext_symbols": {}}, lp_out, sdir)
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, sdir)
     content = lp_out.read_text()
     assert str(sdir) not in content
     assert "from drivers/net/foo.c" in content
@@ -443,7 +451,7 @@ def test_lp_out_cleanup_removes_local_includes(tmp_path):
         tmp_path,
         f'#include "{sdir}/include/foo.h"\n#include <linux/module.h>\n',
     )
-    lp_out_cleanup(Codestream("15.4u0"), {"ext_symbols": {}}, lp_out, sdir)
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, sdir)
     content = lp_out.read_text()
     assert f'#include "{sdir}' not in content
     assert "#include <linux/module.h>" in content
@@ -458,7 +466,7 @@ def test_lp_out_cleanup_removes_unsupported_macros(tmp_path):
         "#define KBUILD_MODNAME foo\n"
         "#define __seg_gs",
     )
-    lp_out_cleanup(Codestream("15.4u0"), {"ext_symbols": {}}, lp_out, tmp_path)
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
     content = lp_out.read_text()
     assert "#define __KERNEL__" not in content
     assert "#define MODULE" not in content
@@ -469,14 +477,14 @@ def test_lp_out_cleanup_removes_unsupported_macros(tmp_path):
 def test_lp_out_cleanup_removes_init_exit_attributes(tmp_path):
     """' __init' and ' __exit' markers are removed from function signatures."""
     lp_out = _make_lp_out(tmp_path, "static __init int foo(void)\n{\n}\n")
-    lp_out_cleanup(Codestream("15.4u0"), {"ext_symbols": {}}, lp_out, tmp_path)
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
     assert "__init" not in lp_out.read_text()
 
 
 def test_lp_out_cleanup_collapses_multiple_empty_lines(tmp_path):
     """Three or more consecutive blank lines are collapsed to one."""
     lp_out = _make_lp_out(tmp_path, "line1\n\n\n\nline2\n")
-    lp_out_cleanup(Codestream("15.4u0"), {"ext_symbols": {}}, lp_out, tmp_path)
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
     assert "\n\n\n" not in lp_out.read_text()
 
 
@@ -485,7 +493,7 @@ def test_lp_out_cleanup_collapses_multiple_empty_lines(tmp_path):
 def test_parse_ccp_warnings_optimized_clone(tmp_path, caplog):
     """Optimized-clone warning logs the clone name and a follow-up reminder."""
     fname = "net/bluetooth/l2cap_sock.c"
-    cs = FakeCS({fname: {}})
+    cs = FakeCS({fname: AffectedFile(fname)})
     log = tmp_path / "ccp.out.txt"
 
     with open(log, "w+") as f:
@@ -502,7 +510,7 @@ def test_parse_ccp_warnings_optimized_clone(tmp_path, caplog):
 def test_parse_ccp_warnings_ipa_removed(tmp_path, caplog):
     """IPA-removed warning logs the symbol name."""
     fname = "kernel/sched/core.c"
-    cs = FakeCS({fname: {}})
+    cs = FakeCS({fname: AffectedFile(fname)})
     log = tmp_path / "ccp.out.txt"
 
     with open(log, "w+") as f:
@@ -516,9 +524,9 @@ def test_parse_ccp_warnings_ipa_removed(tmp_path, caplog):
 
 
 def test_parse_ccp_warnings_dup_symbol(tmp_path):
-    """Conflicting-definition line appends the symbol to cs.files[fname]['dup_symbols']."""
+    """Conflicting-definition line appends the symbol to AffectedFile.dup_symbols."""
     fname = "net/ipv4/tcp_input.c"
-    cs = FakeCS({fname: {}})
+    cs = FakeCS({fname: AffectedFile(fname)})
     log = tmp_path / "ccp.out.txt"
 
     with open(log, "w+") as f:
@@ -526,13 +534,13 @@ def test_parse_ccp_warnings_dup_symbol(tmp_path):
         f.write('conflicting definitions for symbol "sk_filter_trim_cap" found in ELF\n')
         parse_ccp_warnings(f, start_pos, cs, fname)
 
-    assert cs.files[fname]["dup_symbols"] == ["sk_filter_trim_cap"]
+    assert cs.files[fname].dup_symbols == ["sk_filter_trim_cap"]
 
 
 def test_parse_ccp_warnings_no_warnings(tmp_path, caplog):
     """Non-matching lines produce no log output and no side effects."""
     fname = "fs/ext4/inode.c"
-    cs = FakeCS({fname: {}})
+    cs = FakeCS({fname: AffectedFile(fname)})
     log = tmp_path / "ccp.out.txt"
 
     with open(log, "w+") as f:
@@ -544,13 +552,15 @@ def test_parse_ccp_warnings_no_warnings(tmp_path, caplog):
             parse_ccp_warnings(f, start_pos, cs, fname)
 
     assert caplog.text == ""
-    assert "dup_symbols" not in cs.files[fname]
+    # AffectedFile.dup_symbols is always present (default []); no warning
+    # handler should have appended anything.
+    assert cs.files[fname].dup_symbols == []
 
 
 def test_parse_ccp_warnings_multiple_types(tmp_path, caplog):
     """All three warning types in the same file are each handled."""
     fname = "net/core/sock.c"
-    cs = FakeCS({fname: {}})
+    cs = FakeCS({fname: AffectedFile(fname)})
     log = tmp_path / "ccp.out.txt"
 
     with open(log, "w+") as f:
@@ -565,13 +575,13 @@ def test_parse_ccp_warnings_multiple_types(tmp_path, caplog):
 
     assert "Symbol tcp_v4_connect contains optimized clone: tcp_v4_connect.isra.0" in caplog.text
     assert "Unable to verify if lockdep_rtnl_is_held symbol is inlined or not. Please check manually." in caplog.text
-    assert cs.files[fname]["dup_symbols"] == ["nf_conntrack_in"]
+    assert cs.files[fname].dup_symbols == ["nf_conntrack_in"]
 
 
 def test_parse_ccp_warnings_respects_start_pos(tmp_path):
     """Lines written before start_pos are not parsed."""
     fname = "drivers/scsi/sd.c"
-    cs = FakeCS({fname: {}})
+    cs = FakeCS({fname: AffectedFile(fname)})
     log = tmp_path / "ccp.out.txt"
 
     with open(log, "w+") as f:
@@ -581,13 +591,13 @@ def test_parse_ccp_warnings_respects_start_pos(tmp_path):
         f.write('conflicting definitions for symbol "sd_open" found in ELF\n')
         parse_ccp_warnings(f, start_pos, cs, fname)
 
-    assert cs.files[fname]["dup_symbols"] == ["sd_open"]
+    assert cs.files[fname].dup_symbols == ["sd_open"]
 
 
 def test_parse_ccp_warnings_multiple_dup_symbols(tmp_path):
     """Multiple conflicting-definition lines all append to dup_symbols."""
     fname = "mm/slub.c"
-    cs = FakeCS({fname: {}})
+    cs = FakeCS({fname: AffectedFile(fname)})
     log = tmp_path / "ccp.out.txt"
 
     with open(log, "w+") as f:
@@ -596,4 +606,4 @@ def test_parse_ccp_warnings_multiple_dup_symbols(tmp_path):
         f.write('conflicting definitions for symbol "kmem_cache_free" found in ELF\n')
         parse_ccp_warnings(f, start_pos, cs, fname)
 
-    assert cs.files[fname]["dup_symbols"] == ["kmem_cache_alloc", "kmem_cache_free"]
+    assert cs.files[fname].dup_symbols == ["kmem_cache_alloc", "kmem_cache_free"]

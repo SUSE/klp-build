@@ -26,24 +26,27 @@ def test_missing_conf_prefix(caplog):
     assert "Invalid config 'TUN': Missing CONFIG_ prefix" in caplog.text
 
 
+def _assert_tun_file(fdat):
+    assert fdat.module_name == "tun"
+    assert fdat.config_name == "CONFIG_TUN"
+    assert fdat.affected_symbols == {"tun_chr_ioctl", "tun_free_netdev"}
+
+
 def test_file_funcs_ok():
     # Check for multiple variants of file-funcs
     cs = Codestream(CS)
 
     setup_manual([cs], utils.ARCHS, "CONFIG_TUN", "tun",
                  [["drivers/net/tun.c", "tun_chr_ioctl", "tun_free_netdev"]], [], [])
-    assert cs.files["drivers/net/tun.c"] == \
-            {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}
+    _assert_tun_file(cs.files["drivers/net/tun.c"])
 
     setup_manual([cs], utils.ARCHS, "CONFIG_TUN", "tun", [],
                  [["tun", "drivers/net/tun1.c", "tun_chr_ioctl", "tun_free_netdev"]], [])
-    assert cs.files["drivers/net/tun1.c"] == \
-            {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}
+    _assert_tun_file(cs.files["drivers/net/tun1.c"])
 
     setup_manual([cs], utils.ARCHS, "CONFIG_TUN", "tun", [], [],
                  [["CONFIG_TUN", "tun", "drivers/net/tun2.c", "tun_chr_ioctl", "tun_free_netdev"]])
-    assert cs.files["drivers/net/tun2.c"] == \
-            {"module": "tun", "conf": "CONFIG_TUN", "symbols": ["tun_chr_ioctl", "tun_free_netdev"]}
+    _assert_tun_file(cs.files["drivers/net/tun2.c"])
 
 
 def test_non_existent_file():
@@ -140,9 +143,9 @@ def test_valite_conf_mod_file_funcs():
 
     sch = cs.files["net/sched/sch_qfq.c"]
     bts = cs.files["drivers/bluetooth/btsdio.c"]
-    assert sch["conf"] == bts["conf"]
-    assert sch["module"] == "sch_qfq"
-    assert bts["module"] == "btsdio"
+    assert sch.config_name == bts.config_name
+    assert sch.module_name == "sch_qfq"
+    assert bts.module_name == "btsdio"
 
     setup_manual([cs], utils.ARCHS, "CONFIG_NET_SCH_QFQ", "sch_qfq",
                  [["net/sched/sch_qfq.c", "qfq_change_class"]], [],
@@ -151,10 +154,10 @@ def test_valite_conf_mod_file_funcs():
 
     sch = cs.files["net/sched/sch_qfq.c"]
     bts = cs.files["drivers/bluetooth/btsdio.c"]
-    assert sch["conf"] == "CONFIG_NET_SCH_QFQ"
-    assert sch["module"] == "sch_qfq"
-    assert bts["conf"] == "CONFIG_BT_HCIBTSDIO"
-    assert bts["module"] == "btsdio"
+    assert sch.config_name == "CONFIG_NET_SCH_QFQ"
+    assert sch.module_name == "sch_qfq"
+    assert bts.config_name == "CONFIG_BT_HCIBTSDIO"
+    assert bts.module_name == "btsdio"
 
 
 def test_symbol_with_noinstr(caplog):

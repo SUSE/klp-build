@@ -11,6 +11,7 @@ from collections import defaultdict
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.file2config import find_file_config
+from klpbuild.klplib.affected_file import AffectedFile, AffectedModule
 from klpbuild.klplib.ksrc import get_patches_files
 
 
@@ -53,8 +54,12 @@ def __analyse_cs_files(cs, files):
         conf, obj = find_file_config(cs, file)
         funcs = __extract_functions(diffs)
         if conf:
-            cs.files[file] = {'symbols': list(funcs),
-                              'conf': conf, 'module': obj}
+            cs.files[file] = AffectedFile(
+                    file,
+                    config_name=conf,
+                    module_name=obj,
+                    affected_symbols=set(funcs),
+                )
             key = f"{file}:{conf}:{obj}:{sorted(funcs)}"
         else:
             key = f"{file}:::"
@@ -116,11 +121,10 @@ def print_files(report):
             logging.info("%s:\nFILE: %s\n", cs_str, file)
             continue
 
-        conf = cs.files[file]['conf']
-        obj = cs.files[file]['module']
-        funcs = cs.files[file]['symbols']
+        fdata = cs.files[file]
         logging.info("%s:\nFILE: %s\nCONF: %s\nOBJ: %s\nFUNCS: %s\n",
-                     cs_str, file, conf, obj, ', '.join(funcs))
+                     cs_str, file, fdata.config_name, fdata.module_name,
+                     ', '.join(sorted(fdata.affected_symbols)))
 
 
 def analyse_configs(cs_list):
@@ -138,7 +142,7 @@ def analyse_configs(cs_list):
     report = defaultdict(list)
 
     for cs in cs_list:
-        configs = {dat['conf'] for _, dat in cs.files.items()}
+        configs = {f.config_name for f in cs.files.values()}
         cs.set_configs(configs)
         for conf, archs in cs.configs.items():
             key = f"{conf}:{archs}"
@@ -148,19 +152,15 @@ def analyse_configs(cs_list):
     return report
 
 
-def __get_arch_config(conf, arch):
-    return conf[arch] if arch in conf else 'n'
-
-
 def print_configs(report):
 
     for key, cs_list in report.items():
         cs = cs_list[0]
         c = key.split(':')[0]
-        conf = cs.configs[c]
-        x86_64 = __get_arch_config(conf, "x86_64")
-        ppc64le = __get_arch_config(conf, "ppc64le")
-        s390x = __get_arch_config(conf, "s390x")
+        cfg = cs.configs[c]
+        x86_64 = cfg.get_arch("x86_64").value
+        ppc64le = cfg.get_arch("ppc64le").value
+        s390x = cfg.get_arch("s390x").value
         cs_str = utils.classify_codestreams_str(cs_list)
         logging.info("%s:\nCONF: %s\nx86_64: %s\nppc64le: %s\ns390x: %s\n",
                      cs_str, c, x86_64, ppc64le, s390x)
@@ -175,7 +175,7 @@ def filter_unset_configs(cs_list):
         if not cs.configs:
             continue
 
-        isset = [conf for conf, archs in cs.configs.items() if archs]
+        isset = [conf for conf, cfg in cs.configs.items() if cfg.is_set()]
         if not isset:
             unset_cs.append(cs)
             unset_conf += list(cs.configs)
@@ -201,24 +201,32 @@ def analyse_kmodules(cs_list):
     report = defaultdict(list)
 
     for cs in cs_list:
-        for _, dat in cs.files.items():
-            conf = dat['conf']
-            mod = dat['module']
-            if mod in cs.modules:
+        # Per-codestream local dedup. Previously this scribbled bool flags into
+        # cs.modules and patch.filter_unsupported_kmodules called .clear()
+        # afterwards; with AffectedModule the supported / blacklisted fields
+        # live on the persistent module object, so dedup needs its own scratch
+        # set to avoid touching cs.modules until we have a real result.
+        seen: set[str] = set()
+        for f in cs.files.values():
+            mod_name = f.module_name
+            if mod_name in seen:
+                continue
+            seen.add(mod_name)
+
+            # Check if it's built as a module on at least one arch
+            if not cs.configs[f.config_name].is_module_on_any():
                 continue
 
-            # Check if it's not built-in for any arch
-            if 'm' not in [val for _, val in
-                           cs.configs[conf].items()]:
-                continue
-
-            supported, blacklisted = cs.is_module_supported(mod)
+            supported, blacklisted = cs.is_module_supported(mod_name)
             if blacklisted:
                 logging.warning("%s: Module '%s' is not supported by klp-build.",
-                                cs.full_cs_name(), PurePosixPath(mod).name)
+                                cs.full_cs_name(), PurePosixPath(mod_name).name)
 
-            cs.modules[mod] = supported
-            key = f"{mod}:{supported}"
+            mod_obj = cs.modules.setdefault(mod_name, AffectedModule(mod_name))
+            mod_obj.supported = supported
+            mod_obj.blacklisted = blacklisted
+
+            key = f"{mod_name}:{supported}"
             if cs not in report[key]:
                 report[key].append(cs)
 
@@ -230,7 +238,7 @@ def print_kmodules(report):
     for key, cs_list in report.items():
         cs = cs_list[0]
         m = key.split(':')[0]
-        supported = cs.modules[m]
+        supported = cs.modules[m].supported
         cs_str = utils.classify_codestreams_str(cs_list)
         logging.info("%s:\nMOD: %s\nSupported: %s\n",
                      cs_str, m, supported)
@@ -244,12 +252,17 @@ def filter_unsupported_kmodules(cs_list):
         if not cs.modules:
             continue
 
-        supported = [s for _, s in cs.modules.items() if s]
-        if not supported:
+        # A module is "supported" iff its klp-build supportedness flag is True
+        # (None / False are not).
+        if not any(m.supported for m in cs.modules.values()):
             unset_cs.append(cs)
 
-        # Cleanup for future re-use
-        cs.modules.clear()
+        # NOTE: previously cs.modules.clear() was called here to wipe the
+        # supportedness bools so the path-cache repopulation in
+        # setup.__setup_check_mod could reuse the dict. With AffectedModule the
+        # supported/blacklisted flags and the per-arch obj-path cache are
+        # independent fields on the same object, so the wipe is no longer
+        # needed - and would in fact destroy state we want to keep.
 
     for cs in unset_cs:
         cs_list.remove(cs)
