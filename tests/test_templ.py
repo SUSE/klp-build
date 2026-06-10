@@ -22,6 +22,7 @@ def test_templ_with_externalized_vars():
     cs = "15.5u25"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
@@ -71,6 +72,7 @@ def test_templ_without_externalized_vars():
     cs = "15.5u25"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
@@ -123,6 +125,7 @@ def test_is_enabled_only_on_cs_arcs():
     cs = "6.0u11"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
@@ -159,6 +162,7 @@ def test_is_enabled_only_on_x86():
     cs = "15.7u5"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
@@ -189,6 +193,7 @@ def test_check_header_file_included():
     cs = "15.5u25"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
@@ -222,6 +227,7 @@ def test_templ_cve_specified():
     cs = "15.5u30"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": False,
@@ -248,6 +254,7 @@ def test_templ_exts_mod_name():
     cs = "15.4u45"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
@@ -290,6 +297,7 @@ def test_templ_micro_is_ibt():
     cs = "6.0u11"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
@@ -323,6 +331,7 @@ def test_templ_ibt_without_externalized_vars():
     cs = "6.0u11"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
@@ -376,6 +385,7 @@ def test_templ_kbuild_has_contents():
     cs = "6.0u11"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,

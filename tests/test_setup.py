@@ -51,6 +51,7 @@ def test_non_existent_file():
         lp = "bsc_" + inspect.currentframe().f_code.co_name
 
         setup_args = {
+            "cve" : None,
             "lp_name" : lp,
             "archs" : utils.ARCHS,
             "module" : "tun",
@@ -69,6 +70,7 @@ def test_non_existent_module():
         lp = "bsc_" + inspect.currentframe().f_code.co_name
 
         setup_args = {
+            "cve" : None,
             "lp_name" : lp,
             "archs" : utils.ARCHS,
             "module" : "tuna",
@@ -87,6 +89,7 @@ def test_invalid_sym(caplog):
         lp = "bsc_" + inspect.currentframe().f_code.co_name
 
         setup_args = {
+            "cve" : None,
             "lp_name" : lp,
             "archs" : utils.ARCHS,
             "module" : "tun",
@@ -109,6 +112,7 @@ def test_valid_micro_patchid():
     micro_data = {"lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": True}
 
     setup_args = {
+        "cve" : None,
         "lp_name" : lp,
         "archs" : utils.ARCHS,
         "module" : "tun",
@@ -163,6 +167,7 @@ def test_symbol_with_noinstr(caplog):
     for arch in ["x86_64", "ppc64le", "s390x"]:
         with pytest.raises(SystemExit):
             setup_args = {
+                "cve" : None,
                 "lp_name": lp,
                 "archs": [arch],
                 "module": "vmlinux",
@@ -185,6 +190,7 @@ def test_symbol_with_noinstr_ibt():
 
     lp_default_data = {"lp_filter": "16.0rtu1", "conf": "CONFIG_IO_URING", "no_check": True}
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "archs": ["x86_64"],
         "module": "vmlinux",

@@ -173,6 +173,7 @@ def test_compile_commands_enoent():
     cs = "15.6u16"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,
@@ -213,6 +214,7 @@ def test_detect_opt_clone(caplog):
     cs = "15.4u45"
 
     setup_args = {
+        "cve" : None,
         "lp_name": lp,
         "lp_filter": cs,
         "no_check": True,

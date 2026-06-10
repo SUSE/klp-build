@@ -28,6 +28,7 @@ def register_argparser(subparser):
     )
     add_arg_lp_name(args)
     add_arg_lp_filter(args)
+    args.add_argument("--cve", type=str, required=False, help="The CVE assigned to this livepatch")
     args.add_argument("--conf", type=str, required=False, help="The kernel CONFIG used to be build the livepatch")
     args.add_argument(
         "--no-check",
@@ -93,12 +94,12 @@ def register_argparser(subparser):
     )
 
 
-def run(lp_name, lp_filter, no_check, archs, conf, module, file_funcs,
+def run(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
         mod_file_funcs, conf_mod_file_funcs, full_checks, add_patches=None):
     if add_patches is None:
         add_patches = []
 
-    codestreams = setup_codestreams(lp_name, {"conf": conf,
+    codestreams = setup_codestreams(lp_name, {"cve": cve, "conf": conf,
                                               "lp_filter": lp_filter,
                                               "no_check": no_check,
                                               "archs": archs,
@@ -162,8 +163,6 @@ def setup_archs(codestreams):
 def setup_codestreams(lp_name, data):
     utils.validate_lp_name(lp_name)
 
-    cve = None
-
     # Called at this point because codestreams is populated
     if data["no_check"]:
         logging.info("Option --no-check was specified, checking all codestreams that are not filtered out...")
@@ -172,10 +171,13 @@ def setup_codestreams(lp_name, data):
         all_codestreams = get_supported_codestreams()
         codestreams = utils.filter_codestreams(data["lp_filter"], all_codestreams)
     else:
-        cve = bugzilla.get_bug_cve(bugzilla.get_bug(lp_name))
-        assert cve, f"Could not retrieve CVE from bugzilla for {lp_name}"
-        logging.info("CVE retrieved from bugzilla: %s", cve)
-        _, upstream, patched_cs, codestreams = scan(cve, data["conf"],
+        if not (cve := data["cve"]):
+            cve = bugzilla.get_bug_cve(bugzilla.get_bug(lp_name))
+            assert cve, f"Could not retrieve CVE from bugzilla for {lp_name}"
+            logging.info("CVE retrieved from bugzilla: %s", cve)
+            data["cve"] = cve
+
+        _, upstream, patched_cs, codestreams = scan(data["cve"], data["conf"],
                                                     data["lp_filter"], True,
                                                     data["archs"],
                                                     utils.get_workdir(lp_name),
@@ -187,7 +189,8 @@ def setup_codestreams(lp_name, data):
     old_patched_cs = get_codestreams_data('patched_cs')
     new_patched_cs = natsorted(list(set(old_patched_cs + patched_cs)))
 
-    set_codestreams_data(upstream=upstream, patched_cs=new_patched_cs, cve=cve)
+    set_codestreams_data(upstream=upstream, patched_cs=new_patched_cs,
+                         cve=data['cve'])
     return codestreams
 
 
