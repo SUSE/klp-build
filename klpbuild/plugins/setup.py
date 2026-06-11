@@ -238,8 +238,9 @@ def setup_project_files(lp_name, codestreams, full_checks):
             __symbol_check(cs, mod, set(mod_info["syms"]), set(mod_info["archs"]), full_checks)
 
         if not cs.files:
-            raise RuntimeError(f"{cs.full_cs_name()} ({cs.kernel}):"
-                               " No files eligible to be livepatched. Aborting.")
+            logging.error(f"%s (%s): No files eligible to be livepatched.", cs.full_cs_name(), cs.kernel)
+            logging.error(f"Try using --file-funcs to specify the affected file and function.")
+            exit(1)
 
     store_codestreams(lp_name, codestreams)
     logging.info("Done. Setup finished.")
