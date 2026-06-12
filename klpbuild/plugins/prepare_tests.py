@@ -75,7 +75,7 @@ def download_built_rpms(lp_name, lp_filter):
     logging.info("Download finished.")
 
 
-def prepare_tests(lp_name, lp_filter):
+def run(lp_name, lp_filter):
     test_src = get_tests_path(lp_name)
     if test_src and not os.access(test_src, os.X_OK):
         logging.error("Script %s has no execution bit set. Aborting", test_src)
@@ -153,7 +153,3 @@ def prepare_tests(lp_name, lp_filter):
         )
 
         logging.info("Done.")
-
-
-def run(lp_name, lp_filter):
-    prepare_tests(lp_name, lp_filter)
