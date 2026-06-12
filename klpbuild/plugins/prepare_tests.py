@@ -114,15 +114,12 @@ def prepare_tests(lp_name, lp_filter):
                 logging.info("%s/%s: rpm dir not found. Skipping.", cs.full_cs_name(), arch)
                 continue
 
-            # TODO: there will be only one rpm, format it directly
+            rpms = list(rpm_dir.glob("**/*.rpm"))
+            assert len(rpms) == 1, f"{cs.full_cs_name()}/{arch}: {len(rpms)} rpms found. Expecting only one"
 
-            rpms = [rpm for rpm in os.listdir(rpm_dir) if rpm.endswith(".rpm")]
-            if len(rpms) > 1:
-                raise RuntimeError(f"ERROR: {cs.full_cs_name()}/{arch}. {len(rpms)} rpms found. Excepting to find only one")
-
-            for rpm in rpms:
-                validate_livepatch_module(cs, arch, rpm_dir, rpm)
-                shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, "built"))
+            rpm_file = rpms[0]
+            validate_livepatch_module(cs, arch, rpm_dir, rpm_file)
+            shutil.copy(Path(rpm_dir, rpm_file), Path(test_arch_path, "built"))
 
             if cs.rt and arch != "x86_64":
                 continue
