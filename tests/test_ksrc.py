@@ -9,19 +9,16 @@ from klpbuild.klplib.ksrc import (get_patches, get_patches_files,
 
 def test_get_patches_files():
     patch = ["patches.suse/net-fix-__dst_negative_advice-race.patch"]
-    expected = {'include/net/dst_ops.h': [],
-                'include/net/sock.h': ['__dst_negative_advice'],
-                'net/ipv4/route.c': ['ipv4_negative_advice'],
-                'net/ipv6/route.c': ['ip6_negative_advice'],
-                'net/xfrm/xfrm_policy.c': ['xfrm_negative_advice']}
+    expected = {'include/net/dst_ops.h': '',
+                'include/net/sock.h': '__dst_negative_advice',
+                'net/ipv4/route.c': 'ipv4_negative_advice',
+                'net/ipv6/route.c': 'ip6_negative_advice',
+                'net/xfrm/xfrm_policy.c': 'xfrm_negative_advice'}
 
     files = get_patches_files(patch, "SLE15-SP6-LTSS")
-    assert len(files) == len(expected)
-    for file, funcs in files.items():
-        assert file in expected
-        if expected[file]:
-            assert set(expected[file]) & funcs
-
+    assert set(files.keys()) == set(expected.keys())
+    for f, diffs in files.items():
+        assert len(diffs[0]) and expected[f] in diffs[0]
 
 def test_get_patch_subject():
     expected = "tcp/dccp: Don't use timer_pending() in reqsk_queue_unlink()."

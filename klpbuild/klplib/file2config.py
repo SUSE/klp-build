@@ -102,7 +102,37 @@ def _find_config(cs, base_dir, relative_obj_path, deep):
     return None, ""
 
 
-def find_configs_for_files(cs, file_paths: list):
+def find_file_config(cs, path):
+    path = path.strip()
+
+    # Do not check headers
+    if path.endswith('h'):
+        return '', ''
+
+    valid_path = _filter_path(path)
+    obj_file = Path(valid_path.replace('.c', '.o'))
+    config, obj = _find_config(cs, obj_file.parent, obj_file.name, 0)
+    if not config:
+        return '', ''
+
+    # Detect code that is only enabled on a specific architecture.
+    # Use a per-architecture generic CONFIG only if the found CONFIG
+    # does not affect the same architecture as the one indicated in
+    # the given file path.
+    elif path.startswith("arch"):
+        archs = cs.get_all_configs(config)
+        arch = _get_arch_in_path(path)
+        if arch and (len(archs) != 1 or not archs.get(arch)):
+            return archs_config[arch]['conf'], archs_config[arch]['module']
+
+    elif not config.startswith('CONFIG_'):
+        # Garbage like 'subst', 'vds' for wrongly parsed input
+        return '', ''
+
+    return config, obj
+
+
+def find_files_config(cs, file_paths: list):
 
     configs = {}
     missing = []
@@ -111,29 +141,10 @@ def find_configs_for_files(cs, file_paths: list):
         return configs, missing
 
     for path in file_paths:
-        path = path.strip()
-        # Do not check headers
-        if path.endswith('h'):
-            continue
-
-        valid_path = _filter_path(path)
-        obj_file = Path(valid_path.replace('.c', '.o'))
-        config, obj = _find_config(cs, obj_file.parent, obj_file.name, 0)
-        if not config:
-            missing.append(path)
-
-        # Detect code that is only enabled on a specific architecture.
-        # Use a per-architecture generic CONFIG only if the found CONFIG
-        # does not affect the same architecture as the one indicated in
-        # the given file path.
-        elif path.startswith("arch"):
-            archs = cs.get_all_configs(config)
-            arch = _get_arch_in_path(path)
-            if arch and (len(archs) != 1 or not archs.get(arch)):
-                configs[path] = archs_config[arch]
-
-        elif config.startswith('CONFIG_'):
+        config, obj = find_file_config(cs, path)
+        if config:
             configs[path] = {'conf': config, 'module': obj}
-        # else there is garbage like 'subst', 'vds' for wrongly parsed input
+        else:
+            missing.append(path)
 
     return configs, missing

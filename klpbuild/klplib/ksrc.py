@@ -140,15 +140,14 @@ def __get_patch_files(patch, branch):
 
 def get_patches_files(patches, branch):
     """
-    Get the kernel files and functions that have been modified by the given
-    list of patches.
+    Return the files modified by the given list of patches.
 
     Args:
         patches (list): Input list of patches to analyse.
         branch (str): Branch where to locate the given patches.
 
     returns:
-        List: Return the files and functions modified by the given patches.
+        List: Return the files and their corresponding patch changes.
     """
 
     files = {}
@@ -156,14 +155,12 @@ def get_patches_files(patches, branch):
         kernel_commit = get_patch_kernel_commit(p, branch)
         for f in __get_patch_files(p, branch):
             if f not in files:
-                files[f] = set()
+                files[f] = []
             if not kernel_commit:
                 continue
 
             raw = get_commit_body(kernel_commit, f)
-            # Get the modified functions' name
-            funcs = re.findall(r"\s*(\w+)\s*\([^(]*\)\n\+*\s*{\n", raw)
-            files[f].update(set(funcs))
+            files[f].append(raw)
 
     return files
 
