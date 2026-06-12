@@ -25,7 +25,7 @@ PLUGIN_CMD = "prepare-tests"
 def register_argparser(subparser):
     test = subparser.add_parser(
         PLUGIN_CMD,
-        help="Download the built tests and check for LP dependencies",
+        help="Download the built livepatch packages",
     )
 
     add_arg_lp_name(test)
@@ -121,9 +121,7 @@ def prepare_tests(lp_name, lp_filter):
                 raise RuntimeError(f"ERROR: {cs.full_cs_name()}/{arch}. {len(rpms)} rpms found. Excepting to find only one")
 
             for rpm in rpms:
-                # Check for dependencies
                 validate_livepatch_module(cs, arch, rpm_dir, rpm)
-
                 shutil.copy(Path(rpm_dir, rpm), Path(test_arch_path, "built"))
 
             if cs.rt and arch != "x86_64":
