@@ -453,13 +453,17 @@ def test_lp_out_cleanup_removes_unsupported_macros(tmp_path):
     """#define lines for UNSUPPORTED_MACROS are removed."""
     lp_out = _make_lp_out(
         tmp_path,
-        "#define __KERNEL__\n#define MODULE\n#define KBUILD_MODNAME foo\n",
+        "#define __KERNEL__\n"
+        "#define MODULE\n"
+        "#define KBUILD_MODNAME foo\n"
+        "#define __seg_gs",
     )
     lp_out_cleanup(Codestream("15.4u0"), {"ext_symbols": {}}, lp_out, tmp_path)
     content = lp_out.read_text()
     assert "#define __KERNEL__" not in content
     assert "#define MODULE" not in content
     assert "#define KBUILD_MODNAME" not in content
+    assert "#define __seg_gs" not in content
 
 
 def test_lp_out_cleanup_removes_init_exit_attributes(tmp_path):
