@@ -32,7 +32,8 @@ UNSUPPORTED_MACROS = [
         "__KERNEL__",
         "MODULE",
         "KBUILD_MODNAME",
-        r"__has_attribute\("
+        r"__has_attribute\(",
+        "__seg_gs"
         ]
 
 def register_argparser(subparser):
