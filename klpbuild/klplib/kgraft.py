@@ -47,8 +47,9 @@ def fetch_branch(branch, remote="origin"):
 
 def rebase_lp_branch(branch, new_base, remote="origin"):
     new_base = f"{remote}/{new_base}"
+    base_branch = f"{branch}~1"
     subprocess.check_output(
-            ["git", "rebase", new_base, branch],
+            ["git", "rebase", "--onto", new_base, base_branch, branch],
             stderr=subprocess.STDOUT, cwd=get_kgraft()
             )
 
