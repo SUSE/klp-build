@@ -23,7 +23,7 @@ from osctiny import Osc
 
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.config import get_user_settings
-from klpbuild.klplib.utils import ARCH, get_all_symbols_from_object, get_datadir
+from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir
 
 logging.getLogger("osctiny").setLevel(logging.WARNING)
 
@@ -65,7 +65,7 @@ def do_work(func, args: list[RPMData]):
 # We can try delete a project that was removed, so don't bother with errors
 def delete_built_rpms(cs, lp_name):
     try:
-        for arch in cs.archs:
+        for arch in ARCHS:
             shutil.rmtree(Path(cs.get_ccp_dir(lp_name), arch, "rpm"), ignore_errors=True)
     except KeyError:
         pass
