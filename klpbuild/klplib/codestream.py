@@ -61,6 +61,9 @@ class Codestream:
 
     @classmethod
     def from_data(cls, data):
+        data.setdefault("eol", "")
+        data.setdefault("required_patches", None)
+
         return cls(data["name"], data["project"], data["patchid"],
                    data["kernel"], data["eol"], data["archs"], data["files"],
                    data["modules"], data["configs"], data["required_patches"])
