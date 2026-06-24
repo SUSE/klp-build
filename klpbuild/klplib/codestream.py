@@ -437,6 +437,9 @@ class Codestream:
         return Path(obj_match.group(1))
 
     def __search_obj_in_dir(self, fdir, fname):
+        # If no suffix in fname, we'll get a false assert
+        if not fname.endswith(".ko"):
+            fname += ".ko"
         file_path = list(fdir.glob(f"{fname}.*"))
 
         # The given file doesn't have an extension, so try again without it
