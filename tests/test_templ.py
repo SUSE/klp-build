@@ -19,7 +19,7 @@ _generate_klpp_header = templ_module.__dict__["__generate_klpp_header"]
 
 def test_templ_with_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u25"
+    cs = "15.5u40"
 
     setup_args = {
         "cve" : None,
@@ -69,7 +69,7 @@ def test_templ_with_externalized_vars():
 
 def test_templ_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u25"
+    cs = "15.5u40"
 
     setup_args = {
         "cve" : None,
@@ -190,7 +190,7 @@ def test_is_enabled_only_on_x86():
 # bscXXXXXXX.
 def test_check_header_file_included():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "15.5u25"
+    cs = "15.5u40"
 
     setup_args = {
         "cve" : None,

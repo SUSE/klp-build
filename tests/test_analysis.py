@@ -6,7 +6,7 @@
 import logging
 
 from klpbuild.klplib.codestream import Codestream
-from klpbuild.klplib.kernel_tree import get_commit_body
+from klpbuild.klplib.kernel import get_commit_body
 from klpbuild.klplib.analysis import (
     __extract_functions,
     __get_arch_config,

@@ -16,14 +16,17 @@ from collections import OrderedDict
 from pathlib import Path
 from pathlib import PurePath
 from threading import Lock
-from filelock import FileLock
-
 from natsort import natsorted
 
 from klpbuild.klplib import utils
+from klpbuild.klplib.utils import data_lock
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_list
 from klpbuild.klplib.config import get_user_settings
+from klpbuild.klplib.kernel import (
+    get_lp_branch_path, get_kernel_tag_path,
+    abort_patch, create_lp_branch, delete_lp_branch, apply_patch,
+)
 from klpbuild.klplib.templ import generate_livepatches
 
 PLUGIN_CMD = "extract"
@@ -146,8 +149,13 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         else:
             raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
 
+        # Use -C/O= to point make at the source tree directly, bypassing
+        # the obj dir wrapper Makefile that hardcodes a relative include
+        # path to the (not present) RPM-installed source.
         make_args = [
             "make",
+            "-C", str(sdir),
+            f"O={odir}",
             "-sn",
             "--ignore-errors",
             f"CC={cc}",
@@ -167,7 +175,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         ofname = Path(filename.parent, ofname)
 
         try:
-            completed = subprocess.check_output(make_args, cwd=odir,
+            completed = subprocess.check_output(make_args,
                                                 stderr=f).decode().strip()
             f.write("Full output of the make command:\n")
             f.write(str(completed))
@@ -354,7 +362,7 @@ def get_klpp_symbols(out_dir, lp_out):
     return klpp_syms
 
 
-def get_cmd_from_json(cs, fname):
+def get_cmd_from_json(cs, fname, sdir):
     cc_file = cs.get_obj_dir()/"compile_commands.json"
 
     # Older codestreams doens't support compile_commands.json, so use make for them
@@ -369,10 +377,9 @@ def get_cmd_from_json(cs, fname):
             output = d["command"]
             # The arguments found on the file point to '..', since they are generated
             # when the kernel is compiled. Replace the first '..' on each file
-            # path by the codestream kernel source directory since klp-ccp needs to
-            # reach the files.
+            # path by the source directory since klp-ccp needs to reach the files.
             cmd = process_make_output(output)
-            return cmd.replace(" ..", f" {str(cs.get_src_dir())}").replace("-I..", f"-I{str(cs.get_src_dir())}")
+            return cmd.replace(" ..", f" {str(sdir)}").replace("-I..", f"-I{str(sdir)}")
 
     raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
 
@@ -389,6 +396,54 @@ def print_env_vars(fhandle, env):
 
 def get_patches_dir(lp_name):
     return utils.get_workdir(lp_name)/"fixes"
+
+
+def remove_patches(lp_name, cs):
+    '''
+    Remove any leftovers from previous operations.
+    '''
+    abort_patch()
+    delete_lp_branch(lp_name, cs)
+
+
+def apply_all_patches(lp_name, cs):
+    create_lp_branch(lp_name, cs)
+
+    dirs = cs.get_candidate_patches_dirs()
+    available_patch_dirs = [Path(get_patches_dir(lp_name))/d for d in dirs]
+
+    # Pick the first directory in available_patch_dirs that exists
+    patch_dir = None
+    while available_patch_dirs:
+        candidate_patch_dir = available_patch_dirs.pop(0)
+        if candidate_patch_dir.exists():
+            patch_dir = candidate_patch_dir
+            break
+    assert patch_dir, "Couldn't find a patch directory"
+
+    # Get the patches that need to be applied for the current codestream
+    required_patches = set(cs.get_required_patches())
+
+    logging.info("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, patch_dir)
+    # Here for the ordering we rely on the patches being previouly renamed with a prefix
+    for patch in sorted(patch_dir.iterdir()):
+        if not str(patch).endswith(".patch"):
+            continue
+
+        # Skip if the patch is not required for the current codestream
+        patch_name = patch.name.split("-",1)[1] # Drop the prefix from the patch
+        if patch_name not in required_patches:
+            logging.info("\tDropping %s", patch_name)
+            continue
+
+        logging.info("\tApplying %s", patch_name)
+        if not apply_patch(str(patch)):
+            raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): "
+                f"Failed to apply patch {patch_name}. Aborting")
+
+        required_patches.discard(patch_name)
+
+    assert not required_patches, "Some required patches have not been applied"
 
 
 # Get the code for each codestream, removing boilerplate code
@@ -463,127 +518,7 @@ def group_equal_files(lp_name, working_cs):
         logging.info("\t%s", group)
 
 
-def get_lp_branch(lp_name, cs):
-    return lp_name + "_" + cs.full_cs_name()
-
-
-def remove_patches(lp_name, cs):
-    '''
-    Remove any leftovers from previous operations.
-    '''
-
-    sdir = cs.get_src_dir()
-
-    # Abort any pending git-am from previous extractions.
-    subprocess.run(["git", "am", "--abort"],
-                   stdout=subprocess.DEVNULL,
-                   stderr=subprocess.DEVNULL,
-                   cwd=sdir, check=False)
-
-    # Switch to the original kernel branch. Even if that requires
-    # dropping any local changes.
-    err = subprocess.run(["git", "checkout", "-f", f"rpm-{cs.kernel}"],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         cwd=sdir, check=False)
-    if err.returncode != 0:
-        raise RuntimeError(f"Failed to switch to rpm-{cs.kernel} branch. Aborting\n")
-
-    # Delete any branch related to this livepatch.
-    # We need to start in a clean state.
-    bname = get_lp_branch(lp_name, cs)
-    err = subprocess.run(["git", "branch", "-D", f"{bname}"], cwd=sdir,
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.PIPE, check=False)
-    if err.returncode != 0 and f"'{bname}' not found" not in str(err.stderr):
-        raise RuntimeError(f"Failed to delete branch {bname}:\n{err.stderr}\n")
-
-
-def apply_patch(patch, sdir):
-    # Try to apply the patch first with git-am.
-    # Beware that git-am will not work in all cases,
-    # as it is more strict than patch(1).
-    err = subprocess.run(["git", "am", patch],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         cwd=sdir, check=False)
-    if err.returncode == 0:
-        return True
-
-    # Failed to apply the patch with git-am, so now we are in
-    # a conflict state. Fallback to patch(1) and hope for the best!
-    # If patch(1) resolved the conflict, commit the changes and continue
-    # with git-am. Otherwise, exit so that the user can manually fix it.
-    err = subprocess.run(["patch", "-s", "-f", "-p1", "-i", patch],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         cwd=sdir, check=False)
-    if err.returncode != 0:
-        return False
-
-    subprocess.run(["git", "add", "."],
-                   stdout=subprocess.DEVNULL,
-                   stderr=subprocess.DEVNULL,
-                   cwd=sdir, check=False)
-
-    subprocess.run(["git", "am", "--continue"],
-                   stdout=subprocess.DEVNULL,
-                   stderr=subprocess.DEVNULL,
-                   cwd=sdir, check=False)
-
-    return True
-
-
-def apply_all_patches(lp_name, cs):
-    sdir = cs.get_src_dir()
-    bname = get_lp_branch(lp_name, cs)
-    err = subprocess.run(["git", "checkout", "-B", bname],
-                         cwd=sdir,
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         check=False)
-    if err.returncode != 0:
-        raise RuntimeError(f"Failed to create branch {bname}. Aborting")
-
-    dirs = cs.get_candidate_patches_dirs()
-    available_patch_dirs = [Path(get_patches_dir(lp_name))/d for d in dirs]
-
-    # Pick the first directory in available_patch_dirs that exists
-    patch_dir = None
-    while available_patch_dirs:
-        candidate_patch_dir = available_patch_dirs.pop(0)
-        if candidate_patch_dir.exists():
-            patch_dir = candidate_patch_dir
-            break
-    assert patch_dir, "Couldn't find a patch directory"
-
-    # Get the patches that need to be applied for the current codestream
-    required_patches = set(cs.get_required_patches())
-
-    logging.info("Applying patches on %s(%s) from %s", cs.full_cs_name(), cs.kernel, patch_dir)
-    # Here for the ordering we rely on the patches being previouly renamed with a prefix
-    for patch in sorted(patch_dir.iterdir()):
-        if not str(patch).endswith(".patch"):
-            continue
-
-        # Skip if the patch is not required for the current codestream
-        patch_name = patch.name.split("-",1)[1] # Drop the prefix from the patch
-        if patch_name not in required_patches:
-            logging.info("\tDropping %s", patch_name)
-            continue
-
-        logging.info("\tApplying %s", patch_name)
-        if not apply_patch(str(patch), sdir):
-            raise RuntimeError(f"{cs.full_cs_name()}({cs.kernel}): "
-                f"Failed to apply patch {patch_name}. Aborting\n"
-                f"For more information go to: {sdir}")
-
-        required_patches.discard(patch_name)
-
-    assert not required_patches, "Some required patches have not been applied"
-
-
-def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
+def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir):
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
     funcs = ",".join(fdata["symbols"])
@@ -638,7 +573,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext):
     env["KCP_MOD_SYMVERS"] = str(Path(cs.get_boot_dir(), f'{cs.get_boot_filename("symvers")}.gz'))
     env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
     env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(utils.preferred_arch([cs]))/cs.get_mod(obj))
-    env["KCP_KBUILD_SDIR"] = str(cs.get_src_dir())
+    env["KCP_KBUILD_SDIR"] = str(sdir)
     env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
     env["KCP_WORK_DIR"] = str(out_dir)
     env["KCP_READELF"] = "readelf"
@@ -731,11 +666,15 @@ def parse_ccp_warnings(f, start_pos, cs, fname):
                 handler(match, cs, fname)
 
 
-def process(lp_name, total, args, avoid_ext):
+def process(lp_name, total, args, avoid_ext, no_patches):
     i, make_lock, fname, cs, fdata = args
 
-    sdir = cs.get_src_dir()
     odir = cs.get_obj_dir()
+
+    if not no_patches and cs.needs_patches():
+        sdir = get_lp_branch_path(lp_name, cs)
+    else:
+        sdir = get_kernel_tag_path(cs.kernel)
 
     # The header text has two tabs
     cs_info = cs.full_cs_name().ljust(15, " ")
@@ -746,18 +685,15 @@ def process(lp_name, total, args, avoid_ext):
     out_dir = cs.get_ccp_work_dir(lp_name, fname)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # create symlink to the respective codestream file
-    os.symlink(Path(sdir, fname), Path(out_dir, Path(fname).name))
-
     # Make can regenerate fixdep for each file being processed per
     # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
     # calls. Make is pretty fast, so there isn't a real slow down here.
-    cmd = get_cmd_from_json(cs, fname)
+    cmd = get_cmd_from_json(cs, fname, sdir)
     if not cmd:
         with make_lock:
             cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
-    args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext)
+    args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir)
 
     # Detect and set ibt information. It will be used in the TemplateGen
     if '-fcf-protection' in cmd or cs.needs_ibt():
@@ -817,9 +753,7 @@ def lp_out_cleanup(cs, lp_dat, lp_out, sdir):
 
 
 def extract(lp_name, lp_filter, no_patches, avoid_ext):
-    sdir_lock = FileLock(utils.get_datadir()/utils.ARCH/"sdir.lock")
-
-    with sdir_lock:
+    with data_lock():
         start_extract(lp_name, lp_filter, no_patches, avoid_ext)
 
 
@@ -858,7 +792,7 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
     with ThreadPoolExecutor(max_workers=workers) as executor:
         try:
             futures = executor.map(process, repeat(lp_name), repeat(len(args)),
-                                   args, repeat(avoid_ext))
+                                   args, repeat(avoid_ext), repeat(no_patches))
             for future in futures:
                 if future:
                     logging.error(future)

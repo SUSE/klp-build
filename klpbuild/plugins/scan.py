@@ -47,6 +47,7 @@ def register_argparser(subparser):
 
 
 def run(cve, conf, lp_filter, download):
+
     if not cve:
         scan_bugzilla()
         return

@@ -3,6 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
+import fcntl
 import gzip
 import io
 import logging
@@ -10,6 +11,7 @@ import lzma
 import os
 import platform
 import re
+from contextlib import contextmanager
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -441,6 +443,20 @@ def get_datadir(arch=""):
         assert arch in ARCHS
     data_dir = get_user_path('data_dir')
     return data_dir/arch if arch else data_dir
+
+
+@contextmanager
+def data_lock(writer=False):
+    """
+    Lock access to the data directory.
+
+    Callers can decide to simultaneously allow multiple holders (readers),
+    or just one holder (writer).
+    """
+    lock_path = get_user_path('data_dir') / 'data.lock'
+    with open(lock_path, 'a') as f:
+        fcntl.flock(f, fcntl.LOCK_EX if writer else fcntl.LOCK_SH)
+        yield
 
 
 def get_tests_path(lp_name):
