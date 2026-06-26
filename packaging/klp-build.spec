@@ -13,7 +13,7 @@
 # published by the Open Source Initiative.
 
 Name:           klp-build
-Version:        2.0.0
+Version:        2.0.1
 Release:        0
 Summary:        The SUSE kernel livepatching creation tool
 License:        GPL-2.0-only
