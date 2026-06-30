@@ -13,12 +13,9 @@ import logging
 from pathlib import Path, PurePath
 from importlib import resources
 
-from pathlib import Path, PurePath
-from importlib import resources
-
-from klpbuild.klplib.config import get_user_path
+from klpbuild.klplib.affected_file import AffectedConfig, AffectedFile, AffectedModule, ConfigState
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
-from klpbuild.klplib.utils import ARCH, get_workdir, is_mod, get_elf_object, get_datadir, preferred_arch
+from klpbuild.klplib.utils import ARCH, get_workdir, get_elf_object, get_datadir, preferred_arch
 from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
 from klpbuild.klplib.ksrc import KERNEL_BRANCHES
 
@@ -52,11 +49,69 @@ class Codestream:
         self.eol = eol
 
         self.archs = set(archs) if archs is not None else self.get_default_archs()
-        self.files = files if files is not None else {}
-        self.modules = modules if modules is not None else {}
-        self.configs = configs if configs is not None else {}
+        self.files = self.__build_files(files)
+        self.modules = self.__build_modules(modules)
+        self.configs = self.__build_configs(configs)
 
         self.required_patches = required_patches if required_patches is not None else []
+
+    @staticmethod
+    def __build_configs(configs):
+        """
+        Normalise the ``configs`` constructor argument to ``dict[str, AffectedConfig]``.
+
+        Accepts ``None``, a ``dict[str, AffectedConfig]`` (passed through as-is),
+        or the JSON shape ``dict[str, dict[arch, 'y'|'m']]`` produced by
+        :meth:`AffectedConfig.to_dict` (for round-tripping through ``to_data``
+        / ``from_data``).
+        """
+        if not configs:
+            return {}
+        out = {}
+        for name, value in configs.items():
+            if isinstance(value, AffectedConfig):
+                out[name] = value
+            else:
+                out[name] = AffectedConfig.from_dict(name, value)
+        return out
+
+    @staticmethod
+    def __build_files(files):
+        """
+        Normalise the ``files`` constructor argument to ``dict[str, AffectedFile]``.
+
+        Accepts ``None``, a ``dict[str, AffectedFile]`` (passed through as-is),
+        or the JSON shape produced by :meth:`AffectedFile.to_dict` (for
+        round-tripping through ``to_data`` / ``from_data``).
+        """
+        if not files:
+            return {}
+        out = {}
+        for name, value in files.items():
+            if isinstance(value, AffectedFile):
+                out[name] = value
+            else:
+                out[name] = AffectedFile.from_dict(name, value)
+        return out
+
+    @staticmethod
+    def __build_modules(modules):
+        """
+        Normalise the ``modules`` constructor argument to ``dict[str, AffectedModule]``.
+
+        Accepts ``None``, a ``dict[str, AffectedModule]`` (passed through as-is),
+        or the JSON shape produced by :meth:`AffectedModule.to_dict` (for
+        round-tripping through ``to_data`` / ``from_data``).
+        """
+        if not modules:
+            return {}
+        out = {}
+        for name, value in modules.items():
+            if isinstance(value, AffectedModule):
+                out[name] = value
+            else:
+                out[name] = AffectedModule.from_dict(name, value)
+        return out
 
 
     @classmethod
@@ -74,9 +129,9 @@ class Codestream:
                 "kernel" : self.kernel,
                 "eol" : self.eol,
                 "archs": list(self.archs),
-                "files" : self.files,
-                "modules" : self.modules,
-                "configs" : self.configs,
+                "files" : {n: f.to_dict() for n, f in self.files.items()},
+                "modules" : {n: m.to_dict() for n, m in self.modules.items()},
+                "configs" : {n: c.to_dict() for n, c in self.configs.items()},
                 "required_patches" : self.required_patches
                 }
 
@@ -218,7 +273,7 @@ class Codestream:
         return {"ppc64le", "s390x", "x86_64"}
 
     def set_files(self, files):
-        self.files = files
+        self.files = self.__build_files(files)
 
     def set_configs(self, configs):
         self.configs = {conf: self.get_all_configs(conf) for conf in configs}
@@ -366,20 +421,33 @@ class Codestream:
 
         return get_datadir(arch)/mod_path/"modules"/self.get_full_kernel_name()
 
-    # A codestream can be patching multiple objects, so get the path related to
-    # the module that we are interested
-    def get_mod(self, mod):
-        return self.modules[mod]
+    # A codestream can be patching multiple objects; look up the AffectedModule
+    # by its bare name (e.g. "vmlinux" or "fs/ext4/ext4").
+    def get_mod(self, mod_name):
+        return self.modules[mod_name]
 
 
     def get_file_mod(self, file, arch=None):
+        """
+        Resolve which kernel object the given file is patched into for ``arch``.
+
+        Returns an :class:`AffectedModule` (the codestream's vmlinux singleton
+        when the gating CONFIG is built-in on ``arch``, the designated
+        ``module_name`` entry otherwise). The returned instance is the same one
+        held in :attr:`modules`, so any subsequent path-cache or supportedness
+        updates persist on the codestream.
+        """
         fdat = self.files[file]
 
         if not arch:
             arch = preferred_arch([self])
 
-        conf_arch = self.configs[fdat["conf"]][arch]
-        return "vmlinux" if conf_arch == 'y' else fdat["module"]
+        cfg = self.configs[fdat.config_name]
+        if cfg.get_arch(arch) is ConfigState.BUILTIN:
+            return self.modules.setdefault(AffectedModule.VMLINUX,
+                                           AffectedModule.vmlinux())
+        return self.modules.setdefault(fdat.module_name,
+                                       AffectedModule(fdat.module_name))
 
 
     def is_module_supported(self, mod):
@@ -392,23 +460,25 @@ class Codestream:
 
     def get_all_configs(self, conf):
         """
-        Get the config value for all supported architectures of a codestream. If
-        the configuration is not set the return value will be an empty dict.
-        """
-        configs = {}
+        Get the config value for all supported architectures of a codestream.
 
+        Returns an :class:`AffectedConfig`. Architectures where the config is
+        unset (or absent from the kernel config) report as
+        :attr:`ConfigState.NOT_SET` via :meth:`AffectedConfig.get_arch`.
+        """
         if conf and not conf.startswith("CONFIG_"):
             logging.error("Invalid config '%s': Missing CONFIG_ prefix", conf)
             sys.exit(1)
 
+        cfg = AffectedConfig(conf)
         for arch in self.archs:
             kconf = self.get_config_content(arch)
 
             match = re.search(rf"{conf}=([ym])", kconf)
             if match:
-                configs[arch] = match.group(1)
+                cfg.set_arch(arch, ConfigState(match.group(1)))
 
-        return configs
+        return cfg
 
     def get_mod_file_path(self, arch, mod):
         """
@@ -448,17 +518,24 @@ class Codestream:
         return file_path[0]
 
     def find_obj_path(self, arch, mod):
-        # Return the path if the modules was previously found for ARCH, or refetch if
-        # the obejct is for a different architecture
-        if is_mod(mod):
-            obj = self.modules.get(mod, "")
-            if obj:
-                assert self.kernel in str(obj)
-                return obj
+        """
+        Resolve the on-disk object path for ``mod`` (a bare module name, e.g.
+        ``"fs/ext4/ext4"`` or ``"vmlinux"``) on ``arch``, caching the result
+        per-arch on the corresponding :class:`AffectedModule` to avoid
+        re-scanning the filesystem on subsequent calls.
+        """
+        is_vmlinux = mod == AffectedModule.VMLINUX
+        mod_obj = self.modules.setdefault(
+            mod,
+            AffectedModule.vmlinux() if is_vmlinux else AffectedModule(mod),
+        )
 
-        # If the module cache failed or if mod is vmlinux, we need to find the
-        # path to the object
-        if not is_mod(mod):
+        cached = mod_obj.get_obj_path(arch)
+        if cached:
+            assert self.kernel in cached
+            return cached
+
+        if is_vmlinux:
             fpath = Path(self.get_boot_dir(arch), self.get_boot_filename("vmlinux"))
         else:
             fpath = Path(self.get_mod_path(arch), self.get_mod_file_path(arch, mod))
@@ -467,7 +544,9 @@ class Codestream:
 
         assert fmod.exists(), f"Module {str(fmod)} doesn't exists. Aborting"
 
-        return fmod.relative_to(get_datadir(arch))
+        resolved = fmod.relative_to(get_datadir(arch))
+        mod_obj.set_obj_path(arch, str(resolved))
+        return resolved
 
     def lp_out_file(self, lp_name, fname):
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
@@ -541,7 +620,7 @@ class Codestream:
         trace_addrs = []
 
         # Get the addresses of the traceable objects on vmlinux
-        if not is_mod(mod) and check_patchable:
+        if mod == AffectedModule.VMLINUX and check_patchable:
             trace_addrs = self.__get_trace_addresses(arch, elf_obj)
 
         symtab = elf_obj.get_section_by_name(".symtab")

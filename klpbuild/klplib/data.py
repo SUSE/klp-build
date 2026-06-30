@@ -7,6 +7,7 @@ import logging
 import shutil
 from pathlib import Path
 
+from klpbuild.klplib.affected_file import AffectedModule
 from klpbuild.klplib.utils import classify_codestreams_str,ARCHS
 from klpbuild.klplib.ibs import download_cs_rpms, verify_rpm
 from klpbuild.klplib.config import get_user_path
@@ -114,7 +115,7 @@ def __cs_is_missing_data(cs):
     '''
     for arch in cs.archs:
         try:
-            cs.find_obj_path(arch, "vmlinux")
+            cs.find_obj_path(arch, AffectedModule.VMLINUX)
         except AssertionError:
             # Assert triggered: vmlinux was not found
             return True

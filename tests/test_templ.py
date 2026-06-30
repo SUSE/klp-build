@@ -9,10 +9,21 @@ import pytest
 
 import klpbuild.klplib.templ as templ_module
 from klpbuild.klplib import utils
+from klpbuild.klplib.affected_file import AffectedFile
 from klpbuild.klplib.templ import get_multi_funcs
 from klpbuild.plugins.extract import extract
 from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS, get_codestreams_file, get_file_content
+
+
+def _af(name, ext_symbols=None, klpp_symbols=None):
+    """Build an AffectedFile with extraction-phase fields set."""
+    f = AffectedFile(name)
+    if ext_symbols is not None:
+        f.ext_symbols = ext_symbols
+    if klpp_symbols is not None:
+        f.klpp_symbols = klpp_symbols
+    return f
 
 _generate_klpp_header = templ_module.__dict__["__generate_klpp_header"]
 
@@ -417,13 +428,14 @@ def test_templ_kbuild_has_contents():
 
 def test_get_multi_funcs_ibt_returns_empty():
     """IBT codestreams don't need the multi-entry wiring file."""
-    assert get_multi_funcs(FakeCS({}, ibt=True), "bsc123") == ("", "")
+    assert get_multi_funcs(FakeCS(ibt=True), "bsc123") == ("", "")
 
 
 def test_get_multi_funcs_no_ext_symbols():
     """Files without ext_symbols are skipped; only the initial ret line remains."""
     inits, cleanups = get_multi_funcs(
-        FakeCS({"fs/proc/cmdline.c": {"ext_symbols": {}}}), "bsc123"
+        FakeCS({"fs/proc/cmdline.c": _af("fs/proc/cmdline.c", ext_symbols={})}),
+        "bsc123",
     )
 
     assert "\tint ret;\n" in inits
@@ -433,7 +445,8 @@ def test_get_multi_funcs_no_ext_symbols():
 def test_get_multi_funcs_vmlinux_file():
     """A file whose symbols live in vmlinux: _init added, no _cleanup."""
     inits, cleanups = get_multi_funcs(
-        FakeCS({"fs/proc/cmdline.c": {"ext_symbols": {"seq_printf": "vmlinux"}}}),
+        FakeCS({"fs/proc/cmdline.c": _af("fs/proc/cmdline.c",
+                                         ext_symbols={"seq_printf": "vmlinux"})}),
         "bsc123",
     )
 
@@ -445,11 +458,8 @@ def test_get_multi_funcs_module_file():
     """A file whose symbols come from a module: both _init and _cleanup added."""
     inits, cleanups = get_multi_funcs(
         FakeCS(
-            {
-                "drivers/nvme/host/tcp.c": {
-                    "ext_symbols": {"nvme_tcp_try_send": "nvme_tcp"}
-                }
-            },
+            {"drivers/nvme/host/tcp.c": _af("drivers/nvme/host/tcp.c",
+                                            ext_symbols={"nvme_tcp_try_send": "nvme_tcp"})},
             mods={"drivers/nvme/host/tcp.c": "nvme_tcp"},
         ),
         "bsc123",
@@ -464,10 +474,10 @@ def test_get_multi_funcs_multiple_files():
     inits, cleanups = get_multi_funcs(
         FakeCS(
             {
-                "fs/proc/cmdline.c": {"ext_symbols": {"seq_printf": "vmlinux"}},
-                "drivers/nvme/host/tcp.c": {
-                    "ext_symbols": {"nvme_tcp_try_send": "nvme_tcp"}
-                },
+                "fs/proc/cmdline.c": _af("fs/proc/cmdline.c",
+                                         ext_symbols={"seq_printf": "vmlinux"}),
+                "drivers/nvme/host/tcp.c": _af("drivers/nvme/host/tcp.c",
+                                               ext_symbols={"nvme_tcp_try_send": "nvme_tcp"}),
             },
             mods={"drivers/nvme/host/tcp.c": "nvme_tcp"},
         ),
@@ -485,8 +495,9 @@ def test_get_multi_funcs_skips_file_without_ext_symbols():
     inits, cleanups = get_multi_funcs(
         FakeCS(
             {
-                "fs/proc/cmdline.c": {"ext_symbols": {"seq_printf": "vmlinux"}},
-                "net/ipv6/rpl.c": {"ext_symbols": {}},
+                "fs/proc/cmdline.c": _af("fs/proc/cmdline.c",
+                                         ext_symbols={"seq_printf": "vmlinux"}),
+                "net/ipv6/rpl.c": _af("net/ipv6/rpl.c", ext_symbols={}),
             }
         ),
         "bsc123",
@@ -500,7 +511,8 @@ def test_get_multi_funcs_skips_file_without_ext_symbols():
 def test_get_multi_funcs_hyphen_in_lp_name():
     """Hyphens in lp_name are converted to underscores in the generated symbol names."""
     inits, _ = get_multi_funcs(
-        FakeCS({"fs/proc/cmdline.c": {"ext_symbols": {"seq_printf": "vmlinux"}}}),
+        FakeCS({"fs/proc/cmdline.c": _af("fs/proc/cmdline.c",
+                                         ext_symbols={"seq_printf": "vmlinux"})}),
         "bsc-1234",
     )
 
@@ -513,22 +525,16 @@ def test_get_multi_funcs_hyphen_in_lp_name():
 
 def test_generate_klpp_header_empty_files():
     """No source files → empty string."""
-    assert _generate_klpp_header(FakeCS({})) == ""
+    assert _generate_klpp_header(FakeCS()) == ""
 
 
 def test_generate_klpp_header_no_structs():
     """Protos without struct parameters → sorted function declarations only."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {
-                    "klpp_symbols": {
-                        "baz": "void klpp_baz(int x);",
-                        "bar": "int klpp_bar(void);",
-                    }
-                }
-            }
-        )
+        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
+            "baz": "void klpp_baz(int x);",
+            "bar": "int klpp_bar(void);",
+        })})
     )
 
     assert "int klpp_bar(void);" in result
@@ -541,15 +547,9 @@ def test_generate_klpp_header_no_structs():
 def test_generate_klpp_header_with_structs():
     """Proto with a struct parameter → forward declaration prepended."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {
-                    "klpp_symbols": {
-                        "bar": "int klpp_bar(struct sk_buff *skb);",
-                    }
-                }
-            }
-        )
+        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
+            "bar": "int klpp_bar(struct sk_buff *skb);",
+        })})
     )
 
     assert "struct sk_buff;" in result
@@ -560,16 +560,12 @@ def test_generate_klpp_header_with_structs():
 def test_generate_klpp_header_dedup_structs():
     """The same struct appearing in multiple protos is declared only once."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {
-                    "klpp_symbols": {"foo": "int klpp_foo(struct sk_buff *skb);"}
-                },
-                "bar.c": {
-                    "klpp_symbols": {"bar": "int klpp_bar(struct sk_buff *pkt);"}
-                },
-            }
-        )
+        FakeCS({
+            "foo.c": _af("foo.c", klpp_symbols={
+                "foo": "int klpp_foo(struct sk_buff *skb);"}),
+            "bar.c": _af("bar.c", klpp_symbols={
+                "bar": "int klpp_bar(struct sk_buff *pkt);"}),
+        })
     )
 
     assert result.count("struct sk_buff;") == 1
@@ -578,15 +574,9 @@ def test_generate_klpp_header_dedup_structs():
 def test_generate_klpp_header_multiple_structs_sorted():
     """Multiple distinct structs are forward-declared in alphabetical order."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {
-                    "klpp_symbols": {
-                        "foo": "int klpp_foo(struct zebra *z, struct alpha *a);",
-                    }
-                }
-            }
-        )
+        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
+            "foo": "int klpp_foo(struct zebra *z, struct alpha *a);",
+        })})
     )
 
     assert "struct alpha;" in result
@@ -597,12 +587,10 @@ def test_generate_klpp_header_multiple_structs_sorted():
 def test_generate_klpp_header_empty_klpp_symbols_in_file():
     """A file with an empty klpp_symbols dict contributes nothing."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {"klpp_symbols": {}},
-                "bar.c": {"klpp_symbols": {"baz": "void klpp_baz(void);"}},
-            }
-        )
+        FakeCS({
+            "foo.c": _af("foo.c", klpp_symbols={}),
+            "bar.c": _af("bar.c", klpp_symbols={"baz": "void klpp_baz(void);"}),
+        })
     )
 
     assert result == "void klpp_baz(void);"
@@ -611,15 +599,9 @@ def test_generate_klpp_header_empty_klpp_symbols_in_file():
 def test_generate_klpp_header_struct_in_return_type():
     """A struct in the return type also triggers a forward declaration."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {
-                    "klpp_symbols": {
-                        "bar": "struct sk_buff *klpp_bar(void);",
-                    }
-                }
-            }
-        )
+        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
+            "bar": "struct sk_buff *klpp_bar(void);",
+        })})
     )
 
     assert "struct sk_buff;" in result
@@ -629,12 +611,10 @@ def test_generate_klpp_header_struct_in_return_type():
 def test_generate_klpp_header_funcs_sorted_across_files():
     """Prototypes from multiple files are sorted together, not per-file."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {"klpp_symbols": {"zoo": "void klpp_zoo(void);"}},
-                "bar.c": {"klpp_symbols": {"alpha": "int klpp_alpha(void);"}},
-            }
-        )
+        FakeCS({
+            "foo.c": _af("foo.c", klpp_symbols={"zoo": "void klpp_zoo(void);"}),
+            "bar.c": _af("bar.c", klpp_symbols={"alpha": "int klpp_alpha(void);"}),
+        })
     )
 
     assert result.index("klpp_alpha") < result.index("klpp_zoo")
@@ -643,15 +623,9 @@ def test_generate_klpp_header_funcs_sorted_across_files():
 def test_generate_klpp_header_with_enum():
     """Proto with an enum parameter → forward declaration prepended."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {
-                    "klpp_symbols": {
-                        "bar": "void klpp_bar(enum color c);",
-                    }
-                }
-            }
-        )
+        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
+            "bar": "void klpp_bar(enum color c);",
+        })})
     )
 
     assert "enum color;" in result
@@ -662,15 +636,9 @@ def test_generate_klpp_header_with_enum():
 def test_generate_klpp_header_enum_in_return_type():
     """An enum in the return type also triggers a forward declaration."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {
-                    "klpp_symbols": {
-                        "bar": "enum color klpp_bar(void);",
-                    }
-                }
-            }
-        )
+        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
+            "bar": "enum color klpp_bar(void);",
+        })})
     )
 
     assert "enum color;" in result
@@ -680,16 +648,12 @@ def test_generate_klpp_header_enum_in_return_type():
 def test_generate_klpp_header_dedup_enums():
     """The same enum appearing in multiple protos is declared only once."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {
-                    "klpp_symbols": {"foo": "void klpp_foo(enum color c);"}
-                },
-                "bar.c": {
-                    "klpp_symbols": {"bar": "void klpp_bar(enum color d);"}
-                },
-            }
-        )
+        FakeCS({
+            "foo.c": _af("foo.c", klpp_symbols={
+                "foo": "void klpp_foo(enum color c);"}),
+            "bar.c": _af("bar.c", klpp_symbols={
+                "bar": "void klpp_bar(enum color d);"}),
+        })
     )
 
     assert result.count("enum color;") == 1
@@ -698,15 +662,9 @@ def test_generate_klpp_header_dedup_enums():
 def test_generate_klpp_header_mixed_struct_and_enum():
     """Structs appear before enums, each group sorted, separated by blank line."""
     result = _generate_klpp_header(
-        FakeCS(
-            {
-                "foo.c": {
-                    "klpp_symbols": {
-                        "foo": "int klpp_foo(struct zebra *z, enum alpha a);",
-                    }
-                }
-            }
-        )
+        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
+            "foo": "int klpp_foo(struct zebra *z, enum alpha a);",
+        })})
     )
 
     assert "struct zebra;" in result

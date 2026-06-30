@@ -12,8 +12,8 @@ from mako.template import Template
 from klpbuild.klplib.bugzilla import get_bug_title, get_bug
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import get_codestreams_data
-from klpbuild.klplib.utils import (fix_mod_string, get_mail, get_workdir,
-                                   get_lp_number, get_fname, is_mod)
+from klpbuild.klplib.utils import (get_mail, get_workdir,
+                                   get_lp_number, get_fname)
 
 
 MACRO_PROTO_SYMS = """\
@@ -397,23 +397,20 @@ ${get_entries(lpdir, bsc, cs)}
 
 TEMPL_PATCHED = """\
 <%
-from klpbuild.klplib.utils import (is_mod,
-                                   fix_mod_string)
 def get_patched(cs, check_enabled):
     ret = []
     for ffile, fdata in cs.files.items():
         conf = ''
-        if check_enabled and fdata['conf']:
-            conf = f' IS_ENABLED({fdata["conf"]})'
+        if check_enabled and fdata.config_name:
+            conf = f' IS_ENABLED({fdata.config_name})'
 
         mod = cs.get_file_mod(ffile)
-        if is_mod(mod):
-            mod = fix_mod_string(mod)
+        mod_str = mod.lp_module_name
 
-        syms = list(fdata['klpp_symbols'].keys())
+        syms = list(fdata.klpp_symbols.keys())
         syms.sort()
         for sym in syms:
-            ret.append(f'{mod} {sym} klpp_{sym}{conf}')
+            ret.append(f'{mod_str} {sym} klpp_{sym}{conf}')
 
     return "\\n".join(ret)
 %>\
@@ -433,12 +430,12 @@ def get_multi_funcs(cs, lp_name):
     cleanups = []
 
     for file, dat in cs.files.items():
-        if not dat["ext_symbols"]:
+        if not dat.ext_symbols:
             continue
 
         fname = get_fname(cs.lp_out_file(lp_name, file))
         mod = cs.get_file_mod(file)
-        cln = f"\t{fname}_cleanup();\n" if is_mod(mod) else ''
+        cln = f"\t{fname}_cleanup();\n" if not mod.is_vmlinux else ''
         init = f"\tret = {fname}_init();\n\tif (ret)\n\t\treturn ret;\n"
 
         inits.append(init)
@@ -472,7 +469,7 @@ def __generate_klpp_header(cs):
     enums = set()
 
     for dat in cs.files.values():
-        protos = list(dat["klpp_symbols"].values())
+        protos = list(dat.klpp_symbols.values())
         funcs.extend(protos)
         for p in protos:
             structs.update(re.findall(r"(struct\s+\w+)\s*\**\w+", p))
@@ -509,17 +506,17 @@ def __generate_header_file(lp_name, lp_path, cs):
         proto_syms = {}
 
         for src_file, data in cs.files.items():
-            configs.add(data["conf"])
+            configs.add(data.config_name)
             mod = cs.get_file_mod(src_file)
             # If we have external symbols we need an init function to load them. If the module
             # isn't vmlinux then we also need an _exit function
-            if data["ext_symbols"]:
-                if is_mod(mod):
+            if data.ext_symbols:
+                if not mod.is_vmlinux:
                     # Used by the livepatch_cleanup
                     has_cleanup = True
 
                 proto_fname = get_fname(cs.lp_out_file(lp_name, src_file))
-                proto_syms[proto_fname] = {"cleanup": is_mod(mod)}
+                proto_syms[proto_fname] = {"cleanup": not mod.is_vmlinux}
 
         # If we don't have any external symbols then we don't need the empty _init/_exit functions
         if proto_syms.keys():
@@ -588,11 +585,11 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
         fdata = cs.files[str(src_file)]
         mod = cs.get_file_mod(src_file)
         tvars.update({
-            "config": fdata.get("conf", ""),
-            "ext_vars": fdata.get("ext_symbols", ""),
-            "ibt": fdata.get("ibt", False),
+            "config": fdata.config_name or "",
+            "ext_vars": fdata.ext_symbols,
+            "ibt": fdata.ibt,
             "inc_src_file": cs.lp_out_file(lp_name, src_file),
-            "mod": fix_mod_string(mod),
+            "mod": "" if mod.is_vmlinux else mod.lp_module_name,
             "mod_mutex": cs.is_mod_mutex(),
         })
 

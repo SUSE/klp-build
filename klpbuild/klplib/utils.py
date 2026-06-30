@@ -121,10 +121,6 @@ def unclassify_codestreams(cs_group, cs_list):
     return [cs for cs in cs_list if cs.full_cs_name() in expanded]
 
 
-def is_mod(mod):
-    return mod != "vmlinux"
-
-
 def get_lp_number(lp_name):
     return lp_name.replace("bsc", "")
 
@@ -355,8 +351,8 @@ def filter_codestreams_by_arch(archs, cs_list):
 def affected_archs(cs_list):
     conf_archs = set()
     for cs in cs_list:
-        for val in cs.configs.values():
-            conf_archs.update(val)
+        for cfg in cs.configs.values():
+            conf_archs.update(cfg.archs())
 
     return sorted(conf_archs)
 
@@ -384,14 +380,6 @@ def get_mail():
     email = git_data.get_value("user", "email")
 
     return user, email
-
-def fix_mod_string(mod):
-    if not is_mod(mod):
-        return ""
-
-    # Modules like snd-pcm needs to be replaced by snd_pcm in LP_MODULE
-    # and in kallsyms lookup
-    return os.path.basename(mod.replace("-", "_"))
 
 
 def get_fname(src_name):
