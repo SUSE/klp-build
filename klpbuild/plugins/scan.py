@@ -98,7 +98,9 @@ def scan_job(bug, cve):
     # Check if parent bug has been discarded or
     # marked as already fixed.
     dep = get_bug_dep(bug)
-    if is_bug_dropped(dep):
+    if not dep:
+        status = "No-parent"
+    elif is_bug_dropped(dep):
         status = "Dropped"
     elif is_bug_fixed(dep):
         status = "Fixed(0)"
