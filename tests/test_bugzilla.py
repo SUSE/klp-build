@@ -7,7 +7,8 @@ from datetime import date
 
 from klpbuild.klplib.utils import date_to_days
 from klpbuild.klplib.bugzilla import (get_bug, get_bug_title, get_pending_bugs,
-                                      get_bug_data, get_bug_desc, get_bug_prio)
+                                      get_bug_data, get_bug_desc, get_bug_prio,
+                                      get_kss_watchdog_report)
 
 def test_get_pending_bugs():
     bugs = get_pending_bugs()
@@ -49,3 +50,9 @@ def test_get_bug_deadline():
     bug = get_bug("1263927")
     data = get_bug_data(bug)
     assert data.deadline == expected
+
+
+def test_get_kss_watchdog_report():
+    expected = "NO CODESTREAM AFFECTED"
+    bug = get_bug("1267667")
+    assert expected in get_kss_watchdog_report(bug)

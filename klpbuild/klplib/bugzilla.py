@@ -195,12 +195,27 @@ def get_bug_prio(bug):
     return prio
 
 
+def get_kss_watchdog_report(bug):
+    comments = get_bug_comments(bug)
+
+    if not comments:
+        return ""
+
+    for c in comments:
+        if "kernel-security-sentinel" in c['creator']:
+            return c['text']
+
+    return ""
+
+
 def is_bug_dropped(bug):
-    return bug.resolution and bug.resolution in {"INVALID", "WONTFIX", "DUPLICATED"}
+    return (bug.resolution in {"INVALID", "WONTFIX", "DUPLICATED"} or
+            "NO CODESTREAM AFFECTED" in get_kss_watchdog_report(bug))
 
 
 def is_bug_fixed(bug):
-    return bug.resolution and bug.resolution == "FIXED"
+    return (bug.resolution == "FIXED" or
+            "NO ACTION NEEDED" in get_kss_watchdog_report(bug))
 
 
 def is_bug_embargoed(bug):
