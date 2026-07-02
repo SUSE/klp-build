@@ -82,11 +82,11 @@ def scan_bugzilla():
         for b in bugs:
             if is_bug_embargoed(b):
                 continue
-            cve, system, cvss, prio  = get_bug_data(b)
-            if not cve:
+            data = get_bug_data(b)
+            if not data.cve:
                 continue
-            job = executor.submit(scan_job, b, cve)
-            pool[job] = [b.id, cve, system, cvss, prio]
+            job = executor.submit(scan_job, b, data.cve)
+            pool[job] = [b.id, *data]
 
         for job in concurrent.futures.as_completed(pool):
             bug = pool[job]

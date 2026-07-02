@@ -4,12 +4,15 @@
 # Authors: Fernando Gonzalez
 #          Marcos Paulo de Souza <mpdesouza@suse.com>
 
+from collections import namedtuple
 from functools import wraps
 import time
 import bugzilla
 
 from klpbuild.klplib.utils import is_cve_valid
 from klpbuild.klplib.config import get_user_settings
+
+BugData = namedtuple("BugData", ["cve", "subsys", "cvss", "prio"])
 
 __BZAPI = None
 def __check_is_connected(func):
@@ -173,8 +176,8 @@ def is_bug_embargoed(bug):
 
 def get_bug_data(bug):
     dep = get_bug_dep(bug)
-    return (get_bug_cve(bug), get_bug_subsys(bug), get_bug_cvss(dep),
-            get_bug_prio(bug))
+    return BugData(get_bug_cve(bug), get_bug_subsys(bug), get_bug_cvss(dep),
+                   get_bug_prio(bug))
 
 
 def get_bug_desc(bug):

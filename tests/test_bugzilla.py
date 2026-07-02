@@ -20,9 +20,9 @@ def test_get_bug_title():
 
 def test_get_bug_data():
     bug = get_bug("1227320")
-    cve, subsys, cvss, prio = get_bug_data(bug)
-    assert (cve == "2024-35789" and subsys == "wifi"
-            and cvss == "7.8" and prio == "Medium")
+    data = get_bug_data(bug)
+    assert (data.cve == "2024-35789" and data.subsys == "wifi"
+            and data.cvss == "7.8" and data.prio == "Medium")
 
 
 def test_get_bug_desc():
