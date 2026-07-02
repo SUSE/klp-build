@@ -159,7 +159,22 @@ def get_bug_subsys(bug):
 
 
 def get_bug_prio(bug):
-    return bug.priority[5:]
+    prio = bug.priority[5:]
+
+    '''
+    The bug priority has precedence over the severity.
+    However, "Medium" priority covers a wide range.
+    Add severity into the equation for more precision.
+    The severity rounds up or down the Medium priority.
+    '''
+    if prio == "Medium":
+        if bug.severity == "Critical":
+            prio = "High"
+        if bug.severity == "Normal":
+            prio = "Low"
+        # Severity "Major" is the most common for LPs.
+
+    return prio
 
 
 def is_bug_dropped(bug):

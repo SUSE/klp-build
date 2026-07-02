@@ -4,7 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from klpbuild.klplib.bugzilla import (get_bug, get_bug_title, get_pending_bugs,
-                                      get_bug_data, get_bug_desc)
+                                      get_bug_data, get_bug_desc, get_bug_prio)
 
 
 def test_get_pending_bugs():
@@ -30,3 +30,12 @@ def test_get_bug_desc():
     bug = get_bug("1227320")
     desc = get_bug_desc(bug)
     assert desc and expected in desc
+
+
+def test_get_bug_prio():
+    expected = "Medium"
+    bug = get_bug("1263002")
+    prio = get_bug_prio(bug)
+    assert (prio == expected and
+            bug.priority[5:] == "Medium" and
+            bug.severity == "Major")
