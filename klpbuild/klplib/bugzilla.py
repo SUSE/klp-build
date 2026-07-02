@@ -5,14 +5,15 @@
 #          Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from collections import namedtuple
+from datetime import date
 from functools import wraps
 import time
 import bugzilla
 
-from klpbuild.klplib.utils import is_cve_valid
+from klpbuild.klplib.utils import is_cve_valid, date_to_days
 from klpbuild.klplib.config import get_user_settings
 
-BugData = namedtuple("BugData", ["cve", "subsys", "cvss", "prio"])
+BugData = namedtuple("BugData", ["cve", "subsys", "cvss", "prio", "deadline"])
 
 __BZAPI = None
 def __check_is_connected(func):
@@ -65,7 +66,8 @@ def get_pending_bugs():
     bugs = __BZAPI.getbugs(ids)
 
     deps_ids = [b.depends_on[0] for b in bugs if len(b.depends_on) > 0]
-    deps_fields = ["status", "resolution", "assigned_to", "whiteboard"]
+    deps_fields = ["status", "resolution", "assigned_to",
+                   "whiteboard", "deadline"]
     __dep_bugs = {d.id:d for d in __BZAPI.getbugs(deps_ids,include_fields=deps_fields)}
 
     return bugs
@@ -158,6 +160,22 @@ def get_bug_subsys(bug):
     return summary[3][:40].strip().replace(' ', '')
 
 
+def get_bug_deadline(bug):
+    if bug and hasattr(bug, "deadline") and bug.deadline:
+        return date_to_days(bug.deadline)
+
+    '''
+    If there's no deadline for the LP, try with the parent bug.
+    This deadline is mainly meant for the backports, but still,
+    it might be useful for us. Filter out deadlines already past.
+    '''
+    if (dep := get_bug_dep(bug)) and hasattr(dep, "deadline") and dep.deadline:
+        if date.fromisoformat(dep.deadline) >= date.today():
+            return date_to_days(dep.deadline)
+
+    return "None"
+
+
 def get_bug_prio(bug):
     prio = bug.priority[5:]
 
@@ -192,7 +210,7 @@ def is_bug_embargoed(bug):
 def get_bug_data(bug):
     dep = get_bug_dep(bug)
     return BugData(get_bug_cve(bug), get_bug_subsys(bug), get_bug_cvss(dep),
-                   get_bug_prio(bug))
+                   get_bug_prio(bug), get_bug_deadline(bug))
 
 
 def get_bug_desc(bug):

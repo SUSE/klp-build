@@ -97,7 +97,7 @@ def scan_bugzilla():
     logging.getLogger().setLevel(logging.INFO)
 
     logging.info(tabulate.tabulate(table, headers=["ID", "CVE", "SUBSYSTEM", "CVSS", "PRIORITY",
-                                                   "STATUS", "ARCHS", "EOL", "AFFECTED"]))
+                                                   "DEADLINE", "STATUS", "ARCHS", "EOL", "AFFECTED"]))
 
 
 def scan_job(bug, cve):

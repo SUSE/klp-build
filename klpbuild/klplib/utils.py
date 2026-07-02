@@ -509,6 +509,19 @@ def is_lp_eol_soon(cs_list):
     return eol <= date.today() + timedelta(days=30)
 
 
+def date_to_days(date_str):
+    '''
+    Given a date string (YYYY-MM-DD), return the number of days
+    left until/since then from today.
+
+    Return:
+        str: "+d": 'd' days left until date.
+            "-d": 'd' days since that date.
+    '''
+    days = (date.fromisoformat(date_str) - date.today()).days
+    return f"+{days}" if days >= 0 else str(days)
+
+
 def validate_lp_name(lp_name):
     if not lp_name.startswith("bsc"):
         raise ValueError("Please use prefix 'bsc' for livepatch name")
