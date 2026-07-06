@@ -106,7 +106,7 @@ def run(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
                                               "archs": archs,
                                               "extra_patches": add_patches})
 
-    if conf:
+    if conf or conf_mod_file_funcs:
         setup_manual(codestreams, archs, conf, module,
                      file_funcs, mod_file_funcs,
                      conf_mod_file_funcs)
@@ -122,10 +122,12 @@ def setup_manual(codestreams, archs, conf, mod,
         raise ValueError("You need to specify at least one of the file-funcs variants!")
 
     ffuncs = {}
-    configs = {conf}
+    configs = set()
     for f in file_funcs:
         filepath = f[0]
         funcs = f[1:]
+
+        configs.add(conf)
 
         ffuncs[filepath] = AffectedFile(filepath, config_name=conf,
                                         module_name=mod,
@@ -135,6 +137,8 @@ def setup_manual(codestreams, archs, conf, mod,
         fmod = f[0]
         filepath = f[1]
         funcs = f[2:]
+
+        configs.add(conf)
 
         ffuncs[filepath] = AffectedFile(filepath, config_name=conf,
                                         module_name=fmod,

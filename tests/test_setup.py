@@ -255,3 +255,26 @@ def test_find_obj_path():
     assert "usr/lib/modules/6.12.0-160000.5-default/kernel/net/bluetooth/bluetooth.ko.zst" == str(
         cs.find_obj_path("x86_64", "net/bluetooth/bluetooth")
     )
+
+
+def test_conf_mod_file_funcs():
+    """
+    Make sure that we support the other variants of file-funcs arguments
+    """
+    lp = "bsc_" + inspect.currentframe().f_code.co_name
+
+    setup_args = {
+        "cve": None,
+        "lp_name": lp,
+        "archs": utils.ARCHS,
+        "module": None,
+        "file_funcs": [],
+        "mod_file_funcs": [],
+        "conf_mod_file_funcs": [["CONFIG_CIFS", "cifs", "fs/smb/client/cifs_spnego.c", "cifs_spnego_key_destroy"],
+                                ["CONFIG_KEYS", "vmlinux", "security/keys/key.c", "key_alloc"]],
+        "full_checks": False,
+        "lp_filter": CS,
+        "no_check": True,
+        "conf": None
+    }
+    setup(**setup_args)
