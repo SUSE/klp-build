@@ -4,12 +4,16 @@
 # Authors: Fernando Gonzalez
 #          Marcos Paulo de Souza <mpdesouza@suse.com>
 
+from collections import namedtuple
+from datetime import date
 from functools import wraps
 import time
 import bugzilla
 
-from klpbuild.klplib.utils import is_cve_valid
+from klpbuild.klplib.utils import is_cve_valid, date_to_days
 from klpbuild.klplib.config import get_user_settings
+
+BugData = namedtuple("BugData", ["cve", "subsys", "cvss", "prio", "deadline"])
 
 __BZAPI = None
 def __check_is_connected(func):
@@ -62,7 +66,8 @@ def get_pending_bugs():
     bugs = __BZAPI.getbugs(ids)
 
     deps_ids = [b.depends_on[0] for b in bugs if len(b.depends_on) > 0]
-    deps_fields = ["status", "resolution", "assigned_to", "whiteboard"]
+    deps_fields = ["status", "resolution", "assigned_to",
+                   "whiteboard", "deadline"]
     __dep_bugs = {d.id:d for d in __BZAPI.getbugs(deps_ids,include_fields=deps_fields)}
 
     return bugs
@@ -95,7 +100,7 @@ def get_bug_comments(bug):
     while i < 5:
         try:
             return bug.getcomments()
-        except bugzilla.BugzillaError:
+        except Exception:
             # There's a max number of allowed simultaneous requests...
             time.sleep(5)
             i += 1
@@ -155,16 +160,62 @@ def get_bug_subsys(bug):
     return summary[3][:40].strip().replace(' ', '')
 
 
+def get_bug_deadline(bug):
+    if bug and hasattr(bug, "deadline") and bug.deadline:
+        return date_to_days(bug.deadline)
+
+    '''
+    If there's no deadline for the LP, try with the parent bug.
+    This deadline is mainly meant for the backports, but still,
+    it might be useful for us. Filter out deadlines already past.
+    '''
+    if (dep := get_bug_dep(bug)) and hasattr(dep, "deadline") and dep.deadline:
+        if date.fromisoformat(dep.deadline) >= date.today():
+            return date_to_days(dep.deadline)
+
+    return "None"
+
+
 def get_bug_prio(bug):
-    return bug.priority[5:]
+    prio = bug.priority[5:]
+
+    '''
+    The bug priority has precedence over the severity.
+    However, "Medium" priority covers a wide range.
+    Add severity into the equation for more precision.
+    The severity rounds up or down the Medium priority.
+    '''
+    if prio == "Medium":
+        if bug.severity == "Critical":
+            prio = "High"
+        if bug.severity == "Normal":
+            prio = "Low"
+        # Severity "Major" is the most common for LPs.
+
+    return prio
+
+
+def get_kss_watchdog_report(bug):
+    comments = get_bug_comments(bug)
+
+    if not comments:
+        return ""
+
+    for c in comments:
+        if "kernel-security-sentinel" in c['creator']:
+            return c['text']
+
+    return ""
 
 
 def is_bug_dropped(bug):
-    return bug.resolution and bug.resolution in {"INVALID", "WONTFIX", "DUPLICATED"}
+    return (bug.resolution in {"INVALID", "WONTFIX", "DUPLICATED"} or
+            "NO CODESTREAM AFFECTED" in get_kss_watchdog_report(bug))
 
 
 def is_bug_fixed(bug):
-    return bug.resolution and bug.resolution == "FIXED"
+    return (bug.resolution == "FIXED" or
+            "NO ACTION NEEDED" in get_kss_watchdog_report(bug))
 
 
 def is_bug_embargoed(bug):
@@ -173,8 +224,8 @@ def is_bug_embargoed(bug):
 
 def get_bug_data(bug):
     dep = get_bug_dep(bug)
-    return (get_bug_cve(bug), get_bug_subsys(bug), get_bug_cvss(dep),
-            get_bug_prio(bug))
+    return BugData(get_bug_cve(bug), get_bug_subsys(bug), get_bug_cvss(dep),
+                   get_bug_prio(bug), get_bug_deadline(bug))
 
 
 def get_bug_desc(bug):
