@@ -84,6 +84,7 @@ def scan_bugzilla():
                 continue
             data = get_bug_data(b)
             if not data.cve:
+                table.append([b.id, *data._replace(cve="None"), *JobResult()])
                 continue
             job = executor.submit(scan_job, b, data.cve)
             pool[job] = [b.id, *data]
