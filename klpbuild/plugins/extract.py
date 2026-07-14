@@ -342,7 +342,7 @@ def get_klpp_symbols(out_dir, lp_out):
             klpp_proto = re.sub(r'\s+', ' ', m.group(2)).strip() + ';'
             # Remove the attributes left by klp-ccp, since they don't mean much
             # for kernel modules
-            klpp_proto = re.sub(r' __(init|exit)', ' ', klpp_proto)
+            klpp_proto = re.sub(r' __(init|exit|sched)', ' ', klpp_proto)
             klpp_syms.update({sym: klpp_proto})
 
             # Remove the 'static' keyword in the prototypes, if any

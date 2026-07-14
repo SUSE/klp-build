@@ -132,19 +132,21 @@ def test_get_klpp_symbols_function_pointer_param(tmp_path):
     assert result == {"foo": "int klpp_foo(int (*cb)(void));"}
 
 
-def test_get_klpp_symbols_strips_init_exit(tmp_path):
+def test_get_klpp_symbols_strips_init_exit_sched(tmp_path):
     r"""__init and __exit are part of ([\w\*]\s*)* and stripped from the proto."""
     lp_out = tmp_path / "lp.c"
     lp_out.write_text(
         "static int __init klpp_foo(void)\n{\n    return 0;\n}\n"
         "static void __exit klpp_bar(void)\n{\n}\n"
+        "static void __sched klpp_baz(void)\n{\n}\n"
     )
-    (tmp_path / "patched_funcs").write_text("foo\nbar\n")
+    (tmp_path / "patched_funcs").write_text("foo\nbar\nbaz\n")
 
     result = get_klpp_symbols(tmp_path, lp_out)
 
     assert "__init" not in result["foo"]
     assert "__exit" not in result["bar"]
+    assert "__sched" not in result["baz"]
 
 
 def test_get_klpp_symbols_multiple_symbols(tmp_path):
