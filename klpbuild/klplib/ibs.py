@@ -21,6 +21,7 @@ from lxml import etree
 from natsort import natsorted
 from osctiny import Osc
 
+from klpbuild.klplib.affected_file import AffectedModule
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.config import get_user_settings
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir
@@ -141,7 +142,7 @@ def get_cs_packages(cs_list, dest):
 
 
 def find_missing_symbols(cs, arch, lp_mod_path):
-    vmlinux_path = get_datadir(arch) / cs.find_obj_path(arch, "vmlinux")
+    vmlinux_path = get_datadir(arch) / cs.find_obj_path(arch, AffectedModule.VMLINUX)
     vmlinux_syms = get_all_symbols_from_object(vmlinux_path, True)
 
     # Get list of UNDEFINED symbols from the livepatch module
