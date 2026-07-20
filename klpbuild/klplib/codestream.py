@@ -520,20 +520,25 @@ class Codestream:
     def find_obj_path(self, arch, mod):
         """
         Resolve the on-disk object path for ``mod`` (a bare module name, e.g.
-        ``"fs/ext4/ext4"`` or ``"vmlinux"``) on ``arch``, caching the result
-        per-arch on the corresponding :class:`AffectedModule` to avoid
-        re-scanning the filesystem on subsequent calls.
+        ``"fs/ext4/ext4"`` or ``"vmlinux"``) on ``arch``.
+
+        The resolved path is cached per-arch on the matching
+        :class:`AffectedModule` in :attr:`modules` *only when one already
+        exists*. This method must never create a module entry: resolving or
+        probing a path (the data-availability check in ``data.py``, the ibs
+        vmlinux lookup, symbol checks) must not register a module as
+        "affected", otherwise :func:`filter_unsupported_kmodules` would be
+        defeated by a spurious ``supported=True`` vmlinux entry landing in
+        every codestream's :attr:`modules`.
         """
         is_vmlinux = mod == AffectedModule.VMLINUX
-        mod_obj = self.modules.setdefault(
-            mod,
-            AffectedModule.vmlinux() if is_vmlinux else AffectedModule(mod),
-        )
+        mod_obj = self.modules.get(mod)
 
-        cached = mod_obj.get_obj_path(arch)
-        if cached:
-            assert self.kernel in cached
-            return cached
+        if mod_obj:
+            cached = mod_obj.get_obj_path(arch)
+            if cached:
+                assert self.kernel in cached
+                return cached
 
         if is_vmlinux:
             fpath = Path(self.get_boot_dir(arch), self.get_boot_filename("vmlinux"))
@@ -545,7 +550,8 @@ class Codestream:
         assert fmod.exists(), f"Module {str(fmod)} doesn't exists. Aborting"
 
         resolved = fmod.relative_to(get_datadir(arch))
-        mod_obj.set_obj_path(arch, str(resolved))
+        if mod_obj:
+            mod_obj.set_obj_path(arch, str(resolved))
         return resolved
 
     def lp_out_file(self, lp_name, fname):
