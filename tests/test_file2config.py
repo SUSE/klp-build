@@ -194,6 +194,14 @@ def test_find_file_config_builtin_to_root():
     assert obj == "vmlinux"
 
 
+def test_find_file_config_builtin_object_reported_as_vmlinux():
+    # CONFIG_FSNOTIFY is a bool (built-in only): the object lives in vmlinux,
+    # so find_file_config reports vmlinux instead of the object path.
+    config, obj = find_file_config(CS, "fs/notify/fsnotify.c")
+    assert config == "CONFIG_FSNOTIFY"
+    assert obj == "vmlinux"
+
+
 def test_find_file_config_strips_whitespace():
     config, _ = find_file_config(CS, "  net/tls/tls.c  ")
     assert config == "CONFIG_TLS"

@@ -216,6 +216,15 @@ def find_file_config(cs, path):
     if not config or not config.startswith('CONFIG_'):
         return '', ''
 
+    # If the config is built into the kernel image (=y) on every arch where
+    # it's set, the object lives in vmlinux. Report vmlinux directly so the
+    # stored module_name matches what get_file_mod() resolves at runtime (and
+    # what the manual setup path defaults to).
+    cfg = cs.get_all_configs(config)
+    if cfg.is_set() and all(cfg.get_arch(arch) is ConfigState.BUILTIN
+                            for arch in cfg.archs()):
+        obj = AffectedModule.VMLINUX
+
     return config, obj
 
 
