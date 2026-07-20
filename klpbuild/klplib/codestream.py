@@ -421,12 +421,6 @@ class Codestream:
 
         return get_datadir(arch)/mod_path/"modules"/self.get_full_kernel_name()
 
-    # A codestream can be patching multiple objects; look up the AffectedModule
-    # by its bare name (e.g. "vmlinux" or "fs/ext4/ext4").
-    def get_mod(self, mod_name):
-        return self.modules[mod_name]
-
-
     def get_file_mod(self, file, arch=None):
         """
         Resolve which kernel object the given file is patched into for ``arch``.
