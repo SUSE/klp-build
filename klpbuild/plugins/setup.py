@@ -178,8 +178,13 @@ def setup_codestreams(lp_name, data):
         all_codestreams = get_supported_codestreams()
         codestreams = utils.filter_codestreams(data["lp_filter"], all_codestreams)
     else:
+        bug = bugzilla.get_bug(lp_name)
+        if len(bug.depends_on) == 1:
+            data["parent"] = bug.depends_on[0]
+            logging.info("Using parent bsc number to help tracking backports: %s", data["parent"])
+
         if not (cve := data["cve"]):
-            cve = bugzilla.get_bug_cve(bugzilla.get_bug(lp_name))
+            cve = bugzilla.get_bug_cve(bug)
             assert cve, f"Could not retrieve CVE from bugzilla for {lp_name}"
             logging.info("CVE retrieved from bugzilla: %s", cve)
             data["cve"] = cve
@@ -188,7 +193,8 @@ def setup_codestreams(lp_name, data):
                                                     data["lp_filter"], True,
                                                     data["archs"],
                                                     utils.get_workdir(lp_name),
-                                                    data.get("extra_patches", []))
+                                                    data.get("extra_patches", []),
+                                                    data["parent"])
 
     # Add new codestreams names to the already existing list, skipping
     # duplicates
