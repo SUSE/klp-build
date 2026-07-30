@@ -13,7 +13,6 @@ from klpbuild.klplib.file2config import (
     _load_makefile,
     _find_config,
     find_file_config,
-    find_files_config,
 )
 
 
@@ -219,32 +218,3 @@ def test_find_file_config_obj_prefix_variable():
 def test_find_file_config_nested_subdir():
     config, _ = find_file_config(CS, "drivers/net/ethernet/mellanox/mlx5/core/steering/dr_domain.c")
     assert config == "CONFIG_MLX5_SW_STEERING"
-
-
-# -- find_files_config ---------------------------------------------------------
-
-
-def test_find_files_config_empty_list():
-    configs, missing = find_files_config(CS, [])
-    assert not configs
-    assert not missing
-
-
-def test_find_files_config_single_found():
-    configs, missing = find_files_config(CS, ["net/tls/tls.c"])
-    assert "net/tls/tls.c" in configs
-    assert configs["net/tls/tls.c"]["conf"] == "CONFIG_TLS"
-    assert not missing
-
-
-def test_find_files_config_single_missing():
-    configs, missing = find_files_config(CS, ["include/linux/tls.h"])
-    assert not configs
-    assert missing == ["include/linux/tls.h"]
-
-
-def test_find_files_config_mixed():
-    configs, missing = find_files_config(CS, ["net/tls/tls.c", "include/linux/tls.h", "net/tls/nonexistent.c"])
-    assert "net/tls/tls.c" in configs
-    assert "include/linux/tls.h" in missing
-    assert "net/tls/nonexistent.c" in missing
