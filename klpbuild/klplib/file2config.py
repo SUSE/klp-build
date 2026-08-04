@@ -225,21 +225,3 @@ def find_file_config(cs, path):
         obj = AffectedModule.VMLINUX
 
     return config, obj
-
-
-def find_files_config(cs, file_paths: list):
-
-    configs = {}
-    missing = []
-
-    if not file_paths:
-        return configs, missing
-
-    for path in file_paths:
-        config, obj = find_file_config(cs, path)
-        if config:
-            configs[path] = {'conf': config, 'module': obj}
-        else:
-            missing.append(path)
-
-    return configs, missing
