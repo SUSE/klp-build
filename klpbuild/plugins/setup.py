@@ -9,6 +9,7 @@ import logging
 from natsort import natsorted
 
 from klpbuild.klplib import bugzilla, utils
+from klpbuild.klplib.affected_file import AffectedFile
 from klpbuild.klplib.cmd import add_arg_lp_filter, add_arg_lp_name
 from klpbuild.klplib.codestreams_data import (
     get_codestreams_data,
@@ -126,14 +127,18 @@ def setup_manual(codestreams, archs, conf, mod,
         filepath = f[0]
         funcs = f[1:]
 
-        ffuncs[filepath] = {"module": mod, "conf": conf, "symbols": funcs}
+        ffuncs[filepath] = AffectedFile(filepath, config_name=conf,
+                                        module_name=mod,
+                                        affected_symbols=set(funcs))
 
     for f in mod_file_funcs:
         fmod = f[0]
         filepath = f[1]
         funcs = f[2:]
 
-        ffuncs[filepath] = {"module": fmod, "conf": conf, "symbols": funcs}
+        ffuncs[filepath] = AffectedFile(filepath, config_name=conf,
+                                        module_name=fmod,
+                                        affected_symbols=set(funcs))
 
     for f in conf_mod_file_funcs:
         fconf = f[0]
@@ -143,7 +148,9 @@ def setup_manual(codestreams, archs, conf, mod,
 
         configs.add(fconf)
 
-        ffuncs[filepath] = {"module": fmod, "conf": fconf, "symbols": funcs}
+        ffuncs[filepath] = AffectedFile(filepath, config_name=fconf,
+                                        module_name=fmod,
+                                        affected_symbols=set(funcs))
 
     for cs in codestreams:
         cs.set_archs(archs)
@@ -208,9 +215,9 @@ def setup_project_files(lp_name, codestreams, full_checks):
 
         # Check if the files and symbols exist in the respective codestream directories
         for f, fdata in cs.files.copy().items():
-            conf = fdata["conf"]
-            archs = cs.configs[conf]
-            syms = fdata["symbols"]
+            cfg = cs.configs[fdata.config_name]
+            archs = cfg.archs()
+            syms = fdata.affected_symbols
             if not syms:
                 logging.warning("%s (%s): No symbols found for %s file."
                                 " Skipping.", cs.full_cs_name(), cs.kernel, f)
@@ -227,18 +234,22 @@ def setup_project_files(lp_name, codestreams, full_checks):
                 mod = cs.get_file_mod(f, arch)
                 __setup_check_mod(cs, mod, arch)
 
-            # append the current symbols and module to anuy previously set ones
-            mod_info = syms_to_be_checked.get(mod, {})
-            syms_to_be_checked[mod] = {
-                "syms": mod_info.get("syms", []) + syms,
-                "archs": mod_info.get("archs", []) + list(archs.keys()),
+            # append the current symbols and module to any previously set ones.
+            # Key by the module's bare name (not the AffectedModule itself) so
+            # the downstream check_symbol_archs / find_obj_path chain keeps its
+            # string contract (matching the extract.py call site).
+            mod_name = mod.name
+            mod_info = syms_to_be_checked.get(mod_name, {})
+            syms_to_be_checked[mod_name] = {
+                "syms": mod_info.get("syms", []) + list(syms),
+                "archs": mod_info.get("archs", []) + list(archs),
             }
 
         # Just call the symbol check once per module
         # The set calls are necessary because we can have duplicated entries
         # like the arch for different files.
-        for mod, mod_info in syms_to_be_checked.items():
-            __symbol_check(cs, mod, set(mod_info["syms"]), set(mod_info["archs"]), full_checks)
+        for mod_name, mod_info in syms_to_be_checked.items():
+            __symbol_check(cs, mod_name, set(mod_info["syms"]), set(mod_info["archs"]), full_checks)
 
         if not cs.files:
             logging.error(f"%s (%s): No files eligible to be livepatched.", cs.full_cs_name(), cs.kernel)
@@ -262,17 +273,19 @@ def __setup_check_file(cs, file):
 
 
 def __setup_check_mod(cs, mod, arch):
-    if mod in cs.modules:
+    # ``mod`` is an :class:`AffectedModule` returned by ``cs.get_file_mod()``.
+    # Skip if the on-disk path is already cached for this arch on this object;
+    # ``find_obj_path`` will populate the cache and the supportedness check
+    # only needs to fire once per (codestream, module, arch) tuple.
+    if mod.get_obj_path(arch):
         return
 
-    mod_path = cs.find_obj_path(arch, mod)
+    mod_path = cs.find_obj_path(arch, mod.name)
 
     # Validate if the module being livepatched is supported or not
     if utils.check_module_unsupported(arch, mod_path):
         logging.warning("%s (%s): Module %s is not supported by SLE",
-                        cs.full_cs_name(), cs.kernel, mod)
-
-    cs.modules[mod] = str(mod_path)
+                        cs.full_cs_name(), cs.kernel, mod.name)
 
 
 def __symbol_check(cs, mod, syms, archs, full_checks):

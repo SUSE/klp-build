@@ -187,9 +187,14 @@ def test_filter_codestreams_by_arch():
     assert not utils.filter_codestreams_by_arch([], [non_rt_cs])
 
 
+def _archs_as_module(archs):
+    """Build a per-arch CONFIG dict in the AffectedConfig shape (state irrelevant here)."""
+    return {arch: "m" for arch in archs}
+
+
 def test_affected_archs():
-    cs1 = Codestream("15.5u10", configs={"CONFIG_A": ["x86_64", "s390x"]})
-    cs2 = Codestream("15.5u11", configs={"CONFIG_B": ["ppc64le"]})
+    cs1 = Codestream("15.5u10", configs={"CONFIG_A": _archs_as_module(["x86_64", "s390x"])})
+    cs2 = Codestream("15.5u11", configs={"CONFIG_B": _archs_as_module(["ppc64le"])})
 
     assert utils.affected_archs([cs1]) == ["s390x", "x86_64"]
     assert utils.affected_archs([cs2]) == ["ppc64le"]
@@ -201,7 +206,7 @@ def test_affected_archs():
 
 def test_preferred_arch():
     def make_cs(archs):
-        return Codestream("15.5u10", configs={"CONFIG_A": archs})
+        return Codestream("15.5u10", configs={"CONFIG_A": _archs_as_module(archs)})
 
     # x86_64 is top priority
     assert utils.preferred_arch([make_cs(["x86_64", "s390x", "ppc64le"])]) == "x86_64"
