@@ -42,17 +42,16 @@ def test_get_klpp_symbols_missing_patched_funcs(tmp_path):
         get_klpp_symbols(tmp_path, lp_out)
 
 
-def test_get_klpp_symbols_no_static_no_match(tmp_path, caplog):
-    """Regex requires 'static': function without it is not matched → warning."""
+def test_get_klpp_symbols_no_static(tmp_path, caplog):
+    """Regex has 'static' as optional"""
     lp_out = tmp_path / "lp.c"
     lp_out.write_text("int klpp_foo(void)\n{\n    return 0;\n}\n")
     (tmp_path / "patched_funcs").write_text("foo\n")
 
-    with caplog.at_level(logging.WARNING):
-        result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out)
 
-    assert not result
-    assert "Failed to find klpp_foo" in caplog.text
+    assert result == {"foo": "int klpp_foo(void);"}
+    assert "static" not in caplog.text
 
 
 def test_get_klpp_symbols_simple_return_type(tmp_path):
