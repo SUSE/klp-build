@@ -15,7 +15,8 @@ from klpbuild.klplib.kgraft import (find_lp_branches,
                                     create_lp_branch,
                                     commit_lp_changes,
                                     get_kgraft,
-                                    init_kgraft)
+                                    init_kgraft,
+                                    reset_kgraft)
 
 PLUGIN_CMD = "commit"
 
@@ -53,6 +54,8 @@ def commit(lp_name, codestreams, force):
         shutil.copytree(code_path, f"{get_kgraft()}/{lp_name}", dirs_exist_ok=True)
         commit_lp_changes(lp_name)
         logging.info("Livepatch '%s' commited", branch)
+
+    reset_kgraft()
 
 
 def run(lp_name, lp_filter, force):
