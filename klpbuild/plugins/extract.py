@@ -329,8 +329,8 @@ def get_klpp_symbols(out_dir, lp_out):
         for sym in f:
             sym = sym.strip()
             # Create a regex for finding the klpp_{sym} function
-            # declaration and definition.
-            rfmt = fr"(static\s+)?([\w\*\s]+?klpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\))"
+            # definition.
+            rfmt = fr"(static\s+)?([\w\*\s]+?klpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\))(?!\s*;)"
             regex = re.compile(rfmt, re.S)
 
             # Search and save the function prototype for later use
