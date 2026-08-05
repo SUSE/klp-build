@@ -38,6 +38,17 @@ def get_kgraft():
     return __KGR_PATH
 
 
+def reset_kgraft():
+    '''
+        Checkout to the worktree's main branch
+    '''
+    subprocess.check_output(
+            ["git", "checkout", "-f", TREE_NAME],
+            cwd=get_kgraft(),
+            stderr=subprocess.STDOUT,
+            )
+
+
 def fetch_branch(branch, remote="origin"):
     subprocess.check_output(
         ["git", "fetch", remote, branch],
@@ -69,11 +80,7 @@ def delete_lp_branches(branches):
     if not branches:
         return
 
-    subprocess.check_output(
-            ["git", "checkout", "-f", TREE_NAME],
-            cwd=get_kgraft(),
-            stderr=subprocess.STDOUT,
-            )
+    reset_kgraft()
 
     for bname in branches:
         err = subprocess.run(["git", "branch", "-D", bname], cwd=get_kgraft(),
