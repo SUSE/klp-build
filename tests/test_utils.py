@@ -144,6 +144,8 @@ def test_filter_codestreams():
         Codestream("15.3u10"),
         Codestream("15.5u6"),
         Codestream("6.0u0"),
+        Codestream("16.0u1"),
+        Codestream("16.0u10"),
     ]
 
     # No filter returns all
@@ -163,6 +165,10 @@ def test_filter_codestreams():
 
     # No match returns empty list
     assert not utils.filter_codestreams("99\\..*", cs_list)
+
+    # A filter naming a single update must not also match longer updates that
+    # start with the same digits
+    assert utils.filter_codestreams("16.0u1", cs_list) == [Codestream("16.0u1")]
 
 
 def test_filter_codestreams_by_arch():
