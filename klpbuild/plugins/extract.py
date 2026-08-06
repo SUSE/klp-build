@@ -265,7 +265,7 @@ def fix_ext_symbols(cs, fdata: AffectedFile, lp_out):
     for sym_list in fdata.ext_symbols.values():
         for s in sym_list:
             # Keep only static declarations
-            lp_out = re.sub(rf"^(?!static|\s|#)\w[^;:()=]+\(\*klpe_{s}\)[^;:=]*;",
+            lp_out = re.sub(rf"^(?!(?:static|STATIC)|\s|#)\w[^;:()=]+\(\*klpe_{s}\)[^;:=]*;",
                             '', lp_out, flags=re.MULTILINE)
 
 
