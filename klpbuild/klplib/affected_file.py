@@ -123,6 +123,10 @@ class AffectedConfig:
 
     def __init__(self, config_name: str,
                  arch_values: dict[str, str] | None = None):
+        if not config_name:
+            raise ValueError(
+                f"Invalid config '{config_name}': empty value")
+
         if not config_name.startswith("CONFIG_"):
             raise ValueError(
                 f"Invalid config '{config_name}': missing CONFIG_ prefix")
