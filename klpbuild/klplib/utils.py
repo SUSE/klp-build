@@ -316,7 +316,7 @@ def filter_codestreams(lp_filter, cs_list, verbose=False):
     filtered = []
     for cs in cs_list:
         name = cs.full_cs_name()
-        if re.match(lp_filter, name):
+        if re.fullmatch(lp_filter, name):
             result.append(cs)
         else:
             filtered.append(name)
