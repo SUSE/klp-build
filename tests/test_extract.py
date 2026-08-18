@@ -17,6 +17,7 @@ from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.plugins.extract import (
     extract,
     fix_ext_symbols,
+    fix_klpp_symbols,
     get_ext_symbols,
     get_klpp_symbols,
     lp_out_cleanup,
@@ -26,10 +27,11 @@ from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS
 
 
-def _make_fdata(ext_symbols=None):
-    """Create an AffectedFile with ext_symbols set for testing."""
+def _make_fdata(ext_symbols=None, klpp_symbols=None):
+    """Create an AffectedFile with ext_symbols/klpp_symbols set for testing."""
     f = AffectedFile("test.c")
     f.ext_symbols = ext_symbols or {}
+    f.klpp_symbols = klpp_symbols or {}
     return f
 
 
@@ -63,7 +65,20 @@ def test_get_klpp_symbols_simple_return_type(tmp_path):
     result = get_klpp_symbols(tmp_path, lp_out)
 
     assert result == {"foo": "int klpp_foo(int a, int b);"}
-    assert "static" not in lp_out.read_text()
+
+
+def test_get_klpp_symbols_does_not_modify_file(tmp_path):
+    """get_klpp_symbols only parses lp_out; it must not rewrite the file.
+    Stripping 'static' from the definition is fix_klpp_symbols's job,
+    applied later during lp_out_cleanup."""
+    content = "static int klpp_foo(int a, int b)\n{\n    return a + b;\n}\n"
+    lp_out = tmp_path / "lp.c"
+    lp_out.write_text(content)
+    (tmp_path / "patched_funcs").write_text("foo\n")
+
+    get_klpp_symbols(tmp_path, lp_out)
+
+    assert lp_out.read_text() == content
 
 
 def test_get_klpp_symbols_pointer_return_type(tmp_path):
@@ -342,6 +357,50 @@ def test_fix_ext_symbols_percpu_struct_pointer_type():
     result = fix_ext_symbols(cs, fdata, lp_out)
     assert "static struct foo * __percpu (*klpe_bar);" in result
     assert "__attribute__" not in result
+
+
+# ── fix_klpp_symbols ───────────────────────────────────────────────────────────
+
+def test_fix_klpp_symbols_strips_static_from_definition():
+    """The 'static' keyword is removed from the klpp function definition,
+    matching the stored (static-free) prototype."""
+    fdata = _make_fdata(klpp_symbols={"foo": "int klpp_foo(int a, int b);"})
+    lp_out = "static int klpp_foo(int a, int b)\n{\n    return a + b;\n}\n"
+    result = fix_klpp_symbols(fdata, lp_out)
+    assert "static" not in result
+    assert "int klpp_foo(int a, int b)\n{\n    return a + b;\n}\n" in result
+
+
+def test_fix_klpp_symbols_removes_duplicate_declaration():
+    """A standalone klpp function declaration (no body) is removed entirely,
+    since it duplicates the one already emitted in the header. The surviving
+    definition also has 'static' stripped."""
+    fdata = _make_fdata(klpp_symbols={"foo": "int klpp_foo(void);"})
+    lp_out = "int klpp_foo(void);\nstatic int klpp_foo(void)\n{\n    return 0;\n}\n"
+    result = fix_klpp_symbols(fdata, lp_out)
+    assert result == "int klpp_foo(void)\n{\n    return 0;\n}\n"
+
+
+def test_fix_klpp_symbols_no_static_definition_unchanged():
+    """When the definition never had 'static', the buffer is left as-is."""
+    fdata = _make_fdata(klpp_symbols={"foo": "int klpp_foo(void);"})
+    lp_out = "int klpp_foo(void)\n{\n    return 0;\n}\n"
+    result = fix_klpp_symbols(fdata, lp_out)
+    assert result == lp_out
+
+
+def test_fix_klpp_symbols_multiple_symbols_all_processed():
+    """Every symbol in fdata.klpp_symbols has its 'static' stripped."""
+    fdata = _make_fdata(klpp_symbols={
+        "alpha": "int klpp_alpha(void);",
+        "beta": "void klpp_beta(int x);",
+    })
+    lp_out = (
+        "static int klpp_alpha(void)\n{\n    return 0;\n}\n"
+        "static void klpp_beta(int x)\n{\n}\n"
+    )
+    result = fix_klpp_symbols(fdata, lp_out)
+    assert "static" not in result
 
 
 # ── get_ext_symbols ────────────────────────────────────────────────────────────
