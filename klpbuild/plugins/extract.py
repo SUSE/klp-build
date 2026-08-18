@@ -315,10 +315,13 @@ def get_ext_symbols(out_dir):
     return symbols
 
 
-def get_klpp_symbols(out_dir, lp_out):
+def get_klpp_symbols(out_dir, lp_out, mod_name):
     fpath = Path(out_dir, "patched_funcs")
     if not fpath.exists():
         raise RuntimeError(f"File not found: {fpath}")
+
+    if fpath.stat().st_size == 0:
+        raise RuntimeError(f"klp-ccp could not find any of the indicated symbols in {mod_name}")
 
     with open(lp_out) as f:
         lp_code = f.read()
@@ -786,7 +789,7 @@ def process(lp_name, total, args, avoid_ext):
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
     cs.files[fname].ext_symbols = get_ext_symbols(out_dir)
-    cs.files[fname].klpp_symbols = get_klpp_symbols(out_dir, lp_out)
+    cs.files[fname].klpp_symbols = get_klpp_symbols(out_dir, lp_out, fdata.module_name)
 
     lp_out_cleanup(cs, cs.files[fname], lp_out, sdir)
 
