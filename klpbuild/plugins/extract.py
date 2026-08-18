@@ -802,6 +802,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir):
     - Remove the attributes left by klp-ccp, since they don't mean much for
       kernel modules.
     - Fix externalized symbols declaration.
+    - Remove typeof(...) declarations left by klp-ccp.
     - Remove big chunks of empty lines.
     """
     macros = '|'.join(UNSUPPORTED_MACROS)
@@ -814,6 +815,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir):
         file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
+        file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
         file_buf = fix_ext_symbols(cs, fdata, file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)

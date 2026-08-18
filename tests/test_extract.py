@@ -482,6 +482,31 @@ def test_lp_out_cleanup_removes_init_exit_attributes(tmp_path):
     assert "__init" not in lp_out.read_text()
 
 
+def test_lp_out_cleanup_removes_typeof_variable_declaration(tmp_path):
+    """A 'typeof(TYPE) VAR;' declaration, where a variable name follows the
+    closing paren before the semicolon, is removed in full."""
+    lp_out = _make_lp_out(
+        tmp_path,
+        "typeof(klpp_ulpi_register_interface) klpp_ulpi_register_interface;\n"
+        "static int foo(void)\n{\n}\n",
+    )
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
+    content = lp_out.read_text()
+    assert "typeof(" not in content
+    assert "klpp_ulpi_register_interface" not in content
+    assert "static int foo(void)" in content
+
+
+def test_lp_out_cleanup_keeps_indented_typeof(tmp_path):
+    """Only lines starting with 'typeof(' at column 0 are removed; indented
+    occurrences (e.g. inside a function body) are left untouched."""
+    lp_out = _make_lp_out(
+        tmp_path, "static int foo(void)\n{\n\ttypeof(bar) x;\n}\n"
+    )
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
+    assert "typeof(bar) x;" in lp_out.read_text()
+
+
 def test_lp_out_cleanup_collapses_multiple_empty_lines(tmp_path):
     """Three or more consecutive blank lines are collapsed to one."""
     lp_out = _make_lp_out(tmp_path, "line1\n\n\n\nline2\n")
