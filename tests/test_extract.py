@@ -41,7 +41,7 @@ def test_get_klpp_symbols_missing_patched_funcs(tmp_path):
     lp_out.write_text("")
 
     with pytest.raises(RuntimeError, match="File not found"):
-        get_klpp_symbols(tmp_path, lp_out)
+        get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
 
 def test_get_klpp_symbols_no_static(tmp_path, caplog):
@@ -50,7 +50,7 @@ def test_get_klpp_symbols_no_static(tmp_path, caplog):
     lp_out.write_text("int klpp_foo(void)\n{\n    return 0;\n}\n")
     (tmp_path / "patched_funcs").write_text("foo\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert result == {"foo": "int klpp_foo(void);"}
     assert "static" not in caplog.text
@@ -62,7 +62,7 @@ def test_get_klpp_symbols_simple_return_type(tmp_path):
     lp_out.write_text("static int klpp_foo(int a, int b)\n{\n    return a + b;\n}\n")
     (tmp_path / "patched_funcs").write_text("foo\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert result == {"foo": "int klpp_foo(int a, int b);"}
 
@@ -76,7 +76,7 @@ def test_get_klpp_symbols_does_not_modify_file(tmp_path):
     lp_out.write_text(content)
     (tmp_path / "patched_funcs").write_text("foo\n")
 
-    get_klpp_symbols(tmp_path, lp_out)
+    get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert lp_out.read_text() == content
 
@@ -87,7 +87,7 @@ def test_get_klpp_symbols_pointer_return_type(tmp_path):
     lp_out.write_text("static char *klpp_foo(void)\n{\n    return NULL;\n}\n")
     (tmp_path / "patched_funcs").write_text("foo\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert result == {"foo": "char *klpp_foo(void);"}
 
@@ -98,7 +98,7 @@ def test_get_klpp_symbols_multiword_return_type(tmp_path):
     lp_out.write_text("static unsigned long klpp_foo(int x)\n{\n    return 0;\n}\n")
     (tmp_path / "patched_funcs").write_text("foo\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert result == {"foo": "unsigned long klpp_foo(int x);"}
 
@@ -111,7 +111,7 @@ def test_get_klpp_symbols_const_struct_pointer_return(tmp_path):
     )
     (tmp_path / "patched_funcs").write_text("bar\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert result == {"bar": "const struct foo *klpp_bar(struct foo *p);"}
 
@@ -122,7 +122,7 @@ def test_get_klpp_symbols_multiline_via_re_s(tmp_path):
     lp_out.write_text("static int\nklpp_baz(int a)\n{\n    return a;\n}\n")
     (tmp_path / "patched_funcs").write_text("baz\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert "baz" in result
     # Whitespace normalization must collapse the newline in the prototype
@@ -138,7 +138,7 @@ def test_get_klpp_symbols_params_with_pointer(tmp_path):
     )
     (tmp_path / "patched_funcs").write_text("foo\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert result == {"foo": "int klpp_foo(int *p, struct bar *q);"}
 
@@ -149,7 +149,7 @@ def test_get_klpp_symbols_function_pointer_param(tmp_path):
     lp_out.write_text("static int klpp_foo(int (*cb)(void))\n{\n    return 0;\n}\n")
     (tmp_path / "patched_funcs").write_text("foo\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert result == {"foo": "int klpp_foo(int (*cb)(void));"}
 
@@ -164,7 +164,7 @@ def test_get_klpp_symbols_strips_init_exit_sched(tmp_path):
     )
     (tmp_path / "patched_funcs").write_text("foo\nbar\nbaz\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert "__init" not in result["foo"]
     assert "__exit" not in result["bar"]
@@ -180,7 +180,7 @@ def test_get_klpp_symbols_multiple_symbols(tmp_path):
     )
     (tmp_path / "patched_funcs").write_text("alpha\nbeta\ngamma\n")
 
-    result = get_klpp_symbols(tmp_path, lp_out)
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
 
     assert "alpha" in result
     assert "beta" in result
