@@ -138,10 +138,14 @@ def create_lp_package(osc, lp_name, i, total, cs):
 
 
 def run(lp_name, lp_filter, wait=False, fast=False):
+    cs_list = get_codestreams_list()
+
+    commit(lp_name, cs_list, force=False)
+
     if fast:
-        cs_list = filter_fast(get_codestreams_list())
+        cs_list = filter_fast(lp_name, cs_list)
     else:
-        cs_list = filter_codestreams(lp_filter, get_codestreams_list())
+        cs_list = filter_codestreams(lp_filter, cs_list)
 
     if not cs_list:
         logging.error("push: No codestreams found for %s", lp_name)
@@ -154,8 +158,6 @@ def run(lp_name, lp_filter, wait=False, fast=False):
 
     total = len(cs_list)
     i = 1
-
-    commit(lp_name, cs_list, force=False)
 
     # More threads makes OBS to return error 500
     for cs in cs_list:
