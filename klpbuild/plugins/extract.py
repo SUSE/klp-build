@@ -315,6 +315,26 @@ def get_ext_symbols(out_dir):
     return symbols
 
 
+def fix_klpp_symbols(fdata: AffectedFile, lp_out):
+    '''
+        - Removes any klpp function declaration in the .c files to
+          avoid signature conflicts with the declarations in the header
+          file during compilation.
+          Inlined klpp functions are not affected.
+        - Remove 'static' keyword from klpp function definition.
+    '''
+
+    for sym, proto in fdata.klpp_symbols.items():
+        rfmt = fr"[\w\*\s]+?\bklpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\)\s*;\n?"
+        lp_out = re.sub(rfmt, '', lp_out, flags=re.S)
+
+        # Remove the 'static' keyword in the prototypes, if any
+        proto = proto.rstrip(';')
+        lp_out = re.sub(fr'(static|STATIC)\s+{re.escape(proto)}', proto, lp_out)
+
+    return lp_out
+
+
 def get_klpp_symbols(out_dir, lp_out, mod_name):
     fpath = Path(out_dir, "patched_funcs")
     if not fpath.exists():
@@ -346,12 +366,6 @@ def get_klpp_symbols(out_dir, lp_out, mod_name):
             # for kernel modules
             klpp_proto = re.sub(r' __(init|exit|sched)', ' ', klpp_proto)
             klpp_syms.update({sym: klpp_proto})
-
-            # Remove the 'static' keyword in the prototypes, if any
-            lp_code = regex.sub(r'\2', lp_code)
-
-    with open(lp_out, "w") as f:
-        f.write(lp_code)
 
     return klpp_syms
 
@@ -805,6 +819,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir):
     - Remove the attributes left by klp-ccp, since they don't mean much for
       kernel modules.
     - Fix externalized symbols declaration.
+    - Fix klpp symbols declaration.
     - Remove typeof(...) declarations left by klp-ccp.
     - Remove big chunks of empty lines.
     """
@@ -820,6 +835,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir):
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
         file_buf = fix_ext_symbols(cs, fdata, file_buf)
+        file_buf = fix_klpp_symbols(fdata, file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
