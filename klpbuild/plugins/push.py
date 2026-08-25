@@ -7,7 +7,6 @@ import logging
 import os
 from pathlib import Path
 import shutil
-import subprocess
 import sys
 import time
 
@@ -21,9 +20,9 @@ from klpbuild.klplib.utils import (classify_codestreams_str, filter_codestreams,
                                    get_cs_branch)
 from klpbuild.plugins.status import status
 from klpbuild.plugins.commit import commit
-from klpbuild.klplib.kgraft import (create_lp_branch, fetch_branch,
-                                    rebase_lp_branch, find_lp_branches,
-                                    delete_lp_branches, get_kgraft)
+from klpbuild.klplib.kgraft import (create_release_branch,
+                                    find_lp_branches, delete_lp_branches,
+                                    tar_up, get_kgraft)
 
 PLUGIN_CMD = "push"
 
@@ -53,36 +52,7 @@ def create_prj_meta(cs):
            "</project>"
 
 
-def create_push_branch(cs, lp_branch):
-    product_branch = cs.get_full_product_name()
-    push_branch = f"push/{product_branch}/{str(lp_branch)}"
-
-    try:
-        fetch_branch(product_branch)
-        create_lp_branch(push_branch, lp_branch)
-        rebase_lp_branch(push_branch, product_branch)
-    except subprocess.CalledProcessError:
-        # Fallback in case the push_branch cannot be successfully created.
-        # Not meant for building final livepatches.
-        logging.warning("Failed to create branch '%s'. Using instead '%s'.",
-                        push_branch, lp_branch)
-        push_branch = lp_branch
-
-    return push_branch
-
-
-def create_lp_package(osc, lp_name, i, total, cs):
-    kgr_path = get_kgraft()
-    branch = get_cs_branch(cs, lp_name, kgr_path)
-    if not branch:
-        logging.info("Could not find git branch for %s. Skipping.", cs.full_cs_name())
-        return
-
-    # Remove previously created directories
-    prj_path = Path(cs.get_ccp_dir(lp_name), "checkout")
-    if prj_path.exists():
-        shutil.rmtree(prj_path)
-
+def create_osc_prj(osc, lp_name, cs):
     # If the project exists, drop it first
     prj = convert_cs_to_prj(cs, prj_prefix(lp_name, osc))
     delete_project(osc, 0, 0, prj, verbose=False)
@@ -101,9 +71,21 @@ def create_lp_package(osc, lp_name, i, total, cs):
         logging.error(e, str(e))
         raise RuntimeError("") from e
 
-    osc.packages.checkout(prj, "klp", prj_path)
+    return prj
 
-    push_branch = create_push_branch(cs, branch)
+
+def create_lp_package(osc, lp_name, i, total, cs):
+    kgr_path = get_kgraft()
+
+    branch = get_cs_branch(cs, lp_name, kgr_path)
+    if not branch:
+        logging.info("Could not find git branch for %s. Skipping.", cs.full_cs_name())
+        return
+
+    push_branch = create_release_branch(cs, branch, "push")
+    if not push_branch:
+        logging.info("Failed to create a release branch. Skipping.")
+        return
 
     logging.info("(%s/%s) pushing %s using branches %s...",
                  i, total, cs.full_cs_name(), push_branch)
@@ -115,14 +97,13 @@ def create_lp_package(osc, lp_name, i, total, cs):
     if lp_name not in os.listdir(kgr_path):
         logging.warning("Directory %s not found on branch %s", lp_name, branch)
 
-    # Fix RELEASE version
-    with open(Path(kgr_path, "scripts", "release-version.sh"), "w") as f:
-        ver = cs.get_full_product_name().replace("EMBARGO", "")
-        f.write(f"RELEASE={ver}")
+    # Fix RELEASE version and archive the source code
+    ver = cs.get_full_product_name().replace("EMBARGO", "")
+    prj_path = Path(cs.get_ccp_dir(lp_name), "checkout")
+    tar_up(prj_path, ver)
 
-    subprocess.check_output(
-        ["bash", "./scripts/tar-up.sh", "-d", str(prj_path)], stderr=subprocess.STDOUT, cwd=kgr_path
-    )
+    prj = create_osc_prj(osc, lp_name, cs)
+    osc.packages.checkout(prj, "klp", prj_path)
 
     # Add all files to the project, commit the changes and delete the directory.
     for fname in prj_path.iterdir():
