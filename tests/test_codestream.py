@@ -87,3 +87,40 @@ def test_sle16rt_config():
     cs = Codestream("16.0rtu0", kernel="6.12.0-160000.11")
     config_content = cs.get_config_content()
     assert "CONFIG_RCU_BOOST_DELAY" in config_content
+
+
+def test_get_file_mod_builtin_arch_config():
+    """
+    Ensure get_file_mod returns the specified module when the config is an
+    architecture/builtin config (e.g. CONFIG_X86=y) rather than overriding it
+    with vmlinux.
+    """
+    cs = Codestream.from_data({
+        "name": "15.4u55",
+        "project": "SUSE:Maintenance:44719",
+        "patchid": "",
+        "kernel": "5.14.21-150400.24.222",
+        "eol": "2026-12-31",
+        "archs": ["x86_64"],
+        "files": {
+            "arch/x86/kvm/mmu/mmu.c": {
+                "config_name": "CONFIG_X86",
+                "module_name": "kvm",
+                "affected_symbols": ["paging32_page_fault"],
+                "ibt": False,
+                "dup_symbols": [],
+                "ext_symbols": {},
+                "klpp_symbols": {}
+            }
+        },
+        "modules": {},
+        "configs": {
+            "CONFIG_X86": {"x86_64": "y"}
+        },
+        "required_patches": []
+    })
+
+    mod = cs.get_file_mod("arch/x86/kvm/mmu/mmu.c", "x86_64")
+    assert mod.name == "kvm"
+    assert "kvm" in cs.modules
+    assert "vmlinux" not in cs.modules

@@ -426,18 +426,20 @@ class Codestream:
         Resolve which kernel object the given file is patched into for ``arch``.
 
         Returns an :class:`AffectedModule` (the codestream's vmlinux singleton
-        when the gating CONFIG is built-in on ``arch``, the designated
-        ``module_name`` entry otherwise). The returned instance is the same one
-        held in :attr:`modules`, so any subsequent path-cache or supportedness
-        updates persist on the codestream.
+        when the file or its gating module CONFIG is built-in on ``arch``, the
+        designated ``module_name`` entry otherwise). The returned instance is
+        the same one held in :attr:`modules`, so any subsequent path-cache or
+        supportedness updates persist on the codestream.
         """
         fdat = self.files[file]
 
         if not arch:
             arch = preferred_arch([self])
 
-        cfg = self.configs[fdat.config_name]
-        if cfg.get_arch(arch) is ConfigState.BUILTIN:
+        cfg = self.configs.get(fdat.config_name)
+        if fdat.module_name == AffectedModule.VMLINUX or (
+            cfg and cfg.is_module_on_any() and cfg.get_arch(arch) is ConfigState.BUILTIN
+        ):
             return self.modules.setdefault(AffectedModule.VMLINUX,
                                            AffectedModule.vmlinux())
         return self.modules.setdefault(fdat.module_name,
