@@ -330,7 +330,8 @@ def fix_klpp_symbols(fdata: AffectedFile, lp_out):
 
         # Remove the 'static' keyword in the prototypes, if any
         proto = proto.rstrip(';')
-        lp_out = re.sub(fr'(static|STATIC)\s+{re.escape(proto)}', proto, lp_out)
+        proto_re = r'\s+'.join(re.escape(p) for p in proto.split(' '))
+        lp_out = re.sub(fr'(static|STATIC)\s+{proto_re}', proto, lp_out)
 
     return lp_out
 
@@ -353,7 +354,7 @@ def get_klpp_symbols(out_dir, lp_out, mod_name):
             sym = sym.strip()
             # Create a regex for finding the klpp_{sym} function
             # definition.
-            rfmt = fr"(static\s+)?([\w\*\s]+?klpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\))(?!\s*;)"
+            rfmt = fr"(\s*static\s+)?([\w\*\s]+?klpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\))(?!\s*;)"
             regex = re.compile(rfmt, re.S)
 
             # Search and save the function prototype for later use
