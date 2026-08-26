@@ -3,8 +3,6 @@
 # Copyright (C) 2025 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-from datetime import date
-
 from klpbuild.klplib.utils import date_to_days
 from klpbuild.klplib.bugzilla import (get_bug, get_bug_title, get_pending_bugs,
                                       get_bug_data, get_bug_desc, get_bug_prio,

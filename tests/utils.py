@@ -34,7 +34,7 @@ class FakeCS:
     def lp_out_file(self, lp, f):
         return f"{lp}_{f.replace('/', '_').replace('-', '_')}"
 
-    def get_file_mod(self, f, arch=None):
+    def get_file_mod(self, f):
         # Mirrors Codestream.get_file_mod: returns an AffectedModule, with the
         # same instance returned across calls so cache_obj_path mutations stay
         # visible (matching Codestream.modules.setdefault semantics).

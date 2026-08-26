@@ -13,7 +13,7 @@ def test_scan_all_cs_patched(caplog):
     assert "All supported codestreams are already patched" in caplog.text
 
 
-def test_scan_with_extra_patches(caplog):
+def test_scan_with_extra_patches():
     extra_patch = "patches.suse/net-fix-__dst_negative_advice-race.patch"
     patches, _, _, _ = scan("2022-48801", "", "", False,
                             extra_patches=[extra_patch])

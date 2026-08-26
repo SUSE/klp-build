@@ -21,7 +21,7 @@ from filelock import FileLock
 from natsort import natsorted
 
 from klpbuild.klplib import utils
-from klpbuild.klplib.affected_file import AffectedFile, AffectedModule
+from klpbuild.klplib.affected_file import AffectedFile
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_list
 from klpbuild.klplib.config import get_user_settings
