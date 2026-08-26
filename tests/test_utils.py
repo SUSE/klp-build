@@ -24,15 +24,23 @@ def test_group_classify():
         ["15.4u24-26", "15.5u6-9", "15.5u11-14", "15.6u0-10"]
 
 
-def test_filter_fast():
+def test_filter_fast(monkeypatch):
+    monkeypatch.setattr(utils, "get_user_path", lambda entry: None)
+    monkeypatch.setattr(
+        utils,
+        "get_lp_branches",
+        lambda lp_name, git_dir: ["bsc123456_15.2u10-11_15.3u10-12_6.0u0"],
+    )
+
     assert utils.filter_fast(
+        "bsc123456",
         [
             Codestream("6.0u0"),
             Codestream("15.2u10"),
             Codestream("15.2u11"),
             Codestream("15.3u10"),
             Codestream("15.3u12"),
-        ]
+        ],
     ) == [Codestream("6.0u0"), Codestream("15.2u10"), Codestream("15.3u10")]
 
 
