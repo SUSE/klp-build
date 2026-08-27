@@ -16,7 +16,7 @@ from importlib import resources
 from klpbuild.klplib.affected_file import AffectedConfig, AffectedFile, AffectedModule, ConfigState
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
 from klpbuild.klplib.utils import ARCH, get_workdir, get_elf_object, get_datadir, preferred_arch
-from klpbuild.klplib.kernel_tree import init_cs_kernel_tree, file_exists_in_tag, read_file_in_tag
+from klpbuild.klplib.kernel import file_exists_in_tag, read_file_in_tag, get_kernel_tag_path
 from klpbuild.klplib.ksrc import KERNEL_BRANCHES
 
 class Codestream:
@@ -144,7 +144,10 @@ class Codestream:
     def __str__(self):
         return self.full_cs_name()
 
-    def get_src_dir(self, arch=None, init=True):
+    def get_src_dir(self):
+        return get_kernel_tag_path(self.kernel)
+
+    def get_build_dir(self, arch=None):
         # Before sle16, only -rt codestreams have a suffix for source directory
         has_rt_suffix = self.rt and self.sle < 16
         name = self.get_full_kernel_name() if has_rt_suffix else self.kernel
@@ -152,16 +155,13 @@ class Codestream:
         if not arch:
             arch = preferred_arch([self])
 
-        src_dir = get_datadir(arch)/"usr"/"src"/f"linux-{name}"
-        if init:
-            init_cs_kernel_tree(self.kernel, src_dir)
-        return src_dir
+        return get_datadir(arch)/"usr"/"src"/f"linux-{name}"
 
     def get_obj_dir(self, arch=None):
         if not arch:
             arch = preferred_arch([self])
 
-        return Path(f"{self.get_src_dir(arch, init=False)}-obj", arch, self.get_kernel_type())
+        return Path(f"{self.get_build_dir(arch)}-obj", arch, self.get_kernel_type())
 
     def get_ipa_file(self, fname, arch=None):
 
@@ -426,18 +426,20 @@ class Codestream:
         Resolve which kernel object the given file is patched into for ``arch``.
 
         Returns an :class:`AffectedModule` (the codestream's vmlinux singleton
-        when the gating CONFIG is built-in on ``arch``, the designated
-        ``module_name`` entry otherwise). The returned instance is the same one
-        held in :attr:`modules`, so any subsequent path-cache or supportedness
-        updates persist on the codestream.
+        when the file or its gating module CONFIG is built-in on ``arch``, the
+        designated ``module_name`` entry otherwise). The returned instance is
+        the same one held in :attr:`modules`, so any subsequent path-cache or
+        supportedness updates persist on the codestream.
         """
         fdat = self.files[file]
 
         if not arch:
             arch = preferred_arch([self])
 
-        cfg = self.configs[fdat.config_name]
-        if cfg.get_arch(arch) is ConfigState.BUILTIN:
+        cfg = self.configs.get(fdat.config_name)
+        if fdat.module_name == AffectedModule.VMLINUX or (
+            cfg and cfg.is_module_on_any() and cfg.get_arch(arch) is ConfigState.BUILTIN
+        ):
             return self.modules.setdefault(AffectedModule.VMLINUX,
                                            AffectedModule.vmlinux())
         return self.modules.setdefault(fdat.module_name,
