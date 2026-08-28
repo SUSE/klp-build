@@ -112,7 +112,7 @@ def get_cs_packages(cs_list, dest):
     # kernel-default-kgraft (for SLE12)
     # kernel-default-kgraft-devel (for SLE12)
     pkg_regex = \
-        r"(kernel-(default|rt)\-((livepatch|kgraft)?\-?devel)?\-?[\d\.\-]+.(s390x|x86_64|ppc64le).rpm)"
+        r"(kernel-(default|rt)-((livepatch|kgraft)?-?devel)?-?[\d.-]+\.(s390x|x86_64|ppc64le)\.rpm)"
 
     rpms = []
     i = 1
