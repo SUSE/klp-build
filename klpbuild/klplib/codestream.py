@@ -265,7 +265,9 @@ class Codestream:
         if self.is_micro:
             return {"s390x", "x86_64"}
 
-        # We support all architecture for all other codestreams
+        if (self.sle, self.sp) >= (16, 1):
+            return {"ppc64le", "s390x", "x86_64", "aarch64"}
+
         return {"ppc64le", "s390x", "x86_64"}
 
     def set_files(self, files):
@@ -650,10 +652,11 @@ class Codestream:
             # TODO: implement support for modules as well
             if trace_addrs:
                 # The symbol is unique, so we can grab the first entry safely
+                # TODO: missing support for aarch64
                 if arch in ["x86_64", "s390x"]:
                     self.__check_patchable_sym(arch, symbol, syms[0], trace_addrs)
 
-                else:
+                elif arch in ["ppc64le"]:
                     self.__check_patchable_sym_ppc64le(arch, symbol, syms[0], trace_addrs)
 
         return ret
