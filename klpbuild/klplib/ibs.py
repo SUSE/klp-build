@@ -105,15 +105,6 @@ def get_project_names(osc, lp_name, lp_filter):
 
 
 def get_cs_packages(cs_list, dest):
-    # The packages that we search for are:
-    # kernel-(default|rt)
-    # kernel-(default|rt)-devel
-    # kernel-(default|rt)-livepatch-devel (for SLE15+)
-    # kernel-default-kgraft (for SLE12)
-    # kernel-default-kgraft-devel (for SLE12)
-    pkg_regex = \
-        r"(kernel-(default|rt)-((livepatch|kgraft)?-?devel)?-?[\d.-]+\.(s390x|x86_64|ppc64le)\.rpm)"
-
     rpms = []
     i = 1
 
@@ -125,6 +116,20 @@ def get_cs_packages(cs_list, dest):
             ret = osc.build.get_binary_list(cs.get_project_name(),
                                             cs.get_repo(), arch,
                                             cs.get_package_name())
+
+            # The packages that we search for are:
+            # kernel-(default|rt)
+            # kernel-(default|rt)-devel
+            # kernel-(default|rt)-livepatch-devel (for SLE15+)
+            # kernel-default-kgraft (for SLE12)
+            # kernel-default-kgraft-devel (for SLE12)
+            pkg_regex = (
+                r"(kernel-(default|rt)"
+                r"-((livepatch|kgraft)?-?devel)?"
+                r"-?[\d.-]+"
+                rf"\.{re.escape(arch)}\.rpm)"
+            )
+
             for file in re.findall(pkg_regex, str(etree.tostring(ret))):
                 # FIXME: adjust the regex to only deal with strings
                 if isinstance(file, str):
