@@ -27,6 +27,8 @@ KERNEL_BRANCHES = {
     "15.7rt": "SLE15-SP7-RT",
     "16.0": "SL-16.0",
     "16.0rt": "SL-16.0",
+    "16.1": "SL-16.1",
+    "16.1rt": "SL-16.1",
     "6.0": "SUSE-2024",
     "6.0rt": "SUSE-2024-RT",
     "cve-5.14": "cve/linux-5.14-LTSS",
