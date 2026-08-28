@@ -15,7 +15,7 @@ import requests
 from klpbuild.klplib import utils
 from klpbuild.klplib.codestream import Codestream
 
-SUPPORTED_CS_URL = "https://gitlab.suse.de/live-patching/sle-live-patching-data/raw/master/supported.csv"
+SUPPORTED_CS_URL = "https://gitlab.suse.de/vmezzela/sle-live-patching-data/raw/master/supported.csv"
 SUSE_CERT = Path("/etc/ssl/certs/SUSE_Trust_Root.pem")
 
 __supported_codestreams_cache = []
