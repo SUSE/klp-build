@@ -10,7 +10,7 @@ import sys
 import tempfile
 import logging
 
-from pathlib import Path, PurePath
+from pathlib import Path
 from importlib import resources
 
 from klpbuild.klplib.affected_file import AffectedConfig, AffectedFile, AffectedModule, ConfigState

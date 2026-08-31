@@ -5,7 +5,6 @@
 
 import logging
 import shutil
-from pathlib import Path
 
 from klpbuild.klplib.affected_file import AffectedModule
 from klpbuild.klplib.utils import classify_codestreams_str,ARCHS

@@ -5,7 +5,6 @@
 
 import concurrent.futures
 import dataclasses
-import errno
 from itertools import repeat
 import logging
 import os
@@ -176,7 +175,7 @@ def validate_livepatch_module(cs, arch, rpm_dir, rpm):
 
 def verify_rpm(rpm_path):
     ret = subprocess.run(["rpm", "-K", "--nosignature", str(rpm_path)],
-                            capture_output=True, text=True)
+                            capture_output=True, text=True, check=False)
     if ret.returncode != 0:
         logging.error("RPM verification failed for %s", rpm_path)
         return False

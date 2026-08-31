@@ -3,11 +3,12 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com
 
+import concurrent.futures
 import dataclasses
 import logging
-import concurrent.futures
-import tabulate
 from dataclasses import dataclass
+
+import tabulate
 
 from klpbuild.klplib import utils
 from klpbuild.klplib.analysis import (
