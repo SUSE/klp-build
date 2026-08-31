@@ -241,6 +241,23 @@ branch in the repository.
 Overwrite existing livepatches and branches in the repository.
 .RE
 .TP
+.B lint
+Verifies the code quality of the commited livepatches.
+More specifically,
+.B lint
+compiles with
+.BR gcc (1)
+the livepatch for a given codestream and reports back
+the number of errors, warnings and unrelated errors found
+during compilation and linking.
+.RS 7
+.TP
+.BI --gcc " GCC_VERSION_NUMBER"
+Use a specific
+.BR gcc (1)
+version (e.g 13, 15...).
+.RE
+.TP
 .B format-patches
 Extract patches from kgraft-patches (see the
 .BR "SEE ALSO" " section)."
