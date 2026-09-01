@@ -94,18 +94,30 @@ def register_argparser(subparser):
         "These patches will be checked per-codestream and applied "
         "before CVE patches if missing.",
     )
+    args.add_argument(
+        "--commit", "--commits",
+        dest="commits",
+        type=str,
+        nargs="+",
+        required=False,
+        default=[],
+        help="Upstream commit SHA(s) assigned to this livepatch",
+    )
 
 
 def run(lp_name, lp_filter, no_check, archs, cve, conf, module, file_funcs,
-        mod_file_funcs, conf_mod_file_funcs, full_checks, add_patches=None):
+        mod_file_funcs, conf_mod_file_funcs, full_checks, add_patches=None, commits=None):
     if add_patches is None:
         add_patches = []
+    if commits is None:
+        commits = []
 
     codestreams = setup_codestreams(lp_name, {"cve": cve, "conf": conf,
                                               "lp_filter": lp_filter,
                                               "no_check": no_check,
                                               "archs": archs,
-                                              "extra_patches": add_patches})
+                                              "extra_patches": add_patches,
+                                              "commits": commits})
 
     if conf:
         setup_manual(codestreams, archs, conf, module,
@@ -179,17 +191,18 @@ def setup_codestreams(lp_name, data):
         all_codestreams = get_supported_codestreams()
         codestreams = utils.filter_codestreams(data["lp_filter"], all_codestreams)
     else:
-        if not (cve := data["cve"]):
+        if not (cve := data.get("cve")) and not data.get("commits"):
             cve = bugzilla.get_bug_cve(bugzilla.get_bug(lp_name))
             assert cve, f"Could not retrieve CVE from bugzilla for {lp_name}"
             logging.info("CVE retrieved from bugzilla: %s", cve)
             data["cve"] = cve
 
-        _, upstream, patched_cs, codestreams = scan(data["cve"], data["conf"],
+        _, upstream, patched_cs, codestreams = scan(data.get("cve"), data["conf"],
                                                     data["lp_filter"], True,
                                                     data["archs"],
                                                     utils.get_workdir(lp_name),
-                                                    data.get("extra_patches", []))
+                                                    data.get("extra_patches", []),
+                                                    commits=data.get("commits", []))
 
     # Add new codestreams names to the already existing list, skipping
     # duplicates
@@ -198,7 +211,7 @@ def setup_codestreams(lp_name, data):
     new_patched_cs = natsorted(list(set(old_patched_cs + patched_cs)))
 
     set_codestreams_data(upstream=upstream, patched_cs=new_patched_cs,
-                         cve=data['cve'])
+                         cve=data.get('cve') or "")
     return codestreams
 
 
