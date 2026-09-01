@@ -190,23 +190,38 @@ def store_patch(pfile, patch, savedir, savedir_idx, bc):
         f.write(pfile)
 
 
-def get_branch_patches(cve, mbranch):
+def get_branch_patches(mbranch, cve=None, commits=None):
     kern_src = get_user_path('kernel_src_dir')
+
+    if not cve and not commits:
+        return []
+
+    if commits is None:
+        commits = []
+    if isinstance(commits, str):
+        commits = [commits]
+
+    git_cmd = ["/usr/bin/git", "-C", kern_src, "grep", "-l"]
+    if cve:
+        git_cmd.extend(["-e", rf"References:.*CVE-{cve}\b"])
+    for commit in commits:
+        git_cmd.extend(["-e", f"Git-commit: {commit}"])
+
+    git_cmd.extend([f"remotes/origin/{mbranch}", "--", "patches.suse/"])
 
     try:
         patch_files = subprocess.check_output(
-            ["/usr/bin/git", "-C", kern_src, "grep", "-l", f"CVE-{cve}",
-             f"remotes/origin/{mbranch}", "--", "patches.suse/"],
+            git_cmd,
             stderr=subprocess.STDOUT,
         ).decode(sys.stdout.encoding)
     except subprocess.CalledProcessError:
         # If we don't find any commits for RT branchs, try with the non-RT variant.
-        return [] if "RT" not in mbranch else get_branch_patches(cve, mbranch.replace("-RT", ""))
+        return [] if "RT" not in mbranch else get_branch_patches(mbranch.replace("-RT", ""), cve, commits=commits)
 
     # Prepare command to extract correct ordering of patches
     cmd = ["/usr/bin/git", "-C", kern_src, "grep", "-o", "-h"]
     for patch in patch_files.splitlines():
-        _, fname = patch.split(":")
+        _, fname = patch.split(":", 1)
         cmd.append("-e")
         cmd.append(fname)
     cmd += [f"remotes/origin/{mbranch}:series.conf"]
@@ -221,9 +236,11 @@ def get_branch_patches(cve, mbranch):
 
 
 @__check_kernel_source_tags_are_fetched
-def get_patches(cve, savedir=None, extra_patches=None):
+def get_patches(cve=None, savedir=None, extra_patches=None, commits=None):
     if extra_patches is None:
         extra_patches = []
+    if commits is None:
+        commits = []
 
     logging.info("Getting SUSE fixes for upstream commits per CVE branch. It can take some time...")
 
@@ -261,7 +278,7 @@ def get_patches(cve, savedir=None, extra_patches=None):
             else:
                 logging.debug("\textra patch %s not found in %s", extra_patch, mbranch)
 
-        for patch in get_branch_patches(cve, mbranch):
+        for patch in get_branch_patches(mbranch, cve, commits=commits):
             if patch.strip().startswith("#"):
                 continue
 
