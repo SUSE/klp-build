@@ -243,7 +243,7 @@ def find_commit(subject, branch, skip=0):
                 ["git", "-C", kernel_tree, "log", "-n1",
                  f"--grep=^{subject}", rf"--grep=-\s*{subject}",
                  "--pretty='%h'", f"--skip={skip}",
-                 f"remotes/origin/{branch}"],
+                 f"{branch}"],
                 capture_output=True,
                 check=False,
                 text=True,
