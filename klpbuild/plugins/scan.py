@@ -48,6 +48,14 @@ def register_argparser(subparser):
         help="Shows which codestreams are vulnerable to the CVE"
     )
     args.add_argument(
+        "--commit", "--commits",
+        dest="commits",
+        required=False,
+        nargs="+",
+        default=[],
+        help="Upstream commit SHA(s) to check patches for"
+    )
+    args.add_argument(
         "--conf",
         required=False,
         help="Helps to check only the codestreams that have this config set."
@@ -60,12 +68,12 @@ def register_argparser(subparser):
     )
 
 
-def run(cve, conf, lp_filter, download):
-    if not cve:
+def run(cve, conf, lp_filter, download, commits=None):
+    if not cve and not commits:
         scan_bugzilla()
         return
 
-    scan(cve, conf, lp_filter, download)
+    scan(cve, conf, lp_filter, download, commits=commits)
 
 
 def scan_bugzilla():
@@ -138,15 +146,19 @@ def scan_job(bug, cve):
     return result
 
 
-def scan(cve, conf, lp_filter, download, archs=None, savedir=None, extra_patches=None):
+def scan(cve, conf, lp_filter, download, archs=None, savedir=None, extra_patches=None, commits=None):
     if archs is None:
         archs = utils.ARCHS
     if extra_patches is None:
         extra_patches = []
+    if commits is None:
+        commits = []
 
-    assert cve and utils.is_cve_valid(cve)
+    assert cve or commits, "Either CVE or commit SHA(s) must be specified"
+    if cve:
+        assert utils.is_cve_valid(cve)
 
-    upstream, patches = get_patches(cve, savedir, extra_patches)
+    upstream, patches = get_patches(cve, savedir, extra_patches, commits=commits)
 
     all_codestreams = get_supported_codestreams()
     filtered_codesteams = utils.filter_codestreams(lp_filter, all_codestreams, verbose=True)
