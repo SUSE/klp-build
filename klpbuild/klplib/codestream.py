@@ -157,7 +157,7 @@ class Codestream:
 
         kernel_dir = get_datadir(arch)/"usr"/"src"/f"linux-{name}"
 
-        return Path(f"{kernel_dir}-obj", arch, self.get_kernel_type())
+        return Path(f"{kernel_dir}-obj", arch, self.get_kernel_type()).resolve()
 
     def get_ipa_file(self, fname, arch=None):
 
