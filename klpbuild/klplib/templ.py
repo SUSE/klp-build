@@ -449,9 +449,9 @@ def __preproc_slashes(text):
     return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
 
 
-def __generate_patched_conf(lp_name, cs):
+def __generate_patched_conf(lp_name, cs, arch):
     render_vars = {"cs": cs, "check_enabled": __is_check_enabled(cs)}
-    with open(Path(cs.get_lp_dir(lp_name), "patched_funcs.csv"), "w") as f:
+    with open(Path(cs.get_lp_dir(lp_name, arch), "patched_funcs.csv"), "w") as f:
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
 
@@ -547,7 +547,7 @@ def __generate_header_file(lp_name, lp_path, cs):
         lpdir = TemplateLookup(directories=[Path()], preprocessor=__preproc_slashes)
         f.write(Template(header_templ, lookup=lpdir).render(**render_vars))
 
-def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
+def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name, arch):
     cve = get_codestreams_data('cve')
     if not cve:
         cve = "XXXX-XXXX"
@@ -597,20 +597,20 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
             temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_MODULE
         else:
             temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
-        lp_inc_dir = cs.get_ccp_work_dir(lp_name, src_file)
+        lp_inc_dir = cs.get_ccp_work_dir(lp_name, src_file, arch)
 
     lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=__preproc_slashes)
     with open(Path(lp_path, out_name), "w") as f:
         f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**tvars))
 
-def generate_livepatches(lp_name, cs):
-    lp_path = cs.get_lp_dir(lp_name)
+def generate_livepatches(lp_name, cs, arch):
+    lp_path = cs.get_lp_dir(lp_name, arch)
     lp_path.mkdir(exist_ok=True)
 
     files = cs.files
     is_multi_files = len(files.keys()) > 1
 
-    __generate_patched_conf(lp_name, cs)
+    __generate_patched_conf(lp_name, cs, arch)
 
     # If there are more then one source file, we cannot fully infer what are
     # the correct configs and mods to be livepatched, so leave the mod and
@@ -626,14 +626,14 @@ def generate_livepatches(lp_name, cs):
         out_name = f"livepatch_{lp_name}.c" if not is_multi_files else \
             cs.lp_out_file(lp_name, src_file)
 
-        __generate_lp_file(lp_name, lp_path, cs, src_file, out_name)
+        __generate_lp_file(lp_name, lp_path, cs, src_file, out_name, arch)
 
     # One additional file to encapsulate the _init and _clenaup methods
     # of the other source files
     if is_multi_files:
-        __generate_lp_file(lp_name, lp_path, cs, None, f"livepatch_{lp_name}.c")
+        __generate_lp_file(lp_name, lp_path, cs, None, f"livepatch_{lp_name}.c", arch)
 
-    __create_kbuild(lp_name, cs)
+    __create_kbuild(lp_name, cs, arch)
 
 
 def __is_check_enabled(cs: Codestream):
@@ -642,10 +642,10 @@ def __is_check_enabled(cs: Codestream):
     return cs.archs != cs.get_default_archs()
 
 
-def __create_kbuild(lp_name, cs):
+def __create_kbuild(lp_name, cs, arch):
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
-    render_vars = {"bsc": lp_name, "cs": cs, "lpdir": cs.get_lp_dir(lp_name)}
-    with open(Path(cs.get_lp_dir(lp_name), "Kbuild.inc"), "w") as f:
+    render_vars = {"bsc": lp_name, "cs": cs, "lpdir": cs.get_lp_dir(lp_name, arch)}
+    with open(Path(cs.get_lp_dir(lp_name, arch), "Kbuild.inc"), "w") as f:
         f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
 

@@ -49,6 +49,10 @@ def test_get_arch_in_path_powerpc():
     assert _get_arch_in_path("arch/powerpc/kernel/entry_64.c") == "ppc64le"
 
 
+def test_get_arch_in_path_arm64():
+    assert _get_arch_in_path("arch/arm64/kernel/setup.c") == "aarch64"
+
+
 def test_get_arch_in_path_none():
     assert _get_arch_in_path("net/tls/tls_main.c") is None
 

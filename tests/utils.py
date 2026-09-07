@@ -61,9 +61,9 @@ class FakeCS:
         return self._supported.get(mod, (True, False))
 
 
-def get_file_content(lp_name, lp_filter, fname=None):
+def get_file_content(lp_name, lp_filter, fname=None, arch="x86_64"):
     # Check the generated LP files
-    path = get_workdir(lp_name)/"ccp"/lp_filter/"lp"
+    path = get_workdir(lp_name)/"ccp"/lp_filter/f"lp_{arch}"
 
     if not fname:
         fname = f'livepatch_{lp_name}.c'

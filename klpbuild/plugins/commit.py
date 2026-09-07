@@ -30,9 +30,16 @@ def register_argparser(subparser):
     add_arg_lp_filter(fmt)
     fmt.add_argument("--force", "-f", action="store_true",
                      help="Overwrite existing livepatches in kgraft repository.")
+    fmt.add_argument(
+        "--arch",
+        type=str,
+        default="x86_64",
+        choices=["x86_64", "aarch64"],
+        help="Architecture target used by klp-ccp (default: x86_64)",
+    )
 
 
-def commit(lp_name, codestreams, force):
+def commit(lp_name, codestreams, force, arch="x86_64"):
     init_kgraft()
 
     branches = find_lp_branches(f"{lp_name}_*")
@@ -50,16 +57,16 @@ def commit(lp_name, codestreams, force):
         branch = f"{lp_name}_{group.replace(' ', '_')}"
         create_lp_branch(branch)
 
-        code_path = cs_list[0].get_lp_dir(lp_name)
+        code_path = cs_list[0].get_lp_dir(lp_name, arch)
         shutil.copytree(code_path, f"{get_kgraft()}/{lp_name}", dirs_exist_ok=True)
         commit_lp_changes(lp_name)
-        logging.info("Livepatch '%s' commited", branch)
+        logging.info("Livepatch '%s' commited to %s", code_path, branch)
 
     reset_kgraft()
 
 
-def run(lp_name, lp_filter, force):
+def run(lp_name, lp_filter, force, arch="x86_64"):
     supported_codestreams = get_supported_codestreams()
     filtered_codestreams = filter_codestreams(lp_filter, supported_codestreams)
 
-    commit(lp_name, filtered_codestreams, force)
+    commit(lp_name, filtered_codestreams, force, arch)

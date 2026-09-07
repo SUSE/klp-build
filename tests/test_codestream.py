@@ -69,6 +69,7 @@ def test_find_obj_path_arch():
                     "x86_64":  "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
                     "ppc64le": "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
                     "s390x":   "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
+                    "aarch64": "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
                 }
             }
         },
