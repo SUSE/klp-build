@@ -206,7 +206,7 @@ The module that will be livepatched for all files. If empty,
 .I vmlinux
 will be livepatched instead.
 .TP
-.BI --archs " {ppc64le,s390x,x86_64} [{ppc64le,s390x,x86_64} ...]"
+.BI --archs " {aarch64,ppc64le,s390x,x86_64} [{aarch64,ppc64le,s390x,x86_64} ...]"
 Supported architectures for this livepatch.
 .TP
 .BI --add-patches " PATCH [PATCH ...]"
@@ -232,6 +232,9 @@ different architectures.
 .TP
 .B --no-patches
 Do not apply the patches even if they exist.
+.TP
+.BI --klp-ccp-arch " {aarch64,x86_64}"
+Architecture target for klp-ccp (default: x86_64).
 .RE
 .TP
 .B commit
@@ -316,7 +319,7 @@ Wait until all codestreams builds are finished.
 Get build logs from SUSE'S Build Service.
 .RS 7
 .TP
-.BI --arch " {ppc64le,s390x,x86_64}"
+.BI --arch " {aarch64,ppc64le,s390x,x86_64}"
 Build architecture.
 .TP
 .BI --filter
