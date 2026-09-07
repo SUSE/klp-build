@@ -161,9 +161,10 @@ def print_configs(report):
         x86_64 = cfg.get_arch("x86_64").value
         ppc64le = cfg.get_arch("ppc64le").value
         s390x = cfg.get_arch("s390x").value
+        aarch64 = cfg.get_arch("aarch64").value
         cs_str = utils.classify_codestreams_str(cs_list)
-        logging.info("%s:\nCONF: %s\nx86_64: %s\nppc64le: %s\ns390x: %s\n",
-                     cs_str, c, x86_64, ppc64le, s390x)
+        logging.info("%s:\nCONF: %s\nx86_64: %s\naarch64: %s\nppc64le: %s\ns390x: %s\n",
+                     cs_str, c, x86_64, aarch64, ppc64le, s390x)
 
 
 def filter_unset_configs(cs_list):
