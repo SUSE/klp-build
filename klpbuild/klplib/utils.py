@@ -376,7 +376,7 @@ def preferred_arch(cs_list) -> str:
     archs = affected_archs(cs_list)
 
     # the preference order
-    for arch in ["x86_64", "s390x", "ppc64le"]:
+    for arch in ["x86_64", "aarch64", "s390x", "ppc64le"]:
         if arch in archs:
             return arch
 
