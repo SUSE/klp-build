@@ -3,7 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
-from klpbuild.klplib.kernel_tree import get_commit_data, get_commit_body, find_commit
+from klpbuild.klplib.kernel import get_commit_data, get_commit_body, find_commit
 
 def test_multiline_upstream_commit_subject():
     _, subj, _ = get_commit_data("49c47cc21b5b")

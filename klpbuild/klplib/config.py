@@ -91,6 +91,19 @@ def get_user_path(entry, isdir=True, isopt=False):
     return p
 
 
+@__check_config_is_loaded
+def get_repos_dir():
+    """
+    Get the repos directory for per-user git worktrees and FUSE mounts.
+    Falls back to data_dir's parent / "repos" for configs without repos_dir.
+    """
+    p = get_user_path('repos_dir', isopt=True)
+    if p == Path(""):
+        p = get_user_path('data_dir').parent / "repos"
+        os.makedirs(p, exist_ok=True)
+    return p
+
+
 def __get_user_conf_file():
     """
     Returns the file path to the user configuration file.
@@ -114,12 +127,14 @@ def __setup_user_env(basedir):
     """
     workdir = Path(basedir)/"livepatches"
     datadir = Path(basedir)/"data"
+    reposdir = Path(basedir)/"repos"
     user_conf_file = __get_user_conf_file()
 
     config = ConfigParser(allow_no_value=True)
 
     config['Paths'] = {'work_dir': workdir,
                        'data_dir': datadir,
+                       'repos_dir': reposdir,
                        '## SUSE internal use only ##': None,
                        '#kgr_patches_dir': 'kgraft-patches/',
                        '#kgr_patches_tests_dir': 'kgraft-patches_testscripts/',
@@ -135,6 +150,7 @@ def __setup_user_env(basedir):
 
     os.makedirs(workdir, exist_ok=True)
     os.makedirs(datadir, exist_ok=True)
+    os.makedirs(reposdir, exist_ok=True)
 
 
 def __load_user_conf():

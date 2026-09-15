@@ -1,9 +1,10 @@
 [Paths]
-work_dir = klp/livepatches
-data_dir = klp/data
+work_dir = /root/klp/livepatches
+data_dir = /root/klp/data
+repos_dir = /root/klp/repos
 ## suse internal use only ##
-kernel_src_dir = build/kernel-source/
-kernel_dir = build/kernel/
+kernel_src_dir = /root/kernel-source/
+kernel_dir = /root/kernel/
 
 [Settings]
 workers = 2
