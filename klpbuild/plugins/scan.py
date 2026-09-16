@@ -123,7 +123,7 @@ def scan_job(bug, cve):
     if npatches:
         result.status = f"Fixed({npatches})"
 
-    if dep and "security-team" not in dep.assigned_to:
+    if dep and "security" not in dep.assigned_to:
         result.status = f"Incomplete({npatches})"
 
     if affected_cs:

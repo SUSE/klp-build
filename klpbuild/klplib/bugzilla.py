@@ -209,13 +209,13 @@ def get_kss_watchdog_report(bug):
 
 
 def is_bug_dropped(bug):
-    return (bug.resolution in {"INVALID", "WONTFIX", "DUPLICATED"} or
-            "NO CODESTREAM AFFECTED" in get_kss_watchdog_report(bug))
+    return bug.resolution in {"INVALID", "WONTFIX", "DUPLICATED"}
 
 
 def is_bug_fixed(bug):
     return (bug.resolution == "FIXED" or
-            "NO ACTION NEEDED" in get_kss_watchdog_report(bug))
+            "NO ACTION NEEDED" in get_kss_watchdog_report(bug) or
+            "NO CODESTREAM AFFECTED" in get_kss_watchdog_report(bug))
 
 
 def is_bug_embargoed(bug):
