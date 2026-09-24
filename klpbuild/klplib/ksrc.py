@@ -340,12 +340,12 @@ def ksrc_is_module_supported(module, kernel):
         """
     unsupported_markers = {
         "-",
-        "+external",
         "-!optional"
     }
 
     supported_markers = {
         "+base",
+        "+external",
     }
 
     mpath = module
@@ -385,7 +385,8 @@ def ksrc_is_module_supported(module, kernel):
             break
 
         # Blacklisted, but supported for livepatching.
-        if re.match(r"\+.*-kmp", markers[0]):
+        # The modules are shipped in different kernel packages.
+        if re.match(r"\+.*-kmp", markers[0]) or markers[0] == "+external":
             blacklisted = True
 
         # Check if any marker belongs to UNSUPPORTED_MARKERS

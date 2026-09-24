@@ -51,8 +51,8 @@ def test_is_module_supported():
 
     mod = "net/tipc/tipc"
     # Expected: "+external	net/tipc/tipc"
-    supported, _ = ksrc_is_module_supported(mod, "6.4.0-150600.23.65")
-    assert not supported
+    supported, filtered = ksrc_is_module_supported(mod, "6.4.0-150600.23.65")
+    assert supported and filtered
 
     mod = "net/netfilter/ipset/ip_set_bitmap_ip"
     # Expected: "+base	net/netfilter/ipset/ip_set_bitmap_ip    # ipset: IP bitmap"
