@@ -70,7 +70,7 @@ def test_get_rt_patches():
             "patches.suse/bpf-Check-bloom-filter-map-value-size.patch",
             "patches.suse/bpf-Protect-against-int-overflow-for-stack-access-si.patch"
             ]
-    patches = get_branch_patches("2024-35905", "SUSE-2024-RT")
+    patches = get_branch_patches("SUSE-2024-RT", "2024-35905")
     assert patches and expected == patches
 
 
