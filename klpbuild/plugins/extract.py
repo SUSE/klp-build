@@ -868,10 +868,10 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
 
     group_equal_files(lp_name, working_cs, klp_ccp_arch)
 
-    pref_archs = utils.preferred_arch(working_cs)
-    if 'x86_64' not in pref_archs:
-        logging.warning("ATTENTION! The current livepatch doesn't affect x86_64. "
+    pref_arch = utils.preferred_arch(working_cs)
+    if pref_arch not in ["x86_64", "aarch64"]:
+        logging.warning("ATTENTION! The current livepatch doesn't affect x86_64 or aarch64. "
                         "klp-ccp doesn't officially support other architectures "
-                        "besides x86, meaning that it can generate wrong code.")
+                        "besides x86 and aarch64, meaning that it can generate wrong code.")
 
     logging.info("\nDone. Extract finished.")
