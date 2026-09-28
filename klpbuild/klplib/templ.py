@@ -397,14 +397,14 @@ ${get_entries(lpdir, bsc, cs)}
 
 TEMPL_PATCHED = """\
 <%
-def get_patched(cs, check_enabled):
+def get_patched(cs, check_enabled, arch):
     ret = []
     for ffile, fdata in cs.files.items():
         conf = ''
         if check_enabled and fdata.config_name:
             conf = f' IS_ENABLED({fdata.config_name})'
 
-        mod = cs.get_file_mod(ffile)
+        mod = cs.get_file_mod(ffile, arch)
         mod_str = mod.lp_module_name
 
         syms = list(fdata.klpp_symbols.keys())
@@ -414,11 +414,11 @@ def get_patched(cs, check_enabled):
 
     return "\\n".join(ret)
 %>\
-${get_patched(cs, check_enabled)}
+${get_patched(cs, check_enabled, arch)}
 """
 
 
-def get_multi_funcs(cs, lp_name):
+def get_multi_funcs(cs, lp_name, arch=None):
     '''
     Generate the 'livepatch.c' that wires up multiple inits() and
     cleanups().
@@ -434,7 +434,7 @@ def get_multi_funcs(cs, lp_name):
             continue
 
         fname = get_fname(cs.lp_out_file(lp_name, file))
-        mod = cs.get_file_mod(file)
+        mod = cs.get_file_mod(file, arch)
         cln = f"\t{fname}_cleanup();\n" if not mod.is_vmlinux else ''
         init = f"\tret = {fname}_init();\n\tif (ret)\n\t\treturn ret;\n"
 
@@ -450,7 +450,7 @@ def __preproc_slashes(text):
 
 
 def __generate_patched_conf(lp_name, cs, arch):
-    render_vars = {"cs": cs, "check_enabled": __is_check_enabled(cs)}
+    render_vars = {"cs": cs, "check_enabled": __is_check_enabled(cs), "arch": arch}
     with open(Path(cs.get_lp_dir(lp_name, arch), "patched_funcs.csv"), "w") as f:
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
@@ -487,7 +487,7 @@ def __generate_klpp_header(cs):
     return fwd_decls + '\n'.join(funcs)
 
 
-def __generate_header_file(lp_name, lp_path, cs):
+def __generate_header_file(lp_name, lp_path, cs, arch):
     out_name = f"livepatch_{lp_name}.h"
     render_vars = {
         "fname": get_fname(out_name),
@@ -507,7 +507,7 @@ def __generate_header_file(lp_name, lp_path, cs):
 
         for src_file, data in cs.files.items():
             configs.add(data.config_name)
-            mod = cs.get_file_mod(src_file)
+            mod = cs.get_file_mod(src_file, arch)
             # If we have external symbols we need an init function to load them. If the module
             # isn't vmlinux then we also need an _exit function
             if data.ext_symbols:
@@ -577,13 +577,13 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name, arch):
     if not src_file:
         if cs.needs_ibt():
             return
-        inits, cleanups = get_multi_funcs(cs, lp_name)
+        inits, cleanups = get_multi_funcs(cs, lp_name, arch)
         tvars.update({"inits": inits, "cleanups": cleanups})
         temp_str = TEMPL_MULTI_ENTRY
         lp_inc_dir = Path("non-existent")
     else:
         fdata = cs.files[str(src_file)]
-        mod = cs.get_file_mod(src_file)
+        mod = cs.get_file_mod(src_file, arch)
         tvars.update({
             "config": fdata.config_name or "",
             "ext_vars": fdata.ext_symbols,
@@ -615,7 +615,7 @@ def generate_livepatches(lp_name, cs, arch):
     # If there are more then one source file, we cannot fully infer what are
     # the correct configs and mods to be livepatched, so leave the mod and
     # config entries empty
-    __generate_header_file(lp_name, lp_path, cs)
+    __generate_header_file(lp_name, lp_path, cs, arch)
 
     # Run the template engine for each generated source file.
     for src_file, _ in files.items():
