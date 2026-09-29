@@ -33,8 +33,9 @@ def run(lp_name, no_test, version):
     kgr_patches = get_user_path('kgr_patches_dir')
 
     # Remove dir to avoid leftover patches with different names
-    patches_dir = utils.get_workdir(lp_name, True) / "patches"
+    patches_dir = utils.get_workdir(lp_name) / "patches"
     shutil.rmtree(patches_dir, ignore_errors=True)
+    patches_dir.mkdir(parents=True)
 
     prefix = f"Klp-patches][PATCH {ver}"
 
