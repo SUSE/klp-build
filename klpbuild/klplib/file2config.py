@@ -16,6 +16,7 @@ archs_config = {
         's390x': {'conf': "CONFIG_S390", 'module': AffectedModule.VMLINUX},
         'x86_64': {'conf': "CONFIG_X86_64", 'module': AffectedModule.VMLINUX},
         'ppc64le': {'conf': "CONFIG_PPC64", 'module': AffectedModule.VMLINUX},
+        'aarch64': {'conf': "CONFIG_ARM64", 'module': AffectedModule.VMLINUX},
 }
 
 
@@ -40,6 +41,8 @@ def _get_arch_in_path(path: str) -> str:
         return "x86_64"
     if "powerpc" in path:
         return "ppc64le"
+    if "arm64" in path:
+        return "aarch64"
 
     return None
 

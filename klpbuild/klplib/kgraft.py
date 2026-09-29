@@ -60,8 +60,8 @@ def fetch_branch(branch, remote="origin"):
         )
 
 
-def rebase_lp_branch(branch, new_base, remote="origin"):
-    new_base = f"{remote}/{new_base}"
+def rebase_lp_branch(branch, new_base):
+    new_base = f"{new_base}"
     subprocess.check_output(
             ["git", "rebase", new_base, branch],
             stderr=subprocess.STDOUT, cwd=get_kgraft()
@@ -120,7 +120,7 @@ def create_release_branch(cs, lp_branch, prefix):
     release_branch = f"{prefix}/{product_branch}/{str(lp_branch)}"
 
     try:
-        fetch_branch(product_branch)
+        # fetch_branch(product_branch)
         create_lp_branch(release_branch, lp_branch)
         rebase_lp_branch(release_branch, product_branch)
     except subprocess.CalledProcessError:

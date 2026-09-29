@@ -223,9 +223,12 @@ def test_preferred_arch():
         return Codestream("15.5u10", configs={"CONFIG_A": _archs_as_module(archs)})
 
     # x86_64 is top priority
-    assert utils.preferred_arch([make_cs(["x86_64", "s390x", "ppc64le"])]) == "x86_64"
+    assert utils.preferred_arch([make_cs(["x86_64", "aarch64", "s390x", "ppc64le"])]) == "x86_64"
 
-    # s390x preferred over ppc64le when x86_64 absent
+    # aarch64 preferred over s390x and ppc64le when x86_64 absent
+    assert utils.preferred_arch([make_cs(["aarch64", "s390x", "ppc64le"])]) == "aarch64"
+
+    # s390x preferred over ppc64le when x86_64 and aarch64 absent
     assert utils.preferred_arch([make_cs(["s390x", "ppc64le"])]) == "s390x"
 
     # ppc64le when it's the only one
