@@ -34,7 +34,7 @@ class FakeCS:
     def lp_out_file(self, lp, f):
         return f"{lp}_{f.replace('/', '_').replace('-', '_')}"
 
-    def get_file_mod(self, f):
+    def get_file_mod(self, f, arch=None):
         # Mirrors Codestream.get_file_mod: returns an AffectedModule, with the
         # same instance returned across calls so cache_obj_path mutations stay
         # visible (matching Codestream.modules.setdefault semantics).
@@ -61,9 +61,9 @@ class FakeCS:
         return self._supported.get(mod, (True, False))
 
 
-def get_file_content(lp_name, lp_filter, fname=None):
+def get_file_content(lp_name, lp_filter, fname=None, arch="x86_64"):
     # Check the generated LP files
-    path = get_workdir(lp_name)/"ccp"/lp_filter/"lp"
+    path = get_workdir(lp_name)/"ccp"/arch/lp_filter/"lp"
 
     if not fname:
         fname = f'livepatch_{lp_name}.c'

@@ -304,45 +304,49 @@ class Codestream:
         return f"{self.base_cs_name()}u{self.update}"
 
 
-    def get_ccp_dir(self, lp_name):
+    def get_ccp_dir(self, lp_name, arch="x86_64"):
         """
         Get the path to the ccp directory of the current codestream.
 
         Args:
             lp_name (str): The name of the live patch.
+            arch (str): Target architecture (default: "x86_64").
 
         Returns:
             Path: The path to the ccp directory of the current codestream.
         """
-        return get_workdir(lp_name, True) / "ccp" / self.full_cs_name()
+        assert arch in ["x86_64", "aarch64"]
+        return get_workdir(lp_name, True) / "ccp" / arch / self.full_cs_name()
 
 
-    def get_lp_dir(self, lp_name):
+    def get_lp_dir(self, lp_name, arch="x86_64"):
         """
         Get the path to the extracted livepatches directory of the current codestream.
 
         Args:
             lp_name (str): The name of the live patch.
+            arch (str): Target architecture (default: "x86_64").
 
         returns:
             path: The path to the extracted livepatches directory of the current codestream.
         """
-        return self.get_ccp_dir(lp_name)/"lp"
+        return self.get_ccp_dir(lp_name, arch)/"lp"
 
 
-    def get_ccp_work_dir(self, lp_name, fname):
+    def get_ccp_work_dir(self, lp_name, fname, arch="x86_64"):
         """
         Get the path to the klp-ccp working directory of the current codestream.
 
         Args:
             lp_name (str): The name of the live patch.
             fname (str): The name of the file we're extracting.
+            arch (str): Target architecture (default: "x86_64").
 
         returns:
             Path: The path to the klp-ccp working directory of the current codestream.
         """
         fpath = f'work_{str(fname).replace("/", "_")}'
-        return self.get_ccp_dir(lp_name)/fpath
+        return self.get_ccp_dir(lp_name, arch)/fpath
 
 
     def get_base_product_name(self):

@@ -127,20 +127,21 @@ def get_lp_number(lp_name):
     return lp_name.replace("bsc", "")
 
 
-def get_lp_groups(lp_name, codestreams):
+def get_lp_groups(lp_name, codestreams, arch="x86_64"):
     '''
     Get the codestreams that are contained in each group indicated
-    in the ccp/groups file.
+    in the ccp/<arch>/groups file.
 
     Args:
         lp_name (str): The name of the livepatch.
         codestreams (list): Filtered list of codestreams to group.
+        arch (str): Target architecture (default: "x86_64").
 
     Returns:
         Dict{string:list}: The list of codestreams contained in each group.
     '''
 
-    workdir = get_workdir(lp_name)/"ccp"
+    workdir = get_workdir(lp_name)/"ccp"/arch
     with open(f"{workdir}/groups", "r") as f:
         groups = f.read()
 
