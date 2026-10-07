@@ -3,6 +3,7 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza
 
+import argparse
 import inspect
 import json
 import logging
@@ -22,16 +23,19 @@ from klpbuild.plugins.extract import (
     get_klpp_symbols,
     lp_out_cleanup,
     parse_ccp_warnings,
+    register_argparser,
 )
 from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS
 
 
-def _make_fdata(ext_symbols=None, klpp_symbols=None):
+def _make_fdata(ext_symbols=None, klpp_symbols=None, arch="x86_64"):
     """Create an AffectedFile with ext_symbols/klpp_symbols set for testing."""
     f = AffectedFile("test.c")
-    f.ext_symbols = ext_symbols or {}
-    f.klpp_symbols = klpp_symbols or {}
+    if ext_symbols is not None:
+        f.set_ext_symbols(arch, ext_symbols)
+    if klpp_symbols is not None:
+        f.set_klpp_symbols(arch, klpp_symbols)
     return f
 
 
@@ -619,7 +623,7 @@ def test_parse_ccp_warnings_dup_symbol(tmp_path):
         f.write('conflicting definitions for symbol "sk_filter_trim_cap" found in ELF\n')
         parse_ccp_warnings(f, start_pos, cs, fname)
 
-    assert cs.files[fname].dup_symbols == ["sk_filter_trim_cap"]
+    assert cs.files[fname].get_dup_symbols("x86_64") == ["sk_filter_trim_cap"]
 
 
 def test_parse_ccp_warnings_no_warnings(tmp_path, caplog):
@@ -637,9 +641,9 @@ def test_parse_ccp_warnings_no_warnings(tmp_path, caplog):
             parse_ccp_warnings(f, start_pos, cs, fname)
 
     assert caplog.text == ""
-    # AffectedFile.dup_symbols is always present (default []); no warning
+    # AffectedFile.dup_symbols is always present (default {}); no warning
     # handler should have appended anything.
-    assert cs.files[fname].dup_symbols == []
+    assert cs.files[fname].get_dup_symbols("x86_64") == []
 
 
 def test_parse_ccp_warnings_multiple_types(tmp_path, caplog):
@@ -660,7 +664,7 @@ def test_parse_ccp_warnings_multiple_types(tmp_path, caplog):
 
     assert "Symbol tcp_v4_connect contains optimized clone: tcp_v4_connect.isra.0" in caplog.text
     assert "Unable to verify if lockdep_rtnl_is_held symbol is inlined or not. Please check manually." in caplog.text
-    assert cs.files[fname].dup_symbols == ["nf_conntrack_in"]
+    assert cs.files[fname].get_dup_symbols("x86_64") == ["nf_conntrack_in"]
 
 
 def test_parse_ccp_warnings_respects_start_pos(tmp_path):
@@ -676,7 +680,7 @@ def test_parse_ccp_warnings_respects_start_pos(tmp_path):
         f.write('conflicting definitions for symbol "sd_open" found in ELF\n')
         parse_ccp_warnings(f, start_pos, cs, fname)
 
-    assert cs.files[fname].dup_symbols == ["sd_open"]
+    assert cs.files[fname].get_dup_symbols("x86_64") == ["sd_open"]
 
 
 def test_parse_ccp_warnings_multiple_dup_symbols(tmp_path):
@@ -691,4 +695,21 @@ def test_parse_ccp_warnings_multiple_dup_symbols(tmp_path):
         f.write('conflicting definitions for symbol "kmem_cache_free" found in ELF\n')
         parse_ccp_warnings(f, start_pos, cs, fname)
 
-    assert cs.files[fname].dup_symbols == ["kmem_cache_alloc", "kmem_cache_free"]
+    assert cs.files[fname].get_dup_symbols("x86_64") == ["kmem_cache_alloc", "kmem_cache_free"]
+
+
+def test_extract_argparser_klp_ccp_arch():
+    """Verify that both -k and --klp-ccp-arch parse correctly."""
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="cmd")
+    register_argparser(sub)
+
+    args_short = parser.parse_args(["extract", "-n", "test_lp", "-k", "aarch64"])
+    assert args_short.klp_ccp_arch == "aarch64"
+
+    args_long = parser.parse_args(["extract", "-n", "test_lp", "--klp-ccp-arch", "aarch64"])
+    assert args_long.klp_ccp_arch == "aarch64"
+
+    args_default = parser.parse_args(["extract", "-n", "test_lp"])
+    assert args_default.klp_ccp_arch == utils.ARCH
+

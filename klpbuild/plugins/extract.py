@@ -60,22 +60,28 @@ def register_argparser(subparser):
     extract_opts.add_argument(
         "--no-patches", action="store_true", help="Do not apply patches if they exist"
     )
+    extract_opts.add_argument(
+        "-k",
+        "--klp-ccp-arch",
+        type=str,
+        default=utils.ARCH,
+        choices=["x86_64", "aarch64"],
+        help="Architecture target for klp-ccp (default: x86_64)",
+    )
 
 
-def run(lp_name, lp_filter, no_patches, avoid_ext):
-    return extract(lp_name, lp_filter, no_patches, avoid_ext)
+def run(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
+    return extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch)
 
 
-def get_cs_code(lp_name, working_cs):
+def get_cs_code(lp_name, working_cs, klp_ccp_arch="x86_64"):
     cs_files = {}
 
     # Mount the cs_files dict
     for cs in working_cs:
         cs_files.setdefault(cs.full_cs_name(), [])
 
-        arch = utils.preferred_arch([cs])
-
-        for fpath in cs.get_lp_dir(lp_name).iterdir():
+        for fpath in cs.get_lp_dir(lp_name, klp_ccp_arch).iterdir():
             fname = fpath.name
             with open(fpath.absolute(), "r+") as fi:
                 src = fi.read()
@@ -90,7 +96,7 @@ def get_cs_code(lp_name, working_cs):
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f"{utils.get_datadir(arch)}.+{fname}", "", src)
+                src = re.sub(f"{utils.get_datadir(klp_ccp_arch)}.+{fname}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(r"\.lineno = \d+,", "", src)
@@ -177,6 +183,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
 
         try:
             completed = subprocess.check_output(make_args,
+                                                stdin=subprocess.DEVNULL,
                                                 stderr=f).decode().strip()
             f.write("Full output of the make command:\n")
             f.write(str(completed))
@@ -220,7 +227,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         return ret
 
 
-def get_missing_ext_symbols(working_cs):
+def get_missing_ext_symbols(working_cs, klp_ccp_arch="x86_64"):
     '''
     Find the symbols that were not externalized and report those that
     can be unexternalized.
@@ -235,7 +242,7 @@ def get_missing_ext_symbols(working_cs):
         # only once per object
         obj_syms = {}
         for fdata in cs.files.values():
-            for obj, syms in fdata.ext_symbols.items():
+            for obj, syms in fdata.get_ext_symbols(klp_ccp_arch).items():
                 obj_syms.setdefault(obj, [])
                 obj_syms[obj].extend(syms)
 
@@ -256,11 +263,11 @@ def get_missing_ext_symbols(working_cs):
     return missing_syms, unext_syms
 
 
-def fix_ext_symbols(cs, fdata: AffectedFile, lp_out):
+def fix_ext_symbols(cs, fdata: AffectedFile, lp_out, arch="x86_64"):
     '''
     Fix klp-ccp mistakes on non-ibt livepatches:
         - Drop any duplicated externalized symbol declaration generated
-          by klp-ccp. This is a workaround for:
+        - by klp-ccp. This is a workaround for:
           https://github.com/SUSE/klp-ccp/issues/13
         - Refactor percpu externalized symbols declaration. Default one
           crashes at runtime.
@@ -270,7 +277,7 @@ def fix_ext_symbols(cs, fdata: AffectedFile, lp_out):
     if cs.needs_ibt():
         return lp_out
 
-    for sym_list in fdata.ext_symbols.values():
+    for sym_list in fdata.get_ext_symbols(arch).values():
         for s in sym_list:
             # Keep only static declarations
             lp_out = re.sub(rf"^(?!(?:static|STATIC)|\s|#)\w[^;:()=]+\(\*klpe_{s}\)[^;:=]*;",
@@ -323,7 +330,7 @@ def get_ext_symbols(out_dir):
     return symbols
 
 
-def fix_klpp_symbols(fdata: AffectedFile, lp_out):
+def fix_klpp_symbols(fdata: AffectedFile, lp_out, arch="x86_64"):
     '''
         - Removes any klpp function declaration in the .c files to
           avoid signature conflicts with the declarations in the header
@@ -332,7 +339,7 @@ def fix_klpp_symbols(fdata: AffectedFile, lp_out):
         - Remove 'static' keyword from klpp function definition.
     '''
 
-    for sym, proto in fdata.klpp_symbols.items():
+    for sym, proto in fdata.get_klpp_symbols(arch).items():
         rfmt = fr"[\w\*\s]+?\bklpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\)\s*;\n?"
         lp_out = re.sub(rfmt, '', lp_out, flags=re.S)
 
@@ -379,8 +386,8 @@ def get_klpp_symbols(out_dir, lp_out, mod_name):
     return klpp_syms
 
 
-def get_cmd_from_json(cs, fname, sdir):
-    cc_file = cs.get_obj_dir()/"compile_commands.json"
+def get_cmd_from_json(cs, fname, sdir, arch="x86_64"):
+    cc_file = cs.get_obj_dir(arch)/"compile_commands.json"
 
     # Older codestreams doens't support compile_commands.json, so use make for them
     if not cc_file.exists():
@@ -464,11 +471,11 @@ def apply_all_patches(lp_name, cs):
 
 
 # Get the code for each codestream, removing boilerplate code
-def group_equal_files(lp_name, working_cs):
+def group_equal_files(lp_name, working_cs, klp_ccp_arch="x86_64"):
     cs_equal = []
     processed = []
 
-    cs_files = get_cs_code(lp_name, working_cs)
+    cs_files = get_cs_code(lp_name, working_cs, klp_ccp_arch)
     toprocess = list(cs_files.keys())
     while len(toprocess) > 0:
         current_cs_list = []
@@ -527,7 +534,9 @@ def group_equal_files(lp_name, working_cs):
     # Sort between all groups of codestreams
     groups = natsorted(groups)
 
-    with open(utils.get_workdir(lp_name)/"ccp"/"groups", "w") as f:
+    groups_dir = utils.get_workdir(lp_name)/"ccp"/klp_ccp_arch
+    groups_dir.mkdir(parents=True, exist_ok=True)
+    with open(groups_dir/"groups", "w") as f:
         f.write("\n".join(groups))
 
     logging.info("\nGrouping codestreams that share the same content and files:")
@@ -535,13 +544,13 @@ def group_equal_files(lp_name, working_cs):
         logging.info("\t%s", group)
 
 
-def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir):
+def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir, klp_ccp_arch="x86_64"):
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
     funcs = ",".join(sorted(fdata.affected_symbols))
 
     ccp_args = [str(shutil.which("klp-ccp")), "-P", "suse.KlpPolicy",
-                "--compiler=x86_64-gcc-9.1.0", "-i", f"{funcs}", "-o",
+                f"--compiler={klp_ccp_arch}-gcc-9.1.0", "-i", f"{funcs}", "-o",
                 f"{str(lp_out)}", "--"]
 
     # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
@@ -584,20 +593,19 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir):
 
     # Needed, otherwise threads would interfere with each other
     env = os.environ.copy()
-    arch = utils.preferred_arch([cs])
-    obj = cs.get_file_mod(fname, arch)
+    obj = cs.get_file_mod(fname, klp_ccp_arch)
 
     # ``find_obj_path`` resolves and caches the per-arch path on ``obj``; we
     # rely on the path having been populated earlier (during setup), but call
     # it here as a safety net so a missing cache entry does not crash.
-    obj_path = obj.get_obj_path(arch) or str(cs.find_obj_path(arch, obj.name))
+    obj_path = obj.get_obj_path(klp_ccp_arch) or str(cs.find_obj_path(klp_ccp_arch, obj.name))
 
     env["KCP_KLP_CONVERT_EXTS"] = "1" if cs.needs_ibt() else "0"
-    env["KCP_MOD_SYMVERS"] = str(Path(cs.get_boot_dir(), f'{cs.get_boot_filename("symvers")}.gz'))
-    env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir())
-    env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(arch) / obj_path)
+    env["KCP_MOD_SYMVERS"] = str(Path(cs.get_boot_dir(klp_ccp_arch), f'{cs.get_boot_filename("symvers")}.gz'))
+    env["KCP_KBUILD_ODIR"] = str(cs.get_obj_dir(klp_ccp_arch))
+    env["KCP_PATCHED_OBJ"] = str(utils.get_datadir(klp_ccp_arch) / obj_path)
     env["KCP_KBUILD_SDIR"] = str(sdir)
-    env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname))
+    env["KCP_IPA_CLONES_DUMP"] = str(cs.get_ipa_file(fname, klp_ccp_arch))
     env["KCP_WORK_DIR"] = str(out_dir)
     env["KCP_READELF"] = "readelf"
     env["KCP_RENAME_PREFIX"] = "klp"
@@ -668,8 +676,8 @@ def _warn_ipa_removed(match, cs, fname):
                     cs.full_cs_name(), fname, symbol_name)
 
 
-def _collect_dup_symbol(match, cs, fname):
-    cs.files[fname].dup_symbols.append(match.group(1))
+def _collect_dup_symbol(match, cs, fname, arch="x86_64"):
+    cs.files[fname].add_dup_symbol(arch, match.group(1))
 
 
 CCP_WARNING_SPECS = [
@@ -679,19 +687,22 @@ CCP_WARNING_SPECS = [
 ]
 
 
-def parse_ccp_warnings(f, start_pos, cs, fname):
+def parse_ccp_warnings(f, start_pos, cs, fname, arch="x86_64"):
     f.seek(start_pos)
     for line in f:
         for pattern, handler in CCP_WARNING_SPECS:
             match = re.search(pattern, line)
             if match:
-                handler(match, cs, fname)
+                if handler == _collect_dup_symbol:
+                    handler(match, cs, fname, arch)
+                else:
+                    handler(match, cs, fname)
 
 
-def process(lp_name, total, args, avoid_ext, no_patches):
+def process(lp_name, total, args, avoid_ext, no_patches, klp_ccp_arch="x86_64"):
     i, make_lock, fname, cs, fdata = args
 
-    odir = cs.get_obj_dir()
+    odir = cs.get_obj_dir(klp_ccp_arch)
 
     if not no_patches and cs.needs_patches():
         sdir = get_lp_branch_path(lp_name, cs)
@@ -704,18 +715,18 @@ def process(lp_name, total, args, avoid_ext, no_patches):
 
     logging.info("%s %s %s", idx, cs_info, fname)
 
-    out_dir = cs.get_ccp_work_dir(lp_name, fname)
+    out_dir = cs.get_ccp_work_dir(lp_name, fname, klp_ccp_arch)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Make can regenerate fixdep for each file being processed per
     # codestream, so avoid the TXTBUSY error by serializing the 'make -sn'
     # calls. Make is pretty fast, so there isn't a real slow down here.
-    cmd = get_cmd_from_json(cs, fname, sdir)
+    cmd = get_cmd_from_json(cs, fname, sdir, klp_ccp_arch)
     if not cmd:
         with make_lock:
             cmd = get_make_cmd(out_dir, cs, fname, odir, sdir)
 
-    args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir)
+    args, lenv = cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir, klp_ccp_arch)
 
     # Detect and set ibt information. It will be used in the TemplateGen
     if '-fcf-protection' in cmd or cs.needs_ibt():
@@ -735,17 +746,17 @@ def process(lp_name, total, args, avoid_ext, no_patches):
         except Exception as exc:
             raise RuntimeError(f"Error when processing {cs.full_cs_name()}:{fname}. Check file {out_log} for details.") from exc
 
-        parse_ccp_warnings(f, start_pos, cs, fname)
+        parse_ccp_warnings(f, start_pos, cs, fname, klp_ccp_arch)
 
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
-    cs.files[fname].ext_symbols = get_ext_symbols(out_dir)
-    cs.files[fname].klpp_symbols = get_klpp_symbols(out_dir, lp_out, fdata.module_name)
+    cs.files[fname].set_ext_symbols(klp_ccp_arch, get_ext_symbols(out_dir))
+    cs.files[fname].set_klpp_symbols(klp_ccp_arch, get_klpp_symbols(out_dir, lp_out, fdata.module_name))
 
-    lp_out_cleanup(cs, cs.files[fname], lp_out, sdir)
+    lp_out_cleanup(cs, cs.files[fname], lp_out, sdir, klp_ccp_arch)
 
 
-def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir):
+def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
     """
     Open the file, read, seek to the beginning, write the new data, and
     then truncate (which will use the current position in file as the
@@ -771,22 +782,23 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir):
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
-        file_buf = fix_ext_symbols(cs, fdata, file_buf)
-        file_buf = fix_klpp_symbols(fdata, file_buf)
+        file_buf = fix_ext_symbols(cs, fdata, file_buf, arch)
+        file_buf = fix_klpp_symbols(fdata, file_buf, arch)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
 
 
-def extract(lp_name, lp_filter, no_patches, avoid_ext):
+def extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch="x86_64"):
     with data_lock():
-        start_extract(lp_name, lp_filter, no_patches, avoid_ext)
+        start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch)
 
 
-def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
+def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
     logging.info("Work directory: %s", utils.get_workdir(lp_name, True))
 
     working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
+    working_cs = [cs for cs in working_cs if klp_ccp_arch in cs.archs]
 
     if len(working_cs) == 0:
         logging.error("No codestreams found")
@@ -799,7 +811,7 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
     make_lock = Lock()
     for cs in working_cs:
         # remove any previously generated files and leftover patches
-        shutil.rmtree(cs.get_ccp_dir(lp_name), ignore_errors=True)
+        shutil.rmtree(cs.get_ccp_dir(lp_name, klp_ccp_arch), ignore_errors=True)
         remove_patches(lp_name, cs)
 
         # Apply patches before the LPs were created
@@ -811,14 +823,14 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
             i += 1
 
     workers = int(get_user_settings("workers"))
-    logging.info("Extracting code using ccp")
+    logging.info("Extracting code using ccp for %s", klp_ccp_arch)
     logging.info("\nGenerating livepatches for %d file(s) using %d workers...", len(args), workers)
     logging.info("\t\tCodestream\tFile")
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         try:
             futures = executor.map(process, repeat(lp_name), repeat(len(args)),
-                                   args, repeat(avoid_ext), repeat(no_patches))
+                                   args, repeat(avoid_ext), repeat(no_patches), repeat(klp_ccp_arch))
             for future in futures:
                 if future:
                     logging.error(future)
@@ -830,7 +842,7 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
 
     # Create the livepatches per codestream
     for cs in working_cs:
-        generate_livepatches(lp_name, cs)
+        generate_livepatches(lp_name, cs, klp_ccp_arch)
         # Cleanup patches after the LPs were created if they were applied
         if not no_patches:
             remove_patches(lp_name, cs)
@@ -840,18 +852,19 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
     # Check for duplicated symbols spotted by klp-ccp
     for cs in working_cs:
         for f, fdata in cs.files.items():
-            if fdata.dup_symbols:
+            dup_syms = fdata.get_dup_symbols(klp_ccp_arch)
+            if dup_syms:
                 logging.warning("%s:%s: Duplicated symbols (check the sympos):",
                                 cs.full_cs_name(), f)
-                logging.warning("\t%s", ", ".join(fdata.dup_symbols))
+                logging.warning("\t%s", ", ".join(dup_syms))
 
     logging.info("\nChecking the externalized symbols in other architectures...")
 
-    missing, unext = get_missing_ext_symbols(working_cs)
+    missing, unext = get_missing_ext_symbols(working_cs, klp_ccp_arch)
     if unext:
         logging.info("\nUnexternalyzing symbols:\n%s\n", ', '.join(unext))
         start_extract(lp_name, lp_filter, no_patches,
-                      avoid_ext + list(unext))
+                      avoid_ext + list(unext), klp_ccp_arch)
         sys.exit(0)
 
     if missing:
@@ -861,12 +874,12 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext):
         logging.warning("Symbols not found:")
         logging.warning(json.dumps(missing, indent=4))
 
-    group_equal_files(lp_name, working_cs)
+    group_equal_files(lp_name, working_cs, klp_ccp_arch)
 
-    pref_archs = utils.preferred_arch(working_cs)
-    if 'x86_64' not in pref_archs:
-        logging.warning("ATTENTION! The current livepatch doesn't affect x86_64. "
+    pref_arch = utils.preferred_arch(working_cs)
+    if pref_arch not in ["x86_64", "aarch64"]:
+        logging.warning("ATTENTION! The current livepatch doesn't affect x86_64 or aarch64. "
                         "klp-ccp doesn't officially support other architectures "
-                        "besides x86, meaning that it can generate wrong code.")
+                        "besides x86 and aarch64, meaning that it can generate wrong code.")
 
     logging.info("\nDone. Extract finished.")
