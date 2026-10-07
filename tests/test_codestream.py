@@ -37,22 +37,24 @@ def test_find_obj_path_arch():
                         "taprio_change"
                 ],
                 "ibt": False,
-                "dup_symbols": [],
+                "dup_symbols": {},
                 "ext_symbols": {
-                    "sch_taprio": [
-                        "advance_sched",
-                        "parse_taprio_schedule",
-                        "taprio_dequeue_offload",
-                        "taprio_dequeue_soft",
-                        "taprio_free_sched_cb",
-                        "taprio_get_time",
-                        "taprio_offload_free",
-                        "taprio_parse_clockid",
-                        "taprio_peek_offload",
-                        "taprio_peek_soft",
-                        "taprio_policy",
-                        "taprio_set_picos_per_byte"
-                    ]
+                    "x86_64": {
+                        "sch_taprio": [
+                            "advance_sched",
+                            "parse_taprio_schedule",
+                            "taprio_dequeue_offload",
+                            "taprio_dequeue_soft",
+                            "taprio_free_sched_cb",
+                            "taprio_get_time",
+                            "taprio_offload_free",
+                            "taprio_parse_clockid",
+                            "taprio_peek_offload",
+                            "taprio_peek_soft",
+                            "taprio_policy",
+                            "taprio_set_picos_per_byte"
+                        ]
+                    }
                 },
                 "klpp_symbols": {}
             }
@@ -69,6 +71,7 @@ def test_find_obj_path_arch():
                     "x86_64":  "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
                     "ppc64le": "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
                     "s390x":   "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
+                    "aarch64": "lib/modules/5.14.21-150500.55.68-default/kernel/net/sched/sch_taprio.ko",
                 }
             }
         },
@@ -87,6 +90,20 @@ def test_sle16rt_config():
     cs = Codestream("16.0rtu0", kernel="6.12.0-160000.11")
     config_content = cs.get_config_content()
     assert "CONFIG_RCU_BOOST_DELAY" in config_content
+
+
+def test_aarch64_config_maps_to_arm64(monkeypatch):
+    calls = []
+
+    def fake_read_rpm_file(kernel_version, file_path):
+        calls.append((kernel_version, file_path))
+        return "CONFIG_FOO=y\n"
+
+    monkeypatch.setattr("klpbuild.klplib.codestream.ksrc_read_rpm_file", fake_read_rpm_file)
+    cs = Codestream("16.1u0", kernel="6.12.0-160100.1")
+    content = cs.get_config_content("aarch64")
+    assert content == "CONFIG_FOO=y\n"
+    assert calls == [("6.12.0-160100.1", "config/arm64/default")]
 
 
 def test_get_file_mod_builtin_arch_config():
@@ -108,7 +125,7 @@ def test_get_file_mod_builtin_arch_config():
                 "module_name": "kvm",
                 "affected_symbols": ["paging32_page_fault"],
                 "ibt": False,
-                "dup_symbols": [],
+                "dup_symbols": {},
                 "ext_symbols": {},
                 "klpp_symbols": {}
             }

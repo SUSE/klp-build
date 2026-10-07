@@ -174,7 +174,8 @@ class Codestream:
         enable/disable portion of the source.
         """
 
-        target_config_file = f"config/{arch}/{self.get_kernel_type()}"
+        karch = "arm64" if arch == "aarch64" else arch
+        target_config_file = f"config/{karch}/{self.get_kernel_type()}"
         if self.sle < 16 or not self.rt:
             return ksrc_read_rpm_file(self.kernel, target_config_file)
 
@@ -182,7 +183,7 @@ class Codestream:
         # -rt kernel. The config file needs to be retrieved by merging the
         # default config with the rt config on the fly as we no longer have a
         # dedicated -rt one
-        default_config_file = f"config/{arch}/default"
+        default_config_file = f"config/{karch}/default"
         default_config_file_content = ksrc_read_rpm_file(self.kernel, default_config_file)
         target_config_file_content = ksrc_read_rpm_file(self.kernel, target_config_file)
         config_merge_script = resources.files("scripts")/"config-merge"
@@ -265,7 +266,9 @@ class Codestream:
         if self.is_micro:
             return {"s390x", "x86_64"}
 
-        # We support all architecture for all other codestreams
+        if (self.sle, self.sp) >= (16, 1):
+            return {"ppc64le", "s390x", "x86_64", "aarch64"}
+
         return {"ppc64le", "s390x", "x86_64"}
 
     def set_files(self, files):
@@ -650,10 +653,11 @@ class Codestream:
             # TODO: implement support for modules as well
             if trace_addrs:
                 # The symbol is unique, so we can grab the first entry safely
+                # TODO: missing support for aarch64
                 if arch in ["x86_64", "s390x"]:
                     self.__check_patchable_sym(arch, symbol, syms[0], trace_addrs)
 
-                else:
+                elif arch in ["ppc64le"]:
                     self.__check_patchable_sym_ppc64le(arch, symbol, syms[0], trace_addrs)
 
         return ret
