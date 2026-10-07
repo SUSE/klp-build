@@ -397,28 +397,28 @@ ${get_entries(lpdir, bsc, cs)}
 
 TEMPL_PATCHED = """\
 <%
-def get_patched(cs, check_enabled):
+def get_patched(cs, check_enabled, arch):
     ret = []
     for ffile, fdata in cs.files.items():
         conf = ''
         if check_enabled and fdata.config_name:
             conf = f' IS_ENABLED({fdata.config_name})'
 
-        mod = cs.get_file_mod(ffile)
+        mod = cs.get_file_mod(ffile, arch)
         mod_str = mod.lp_module_name
 
-        syms = list(fdata.klpp_symbols.keys())
+        syms = list(fdata.get_klpp_symbols(arch).keys())
         syms.sort()
         for sym in syms:
             ret.append(f'{mod_str} {sym} klpp_{sym}{conf}')
 
     return "\\n".join(ret)
 %>\
-${get_patched(cs, check_enabled)}
+${get_patched(cs, check_enabled, arch)}
 """
 
 
-def get_multi_funcs(cs, lp_name):
+def get_multi_funcs(cs, lp_name, arch="x86_64"):
     '''
     Generate the 'livepatch.c' that wires up multiple inits() and
     cleanups().
@@ -426,15 +426,18 @@ def get_multi_funcs(cs, lp_name):
     if cs.needs_ibt():
         return "", ""
 
+    if not arch:
+        arch = "x86_64"
+
     inits = ["\tint ret;\n"]
     cleanups = []
 
     for file, dat in cs.files.items():
-        if not dat.ext_symbols:
+        if not dat.get_ext_symbols(arch):
             continue
 
         fname = get_fname(cs.lp_out_file(lp_name, file))
-        mod = cs.get_file_mod(file)
+        mod = cs.get_file_mod(file, arch)
         cln = f"\t{fname}_cleanup();\n" if not mod.is_vmlinux else ''
         init = f"\tret = {fname}_init();\n\tif (ret)\n\t\treturn ret;\n"
 
@@ -449,13 +452,13 @@ def __preproc_slashes(text):
     return r"<%! HASH='##' %>" + txt.replace("##", "${HASH}")
 
 
-def __generate_patched_conf(lp_name, cs):
-    render_vars = {"cs": cs, "check_enabled": __is_check_enabled(cs)}
-    with open(Path(cs.get_lp_dir(lp_name), "patched_funcs.csv"), "w") as f:
+def __generate_patched_conf(lp_name, cs, arch):
+    render_vars = {"cs": cs, "check_enabled": __is_check_enabled(cs), "arch": arch}
+    with open(Path(cs.get_lp_dir(lp_name, arch), "patched_funcs.csv"), "w") as f:
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
 
-def __generate_klpp_header(cs):
+def __generate_klpp_header(cs, arch="x86_64"):
     '''
     Generate any klpp-specific header information, such as:
     - klpp functions declarations.
@@ -469,7 +472,7 @@ def __generate_klpp_header(cs):
     enums = set()
 
     for dat in cs.files.values():
-        protos = list(dat.klpp_symbols.values())
+        protos = list(dat.get_klpp_symbols(arch).values())
         funcs.extend(protos)
         for p in protos:
             structs.update(re.findall(r"(struct\s+\w+)\s*\**\w+", p))
@@ -487,7 +490,7 @@ def __generate_klpp_header(cs):
     return fwd_decls + '\n'.join(funcs)
 
 
-def __generate_header_file(lp_name, lp_path, cs):
+def __generate_header_file(lp_name, lp_path, cs, arch):
     out_name = f"livepatch_{lp_name}.h"
     render_vars = {
         "fname": get_fname(out_name),
@@ -497,7 +500,7 @@ def __generate_header_file(lp_name, lp_path, cs):
     # and klpp functions information.
     header_templ = TEMPL_IBT_H
 
-    render_vars.update({"klpp_header": __generate_klpp_header(cs)})
+    render_vars.update({"klpp_header": __generate_klpp_header(cs, arch)})
 
     if not cs.needs_ibt():
         configs = set()
@@ -507,10 +510,10 @@ def __generate_header_file(lp_name, lp_path, cs):
 
         for src_file, data in cs.files.items():
             configs.add(data.config_name)
-            mod = cs.get_file_mod(src_file)
+            mod = cs.get_file_mod(src_file, arch)
             # If we have external symbols we need an init function to load them. If the module
             # isn't vmlinux then we also need an _exit function
-            if data.ext_symbols:
+            if data.get_ext_symbols(arch):
                 if not mod.is_vmlinux:
                     # Used by the livepatch_cleanup
                     has_cleanup = True
@@ -547,7 +550,7 @@ def __generate_header_file(lp_name, lp_path, cs):
         lpdir = TemplateLookup(directories=[Path()], preprocessor=__preproc_slashes)
         f.write(Template(header_templ, lookup=lpdir).render(**render_vars))
 
-def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
+def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name, arch):
     cve = get_codestreams_data('cve')
     if not cve:
         cve = "XXXX-XXXX"
@@ -577,16 +580,16 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
     if not src_file:
         if cs.needs_ibt():
             return
-        inits, cleanups = get_multi_funcs(cs, lp_name)
+        inits, cleanups = get_multi_funcs(cs, lp_name, arch)
         tvars.update({"inits": inits, "cleanups": cleanups})
         temp_str = TEMPL_MULTI_ENTRY
         lp_inc_dir = Path("non-existent")
     else:
         fdata = cs.files[str(src_file)]
-        mod = cs.get_file_mod(src_file)
+        mod = cs.get_file_mod(src_file, arch)
         tvars.update({
             "config": fdata.config_name or "",
-            "ext_vars": fdata.ext_symbols,
+            "ext_vars": fdata.get_ext_symbols(arch),
             "ibt": fdata.ibt,
             "inc_src_file": cs.lp_out_file(lp_name, src_file),
             "mod": "" if mod.is_vmlinux else mod.lp_module_name,
@@ -597,25 +600,25 @@ def __generate_lp_file(lp_name, lp_path, cs, src_file, out_name):
             temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_MODULE
         else:
             temp_str = TEMPL_GET_EXTS + TEMPL_PATCH_VMLINUX
-        lp_inc_dir = cs.get_ccp_work_dir(lp_name, src_file)
+        lp_inc_dir = cs.get_ccp_work_dir(lp_name, src_file, arch)
 
     lpdir = TemplateLookup(directories=[lp_inc_dir], preprocessor=__preproc_slashes)
     with open(Path(lp_path, out_name), "w") as f:
         f.write(Template(TEMPL_SUSE_HEADER + temp_str, lookup=lpdir).render(**tvars))
 
-def generate_livepatches(lp_name, cs):
-    lp_path = cs.get_lp_dir(lp_name)
+def generate_livepatches(lp_name, cs, arch):
+    lp_path = cs.get_lp_dir(lp_name, arch)
     lp_path.mkdir(exist_ok=True)
 
     files = cs.files
     is_multi_files = len(files.keys()) > 1
 
-    __generate_patched_conf(lp_name, cs)
+    __generate_patched_conf(lp_name, cs, arch)
 
     # If there are more then one source file, we cannot fully infer what are
     # the correct configs and mods to be livepatched, so leave the mod and
     # config entries empty
-    __generate_header_file(lp_name, lp_path, cs)
+    __generate_header_file(lp_name, lp_path, cs, arch)
 
     # Run the template engine for each generated source file.
     for src_file, _ in files.items():
@@ -626,14 +629,14 @@ def generate_livepatches(lp_name, cs):
         out_name = f"livepatch_{lp_name}.c" if not is_multi_files else \
             cs.lp_out_file(lp_name, src_file)
 
-        __generate_lp_file(lp_name, lp_path, cs, src_file, out_name)
+        __generate_lp_file(lp_name, lp_path, cs, src_file, out_name, arch)
 
     # One additional file to encapsulate the _init and _clenaup methods
     # of the other source files
     if is_multi_files:
-        __generate_lp_file(lp_name, lp_path, cs, None, f"livepatch_{lp_name}.c")
+        __generate_lp_file(lp_name, lp_path, cs, None, f"livepatch_{lp_name}.c", arch)
 
-    __create_kbuild(lp_name, cs)
+    __create_kbuild(lp_name, cs, arch)
 
 
 def __is_check_enabled(cs: Codestream):
@@ -642,10 +645,10 @@ def __is_check_enabled(cs: Codestream):
     return cs.archs != cs.get_default_archs()
 
 
-def __create_kbuild(lp_name, cs):
+def __create_kbuild(lp_name, cs, arch):
     # Create Kbuild.inc file adding an entry for all generated livepatch files.
-    render_vars = {"bsc": lp_name, "cs": cs, "lpdir": cs.get_lp_dir(lp_name)}
-    with open(Path(cs.get_lp_dir(lp_name), "Kbuild.inc"), "w") as f:
+    render_vars = {"bsc": lp_name, "cs": cs, "lpdir": cs.get_lp_dir(lp_name, arch)}
+    with open(Path(cs.get_lp_dir(lp_name, arch), "Kbuild.inc"), "w") as f:
         f.write(Template(TEMPL_KBUILD).render(**render_vars))
 
 

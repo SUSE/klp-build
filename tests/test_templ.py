@@ -16,13 +16,13 @@ from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS, get_codestreams_file, get_file_content
 
 
-def _af(name, ext_symbols=None, klpp_symbols=None):
+def _af(name, ext_symbols=None, klpp_symbols=None, arch="x86_64"):
     """Build an AffectedFile with extraction-phase fields set."""
     f = AffectedFile(name)
     if ext_symbols is not None:
-        f.ext_symbols = ext_symbols
+        f.set_ext_symbols(arch, ext_symbols)
     if klpp_symbols is not None:
-        f.klpp_symbols = klpp_symbols
+        f.set_klpp_symbols(arch, klpp_symbols)
     return f
 
 _generate_klpp_header = templ_module.__dict__["__generate_klpp_header"]
