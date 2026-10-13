@@ -37,7 +37,10 @@ UNSUPPORTED_MACROS = [
         "MODULE",
         "KBUILD_MODNAME",
         r"__has_attribute\(",
-        "__seg_gs"
+        "__seg_gs",
+        "CC_USING_PATCHABLE_FUNCTION_ENTRY",
+        "CONFIG_CC_HAS_K_CONSTRAINT",
+        "ARM64_ASM_ARCH"
         ]
 
 def register_argparser(subparser):

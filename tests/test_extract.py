@@ -528,7 +528,10 @@ def test_lp_out_cleanup_removes_unsupported_macros(tmp_path):
         "#define __KERNEL__\n"
         "#define MODULE\n"
         "#define KBUILD_MODNAME foo\n"
-        "#define __seg_gs",
+        "#define __seg_gs\n"
+        "#define CC_USING_PATCHABLE_FUNCTION_ENTRY 1\n"
+        "#define CONFIG_CC_HAS_K_CONSTRAINT 1\n"
+        "#define ARM64_ASM_ARCH armv8.5-a\n",
     )
     lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
     content = lp_out.read_text()
@@ -536,6 +539,9 @@ def test_lp_out_cleanup_removes_unsupported_macros(tmp_path):
     assert "#define MODULE" not in content
     assert "#define KBUILD_MODNAME" not in content
     assert "#define __seg_gs" not in content
+    assert "#define CC_USING_PATCHABLE_FUNCTION_ENTRY" not in content
+    assert "#define CONFIG_CC_HAS_K_CONSTRAINT" not in content
+    assert "#define ARM64_ASM_ARCH" not in content
 
 
 def test_lp_out_cleanup_removes_init_exit_attributes(tmp_path):
