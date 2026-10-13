@@ -5,9 +5,10 @@
 
 import logging
 import shutil
+import sys
 
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
-from klpbuild.klplib.supported import get_supported_codestreams
+from klpbuild.klplib.codestreams_data import get_codestreams_list
 from klpbuild.klplib.utils import (filter_codestreams,
                                    get_lp_groups)
 from klpbuild.klplib.kgraft import (find_lp_branches,
@@ -33,6 +34,11 @@ def register_argparser(subparser):
 
 
 def commit(lp_name, codestreams, force):
+    for cs in codestreams:
+        if "x86_64" not in cs.archs:
+            logging.error("Codestream '%s' does not affect x86_64", cs.full_cs_name())
+            sys.exit(1)
+
     init_kgraft()
 
     branches = find_lp_branches(f"{lp_name}_*")
@@ -59,7 +65,9 @@ def commit(lp_name, codestreams, force):
 
 
 def run(lp_name, lp_filter, force):
-    supported_codestreams = get_supported_codestreams()
-    filtered_codestreams = filter_codestreams(lp_filter, supported_codestreams)
+    cs_list = filter_codestreams(lp_filter, get_codestreams_list())
+    if not cs_list:
+        logging.error("commit: No codestreams found")
+        sys.exit(1)
 
-    commit(lp_name, filtered_codestreams, force)
+    commit(lp_name, cs_list, force)
