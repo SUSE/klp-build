@@ -193,10 +193,11 @@ def setup_codestreams(lp_name, data):
         all_codestreams = get_supported_codestreams()
         codestreams = utils.filter_codestreams(data["lp_filter"], all_codestreams)
     else:
-        if not (cve := data.get("cve")) and not data.get("commits"):
+        if not data.get("cve"):
             cve = bugzilla.get_bug_cve(bugzilla.get_bug(lp_name))
-            assert cve, f"Could not retrieve CVE from bugzilla for {lp_name}"
-            logging.info("CVE retrieved from bugzilla: %s", cve)
+            assert cve or data.get("commits"), f"Could not retrieve CVE from bugzilla for {lp_name}"
+            if cve:
+                logging.info("CVE retrieved from bugzilla: %s", cve)
             data["cve"] = cve
 
         _, upstream, patched_cs, codestreams = scan(data["cve"], data["conf"],
