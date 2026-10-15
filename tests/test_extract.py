@@ -187,6 +187,21 @@ def test_get_klpp_symbols_multiple_symbols(tmp_path):
     assert "gamma" not in result
 
 
+def test_get_klpp_symbols_skips_calls(tmp_path):
+    """A call before the definition is not taken as the prototype, and
+    annotations after the parameter list are allowed."""
+    lp_out = tmp_path / "lp.c"
+    lp_out.write_text(
+        "int klpp_bar(void)\n{\n\treturn klpp_foo(1) + 1;\n}\n"
+        "void __sched klpp_foo(int a) __acquires(x)\n{\n}\n"
+    )
+    (tmp_path / "patched_funcs").write_text("foo\n")
+
+    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
+
+    assert result == {"foo": "void klpp_foo(int a);"}
+
+
 def test_compile_commands_enoent():
     """
     Check if the extraction fails when a file isn't found on
@@ -359,6 +374,16 @@ def test_fix_ext_symbols_percpu_struct_pointer_type():
     assert "__attribute__" not in result
 
 
+def test_fix_ext_symbols_multiline_and_surrounding_code():
+    """A non-static declaration with the type on its own line is removed,
+    without eating the preceding comment."""
+    cs = Codestream("15.4u0")
+    fdata = _make_fdata({"vmlinux": ["foo"]})
+    lp_out = "/*\nSome text\n*/\nint\n(*klpe_foo)(\n\tint a);\n"
+    result = fix_ext_symbols(cs, fdata, lp_out)
+    assert result == "/*\nSome text\n*/\n\n"
+
+
 # ── fix_klpp_symbols ───────────────────────────────────────────────────────────
 
 def test_fix_klpp_symbols_strips_static_from_definition():
@@ -401,6 +426,20 @@ def test_fix_klpp_symbols_multiple_symbols_all_processed():
     )
     result = fix_klpp_symbols(fdata, lp_out)
     assert "static" not in result
+
+
+def test_fix_klpp_symbols_keeps_calls():
+    """Calls to klpp functions inside function bodies are not removed."""
+    fdata = _make_fdata(klpp_symbols={"foo": "int klpp_foo(int n);"})
+    lp_out = (
+        "int klpp_foo(int n)\n{\n"
+        "\tklpp_foo(1);\n"
+        "\tret = klpp_foo(2);\n"
+        "\tif (n)\n\t\treturn klpp_foo(n - 1);\n"
+        "\telse\n\t\tklpp_foo(3);\n"
+        "}\n"
+    )
+    assert fix_klpp_symbols(fdata, lp_out) == lp_out
 
 
 # ── get_ext_symbols ────────────────────────────────────────────────────────────
@@ -539,6 +578,17 @@ def test_lp_out_cleanup_removes_init_exit_attributes(tmp_path):
     lp_out = _make_lp_out(tmp_path, "static __init int foo(void)\n{\n}\n")
     lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
     assert "__init" not in lp_out.read_text()
+
+
+def test_lp_out_cleanup_keeps_init_exit_prefixed_identifiers(tmp_path):
+    """Identifiers that merely start with __init/__exit are not mangled."""
+    lp_out = _make_lp_out(
+        tmp_path, "static void foo(void)\n{\n\tret = __init_rwsem(a);\n\t__exit_signal(t);\n}\n"
+    )
+    lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
+    content = lp_out.read_text()
+    assert "ret = __init_rwsem(a);" in content
+    assert "__exit_signal(t);" in content
 
 
 def test_lp_out_cleanup_removes_typeof_variable_declaration(tmp_path):
