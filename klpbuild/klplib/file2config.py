@@ -5,11 +5,17 @@
 #
 # Copied from kernel-source:scripts/file2config.py
 
+import logging
 import re
 
 from pathlib import Path
 
 from klpbuild.klplib.affected_file import AffectedModule, ConfigState
+
+
+TOP_LEVEL_PREFIXES = {
+    'obj', 'lib', 'head', 'setup', 'init', 'core', 'drivers', 'net', 'virt', 'vmlinux'
+}
 
 
 archs_config = {
@@ -81,6 +87,37 @@ def has_targets(make_lines):
            any('.o' in l or l.endswith('/') for l in make_lines)
 
 
+def _resolve_composite(cs, base_dir, name, deep):
+    """
+    Resolve the CONFIG option for a composite object by looking for
+    <name>.o in the current directory, falling back to the parent directory.
+    """
+    cfg, obj = _find_config(cs, base_dir, name + '.o', deep + 1)
+    if cfg:
+        return cfg, obj
+    return _find_config(cs, base_dir.parent, base_dir.name + '/', deep)
+
+
+def _resolve_config_target(cs, base_dir, relative_obj_path, target, config, deep):
+    """
+    Resolve targets with a CONFIG option. Composite targets with sub-CONFIGs
+    (e.g. kvm-amd-$(CONFIG_KVM_AMD_SEV)) are recursively resolved to the parent
+    module object.
+    """
+    m = re.match(r'^([a-zA-Z0-9_-]+?)(?:-objs|-y|-m)?-[\$][\({]CONFIG_', target)
+    if not m:
+        return config, str((base_dir / relative_obj_path).with_suffix(''))
+
+    prefix = m.group(1)
+    if prefix not in TOP_LEVEL_PREFIXES:
+        return _resolve_composite(cs, base_dir, prefix, deep)
+
+    if prefix != 'obj':
+        logging.warning("Target prefix '%s' is not 'obj' for %s", prefix, base_dir / relative_obj_path)
+
+    return config, str((base_dir / relative_obj_path).with_suffix(''))
+
+
 def _find_config(cs, base_dir, relative_obj_path, deep):
     """
     Walk up the directory tree looking for the CONFIG option that enables
@@ -117,17 +154,14 @@ def _find_config(cs, base_dir, relative_obj_path, deep):
 
         config = _sanitize_config(target)
         if config:
-            return config, str((base_dir/relative_obj_path).with_suffix(''))
+            return _resolve_config_target(cs, base_dir, relative_obj_path, target, config, deep)
 
         # Unconditionally built (e.g. obj-y, setup-y): check if the target
         # groups multiple .o files, otherwise check the parent directory
         target = re.sub(r'[:+]?=$', '', target)
         if re.match(r'\w+-y$', target):
             filename = target.rsplit('-', 1)[0]
-            config, obj = _find_config(cs, base_dir, filename + '.o', deep + 1)
-            if config:
-                return config, obj
-            return _find_config(cs, base_dir.parent, base_dir.name + '/', deep)
+            return _resolve_composite(cs, base_dir, filename, deep)
 
         # target contains another object file rule, strip the suffix and retry
         try:

@@ -5,6 +5,7 @@
 
 from pathlib import Path
 
+from klpbuild.klplib.affected_file import ConfigState
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.file2config import (
     _filter_path,
@@ -225,4 +226,93 @@ def test_find_file_config_obj_prefix_variable():
 
 def test_find_file_config_nested_subdir():
     config, _ = find_file_config(CS, "drivers/net/ethernet/mellanox/mlx5/core/steering/dr_domain.c")
-    assert config == "CONFIG_MLX5_SW_STEERING"
+    assert config == "CONFIG_MLX5_CORE"
+
+
+class MockConfigState:
+    def __init__(self, state=ConfigState.BUILTIN):
+        self._state = state
+
+    def is_set(self):
+        return self._state is not ConfigState.NOT_SET
+
+    def archs(self):
+        return ["x86_64"]
+
+    def get_arch(self, arch):
+        return self._state
+
+
+class MockCS:
+    def __init__(self, makefiles, configs=None):
+        self.makefiles = makefiles
+        self.configs = configs or {}
+
+    def check_file_exists(self, path):
+        return str(path) in self.makefiles
+
+    def read_file(self, path):
+        return self.makefiles.get(str(path), "")
+
+    def get_all_configs(self, config_name):
+        return self.configs.get(config_name, MockConfigState(ConfigState.NOT_SET))
+
+
+def test_find_config_composite_sub_config():
+    makefiles = {
+        "arch/x86/kvm/Makefile": (
+            "obj-$(CONFIG_KVM_AMD) += kvm-amd.o\n"
+            "kvm-amd-$(CONFIG_KVM_AMD_SEV) += svm/sev.o\n"
+        )
+    }
+    mock_cs = MockCS(makefiles)
+    config, obj = _find_config(mock_cs, Path("arch/x86/kvm/svm"), "sev.o", 0)
+    assert config == "CONFIG_KVM_AMD"
+    assert obj == "arch/x86/kvm/kvm-amd"
+
+
+def test_find_file_config_composite_sub_config():
+    makefiles = {
+        "arch/x86/kvm/Makefile": (
+            "obj-$(CONFIG_KVM_AMD) += kvm-amd.o\n"
+            "kvm-amd-$(CONFIG_KVM_AMD_SEV) += svm/sev.o\n"
+        )
+    }
+    configs = {
+        "CONFIG_KVM_AMD": MockConfigState(ConfigState.MODULE),
+        "CONFIG_KVM_AMD_SEV": MockConfigState(ConfigState.BUILTIN),
+    }
+    mock_cs = MockCS(makefiles, configs)
+    config, obj = find_file_config(mock_cs, "arch/x86/kvm/svm/sev.c")
+    assert config == "CONFIG_KVM_AMD"
+    assert obj == "arch/x86/kvm/kvm-amd"
+
+
+def test_find_config_non_obj_prefix_warning(caplog):
+    import logging
+    makefiles = {
+        "arch/x86/boot/Makefile": (
+            "setup-$(CONFIG_X86_APM_BOOT) += apm.o\n"
+        )
+    }
+    mock_cs = MockCS(makefiles)
+    with caplog.at_level(logging.WARNING):
+        config, obj = _find_config(mock_cs, Path("arch/x86/boot"), "apm.o", 0)
+    assert config == "CONFIG_X86_APM_BOOT"
+    assert "Target prefix 'setup' is not 'obj'" in caplog.text
+
+
+def test_find_config_composite_fallback_to_parent():
+    makefiles = {
+        "arch/x86/Makefile": (
+            "obj-$(CONFIG_KVM) += kvm/\n"
+        ),
+        "arch/x86/kvm/Makefile": (
+            "mycomp-$(CONFIG_KVM_EXTRA) += foo.o\n"
+        ),
+    }
+    mock_cs = MockCS(makefiles)
+    config, obj = _find_config(mock_cs, Path("arch/x86/kvm"), "foo.o", 0)
+    assert config == "CONFIG_KVM"
+    assert obj == "arch/x86/kvm"
+
