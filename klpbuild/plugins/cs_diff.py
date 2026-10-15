@@ -22,9 +22,16 @@ def register_argparser(subparser):
 
     add_arg_lp_name(diff_opts)
     add_arg_lp_filter(diff_opts)
+    diff_opts.add_argument(
+        "--arch",
+        type=str,
+        default="x86_64",
+        choices=["x86_64", "aarch64"],
+        help="Architecture target used by klp-ccp (default: x86_64)",
+    )
 
 
-def cs_diff(lp_name, lp_filter):
+def cs_diff(lp_name, lp_filter, arch="x86_64"):
     """
     To compare two codestreams the filter should result in exactly two codestreams
     """
@@ -35,7 +42,7 @@ def cs_diff(lp_name, lp_filter):
 
     assert len(cs_args) == 2
 
-    cs_code = get_cs_code(lp_name, cs_args)
+    cs_code = get_cs_code(lp_name, cs_args, arch)
 
     cs1 = cs_args[0].full_cs_name()
     cs2 = cs_args[1].full_cs_name()
@@ -51,5 +58,5 @@ def cs_diff(lp_name, lp_filter):
             logging.info(line)
 
 
-def run(lp_name, lp_filter):
-    cs_diff(lp_name, lp_filter)
+def run(lp_name, lp_filter, arch="x86_64"):
+    cs_diff(lp_name, lp_filter, arch)

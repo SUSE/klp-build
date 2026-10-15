@@ -233,11 +233,34 @@ class AffectedFile:
         self.module_name = module_name              # key into cs.modules
         self.affected_symbols: set[str] = set(affected_symbols or ())
 
-        # Extraction-phase artifacts (populated by extract.py)
+        # Extraction-phase artifacts (populated by extract.py per-arch)
         self.ibt: bool = False
-        self.dup_symbols: list[str] = []
-        self.ext_symbols: dict[str, list[str]] = {}     # module name → symbol list
-        self.klpp_symbols: dict[str, str] = {}          # symbol name → prototype
+        self.dup_symbols: dict[str, list[str]] = {}          # arch → duplicated symbol list
+        self.ext_symbols: dict[str, dict[str, list[str]]] = {} # arch → module name → symbol list
+        self.klpp_symbols: dict[str, dict[str, str]] = {}      # arch → symbol name → prototype
+
+    def get_dup_symbols(self, arch: str = "x86_64") -> list[str]:
+        return self.dup_symbols.get(arch, [])
+
+    def add_dup_symbol(self, arch: str, sym: str) -> None:
+        self.dup_symbols.setdefault(arch, [])
+        if sym not in self.dup_symbols[arch]:
+            self.dup_symbols[arch].append(sym)
+
+    def set_dup_symbols(self, arch: str, syms: list[str]) -> None:
+        self.dup_symbols[arch] = list(syms)
+
+    def get_ext_symbols(self, arch: str = "x86_64") -> dict[str, list[str]]:
+        return self.ext_symbols.get(arch, {})
+
+    def set_ext_symbols(self, arch: str, ext_symbols: dict[str, list[str]]) -> None:
+        self.ext_symbols[arch] = {k: list(v) for k, v in ext_symbols.items()}
+
+    def get_klpp_symbols(self, arch: str = "x86_64") -> dict[str, str]:
+        return self.klpp_symbols.get(arch, {})
+
+    def set_klpp_symbols(self, arch: str, klpp_symbols: dict[str, str]) -> None:
+        self.klpp_symbols[arch] = dict(klpp_symbols)
 
     @classmethod
     def from_dict(cls, filename: str, data: dict) -> "AffectedFile":
@@ -249,9 +272,17 @@ class AffectedFile:
             affected_symbols=set(data["affected_symbols"]),
         )
         f.ibt          = data["ibt"]
-        f.dup_symbols  = list(data["dup_symbols"])
-        f.ext_symbols  = dict(data["ext_symbols"])
-        f.klpp_symbols = dict(data["klpp_symbols"])
+        f.dup_symbols  = {
+            arch: list(syms) for arch, syms in data["dup_symbols"].items()
+        }
+        f.ext_symbols  = {
+            arch: {mod: list(syms) for mod, syms in mod_map.items()}
+            for arch, mod_map in data["ext_symbols"].items()
+        }
+        f.klpp_symbols = {
+            arch: dict(sym_protos)
+            for arch, sym_protos in data["klpp_symbols"].items()
+        }
         return f
 
     def to_dict(self) -> dict:
@@ -261,9 +292,17 @@ class AffectedFile:
             "module_name": self.module_name,
             "affected_symbols": sorted(self.affected_symbols),
             "ibt": self.ibt,
-            "dup_symbols": list(self.dup_symbols),
-            "ext_symbols": dict(self.ext_symbols),
-            "klpp_symbols": dict(self.klpp_symbols),
+            "dup_symbols": {
+                arch: list(syms) for arch, syms in self.dup_symbols.items()
+            },
+            "ext_symbols": {
+                arch: {mod: list(syms) for mod, syms in mod_map.items()}
+                for arch, mod_map in self.ext_symbols.items()
+            },
+            "klpp_symbols": {
+                arch: dict(sym_protos)
+                for arch, sym_protos in self.klpp_symbols.items()
+            },
         }
 
     def __eq__(self, other: object) -> bool:

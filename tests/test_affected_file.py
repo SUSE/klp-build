@@ -367,7 +367,7 @@ _FILE_FULL_DICT = {
     "module_name": "drivers/foo",
     "affected_symbols": ["a", "b"],
     "ibt": False,
-    "dup_symbols": [],
+    "dup_symbols": {},
     "ext_symbols": {},
     "klpp_symbols": {},
 }
@@ -384,7 +384,7 @@ def test_file_init_defaults():
 def test_file_init_extraction_defaults():
     f = AffectedFile("foo.c")
     assert f.ibt is False
-    assert f.dup_symbols == []
+    assert f.dup_symbols == {}
     assert f.ext_symbols == {}
     assert f.klpp_symbols == {}
 
@@ -393,13 +393,13 @@ def test_file_extraction_attrs_assignable():
     """Extract step writes these fields directly; verify they accept assignment."""
     f = AffectedFile("foo.c")
     f.ibt = True
-    f.dup_symbols.append("dup")
-    f.ext_symbols["mod"] = ["sym1", "sym2"]
-    f.klpp_symbols["sym1"] = "void sym1(void)"
+    f.add_dup_symbol("x86_64", "dup")
+    f.set_ext_symbols("x86_64", {"mod": ["sym1", "sym2"]})
+    f.set_klpp_symbols("x86_64", {"sym1": "void sym1(void)"})
     assert f.ibt is True
-    assert f.dup_symbols == ["dup"]
-    assert f.ext_symbols == {"mod": ["sym1", "sym2"]}
-    assert f.klpp_symbols == {"sym1": "void sym1(void)"}
+    assert f.get_dup_symbols("x86_64") == ["dup"]
+    assert f.get_ext_symbols("x86_64") == {"mod": ["sym1", "sym2"]}
+    assert f.get_klpp_symbols("x86_64") == {"sym1": "void sym1(void)"}
 
 
 def test_file_init_with_kwargs():
@@ -440,7 +440,7 @@ def test_file_to_dict():
         "module_name": "drivers/foo",
         "affected_symbols": ["a", "b"],   # sorted
         "ibt": False,
-        "dup_symbols": [],
+        "dup_symbols": {},
         "ext_symbols": {},
         "klpp_symbols": {},
     }
@@ -452,7 +452,7 @@ def test_file_to_dict_defaults():
         "module_name": None,
         "affected_symbols": [],
         "ibt": False,
-        "dup_symbols": [],
+        "dup_symbols": {},
         "ext_symbols": {},
         "klpp_symbols": {},
     }
@@ -461,29 +461,38 @@ def test_file_to_dict_defaults():
 def test_file_to_dict_with_extraction_data():
     f = AffectedFile("foo.c", config_name="CONFIG_FOO", module_name="drivers/foo")
     f.ibt = True
-    f.dup_symbols = ["dup1", "dup2"]
-    f.ext_symbols = {"drivers/foo": ["bar", "baz"]}
-    f.klpp_symbols = {"bar": "int bar(void)"}
+    f.set_dup_symbols("x86_64", ["dup1", "dup2"])
+    f.set_ext_symbols("x86_64", {"drivers/foo": ["bar", "baz"]})
+    f.set_klpp_symbols("x86_64", {"bar": "int bar(void)"})
+    f.set_dup_symbols("aarch64", ["dup_arm"])
+    f.set_ext_symbols("aarch64", {"drivers/foo": ["bar"]})
+    f.set_klpp_symbols("aarch64", {"bar": "int bar(void)"})
     d = f.to_dict()
     assert d["ibt"] is True
-    assert d["dup_symbols"] == ["dup1", "dup2"]
-    assert d["ext_symbols"] == {"drivers/foo": ["bar", "baz"]}
-    assert d["klpp_symbols"] == {"bar": "int bar(void)"}
+    assert d["dup_symbols"] == {"x86_64": ["dup1", "dup2"], "aarch64": ["dup_arm"]}
+    assert d["ext_symbols"] == {
+        "x86_64": {"drivers/foo": ["bar", "baz"]},
+        "aarch64": {"drivers/foo": ["bar"]},
+    }
+    assert d["klpp_symbols"] == {
+        "x86_64": {"bar": "int bar(void)"},
+        "aarch64": {"bar": "int bar(void)"},
+    }
 
 
 def test_file_to_dict_extraction_collections_are_copies():
     """Mutating the dict returned by to_dict() must not affect internal state."""
     f = AffectedFile("foo.c")
-    f.dup_symbols.append("a")
-    f.ext_symbols["mod"] = ["x"]
-    f.klpp_symbols["s"] = "p"
+    f.add_dup_symbol("x86_64", "a")
+    f.set_ext_symbols("x86_64", {"mod": ["x"]})
+    f.set_klpp_symbols("x86_64", {"s": "p"})
     d = f.to_dict()
-    d["dup_symbols"].append("mutated")
-    d["ext_symbols"]["new_mod"] = []
-    d["klpp_symbols"]["new_sym"] = ""
-    assert f.dup_symbols == ["a"]
-    assert f.ext_symbols == {"mod": ["x"]}
-    assert f.klpp_symbols == {"s": "p"}
+    d["dup_symbols"]["x86_64"].append("mutated")
+    d["ext_symbols"]["x86_64"]["new_mod"] = []
+    d["klpp_symbols"]["x86_64"]["new_sym"] = ""
+    assert f.get_dup_symbols("x86_64") == ["a"]
+    assert f.get_ext_symbols("x86_64") == {"mod": ["x"]}
+    assert f.get_klpp_symbols("x86_64") == {"s": "p"}
 
 
 def test_file_from_dict_round_trip():
@@ -513,7 +522,7 @@ def test_file_from_dict_round_trip_defaults():
     assert rebuilt.module_name is None
     assert rebuilt.affected_symbols == set()
     assert rebuilt.ibt is False
-    assert rebuilt.dup_symbols == []
+    assert rebuilt.dup_symbols == {}
     assert rebuilt.ext_symbols == {}
     assert rebuilt.klpp_symbols == {}
 
@@ -526,14 +535,14 @@ def test_file_from_dict_round_trip_with_extraction():
         affected_symbols={"x"},
     )
     original.ibt = True
-    original.dup_symbols = ["dup_a", "dup_b"]
-    original.ext_symbols = {"fs/ext4/ext4": ["sym1", "sym2"]}
-    original.klpp_symbols = {"sym1": "int sym1(void)"}
+    original.set_dup_symbols("x86_64", ["dup_a", "dup_b"])
+    original.set_ext_symbols("x86_64", {"fs/ext4/ext4": ["sym1", "sym2"]})
+    original.set_klpp_symbols("x86_64", {"sym1": "int sym1(void)"})
     rebuilt = AffectedFile.from_dict("fs/ext4/inode.c", original.to_dict())
     assert rebuilt.ibt is True
-    assert rebuilt.dup_symbols == ["dup_a", "dup_b"]
-    assert rebuilt.ext_symbols == {"fs/ext4/ext4": ["sym1", "sym2"]}
-    assert rebuilt.klpp_symbols == {"sym1": "int sym1(void)"}
+    assert rebuilt.get_dup_symbols("x86_64") == ["dup_a", "dup_b"]
+    assert rebuilt.get_ext_symbols("x86_64") == {"fs/ext4/ext4": ["sym1", "sym2"]}
+    assert rebuilt.get_klpp_symbols("x86_64") == {"sym1": "int sym1(void)"}
 
 
 def test_file_from_dict_strict_missing_config_name():
@@ -587,20 +596,20 @@ def test_file_from_dict_rebuilds_set_from_list():
 
 def test_file_from_dict_extraction_collections_are_copies():
     """from_dict must not retain references to the input dict's lists/dicts."""
-    src_dup = ["a"]
-    src_ext = {"mod": ["x"]}
-    src_klpp = {"s": "p"}
+    src_dup = {"x86_64": ["a"]}
+    src_ext = {"x86_64": {"mod": ["x"]}}
+    src_klpp = {"x86_64": {"s": "p"}}
     data = dict(_FILE_FULL_DICT)
     data["dup_symbols"] = src_dup
     data["ext_symbols"] = src_ext
     data["klpp_symbols"] = src_klpp
     rebuilt = AffectedFile.from_dict("foo.c", data)
-    src_dup.append("mutated")
-    src_ext["new_mod"] = []
-    src_klpp["new_sym"] = ""
-    assert rebuilt.dup_symbols == ["a"]
-    assert rebuilt.ext_symbols == {"mod": ["x"]}
-    assert rebuilt.klpp_symbols == {"s": "p"}
+    src_dup["x86_64"].append("mutated")
+    src_ext["x86_64"]["new_mod"] = []
+    src_klpp["x86_64"]["new_sym"] = ""
+    assert rebuilt.get_dup_symbols("x86_64") == ["a"]
+    assert rebuilt.get_ext_symbols("x86_64") == {"mod": ["x"]}
+    assert rebuilt.get_klpp_symbols("x86_64") == {"s": "p"}
 
 
 def test_file_equality():
@@ -626,3 +635,33 @@ def test_file_repr_contains_identity_and_keys():
     assert "foo.c" in r
     assert "CONFIG_FOO" in r
     assert "drivers/foo" in r
+
+
+def test_affected_file_multi_arch_extraction_preservation():
+    f = AffectedFile("foo.c")
+    # Simulate x86_64 extraction
+    f.add_dup_symbol("x86_64", "dup_x86")
+    f.set_ext_symbols("x86_64", {"vmlinux": ["sym_x86"]})
+    f.set_klpp_symbols("x86_64", {"sym_x86": "void sym_x86(void)"})
+
+    # Simulate subsequent aarch64 extraction
+    f.add_dup_symbol("aarch64", "dup_arm")
+    f.set_ext_symbols("aarch64", {"vmlinux": ["sym_arm"]})
+    f.set_klpp_symbols("aarch64", {"sym_arm": "void sym_arm(void)"})
+
+    # Verify both archs are preserved
+    assert f.get_dup_symbols("x86_64") == ["dup_x86"]
+    assert f.get_dup_symbols("aarch64") == ["dup_arm"]
+    assert f.get_ext_symbols("x86_64") == {"vmlinux": ["sym_x86"]}
+    assert f.get_ext_symbols("aarch64") == {"vmlinux": ["sym_arm"]}
+    assert f.get_klpp_symbols("x86_64") == {"sym_x86": "void sym_x86(void)"}
+    assert f.get_klpp_symbols("aarch64") == {"sym_arm": "void sym_arm(void)"}
+
+    # Verify round-trip serialization preserves both
+    rebuilt = AffectedFile.from_dict("foo.c", f.to_dict())
+    assert rebuilt.get_dup_symbols("x86_64") == ["dup_x86"]
+    assert rebuilt.get_dup_symbols("aarch64") == ["dup_arm"]
+    assert rebuilt.get_ext_symbols("x86_64") == {"vmlinux": ["sym_x86"]}
+    assert rebuilt.get_ext_symbols("aarch64") == {"vmlinux": ["sym_arm"]}
+    assert rebuilt.get_klpp_symbols("x86_64") == {"sym_x86": "void sym_x86(void)"}
+    assert rebuilt.get_klpp_symbols("aarch64") == {"sym_arm": "void sym_arm(void)"}

@@ -157,7 +157,7 @@ class Codestream:
 
         kernel_dir = get_datadir(arch)/"usr"/"src"/f"linux-{name}"
 
-        return Path(f"{kernel_dir}-obj", arch, self.get_kernel_type())
+        return Path(f"{kernel_dir}-obj", arch, self.get_kernel_type()).resolve()
 
     def get_ipa_file(self, fname, arch=None):
 
@@ -174,7 +174,8 @@ class Codestream:
         enable/disable portion of the source.
         """
 
-        target_config_file = f"config/{arch}/{self.get_kernel_type()}"
+        karch = "arm64" if arch == "aarch64" else arch
+        target_config_file = f"config/{karch}/{self.get_kernel_type()}"
         if self.sle < 16 or not self.rt:
             return ksrc_read_rpm_file(self.kernel, target_config_file)
 
@@ -182,7 +183,7 @@ class Codestream:
         # -rt kernel. The config file needs to be retrieved by merging the
         # default config with the rt config on the fly as we no longer have a
         # dedicated -rt one
-        default_config_file = f"config/{arch}/default"
+        default_config_file = f"config/{karch}/default"
         default_config_file_content = ksrc_read_rpm_file(self.kernel, default_config_file)
         target_config_file_content = ksrc_read_rpm_file(self.kernel, target_config_file)
         config_merge_script = resources.files("scripts")/"config-merge"
@@ -265,7 +266,9 @@ class Codestream:
         if self.is_micro:
             return {"s390x", "x86_64"}
 
-        # We support all architecture for all other codestreams
+        if (self.sle, self.sp) >= (16, 1):
+            return {"ppc64le", "s390x", "x86_64", "aarch64"}
+
         return {"ppc64le", "s390x", "x86_64"}
 
     def set_files(self, files):
@@ -301,45 +304,49 @@ class Codestream:
         return f"{self.base_cs_name()}u{self.update}"
 
 
-    def get_ccp_dir(self, lp_name):
+    def get_ccp_dir(self, lp_name, arch="x86_64"):
         """
         Get the path to the ccp directory of the current codestream.
 
         Args:
             lp_name (str): The name of the live patch.
+            arch (str): Target architecture (default: "x86_64").
 
         Returns:
             Path: The path to the ccp directory of the current codestream.
         """
-        return get_workdir(lp_name, True) / "ccp" / self.full_cs_name()
+        assert arch in ["x86_64", "aarch64"]
+        return get_workdir(lp_name, True) / "ccp" / arch / self.full_cs_name()
 
 
-    def get_lp_dir(self, lp_name):
+    def get_lp_dir(self, lp_name, arch="x86_64"):
         """
         Get the path to the extracted livepatches directory of the current codestream.
 
         Args:
             lp_name (str): The name of the live patch.
+            arch (str): Target architecture (default: "x86_64").
 
         returns:
             path: The path to the extracted livepatches directory of the current codestream.
         """
-        return self.get_ccp_dir(lp_name)/"lp"
+        return self.get_ccp_dir(lp_name, arch)/"lp"
 
 
-    def get_ccp_work_dir(self, lp_name, fname):
+    def get_ccp_work_dir(self, lp_name, fname, arch="x86_64"):
         """
         Get the path to the klp-ccp working directory of the current codestream.
 
         Args:
             lp_name (str): The name of the live patch.
             fname (str): The name of the file we're extracting.
+            arch (str): Target architecture (default: "x86_64").
 
         returns:
             Path: The path to the klp-ccp working directory of the current codestream.
         """
         fpath = f'work_{str(fname).replace("/", "_")}'
-        return self.get_ccp_dir(lp_name)/fpath
+        return self.get_ccp_dir(lp_name, arch)/fpath
 
 
     def get_base_product_name(self):
@@ -650,10 +657,11 @@ class Codestream:
             # TODO: implement support for modules as well
             if trace_addrs:
                 # The symbol is unique, so we can grab the first entry safely
+                # TODO: missing support for aarch64
                 if arch in ["x86_64", "s390x"]:
                     self.__check_patchable_sym(arch, symbol, syms[0], trace_addrs)
 
-                else:
+                elif arch in ["ppc64le"]:
                     self.__check_patchable_sym_ppc64le(arch, symbol, syms[0], trace_addrs)
 
         return ret
