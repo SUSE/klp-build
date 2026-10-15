@@ -40,6 +40,11 @@ UNSUPPORTED_MACROS = [
         "__seg_gs"
         ]
 
+FUNC_PARAMS_RE = r"\([^()]*(?:\([^()]*\)[^()]*)*\)"
+
+DECL_PREFIX_RE = r"[A-Za-z_](?:[\w\t *]|\n(?!\s|(?:static|STATIC)\b))*?"
+
+
 def register_argparser(subparser):
     extract_opts = subparser.add_parser(
         PLUGIN_CMD, help="Extract initial livepatches"
@@ -273,7 +278,7 @@ def fix_ext_symbols(cs, fdata: AffectedFile, lp_out):
     for sym_list in fdata.ext_symbols.values():
         for s in sym_list:
             # Keep only static declarations
-            lp_out = re.sub(rf"^(?!(?:static|STATIC)|\s|#)\w[^;:()=]+\(\*klpe_{s}\)[^;:=]*;",
+            lp_out = re.sub(rf"^(?!(?:static|STATIC)\b){DECL_PREFIX_RE}\(\*klpe_{s}\)[^;:=]*;",
                             '', lp_out, flags=re.MULTILINE)
 
 
@@ -332,14 +337,13 @@ def fix_klpp_symbols(fdata: AffectedFile, lp_out):
         - Remove 'static' keyword from klpp function definition.
     '''
 
-    for sym, proto in fdata.klpp_symbols.items():
-        rfmt = fr"[\w\*\s]+?\bklpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\)\s*;\n?"
-        lp_out = re.sub(rfmt, '', lp_out, flags=re.S)
+    for sym in fdata.klpp_symbols:
+        rfmt = fr"^{DECL_PREFIX_RE}\bklpp_{sym}\s*{FUNC_PARAMS_RE}[^;{{}}/]*;\n?"
+        lp_out = re.sub(rfmt, '', lp_out, flags=re.MULTILINE)
 
-        # Remove the 'static' keyword in the prototypes, if any
-        proto = proto.rstrip(';')
-        proto_re = r'\s+'.join(re.escape(p) for p in proto.split(' '))
-        lp_out = re.sub(fr'(static|STATIC)\s+{proto_re}', proto, lp_out)
+        # Remove the 'static' keyword in the definition, if any
+        lp_out = re.sub(fr"^(?:static|STATIC)\s+(?={DECL_PREFIX_RE}\bklpp_{sym}\s*\()",
+                        '', lp_out, flags=re.MULTILINE)
 
     return lp_out
 
@@ -362,18 +366,19 @@ def get_klpp_symbols(out_dir, lp_out, mod_name):
             sym = sym.strip()
             # Create a regex for finding the klpp_{sym} function
             # definition.
-            rfmt = fr"(\s*static\s+)?([\w\*\s]+?klpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\))(?!\s*;)"
-            regex = re.compile(rfmt, re.S)
+            rfmt = (fr"^(?:(?:static|STATIC)\s+)?"
+                    fr"({DECL_PREFIX_RE}\bklpp_{sym}\s*{FUNC_PARAMS_RE})(?=[^;{{}}]*\{{)")
+            regex = re.compile(rfmt, re.MULTILINE)
 
             # Search and save the function prototype for later use
             m = regex.search(lp_code)
             if not m:
                 logging.warning("Failed to find klpp_%s in %s", sym, lp_out)
                 continue
-            klpp_proto = re.sub(r'\s+', ' ', m.group(2)).strip() + ';'
             # Remove the attributes left by klp-ccp, since they don't mean much
             # for kernel modules
-            klpp_proto = re.sub(r' __(init|exit|sched)', ' ', klpp_proto)
+            klpp_proto = re.sub(r'\b__(init|exit|sched)\b', '', m.group(1))
+            klpp_proto = re.sub(r'\s+', ' ', klpp_proto).strip() + ';'
             klpp_syms.update({sym: klpp_proto})
 
     return klpp_syms
@@ -769,7 +774,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir):
         file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
         file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
-        file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
+        file_buf = re.sub(r"\b__(init|exit)\b[ \t]*", '', file_buf)
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
         file_buf = fix_ext_symbols(cs, fdata, file_buf)
         file_buf = fix_klpp_symbols(fdata, file_buf)
