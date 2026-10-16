@@ -33,15 +33,18 @@ from klpbuild.klplib.templ import generate_livepatches
 PLUGIN_CMD = "extract"
 
 UNSUPPORTED_MACROS = [
-        "__KERNEL__",
-        "MODULE",
-        "KBUILD_MODNAME",
-        r"__has_attribute\(",
-        "__seg_gs",
-        "CC_USING_PATCHABLE_FUNCTION_ENTRY",
-        "CONFIG_CC_HAS_K_CONSTRAINT",
-        "ARM64_ASM_ARCH"
-        ]
+    r"__has_attribute\(",
+    "__KERNEL__",
+    "__seg_gs",
+    "ARM64_ASM_ARCH",
+    "CC_HAVE_ASM_GOTO",
+    "CC_USING_PATCHABLE_FUNCTION_ENTRY",
+    "CONFIG_CC_HAS_K_CONSTRAINT",
+    "KBUILD_MODNAME",
+    "MODULE",
+    "RETPOLINE"
+]
+
 
 def register_argparser(subparser):
     extract_opts = subparser.add_parser(
