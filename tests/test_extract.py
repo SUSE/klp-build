@@ -18,7 +18,6 @@ from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.plugins.extract import (
     extract,
     fix_ext_symbols,
-    fix_klpp_symbols,
     get_ext_symbols,
     get_klpp_symbols,
     lp_out_cleanup,
@@ -72,9 +71,7 @@ def test_get_klpp_symbols_simple_return_type(tmp_path):
 
 
 def test_get_klpp_symbols_does_not_modify_file(tmp_path):
-    """get_klpp_symbols only parses lp_out; it must not rewrite the file.
-    Stripping 'static' from the definition is fix_klpp_symbols's job,
-    applied later during lp_out_cleanup."""
+    """get_klpp_symbols only parses lp_out; it must not rewrite the file."""
     content = "static int klpp_foo(int a, int b)\n{\n    return a + b;\n}\n"
     lp_out = tmp_path / "lp.c"
     lp_out.write_text(content)
@@ -267,87 +264,16 @@ def test_detect_opt_clone(caplog):
 def test_fix_ext_symbols_ibt_returns_unchanged():
     """IBT codestreams bypass all fixups and return lp_out as-is."""
     cs = Codestream("15.6u0")  # needs_ibt() == True
-    fdata = _make_fdata({"vmlinux": ["my_func"]})
     lp_out = "int (*klpe_my_func)(void);\nstatic int (*klpe_my_func)(void);\n"
-    assert fix_ext_symbols(cs, fdata, lp_out) == lp_out
-
-
-def test_fix_ext_symbols_removes_duplicate_non_static_decls():
-    """
-    Core use-case: klp-ccp emits a duplicate non-static declaration alongside
-    the real static one.  Both non-static copies must be erased; the static
-    declaration must survive intact.
-    """
-    cs = Codestream("15.4u0")
-    fdata = _make_fdata({"vmlinux": ["foo"]})
-    lp_out = (
-        "int (*klpe_foo)(void);\n"   # duplicate #1 – must be removed
-        "int (*klpe_foo)(void);\n"   # duplicate #2 – must be removed
-        "static int (*klpe_foo)(void);\n"  # real declaration – must survive
-    )
-    result = fix_ext_symbols(cs, fdata, lp_out)
-    assert result.count("(*klpe_foo)") == 1
-    assert "static int (*klpe_foo)(void);" in result
-
-
-def test_fix_ext_symbols_hash_prefixed_line_not_removed():
-    """Lines starting with '#' (e.g. macro definitions) are protected by the
-    negative lookahead and must not be erased."""
-    cs = Codestream("15.4u0")
-    fdata = _make_fdata({"vmlinux": ["foo"]})
-    lp_out = "#define WRAP int (*klpe_foo)(void);\n"
-    result = fix_ext_symbols(cs, fdata, lp_out)
-    assert "#define WRAP int (*klpe_foo)(void);" in result
-
-
-def test_fix_ext_symbols_indented_decl_not_removed():
-    """Declarations that start with whitespace (indented) are protected by the
-    negative lookahead and must be left untouched."""
-    cs = Codestream("15.4u0")
-    fdata = _make_fdata({"vmlinux": ["foo"]})
-    lp_out = "\tint (*klpe_foo)(void);\n"
-    result = fix_ext_symbols(cs, fdata, lp_out)
-    assert "(*klpe_foo)" in result
-
-
-def test_fix_ext_symbols_symbol_name_is_exact():
-    """The regex anchors on 'klpe_{sym}' exactly; a symbol whose name is a
-    prefix of another must not accidentally remove the longer one."""
-    cs = Codestream("15.4u0")
-    fdata = _make_fdata({"vmlinux": ["foo"]})
-    lp_out = "int (*klpe_foo)(void);\nint (*klpe_foobar)(void);\n"
-    result = fix_ext_symbols(cs, fdata, lp_out)
-    assert "(*klpe_foo)" not in result
-    assert "(*klpe_foobar)" in result
-
-
-def test_fix_ext_symbols_multi_word_type_removed():
-    """Non-static declarations with multi-word types (e.g. 'unsigned long')
-    are still matched and removed."""
-    cs = Codestream("15.4u0")
-    fdata = _make_fdata({"vmlinux": ["counter"]})
-    lp_out = "unsigned long (*klpe_counter)(int x);\n"
-    result = fix_ext_symbols(cs, fdata, lp_out)
-    assert "(*klpe_counter)" not in result
-
-
-def test_fix_ext_symbols_multi_module_all_processed():
-    """Symbols listed under different modules in ext_symbols are all cleaned up."""
-    cs = Codestream("15.4u0")
-    fdata = _make_fdata({"vmlinux": ["foo"], "nfnetlink": ["bar"]})
-    lp_out = "int (*klpe_foo)(void);\nint (*klpe_bar)(void);\n"
-    result = fix_ext_symbols(cs, fdata, lp_out)
-    assert "(*klpe_foo)" not in result
-    assert "(*klpe_bar)" not in result
+    assert fix_ext_symbols(cs, lp_out) == lp_out
 
 
 def test_fix_ext_symbols_percpu_scalar_type():
     """Percpu __attribute__ declaration with a scalar type is rewritten to
     'static TYPE __percpu VAR'."""
     cs = Codestream("15.4u0")
-    fdata = _make_fdata({})
     lp_out = 'static __attribute__((section(".data..percpu" ""))) __typeof__(int) (*klpe_example);\n'
-    result = fix_ext_symbols(cs, fdata, lp_out)
+    result = fix_ext_symbols(cs, lp_out)
     assert "static int __percpu (*klpe_example);" in result
     assert "__attribute__" not in result
 
@@ -356,55 +282,10 @@ def test_fix_ext_symbols_percpu_struct_pointer_type():
     """Percpu __attribute__ declaration with a struct-pointer type is rewritten
     correctly; the full type including '*' ends up before __percpu."""
     cs = Codestream("15.4u0")
-    fdata = _make_fdata({})
     lp_out = 'static __attribute__((section(".data..percpu" ""))) __typeof__(struct foo *) (*klpe_bar);\n'
-    result = fix_ext_symbols(cs, fdata, lp_out)
+    result = fix_ext_symbols(cs, lp_out)
     assert "static struct foo * __percpu (*klpe_bar);" in result
     assert "__attribute__" not in result
-
-
-# ── fix_klpp_symbols ───────────────────────────────────────────────────────────
-
-def test_fix_klpp_symbols_strips_static_from_definition():
-    """The 'static' keyword is removed from the klpp function definition,
-    matching the stored (static-free) prototype."""
-    fdata = _make_fdata(klpp_symbols={"foo": "int klpp_foo(int a, int b);"})
-    lp_out = "static int klpp_foo(int a, int b)\n{\n    return a + b;\n}\n"
-    result = fix_klpp_symbols(fdata, lp_out)
-    assert "static" not in result
-    assert "int klpp_foo(int a, int b)\n{\n    return a + b;\n}\n" in result
-
-
-def test_fix_klpp_symbols_removes_duplicate_declaration():
-    """A standalone klpp function declaration (no body) is removed entirely,
-    since it duplicates the one already emitted in the header. The surviving
-    definition also has 'static' stripped."""
-    fdata = _make_fdata(klpp_symbols={"foo": "int klpp_foo(void);"})
-    lp_out = "int klpp_foo(void);\nstatic int klpp_foo(void)\n{\n    return 0;\n}\n"
-    result = fix_klpp_symbols(fdata, lp_out)
-    assert result == "int klpp_foo(void)\n{\n    return 0;\n}\n"
-
-
-def test_fix_klpp_symbols_no_static_definition_unchanged():
-    """When the definition never had 'static', the buffer is left as-is."""
-    fdata = _make_fdata(klpp_symbols={"foo": "int klpp_foo(void);"})
-    lp_out = "int klpp_foo(void)\n{\n    return 0;\n}\n"
-    result = fix_klpp_symbols(fdata, lp_out)
-    assert result == lp_out
-
-
-def test_fix_klpp_symbols_multiple_symbols_all_processed():
-    """Every symbol in fdata.klpp_symbols has its 'static' stripped."""
-    fdata = _make_fdata(klpp_symbols={
-        "alpha": "int klpp_alpha(void);",
-        "beta": "void klpp_beta(int x);",
-    })
-    lp_out = (
-        "static int klpp_alpha(void)\n{\n    return 0;\n}\n"
-        "static void klpp_beta(int x)\n{\n}\n"
-    )
-    result = fix_klpp_symbols(fdata, lp_out)
-    assert "static" not in result
 
 
 # ── get_ext_symbols ────────────────────────────────────────────────────────────
