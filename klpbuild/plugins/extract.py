@@ -269,12 +269,9 @@ def get_missing_ext_symbols(working_cs, klp_ccp_arch="x86_64"):
     return missing_syms, unext_syms
 
 
-def fix_ext_symbols(cs, fdata: AffectedFile, lp_out, arch="x86_64"):
+def fix_ext_symbols(cs, lp_out):
     '''
     Fix klp-ccp mistakes on non-ibt livepatches:
-        - Drop any duplicated externalized symbol declaration generated
-        - by klp-ccp. This is a workaround for:
-          https://github.com/SUSE/klp-ccp/issues/13
         - Refactor percpu externalized symbols declaration. Default one
           crashes at runtime.
     '''
@@ -282,13 +279,6 @@ def fix_ext_symbols(cs, fdata: AffectedFile, lp_out, arch="x86_64"):
     # Only happens with non-ibt codestreams for now
     if cs.needs_ibt():
         return lp_out
-
-    for sym_list in fdata.get_ext_symbols(arch).values():
-        for s in sym_list:
-            # Keep only static declarations
-            lp_out = re.sub(rf"^(?!(?:static|STATIC)|\s|#)\w[^;:()=]+\(\*klpe_{s}\)[^;:=]*;",
-                            '', lp_out, flags=re.MULTILINE)
-
 
     # From:
     # - static __attribute__((section(".data..percpu" ""))) __typeof__(int)
@@ -334,27 +324,6 @@ def get_ext_symbols(out_dir):
         symbols[mod].append(sym)
 
     return symbols
-
-
-def fix_klpp_symbols(fdata: AffectedFile, lp_out, arch="x86_64"):
-    '''
-        - Removes any klpp function declaration in the .c files to
-          avoid signature conflicts with the declarations in the header
-          file during compilation.
-          Inlined klpp functions are not affected.
-        - Remove 'static' keyword from klpp function definition.
-    '''
-
-    for sym, proto in fdata.get_klpp_symbols(arch).items():
-        rfmt = fr"[\w\*\s]+?\bklpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\)\s*;\n?"
-        lp_out = re.sub(rfmt, '', lp_out, flags=re.S)
-
-        # Remove the 'static' keyword in the prototypes, if any
-        proto = proto.rstrip(';')
-        proto_re = r'\s+'.join(re.escape(p) for p in proto.split(' '))
-        lp_out = re.sub(fr'(static|STATIC)\s+{proto_re}', proto, lp_out)
-
-    return lp_out
 
 
 def get_klpp_symbols(out_dir, lp_out, mod_name):
@@ -773,7 +742,6 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
     - Remove the attributes left by klp-ccp, since they don't mean much for
       kernel modules.
     - Fix externalized symbols declaration.
-    - Fix klpp symbols declaration.
     - Remove typeof(...) declarations left by klp-ccp.
     - Remove big chunks of empty lines.
     """
@@ -788,8 +756,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
-        file_buf = fix_ext_symbols(cs, fdata, file_buf, arch)
-        file_buf = fix_klpp_symbols(fdata, file_buf, arch)
+        file_buf = fix_ext_symbols(cs, file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
