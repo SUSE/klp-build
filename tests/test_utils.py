@@ -352,3 +352,45 @@ def test_is_lp_eol_soon_uses_latest():
         Codestream("15.5u21", eol=far),
     ]
     assert not utils.is_lp_eol_soon(cs_list)
+
+
+def test_get_lp_eol_non_date():
+    cs_list = [
+        Codestream("15.4u44", eol="only LTSS supported"),
+        Codestream("15.5u20", eol="2025-11-09"),
+        Codestream("15.5u22", eol="2026-02-21"),
+    ]
+    assert utils.get_lp_eol(cs_list) == "2026-02-21"
+
+    all_non_date = [
+        Codestream("15.4u44", eol="only LTSS supported"),
+        Codestream("15.4u45", eol="n/a"),
+    ]
+    assert utils.get_lp_eol(all_non_date) == "n/a"
+    assert utils.get_lp_eol([]) == "n/a"
+
+
+def test_is_lp_eol_soon_non_date():
+    from datetime import date, timedelta
+
+    today = date.today()
+    soon = (today + timedelta(days=20)).isoformat()
+    far = (today + timedelta(days=60)).isoformat()
+
+    # Only non-date EOLs
+    assert not utils.is_lp_eol_soon([Codestream("15.4u44", eol="only LTSS supported")])
+    assert not utils.is_lp_eol_soon([])
+
+    # Mixed non-date and soon date
+    mixed_soon = [
+        Codestream("15.4u44", eol="only LTSS supported"),
+        Codestream("15.5u20", eol=soon),
+    ]
+    assert utils.is_lp_eol_soon(mixed_soon)
+
+    # Mixed non-date and far date
+    mixed_far = [
+        Codestream("15.4u44", eol="only LTSS supported"),
+        Codestream("15.5u20", eol=far),
+    ]
+    assert not utils.is_lp_eol_soon(mixed_far)

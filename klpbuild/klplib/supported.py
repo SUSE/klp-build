@@ -59,8 +59,8 @@ def __get_supported_codestreams():
     lines = __download_supported_file() if not utils.in_test_mode() else __load_supported_file()
 
     for line in lines:
-        full_cs, proj, kernel_full, eol, eol_ltss = line.split(",")
-        if eol_ltss.strip():
+        full_cs, proj, kernel_full, eol, eol_ltss = [f.strip() for f in line.split(",")]
+        if eol_ltss:
             eol = eol_ltss
 
         kernel = re.sub(r"\.\d+$", "", kernel_full)
