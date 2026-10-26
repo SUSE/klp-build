@@ -502,9 +502,20 @@ def get_lp_eol(cs_list):
         cs_list (list[Codestream]): List of codestreams.
 
     Returns:
-        str: The latest EOL date string (YYYY-MM-DD).
+        str: The latest EOL date string (YYYY-MM-DD), or "n/a" if no valid
+             date is found.
     '''
-    return max(cs.eol for cs in cs_list)
+    valid_dates = []
+    for cs in cs_list:
+        try:
+            valid_dates.append(date.fromisoformat(cs.eol.strip()))
+        except (ValueError, TypeError, AttributeError):
+            continue
+
+    if not valid_dates:
+        return "n/a"
+
+    return max(valid_dates).isoformat()
 
 
 def is_lp_eol_soon(cs_list):
@@ -517,8 +528,11 @@ def is_lp_eol_soon(cs_list):
     Returns:
         bool: True if the latest EOL is within 30 days from today.
     '''
-    eol = date.fromisoformat(get_lp_eol(cs_list))
-    return eol <= date.today() + timedelta(days=30)
+    try:
+        eol = date.fromisoformat(get_lp_eol(cs_list))
+        return eol <= date.today() + timedelta(days=30)
+    except (ValueError, TypeError):
+        return False
 
 
 def date_to_days(date_str):
