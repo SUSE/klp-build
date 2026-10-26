@@ -233,6 +233,11 @@ different architectures.
 .B --no-patches
 Do not apply the patches even if they exist.
 .TP
+.BI --no-auto-unext " [SYMBOL ...]"
+Do not automatically unexternalize symbols that are missing in other
+architectures. If symbols are specified, only those symbols will be excluded
+from automatic unexternalization.
+.TP
 .BI "-k, --klp-ccp-arch" " {aarch64,x86_64}"
 Architecture target for klp-ccp (default: x86_64).
 .RE
