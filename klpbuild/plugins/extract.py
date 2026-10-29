@@ -556,7 +556,8 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir, klp_ccp_a
     funcs = ",".join(sorted(fdata.affected_symbols))
 
     ccp_args = [str(shutil.which("klp-ccp")), "-P", "suse.KlpPolicy",
-                f"--compiler={klp_ccp_arch}-gcc-9.1.0", "-i", f"{funcs}", "-o",
+                f"--compiler={klp_ccp_arch}-gcc-9.1.0", "-i", f"{funcs}",
+                "--warning-level=critical", "-o",
                 f"{str(lp_out)}", "--"]
 
     # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
