@@ -267,6 +267,7 @@ def test_detect_opt_clone(caplog):
 
 def test_fix_static_keys_replaces_correctly():
     """Verify that both static key variants are correctly replaced with their memory-read variants."""
+    cs = Codestream("15.4u0")
     content = "if (klpr_static_key_false(&my_key)) {\n" \
               "    do_something();\n" \
               "}\n" \
@@ -282,16 +283,27 @@ def test_fix_static_keys_replaces_correctly():
                "}\n" \
                "static_call_query(my_func)(arg1);"
     
-    assert fix_static_keys(content) == expected
+    assert fix_static_keys(cs, "test.c", content) == expected
 
 def test_fix_static_keys_unrelated_content():
     """Verify that unrelated text is not touched."""
+    cs = Codestream("15.4u0")
     content = "static int my_var = 0;\n" \
               "if (some_other_function(klpr_static_key_false))"
     expected = "static int my_var = 0;\n" \
                "if (some_other_function(static_key_enabled))"
     
-    assert fix_static_keys(content) == expected
+    assert fix_static_keys(cs, "test.c", content) == expected
+
+def test_fix_static_keys_numbered_warning(caplog):
+    """Verify that a numbered static key generates a warning."""
+    cs = Codestream("15.4u0")
+    content = "if (klpr_static_key_false0(&my_key))"
+    
+    # Should still process standard replacements (if any) and log the warning
+    fix_static_keys(cs, "test.c", content)
+    assert "Numbered static key detected (e.g. klpr_static_key_true0)" in caplog.text
+    assert "15.4u0:test.c" in caplog.text
 
 
 # ── get_ext_symbols ────────────────────────────────────────────────────────────

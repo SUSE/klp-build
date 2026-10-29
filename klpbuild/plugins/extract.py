@@ -762,7 +762,7 @@ def process(lp_name, total, args, avoid_ext, no_patches, klp_ccp_arch="x86_64"):
     lp_out_cleanup(cs, cs.files[fname], lp_out, sdir, klp_ccp_arch)
 
 
-def fix_static_keys(lp_out):
+def fix_static_keys(cs, fname, lp_out):
     """
     Replace jump-label dependent static keys (klpr_static_key_false,
     klpr_static_key_true) with static_key_enabled.
@@ -770,6 +770,10 @@ def fix_static_keys(lp_out):
     This avoids complex relocation issues with asm goto jump labels and static 
     call trampolines in livepatches, falling back to standard memory reads.
     """
+    if re.search(r"klpr_static_key_(?:true|false)\d+", lp_out):
+        logging.warning("%s:%s: Numbered static key detected (e.g. klpr_static_key_true0). "
+                        "Manual inspection required.", cs.full_cs_name(), fname)
+
     lp_out = lp_out.replace("klpr_static_key_false", "static_key_enabled")
     lp_out = lp_out.replace("klpr_static_key_true", "static_key_enabled")
     lp_out = lp_out.replace("klpr_static_call", "static_call_query")
@@ -806,7 +810,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
         file_buf = fix_ext_symbols(cs, fdata, file_buf, arch)
         file_buf = fix_klpp_symbols(fdata, file_buf, arch)
-        file_buf = fix_static_keys(file_buf)
+        file_buf = fix_static_keys(cs, fdata.filename, file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
