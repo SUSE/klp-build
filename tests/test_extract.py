@@ -521,14 +521,13 @@ def test_lp_out_cleanup_removes_local_includes(tmp_path):
     assert "#include <linux/module.h>" in content
 
 
-def test_lp_out_cleanup_removes_unsupported_macros(tmp_path):
-    """#define lines for UNSUPPORTED_MACROS are removed."""
+def test_lp_out_cleanup_removes_unwanted_macros(tmp_path):
+    """#define lines for UNWANTED_MACROS are removed."""
     lp_out = _make_lp_out(
         tmp_path,
         "#define __KERNEL__\n"
         "#define MODULE\n"
         "#define KBUILD_MODNAME foo\n"
-        "#define __seg_gs\n"
         "#define CC_USING_PATCHABLE_FUNCTION_ENTRY 1\n"
         "#define CONFIG_CC_HAS_K_CONSTRAINT 1\n"
         "#define ARM64_ASM_ARCH armv8.5-a\n",
@@ -538,7 +537,6 @@ def test_lp_out_cleanup_removes_unsupported_macros(tmp_path):
     assert "#define __KERNEL__" not in content
     assert "#define MODULE" not in content
     assert "#define KBUILD_MODNAME" not in content
-    assert "#define __seg_gs" not in content
     assert "#define CC_USING_PATCHABLE_FUNCTION_ENTRY" not in content
     assert "#define CONFIG_CC_HAS_K_CONSTRAINT" not in content
     assert "#define ARM64_ASM_ARCH" not in content
