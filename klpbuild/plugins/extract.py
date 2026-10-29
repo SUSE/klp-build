@@ -762,6 +762,18 @@ def process(lp_name, total, args, avoid_ext, no_patches, klp_ccp_arch="x86_64"):
     lp_out_cleanup(cs, cs.files[fname], lp_out, sdir, klp_ccp_arch)
 
 
+def fix_static_keys(lp_out):
+    """
+    Replace jump-label dependent static keys (klpr_static_key_false,
+    klpr_static_key_true) with static_key_enabled.
+    This avoids complex relocation issues with asm goto jump labels in livepatches,
+    falling back to standard memory reads while preserving the same boolean logic.
+    """
+    lp_out = lp_out.replace("klpr_static_key_false", "static_key_enabled")
+    lp_out = lp_out.replace("klpr_static_key_true", "static_key_enabled")
+    return lp_out
+
+
 def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
     """
     Open the file, read, seek to the beginning, write the new data, and
@@ -774,6 +786,8 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
       kernel modules.
     - Fix externalized symbols declaration.
     - Fix klpp symbols declaration.
+    - Replace jump-label dependent static keys with their memory-read variants.
+    - Replace static calls with standard indirect memory reads.
     - Remove typeof(...) declarations left by klp-ccp.
     - Remove big chunks of empty lines.
     """
@@ -790,6 +804,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
         file_buf = fix_ext_symbols(cs, fdata, file_buf, arch)
         file_buf = fix_klpp_symbols(fdata, file_buf, arch)
+        file_buf = fix_static_keys(file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()

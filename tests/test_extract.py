@@ -19,6 +19,7 @@ from klpbuild.plugins.extract import (
     extract,
     fix_ext_symbols,
     fix_klpp_symbols,
+    fix_static_keys,
     get_ext_symbols,
     get_klpp_symbols,
     lp_out_cleanup,
@@ -263,6 +264,35 @@ def test_detect_opt_clone(caplog):
 
 
 # ── fix_ext_symbols ────────────────────────────────────────────────────────────
+
+def test_fix_static_keys_replaces_correctly():
+    """Verify that both static key variants are correctly replaced with their memory-read variants."""
+    content = "if (klpr_static_key_false(&my_key)) {\n" \
+              "    do_something();\n" \
+              "}\n" \
+              "if (klpr_static_key_true(&my_other_key)) {\n" \
+              "    do_something_else();\n" \
+              "}"
+    expected = "if (static_key_enabled(&my_key)) {\n" \
+               "    do_something();\n" \
+               "}\n" \
+               "if (static_key_enabled(&my_other_key)) {\n" \
+               "    do_something_else();\n" \
+               "}"
+    
+    assert fix_static_keys(content) == expected
+
+def test_fix_static_keys_unrelated_content():
+    """Verify that unrelated text is not touched."""
+    content = "static int my_var = 0;\n" \
+              "if (some_other_function(klpr_static_key_false))"
+    expected = "static int my_var = 0;\n" \
+               "if (some_other_function(static_key_enabled))"
+    
+    assert fix_static_keys(content) == expected
+
+
+# ── get_ext_symbols ────────────────────────────────────────────────────────────
 
 def test_fix_ext_symbols_ibt_returns_unchanged():
     """IBT codestreams bypass all fixups and return lp_out as-is."""
