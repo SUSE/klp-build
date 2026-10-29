@@ -269,29 +269,6 @@ def get_missing_ext_symbols(working_cs, klp_ccp_arch="x86_64"):
     return missing_syms, unext_syms
 
 
-def fix_ext_symbols(cs, lp_out):
-    '''
-    Fix klp-ccp mistakes on non-ibt livepatches:
-        - Refactor percpu externalized symbols declaration. Default one
-          crashes at runtime.
-    '''
-
-    # Only happens with non-ibt codestreams for now
-    if cs.needs_ibt():
-        return lp_out
-
-    # From:
-    # - static __attribute__((section(".data..percpu" ""))) __typeof__(int)
-    #   (*klpe_example);
-    # To:
-    # + static int __percpu (*klpe_example);
-    lp_out = re.sub(r'^static __attribute__\(\(section\(".data..percpu" '
-                    r'""\)\)\).*__typeof__\((.*)\) (.*)$',
-                    r'static \1 __percpu \2', lp_out,
-                    flags=re.MULTILINE)
-
-    return lp_out
-
 
 def get_ext_symbols(out_dir):
     # Generate the list of exported symbols
@@ -719,7 +696,6 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
     - Remove unsupported macro definitions.
     - Remove the attributes left by klp-ccp, since they don't mean much for
       kernel modules.
-    - Fix externalized symbols declaration.
     - Remove typeof(...) declarations left by klp-ccp.
     - Remove big chunks of empty lines.
     """
@@ -734,7 +710,6 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
-        file_buf = fix_ext_symbols(cs, file_buf)
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
