@@ -46,7 +46,6 @@ TEMPL_IBT_H = """\
 static inline int ${ fname }_init(void) { return 0; }
 static inline void ${ fname }_cleanup(void) {}
 
-${ klpp_header }
 
 #endif /* _${ fname.upper() }_H */
 """
@@ -68,7 +67,6 @@ void ${ fname }_cleanup(void);
 static inline void ${ fname }_cleanup(void) {}
 % endif %
 ${get_protos(proto_syms)}
-${ klpp_header }
 #else /* !IS_ENABLED(${ config }) */
 
 static inline int ${ fname }_init(void) { return 0; }
@@ -86,7 +84,6 @@ static inline void ${ fname }_cleanup(void) {}
 % endif
 ${get_protos(proto_syms)}
 
-${ klpp_header }
 % endif
 #endif /* _${ fname.upper() }_H */
 """
@@ -407,7 +404,7 @@ def get_patched(cs, check_enabled, arch):
         mod = cs.get_file_mod(ffile, arch)
         mod_str = mod.lp_module_name
 
-        syms = list(fdata.get_klpp_symbols(arch).keys())
+        syms = fdata.get_patched_funcs(arch)
         syms.sort()
         for sym in syms:
             ret.append(f'{mod_str} {sym} klpp_{sym}{conf}')
@@ -458,36 +455,6 @@ def __generate_patched_conf(lp_name, cs, arch):
         f.write(Template(TEMPL_PATCHED).render(**render_vars))
 
 
-def __generate_klpp_header(cs, arch="x86_64"):
-    '''
-    Generate any klpp-specific header information, such as:
-    - klpp functions declarations.
-    - Incomplete struct/enum declarations used by the klpp functions.
-
-    Return a formated string with the generated information.
-    '''
-
-    funcs = []
-    structs = set()
-    enums = set()
-
-    for dat in cs.files.values():
-        protos = list(dat.get_klpp_symbols(arch).values())
-        funcs.extend(protos)
-        for p in protos:
-            structs.update(re.findall(r"(struct\s+\w+)\s*\**\w+", p))
-            enums.update(re.findall(r"(enum\s+\w+)\s*\**\w+", p))
-
-    funcs.sort()
-
-    blocks = []
-    if structs:
-        blocks.append(';\n'.join(sorted(structs)) + ';')
-    if enums:
-        blocks.append(';\n'.join(sorted(enums)) + ';')
-    fwd_decls = '\n\n'.join(blocks) + '\n\n' if blocks else ''
-
-    return fwd_decls + '\n'.join(funcs)
 
 
 def __generate_header_file(lp_name, lp_path, cs, arch):
@@ -500,7 +467,6 @@ def __generate_header_file(lp_name, lp_path, cs, arch):
     # and klpp functions information.
     header_templ = TEMPL_IBT_H
 
-    render_vars.update({"klpp_header": __generate_klpp_header(cs, arch)})
 
     if not cs.needs_ibt():
         configs = set()
@@ -637,6 +603,8 @@ def generate_livepatches(lp_name, cs, arch):
         __generate_lp_file(lp_name, lp_path, cs, None, f"livepatch_{lp_name}.c", arch)
 
     __create_kbuild(lp_name, cs, arch)
+
+    (lp_path / "gen-patched-funcs-decls").touch()
 
 
 def __is_check_enabled(cs: Codestream):

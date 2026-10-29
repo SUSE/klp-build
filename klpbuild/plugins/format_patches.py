@@ -140,7 +140,7 @@ def generate_groups(lp_name, codestreams):
         groups += f" - {group}\n"
         cs = cs_list[0]
         for file, fdat in cs.files.items():
-            all_syms = set().union(*[d.keys() for d in fdat.klpp_symbols.values()]) if fdat.klpp_symbols else set()
+            all_syms = set().union(*[lst for lst in fdat.patched_funcs.values()]) if fdat.patched_funcs else set()
             if not all_syms:
                 continue
             syms = '\n\t\t   '.join(sorted(all_syms))
