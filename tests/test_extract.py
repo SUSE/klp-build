@@ -19,7 +19,7 @@ from klpbuild.plugins.extract import (
     extract,
     fix_ext_symbols,
     get_ext_symbols,
-    get_klpp_symbols,
+    get_patched_funcs,
     lp_out_cleanup,
     parse_ccp_warnings,
     register_argparser,
@@ -28,163 +28,29 @@ from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS
 
 
-def _make_fdata(ext_symbols=None, klpp_symbols=None, arch="x86_64"):
-    """Create an AffectedFile with ext_symbols/klpp_symbols set for testing."""
+def _make_fdata(ext_symbols=None, patched_funcs=None, arch="x86_64"):
+    """Create an AffectedFile with ext_symbols/patched_funcs set for testing."""
     f = AffectedFile("test.c")
     if ext_symbols is not None:
         f.set_ext_symbols(arch, ext_symbols)
-    if klpp_symbols is not None:
-        f.set_klpp_symbols(arch, klpp_symbols)
+    if patched_funcs is not None:
+        f.set_patched_funcs(arch, patched_funcs)
     return f
 
-
-def test_get_klpp_symbols_missing_patched_funcs(tmp_path):
-    """RuntimeError when patched_funcs file does not exist."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text("")
-
+def test_get_patched_funcs_missing_file(tmp_path):
     with pytest.raises(RuntimeError, match="File not found"):
-        get_klpp_symbols(tmp_path, lp_out, "test_mod")
+        get_patched_funcs(tmp_path, "test_mod")
 
+def test_get_patched_funcs_empty_file(tmp_path):
+    (tmp_path / "patched_funcs").write_text("")
+    with pytest.raises(RuntimeError, match="klp-ccp could not find any of the indicated symbols"):
+        get_patched_funcs(tmp_path, "test_mod")
 
-def test_get_klpp_symbols_no_static(tmp_path, caplog):
-    """Regex has 'static' as optional"""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text("int klpp_foo(void)\n{\n    return 0;\n}\n")
-    (tmp_path / "patched_funcs").write_text("foo\n")
+def test_get_patched_funcs_success(tmp_path):
+    (tmp_path / "patched_funcs").write_text("foo\nbar\nbaz\n\n")
+    result = get_patched_funcs(tmp_path, "test_mod")
+    assert result == ["foo", "bar", "baz"]
 
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert result == {"foo": "int klpp_foo(void);"}
-    assert "static" not in caplog.text
-
-
-def test_get_klpp_symbols_simple_return_type(tmp_path):
-    """Basic match: scalar return type, simple params."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text("static int klpp_foo(int a, int b)\n{\n    return a + b;\n}\n")
-    (tmp_path / "patched_funcs").write_text("foo\n")
-
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert result == {"foo": "int klpp_foo(int a, int b);"}
-
-
-def test_get_klpp_symbols_does_not_modify_file(tmp_path):
-    """get_klpp_symbols only parses lp_out; it must not rewrite the file."""
-    content = "static int klpp_foo(int a, int b)\n{\n    return a + b;\n}\n"
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text(content)
-    (tmp_path / "patched_funcs").write_text("foo\n")
-
-    get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert lp_out.read_text() == content
-
-
-def test_get_klpp_symbols_pointer_return_type(tmp_path):
-    """Return type with * is captured by [\\w\\*] in the regex."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text("static char *klpp_foo(void)\n{\n    return NULL;\n}\n")
-    (tmp_path / "patched_funcs").write_text("foo\n")
-
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert result == {"foo": "char *klpp_foo(void);"}
-
-
-def test_get_klpp_symbols_multiword_return_type(tmp_path):
-    """Multi-word return type (e.g. 'unsigned long') is fully captured."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text("static unsigned long klpp_foo(int x)\n{\n    return 0;\n}\n")
-    (tmp_path / "patched_funcs").write_text("foo\n")
-
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert result == {"foo": "unsigned long klpp_foo(int x);"}
-
-
-def test_get_klpp_symbols_const_struct_pointer_return(tmp_path):
-    """const struct pointer return type is handled correctly."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text(
-        "static const struct foo *klpp_bar(struct foo *p)\n{\n    return p;\n}\n"
-    )
-    (tmp_path / "patched_funcs").write_text("bar\n")
-
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert result == {"bar": "const struct foo *klpp_bar(struct foo *p);"}
-
-
-def test_get_klpp_symbols_multiline_via_re_s(tmp_path):
-    """re.S flag lets the regex span a newline between return type and name."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text("static int\nklpp_baz(int a)\n{\n    return a;\n}\n")
-    (tmp_path / "patched_funcs").write_text("baz\n")
-
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert "baz" in result
-    # Whitespace normalization must collapse the newline in the prototype
-    assert "\n" not in result["baz"]
-    assert result["baz"] == "int klpp_baz(int a);"
-
-
-def test_get_klpp_symbols_params_with_pointer(tmp_path):
-    """Pointer parameters (e.g. 'int *p') are preserved inside [^)]* ."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text(
-        "static int klpp_foo(int *p, struct bar *q)\n{\n    return 0;\n}\n"
-    )
-    (tmp_path / "patched_funcs").write_text("foo\n")
-
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert result == {"foo": "int klpp_foo(int *p, struct bar *q);"}
-
-
-def test_get_klpp_symbols_function_pointer_param(tmp_path):
-    """Function-pointer parameter '(*cb)(void)' is matched in full."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text("static int klpp_foo(int (*cb)(void))\n{\n    return 0;\n}\n")
-    (tmp_path / "patched_funcs").write_text("foo\n")
-
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert result == {"foo": "int klpp_foo(int (*cb)(void));"}
-
-
-def test_get_klpp_symbols_strips_init_exit_sched(tmp_path):
-    r"""__init and __exit are part of ([\w\*]\s*)* and stripped from the proto."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text(
-        "static int __init klpp_foo(void)\n{\n    return 0;\n}\n"
-        "static void __exit klpp_bar(void)\n{\n}\n"
-        "static void __sched klpp_baz(void)\n{\n}\n"
-    )
-    (tmp_path / "patched_funcs").write_text("foo\nbar\nbaz\n")
-
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert "__init" not in result["foo"]
-    assert "__exit" not in result["bar"]
-    assert "__sched" not in result["baz"]
-
-
-def test_get_klpp_symbols_multiple_symbols(tmp_path):
-    """All matched symbols collected; unmatched one skipped."""
-    lp_out = tmp_path / "lp.c"
-    lp_out.write_text(
-        "static int klpp_alpha(void)\n{\n    return 0;\n}\n"
-        "static void klpp_beta(int x)\n{\n}\n"
-    )
-    (tmp_path / "patched_funcs").write_text("alpha\nbeta\ngamma\n")
-
-    result = get_klpp_symbols(tmp_path, lp_out, "test_mod")
-
-    assert "alpha" in result
-    assert "beta" in result
     assert "gamma" not in result
 
 

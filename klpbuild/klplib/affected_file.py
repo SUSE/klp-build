@@ -237,7 +237,7 @@ class AffectedFile:
         self.ibt: bool = False
         self.dup_symbols: dict[str, list[str]] = {}          # arch → duplicated symbol list
         self.ext_symbols: dict[str, dict[str, list[str]]] = {} # arch → module name → symbol list
-        self.klpp_symbols: dict[str, dict[str, str]] = {}      # arch → symbol name → prototype
+        self.patched_funcs: dict[str, list[str]] = {}      # arch → symbol list
 
     def get_dup_symbols(self, arch: str = "x86_64") -> list[str]:
         return self.dup_symbols.get(arch, [])
@@ -256,11 +256,11 @@ class AffectedFile:
     def set_ext_symbols(self, arch: str, ext_symbols: dict[str, list[str]]) -> None:
         self.ext_symbols[arch] = {k: list(v) for k, v in ext_symbols.items()}
 
-    def get_klpp_symbols(self, arch: str = "x86_64") -> dict[str, str]:
-        return self.klpp_symbols.get(arch, {})
+    def get_patched_funcs(self, arch: str = "x86_64") -> list[str]:
+        return self.patched_funcs.get(arch, [])
 
-    def set_klpp_symbols(self, arch: str, klpp_symbols: dict[str, str]) -> None:
-        self.klpp_symbols[arch] = dict(klpp_symbols)
+    def set_patched_funcs(self, arch: str, patched_funcs: list[str]) -> None:
+        self.patched_funcs[arch] = list(patched_funcs)
 
     @classmethod
     def from_dict(cls, filename: str, data: dict) -> "AffectedFile":
@@ -279,9 +279,9 @@ class AffectedFile:
             arch: {mod: list(syms) for mod, syms in mod_map.items()}
             for arch, mod_map in data["ext_symbols"].items()
         }
-        f.klpp_symbols = {
-            arch: dict(sym_protos)
-            for arch, sym_protos in data["klpp_symbols"].items()
+        f.patched_funcs = {
+            arch: list(syms)
+            for arch, syms in data["patched_funcs"].items()
         }
         return f
 
@@ -299,9 +299,9 @@ class AffectedFile:
                 arch: {mod: list(syms) for mod, syms in mod_map.items()}
                 for arch, mod_map in self.ext_symbols.items()
             },
-            "klpp_symbols": {
-                arch: dict(sym_protos)
-                for arch, sym_protos in self.klpp_symbols.items()
+            "patched_funcs": {
+                arch: list(syms)
+                for arch, syms in self.patched_funcs.items()
             },
         }
 

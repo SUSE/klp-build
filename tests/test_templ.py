@@ -16,16 +16,15 @@ from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS, get_codestreams_file, get_file_content
 
 
-def _af(name, ext_symbols=None, klpp_symbols=None, arch="x86_64"):
+def _af(name, ext_symbols=None, patched_funcs=None, arch="x86_64"):
     """Build an AffectedFile with extraction-phase fields set."""
     f = AffectedFile(name)
     if ext_symbols is not None:
         f.set_ext_symbols(arch, ext_symbols)
-    if klpp_symbols is not None:
-        f.set_klpp_symbols(arch, klpp_symbols)
+    if patched_funcs is not None:
+        f.set_patched_funcs(arch, patched_funcs)
     return f
 
-_generate_klpp_header = templ_module.__dict__["__generate_klpp_header"]
 
 
 def test_templ_with_externalized_vars():
@@ -517,160 +516,3 @@ def test_get_multi_funcs_hyphen_in_lp_name():
     )
 
     # lp_out_file keeps the hyphen; get_fname converts it to _
-    assert "bsc_1234_fs_proc_cmdline_init()" in inits
-
-
-# ── __generate_klpp_header ───────────────────────────────────────────────────
-
-
-def test_generate_klpp_header_empty_files():
-    """No source files → empty string."""
-    assert _generate_klpp_header(FakeCS()) == ""
-
-
-def test_generate_klpp_header_no_structs():
-    """Protos without struct parameters → sorted function declarations only."""
-    result = _generate_klpp_header(
-        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
-            "baz": "void klpp_baz(int x);",
-            "bar": "int klpp_bar(void);",
-        })})
-    )
-
-    assert "int klpp_bar(void);" in result
-    assert "void klpp_baz(int x);" in result
-    assert result.index("klpp_bar") < result.index("klpp_baz")
-    assert "struct" not in result
-    assert "enum" not in result
-
-
-def test_generate_klpp_header_with_structs():
-    """Proto with a struct parameter → forward declaration prepended."""
-    result = _generate_klpp_header(
-        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
-            "bar": "int klpp_bar(struct sk_buff *skb);",
-        })})
-    )
-
-    assert "struct sk_buff;" in result
-    assert "int klpp_bar(struct sk_buff *skb);" in result
-    assert result.index("struct sk_buff;") < result.index("int klpp_bar")
-
-
-def test_generate_klpp_header_dedup_structs():
-    """The same struct appearing in multiple protos is declared only once."""
-    result = _generate_klpp_header(
-        FakeCS({
-            "foo.c": _af("foo.c", klpp_symbols={
-                "foo": "int klpp_foo(struct sk_buff *skb);"}),
-            "bar.c": _af("bar.c", klpp_symbols={
-                "bar": "int klpp_bar(struct sk_buff *pkt);"}),
-        })
-    )
-
-    assert result.count("struct sk_buff;") == 1
-
-
-def test_generate_klpp_header_multiple_structs_sorted():
-    """Multiple distinct structs are forward-declared in alphabetical order."""
-    result = _generate_klpp_header(
-        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
-            "foo": "int klpp_foo(struct zebra *z, struct alpha *a);",
-        })})
-    )
-
-    assert "struct alpha;" in result
-    assert "struct zebra;" in result
-    assert result.index("struct alpha;") < result.index("struct zebra;")
-
-
-def test_generate_klpp_header_empty_klpp_symbols_in_file():
-    """A file with an empty klpp_symbols dict contributes nothing."""
-    result = _generate_klpp_header(
-        FakeCS({
-            "foo.c": _af("foo.c", klpp_symbols={}),
-            "bar.c": _af("bar.c", klpp_symbols={"baz": "void klpp_baz(void);"}),
-        })
-    )
-
-    assert result == "void klpp_baz(void);"
-
-
-def test_generate_klpp_header_struct_in_return_type():
-    """A struct in the return type also triggers a forward declaration."""
-    result = _generate_klpp_header(
-        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
-            "bar": "struct sk_buff *klpp_bar(void);",
-        })})
-    )
-
-    assert "struct sk_buff;" in result
-    assert result.index("struct sk_buff;") < result.index("struct sk_buff *klpp_bar")
-
-
-def test_generate_klpp_header_funcs_sorted_across_files():
-    """Prototypes from multiple files are sorted together, not per-file."""
-    result = _generate_klpp_header(
-        FakeCS({
-            "foo.c": _af("foo.c", klpp_symbols={"zoo": "void klpp_zoo(void);"}),
-            "bar.c": _af("bar.c", klpp_symbols={"alpha": "int klpp_alpha(void);"}),
-        })
-    )
-
-    assert result.index("klpp_alpha") < result.index("klpp_zoo")
-
-
-def test_generate_klpp_header_with_enum():
-    """Proto with an enum parameter → forward declaration prepended."""
-    result = _generate_klpp_header(
-        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
-            "bar": "void klpp_bar(enum color c);",
-        })})
-    )
-
-    assert "enum color;" in result
-    assert "void klpp_bar(enum color c);" in result
-    assert result.index("enum color;") < result.index("void klpp_bar")
-
-
-def test_generate_klpp_header_enum_in_return_type():
-    """An enum in the return type also triggers a forward declaration."""
-    result = _generate_klpp_header(
-        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
-            "bar": "enum color klpp_bar(void);",
-        })})
-    )
-
-    assert "enum color;" in result
-    assert result.index("enum color;") < result.index("enum color klpp_bar")
-
-
-def test_generate_klpp_header_dedup_enums():
-    """The same enum appearing in multiple protos is declared only once."""
-    result = _generate_klpp_header(
-        FakeCS({
-            "foo.c": _af("foo.c", klpp_symbols={
-                "foo": "void klpp_foo(enum color c);"}),
-            "bar.c": _af("bar.c", klpp_symbols={
-                "bar": "void klpp_bar(enum color d);"}),
-        })
-    )
-
-    assert result.count("enum color;") == 1
-
-
-def test_generate_klpp_header_mixed_struct_and_enum():
-    """Structs appear before enums, each group sorted, separated by blank line."""
-    result = _generate_klpp_header(
-        FakeCS({"foo.c": _af("foo.c", klpp_symbols={
-            "foo": "int klpp_foo(struct zebra *z, enum alpha a);",
-        })})
-    )
-
-    assert "struct zebra;" in result
-    assert "enum alpha;" in result
-    assert result.index("struct zebra;") < result.index("enum alpha;")
-    # Verify blank line separates the two groups
-    struct_end = result.index("struct zebra;") + len("struct zebra;")
-    enum_start = result.index("enum alpha;")
-    assert "\n\n" in result[struct_end:enum_start]

@@ -56,7 +56,7 @@ def test_find_obj_path_arch():
                         ]
                     }
                 },
-                "klpp_symbols": {}
+                "patched_funcs": {}
             }
         },
         "modules": {
@@ -127,7 +127,7 @@ def test_get_file_mod_builtin_arch_config():
                 "ibt": False,
                 "dup_symbols": {},
                 "ext_symbols": {},
-                "klpp_symbols": {}
+                "patched_funcs": {}
             }
         },
         "modules": {},
