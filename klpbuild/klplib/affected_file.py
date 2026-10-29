@@ -239,6 +239,11 @@ class AffectedFile:
         self.ext_symbols: dict[str, dict[str, list[str]]] = {} # arch → module name → symbol list
         self.patched_funcs: dict[str, list[str]] = {}      # arch → symbol list
 
+        # Transient extraction artifacts, consumed by the template generator in
+        # the same run (not serialized): the klp-ccp ``klpr_`` macros (see
+        # klplib/klpr_macros.py) used by this file, per-arch.
+        self.klpr_macros: dict[str, list[str]] = {}  # arch → macro name list
+
     def get_dup_symbols(self, arch: str = "x86_64") -> list[str]:
         return self.dup_symbols.get(arch, [])
 
@@ -261,6 +266,12 @@ class AffectedFile:
 
     def set_patched_funcs(self, arch: str, patched_funcs: list[str]) -> None:
         self.patched_funcs[arch] = list(patched_funcs)
+
+    def get_klpr_macros(self, arch: str = "x86_64") -> list[str]:
+        return self.klpr_macros.get(arch, [])
+
+    def set_klpr_macros(self, arch: str, macros: list[str]) -> None:
+        self.klpr_macros[arch] = list(macros)
 
     @classmethod
     def from_dict(cls, filename: str, data: dict) -> "AffectedFile":
