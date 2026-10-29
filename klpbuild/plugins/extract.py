@@ -766,11 +766,13 @@ def fix_static_keys(lp_out):
     """
     Replace jump-label dependent static keys (klpr_static_key_false,
     klpr_static_key_true) with static_key_enabled.
-    This avoids complex relocation issues with asm goto jump labels in livepatches,
-    falling back to standard memory reads while preserving the same boolean logic.
+    Replace static call keys (klpr_static_call) with static_call_query.
+    This avoids complex relocation issues with asm goto jump labels and static 
+    call trampolines in livepatches, falling back to standard memory reads.
     """
     lp_out = lp_out.replace("klpr_static_key_false", "static_key_enabled")
     lp_out = lp_out.replace("klpr_static_key_true", "static_key_enabled")
+    lp_out = lp_out.replace("klpr_static_call", "static_call_query")
     return lp_out
 
 

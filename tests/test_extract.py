@@ -272,13 +272,15 @@ def test_fix_static_keys_replaces_correctly():
               "}\n" \
               "if (klpr_static_key_true(&my_other_key)) {\n" \
               "    do_something_else();\n" \
-              "}"
+              "}\n" \
+              "klpr_static_call(my_func)(arg1);"
     expected = "if (static_key_enabled(&my_key)) {\n" \
                "    do_something();\n" \
                "}\n" \
                "if (static_key_enabled(&my_other_key)) {\n" \
                "    do_something_else();\n" \
-               "}"
+               "}\n" \
+               "static_call_query(my_func)(arg1);"
     
     assert fix_static_keys(content) == expected
 
