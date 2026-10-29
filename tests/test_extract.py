@@ -17,7 +17,6 @@ from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.plugins.extract import (
     extract,
-    fix_ext_symbols,
     get_ext_symbols,
     get_patched_funcs,
     lp_out_cleanup,
@@ -125,36 +124,8 @@ def test_detect_opt_clone(caplog):
     assert "Symbol l2cap_sock_kill contains optimized clone" in caplog.text
 
 
-# ── fix_ext_symbols ────────────────────────────────────────────────────────────
-
-def test_fix_ext_symbols_ibt_returns_unchanged():
-    """IBT codestreams bypass all fixups and return lp_out as-is."""
-    cs = Codestream("15.6u0")  # needs_ibt() == True
-    lp_out = "int (*klpe_my_func)(void);\nstatic int (*klpe_my_func)(void);\n"
-    assert fix_ext_symbols(cs, lp_out) == lp_out
-
-
-def test_fix_ext_symbols_percpu_scalar_type():
-    """Percpu __attribute__ declaration with a scalar type is rewritten to
-    'static TYPE __percpu VAR'."""
-    cs = Codestream("15.4u0")
-    lp_out = 'static __attribute__((section(".data..percpu" ""))) __typeof__(int) (*klpe_example);\n'
-    result = fix_ext_symbols(cs, lp_out)
-    assert "static int __percpu (*klpe_example);" in result
-    assert "__attribute__" not in result
-
-
-def test_fix_ext_symbols_percpu_struct_pointer_type():
-    """Percpu __attribute__ declaration with a struct-pointer type is rewritten
-    correctly; the full type including '*' ends up before __percpu."""
-    cs = Codestream("15.4u0")
-    lp_out = 'static __attribute__((section(".data..percpu" ""))) __typeof__(struct foo *) (*klpe_bar);\n'
-    result = fix_ext_symbols(cs, lp_out)
-    assert "static struct foo * __percpu (*klpe_bar);" in result
-    assert "__attribute__" not in result
-
-
 # ── get_ext_symbols ────────────────────────────────────────────────────────────
+
 
 def test_get_ext_symbols_empty_directory(tmp_path):
     """No fun_exts / obj_exts files → empty dict."""
