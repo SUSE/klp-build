@@ -326,7 +326,7 @@ def get_ext_symbols(out_dir):
     return symbols
 
 
-def get_klpp_symbols(out_dir, lp_out, mod_name):
+def get_patched_funcs(out_dir, mod_name):
     fpath = Path(out_dir, "patched_funcs")
     if not fpath.exists():
         raise RuntimeError(f"File not found: {fpath}")
@@ -334,31 +334,9 @@ def get_klpp_symbols(out_dir, lp_out, mod_name):
     if fpath.stat().st_size == 0:
         raise RuntimeError(f"klp-ccp could not find any of the indicated symbols in {mod_name}")
 
-    with open(lp_out) as f:
-        lp_code = f.read()
-
-    klpp_syms = {}
     with open(fpath) as f:
         # Each line is a symbol patched by klp-ccp
-        for sym in f:
-            sym = sym.strip()
-            # Create a regex for finding the klpp_{sym} function
-            # definition.
-            rfmt = fr"(\s*static\s+)?([\w\*\s]+?klpp_{sym}\s*\([^()]*(?:\([^()]*\)[^()]*)*\))(?!\s*;)"
-            regex = re.compile(rfmt, re.S)
-
-            # Search and save the function prototype for later use
-            m = regex.search(lp_code)
-            if not m:
-                logging.warning("Failed to find klpp_%s in %s", sym, lp_out)
-                continue
-            klpp_proto = re.sub(r'\s+', ' ', m.group(2)).strip() + ';'
-            # Remove the attributes left by klp-ccp, since they don't mean much
-            # for kernel modules
-            klpp_proto = re.sub(r' __(init|exit|sched)', ' ', klpp_proto)
-            klpp_syms.update({sym: klpp_proto})
-
-    return klpp_syms
+        return [sym.strip() for sym in f if sym.strip()]
 
 
 def get_cmd_from_json(cs, fname, sdir, arch="x86_64"):
@@ -726,7 +704,7 @@ def process(lp_name, total, args, avoid_ext, no_patches, klp_ccp_arch="x86_64"):
     lp_out = Path(out_dir, cs.lp_out_file(lp_name, fname))
 
     cs.files[fname].set_ext_symbols(klp_ccp_arch, get_ext_symbols(out_dir))
-    cs.files[fname].set_klpp_symbols(klp_ccp_arch, get_klpp_symbols(out_dir, lp_out, fdata.module_name))
+    cs.files[fname].set_patched_funcs(klp_ccp_arch, get_patched_funcs(out_dir, fdata.module_name))
 
     lp_out_cleanup(cs, cs.files[fname], lp_out, sdir, klp_ccp_arch)
 
