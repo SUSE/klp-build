@@ -32,10 +32,8 @@ from klpbuild.klplib.templ import generate_livepatches
 
 PLUGIN_CMD = "extract"
 
-UNSUPPORTED_MACROS = [
-    r"__has_attribute\(",
+UNWANTED_MACROS = [
     "__KERNEL__",
-    "__seg_gs",
     "ARM64_ASM_ARCH",
     "CC_HAVE_ASM_GOTO",
     "CC_USING_PATCHABLE_FUNCTION_ENTRY",
@@ -777,7 +775,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
     - Remove typeof(...) declarations left by klp-ccp.
     - Remove big chunks of empty lines.
     """
-    macros = '|'.join(UNSUPPORTED_MACROS)
+    macros = '|'.join(UNWANTED_MACROS)
     orig_file = f"{lp_out}.orig"
     with open(str(lp_out), "r+") as f, open(str(orig_file), "w") as orig:
         file_buf = f.read()
