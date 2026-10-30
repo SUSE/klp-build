@@ -19,6 +19,7 @@ from klpbuild.plugins.extract import (
     extract,
     fix_ext_symbols,
     fix_klpp_symbols,
+    fix_static_keys,
     get_ext_symbols,
     get_klpp_symbols,
     lp_out_cleanup,
@@ -263,6 +264,58 @@ def test_detect_opt_clone(caplog):
 
 
 # ── fix_ext_symbols ────────────────────────────────────────────────────────────
+
+def test_fix_static_keys_replaces_correctly():
+    """Verify that both static key variants are correctly replaced with their memory-read variants."""
+    cs = Codestream("15.4u0")
+    content = "if (klpr_static_key_false(&my_key)) {\n" \
+              "    do_something();\n" \
+              "}\n" \
+              "if (klpr_static_key_true(&my_other_key)) {\n" \
+              "    do_something_else();\n" \
+              "}\n" \
+              "klpr_static_call(my_func)(arg1);"
+    expected = "if (static_key_enabled(&my_key)) {\n" \
+               "    do_something();\n" \
+               "}\n" \
+               "if (static_key_enabled(&my_other_key)) {\n" \
+               "    do_something_else();\n" \
+               "}\n" \
+               "static_call_query(my_func)(arg1);"
+    
+    assert fix_static_keys(cs, "test.c", content) == expected
+
+def test_fix_static_keys_unrelated_content():
+    """Verify that unrelated text is not touched."""
+    cs = Codestream("15.4u0")
+    content = "static int my_var = 0;\n" \
+              "if (some_other_function(klpr_static_key_false))"
+    expected = "static int my_var = 0;\n" \
+               "if (some_other_function(static_key_enabled))"
+    
+    assert fix_static_keys(cs, "test.c", content) == expected
+
+def test_fix_static_keys_numbered_warning(caplog):
+    """Verify that a numbered static key generates a warning."""
+    cs = Codestream("15.4u0")
+    content = "if (klpr_static_key_false0(&my_key))"
+    
+    # Should still process standard replacements (if any) and log the warning
+    fix_static_keys(cs, "test.c", content)
+    assert "Numbered static key/call detected" in caplog.text
+    assert "15.4u0:test.c" in caplog.text
+
+def test_fix_static_keys_numbered_call_warning(caplog):
+    """Verify that a numbered static call generates a warning."""
+    cs = Codestream("15.4u0")
+    content = "klpr_static_call0(my_func)(arg1);"
+
+    fix_static_keys(cs, "test.c", content)
+    assert "Numbered static key/call detected" in caplog.text
+    assert "15.4u0:test.c" in caplog.text
+
+
+# ── get_ext_symbols ────────────────────────────────────────────────────────────
 
 def test_fix_ext_symbols_ibt_returns_unchanged():
     """IBT codestreams bypass all fixups and return lp_out as-is."""
