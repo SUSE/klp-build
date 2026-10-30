@@ -770,9 +770,9 @@ def fix_static_keys(cs, fname, lp_out):
     This avoids complex relocation issues with asm goto jump labels and static 
     call trampolines in livepatches, falling back to standard memory reads.
     """
-    if re.search(r"klpr_static_key_(?:true|false)\d+", lp_out):
-        logging.warning("%s:%s: Numbered static key detected (e.g. klpr_static_key_true0). "
-                        "Manual inspection required.", cs.full_cs_name(), fname)
+    if re.search(r"klpr_static_(?:key_(?:true|false)|call)\d+", lp_out):
+        logging.warning("%s:%s: Numbered static key/call detected (e.g. klpr_static_key_true0, "
+                        "klpr_static_call0). Manual inspection required.", cs.full_cs_name(), fname)
 
     lp_out = lp_out.replace("klpr_static_key_false", "static_key_enabled")
     lp_out = lp_out.replace("klpr_static_key_true", "static_key_enabled")

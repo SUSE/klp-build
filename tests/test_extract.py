@@ -302,7 +302,16 @@ def test_fix_static_keys_numbered_warning(caplog):
     
     # Should still process standard replacements (if any) and log the warning
     fix_static_keys(cs, "test.c", content)
-    assert "Numbered static key detected (e.g. klpr_static_key_true0)" in caplog.text
+    assert "Numbered static key/call detected" in caplog.text
+    assert "15.4u0:test.c" in caplog.text
+
+def test_fix_static_keys_numbered_call_warning(caplog):
+    """Verify that a numbered static call generates a warning."""
+    cs = Codestream("15.4u0")
+    content = "klpr_static_call0(my_func)(arg1);"
+
+    fix_static_keys(cs, "test.c", content)
+    assert "Numbered static key/call detected" in caplog.text
     assert "15.4u0:test.c" in caplog.text
 
 
