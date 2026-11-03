@@ -242,9 +242,13 @@ def get_missing_ext_symbols(working_cs, klp_ccp_arch="x86_64", no_auto_unext=Non
     '''
     Find the symbols that were not externalized and report those that
     can be unexternalized.
+
+    Returns a tuple (missing_syms, unext_syms) where unext_syms is keyed by
+    codestream name, so that each codestream only unexternalizes the symbols
+    it actually requires.
     '''
     missing_syms = OrderedDict()
-    unext_syms = set()
+    unext_syms = {}
 
     # Iterate over each codestream, getting each file processed, and all
     # externalized symbols of this file
@@ -277,7 +281,7 @@ def get_missing_ext_symbols(working_cs, klp_ccp_arch="x86_64", no_auto_unext=Non
                     whitelisted -= skip_syms
 
                 if whitelisted:
-                    unext_syms.update(whitelisted)
+                    unext_syms.setdefault(cs.full_cs_name(), set()).update(whitelisted)
                 if blacklisted:
                     missing_syms.setdefault(arch, {})
                     missing_syms[arch].setdefault(obj, {})
@@ -887,9 +891,10 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch, no_au
 
     missing, unext = get_missing_ext_symbols(working_cs, klp_ccp_arch, no_auto_unext)
     if unext:
-        logging.info("\nUnexternalyzing symbols:\n%s\n", ', '.join(unext))
+        unext_syms = sorted(set().union(*unext.values()))
+        logging.info("\nUnexternalyzing symbols:\n%s\n", ', '.join(unext_syms))
         start_extract(lp_name, lp_filter, no_patches,
-                      avoid_ext + list(unext), klp_ccp_arch, no_auto_unext)
+                      avoid_ext + unext_syms, klp_ccp_arch, no_auto_unext)
         sys.exit(0)
 
     if missing:

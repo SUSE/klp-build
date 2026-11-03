@@ -21,6 +21,7 @@ from klpbuild.plugins.extract import (
     fix_klpp_symbols,
     get_ext_symbols,
     get_klpp_symbols,
+    get_missing_ext_symbols,
     lp_out_cleanup,
     parse_ccp_warnings,
     register_argparser,
@@ -716,4 +717,64 @@ def test_extract_argparser_klp_ccp_arch():
 
     args_default = parser.parse_args(["extract", "-n", "test_lp"])
     assert args_default.klp_ccp_arch == utils.ARCH
+
+
+# ── get_missing_ext_symbols ──────────────────────────────────────────────────
+
+
+class _UnextCS(FakeCS):
+    """FakeCS with a configurable check_symbol_archs for unext testing."""
+
+    def __init__(self, files, cs_name, missing):
+        super().__init__(files=files, cs_name=cs_name)
+        # missing: {obj: {arch: [syms]}} returned by check_symbol_archs
+        self._missing = missing
+
+    def check_symbol_archs(self, _archs, mod, _symbols, _skip_on_host, _check_patchable):
+        return self._missing.get(mod, {})
+
+
+def test_get_missing_ext_symbols_unext_is_keyed_per_codestream(monkeypatch):
+    """A symbol that must be unexternalized for one codestream is reported only
+    under that codestream, not applied to codestreams that don't need it."""
+    monkeypatch.setattr(
+        "klpbuild.plugins.extract.get_codestreams_data", lambda _key: ["x86_64", "ppc64le"]
+    )
+
+    # cs_a needs 'needed_sym' unexternalized (missing in ppc64le); cs_b has
+    # nothing missing.
+    cs_a = _UnextCS(
+        {"a.c": _make_fdata(ext_symbols={"vmlinux": ["needed_sym"]})},
+        "15.4u0",
+        {"vmlinux": {"ppc64le": ["needed_sym"]}},
+    )
+    cs_b = _UnextCS(
+        {"b.c": _make_fdata(ext_symbols={"vmlinux": ["other_sym"]})},
+        "15.5u0",
+        {},
+    )
+
+    _missing, unext = get_missing_ext_symbols([cs_a, cs_b])
+
+    assert unext == {"15.4u0": {"needed_sym"}}
+    assert "15.5u0" not in unext
+
+
+def test_get_missing_ext_symbols_blacklisted_not_unexternalized(monkeypatch):
+    """Blacklisted symbols (e.g. __SCT__*) are reported as missing, not
+    collected for automatic unexternalization."""
+    monkeypatch.setattr(
+        "klpbuild.plugins.extract.get_codestreams_data", lambda _key: ["x86_64", "ppc64le"]
+    )
+
+    cs = _UnextCS(
+        {"a.c": _make_fdata(ext_symbols={"vmlinux": ["__SCT__foo"]})},
+        "15.4u0",
+        {"vmlinux": {"ppc64le": ["__SCT__foo"]}},
+    )
+
+    missing, unext = get_missing_ext_symbols([cs])
+
+    assert unext == {}
+    assert missing["ppc64le"]["vmlinux"]["15.4u0"] == ["__SCT__foo"]
 
