@@ -812,22 +812,16 @@ def extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch="x86_64", no
         start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch, no_auto_unext)
 
 
-def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch, no_auto_unext=None):
-    logging.info("Work directory: %s", utils.get_workdir(lp_name, True))
-
-    working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
-    working_cs = [cs for cs in working_cs if klp_ccp_arch in cs.archs]
-
-    if len(working_cs) == 0:
-        logging.error("No codestreams found")
-        sys.exit(1)
-
+def _extract_codestreams(lp_name, cs_list, no_patches, avoid_ext, klp_ccp_arch):
+    '''
+    Run klp-ccp extraction for the given list of codestreams.
+    '''
     # Make it perform better by spawning a process function per
     # cs/file/funcs tuple, instead of spawning a thread per codestream
     args = []
     i = 1
     make_lock = Lock()
-    for cs in working_cs:
+    for cs in cs_list:
         # remove any previously generated files and leftover patches
         shutil.rmtree(cs.get_ccp_dir(lp_name, klp_ccp_arch), ignore_errors=True)
         remove_patches(lp_name, cs)
@@ -854,6 +848,19 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch, no_au
                     logging.error(future)
         except Exception as exc:
             raise RuntimeError(str(exc)) from exc
+
+
+def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch, no_auto_unext=None):
+    logging.info("Work directory: %s", utils.get_workdir(lp_name, True))
+
+    working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
+    working_cs = [cs for cs in working_cs if klp_ccp_arch in cs.archs]
+
+    if len(working_cs) == 0:
+        logging.error("No codestreams found")
+        sys.exit(1)
+
+    _extract_codestreams(lp_name, working_cs, no_patches, avoid_ext, klp_ccp_arch)
 
     # Save the ext_symbols set by execute
     store_codestreams(lp_name, working_cs)
