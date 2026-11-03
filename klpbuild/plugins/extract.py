@@ -676,7 +676,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir, klp_ccp_a
     # have different inline decisions, optimizing and sometimes removing the
     # symbols.
     if avoid_ext:
-        avoid_syms.extend(avoid_ext)
+        avoid_syms.extend(sorted(avoid_ext))
 
     env["KCP_EXT_BLACKLIST"] = ",".join(avoid_syms)
 
@@ -721,8 +721,12 @@ def parse_ccp_warnings(f, start_pos, cs, fname, arch="x86_64"):
                     handler(match, cs, fname)
 
 
-def process(lp_name, total, args, avoid_ext, no_patches, klp_ccp_arch="x86_64"):
+def process(lp_name, total, args, avoid_ext_map, no_patches, klp_ccp_arch="x86_64"):
     i, make_lock, fname, cs, fdata = args
+
+    # Each codestream only avoids externalizing the symbols it actually
+    # requires, so look up the per-codestream set.
+    avoid_ext = avoid_ext_map.get(cs.full_cs_name(), set())
 
     odir = cs.get_obj_dir(klp_ccp_arch)
 
@@ -816,7 +820,13 @@ def extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch="x86_64", no
         start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch, no_auto_unext)
 
 
-def _extract_codestreams(lp_name, cs_list, no_patches, avoid_ext, klp_ccp_arch):
+# Safety bound for the unexternalization convergence loop. The loop is
+# naturally monotonic (per-codestream avoid lists only grow), so this just
+# guards against pathological cases.
+MAX_UNEXT_ROUNDS = 16
+
+
+def _extract_codestreams(lp_name, cs_list, no_patches, avoid_ext_map, klp_ccp_arch):
     '''
     Run klp-ccp extraction for the given list of codestreams.
     '''
@@ -846,7 +856,8 @@ def _extract_codestreams(lp_name, cs_list, no_patches, avoid_ext, klp_ccp_arch):
     with ThreadPoolExecutor(max_workers=workers) as executor:
         try:
             futures = executor.map(process, repeat(lp_name), repeat(len(args)),
-                                   args, repeat(avoid_ext), repeat(no_patches), repeat(klp_ccp_arch))
+                                   args, repeat(avoid_ext_map), repeat(no_patches),
+                                   repeat(klp_ccp_arch))
             for future in futures:
                 if future:
                     logging.error(future)
@@ -864,17 +875,47 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch, no_au
         logging.error("No codestreams found")
         sys.exit(1)
 
-    _extract_codestreams(lp_name, working_cs, no_patches, avoid_ext, klp_ccp_arch)
+    # Each codestream avoids externalizing only the symbols it requires. Start
+    # with the user-provided --avoid-ext list as a common baseline, then let the
+    # auto-unexternalization step grow each entry independently.
+    avoid_ext_map = {cs.full_cs_name(): set(avoid_ext) for cs in working_cs}
 
-    # Save the ext_symbols set by execute
-    store_codestreams(lp_name, working_cs)
+    # First round extracts every codestream; later rounds only re-extract the
+    # ones that need additional symbols unexternalized.
+    cs_to_extract = working_cs
+    for _ in range(MAX_UNEXT_ROUNDS):
+        _extract_codestreams(lp_name, cs_to_extract, no_patches, avoid_ext_map, klp_ccp_arch)
 
-    # Create the livepatches per codestream
-    for cs in working_cs:
-        generate_livepatches(lp_name, cs, klp_ccp_arch)
-        # Cleanup patches after the LPs were created if they were applied
-        if not no_patches:
-            remove_patches(lp_name, cs)
+        # Save the ext_symbols set by execute
+        store_codestreams(lp_name, working_cs)
+
+        # Create the livepatches for the codestreams just extracted
+        for cs in cs_to_extract:
+            generate_livepatches(lp_name, cs, klp_ccp_arch)
+            # Cleanup patches after the LPs were created if they were applied
+            if not no_patches:
+                remove_patches(lp_name, cs)
+
+        logging.info("\nChecking the externalized symbols in other architectures...")
+
+        missing, unext = get_missing_ext_symbols(working_cs, klp_ccp_arch, no_auto_unext)
+
+        # Figure out which codestreams need symbols unexternalized that aren't
+        # already being avoided, and re-extract only those.
+        cs_to_extract = []
+        for cs in working_cs:
+            new_syms = unext.get(cs.full_cs_name(), set()) - avoid_ext_map[cs.full_cs_name()]
+            if new_syms:
+                avoid_ext_map[cs.full_cs_name()].update(new_syms)
+                cs_to_extract.append(cs)
+                logging.info("Unexternalizing symbols for %s:\n%s\n",
+                             cs.full_cs_name(), ', '.join(sorted(new_syms)))
+
+        if not cs_to_extract:
+            break
+    else:
+        logging.warning("Reached the maximum number of unexternalization rounds "
+                        "(%d); some symbols may still be externalized.", MAX_UNEXT_ROUNDS)
 
     logging.info("\nChecking duplicated symbols...")
 
@@ -886,16 +927,6 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch, no_au
                 logging.warning("%s:%s: Duplicated symbols (check the sympos):",
                                 cs.full_cs_name(), f)
                 logging.warning("\t%s", ", ".join(dup_syms))
-
-    logging.info("\nChecking the externalized symbols in other architectures...")
-
-    missing, unext = get_missing_ext_symbols(working_cs, klp_ccp_arch, no_auto_unext)
-    if unext:
-        unext_syms = sorted(set().union(*unext.values()))
-        logging.info("\nUnexternalyzing symbols:\n%s\n", ', '.join(unext_syms))
-        start_extract(lp_name, lp_filter, no_patches,
-                      avoid_ext + unext_syms, klp_ccp_arch, no_auto_unext)
-        sys.exit(0)
 
     if missing:
         with open(utils.get_workdir(lp_name)/"missing_syms", "w") as f:
