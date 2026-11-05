@@ -32,7 +32,7 @@ def init_kgraft():
                 )
     else:
         subprocess.check_output(
-                ["git", "checkout", "-f", TREE_NAME],
+                ["git", "checkout", "-f", "--ignore-other-worktrees", TREE_NAME],
                 cwd=__KGR_PATH,
                 stderr=subprocess.STDOUT,
                 )
@@ -47,7 +47,7 @@ def reset_kgraft():
         Checkout to the worktree's main branch
     '''
     subprocess.check_output(
-            ["git", "checkout", "-f", TREE_NAME],
+            ["git", "checkout", "-f", "--ignore-other-worktrees", TREE_NAME],
             cwd=get_kgraft(),
             stderr=subprocess.STDOUT,
             )

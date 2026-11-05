@@ -87,7 +87,7 @@ def __init_kernel():
             )
         else:
             subprocess.check_output(
-                ["git", "checkout", "-f", TREE_NAME],
+                ["git", "checkout", "-f", "--ignore-other-worktrees", TREE_NAME],
                 cwd=git_path,
                 stderr=subprocess.STDOUT,
             )
