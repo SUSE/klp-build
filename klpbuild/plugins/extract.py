@@ -52,10 +52,12 @@ NON_EXTERNALIZED_SYMS = [
     # Static call trampolines. With the klpr_static_* macro rewriting,
     # references to them should become dead code.
     r"__SCT__\w+",
-    # __SCK__might_resched being externalized is the result of the
-    # might_resched() macro expansion in klp-ccp, however, the same macro gets
-    # rewritten in the postprocessing to its original might_resched()
+    # __SCK__might_resched and __SCK__cond_resched being externalized is the
+    # result of the might_resched()/cond_resched() macro expansion in klp-ccp,
+    # however, the same macro gets rewritten in the postprocessing to its
+    # original *_resched()
     r"__SCK__might_resched",
+    r"__SCK__cond_resched",
 ]
 _NON_EXTERNALIZED_SYMS_RE = re.compile("|".join(f"(?:{p})" for p in NON_EXTERNALIZED_SYMS))
 

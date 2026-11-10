@@ -31,6 +31,8 @@ SIMPLE_MACROS = {
     "klpr_static_key_true": "#define klpr_static_key_true(key) static_key_enabled(key)",
     # Use the kernel's might_resched() instead of klp-ccp's expansion
     "klpr_might_resched": "#define klpr_might_resched() might_resched()",
+    # Use the kernel's cond_resched() instead of klp-ccp's expansion
+    "klpr_cond_resched": "#define klpr_cond_resched() cond_resched()",
 }
 
 ALL_MACROS = (*STATIC_CALL_MACROS, *SIMPLE_MACROS)
