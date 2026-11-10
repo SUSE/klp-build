@@ -376,6 +376,7 @@ TEMPL_KBUILD = """\
 from pathlib import PurePath
 def get_entries(lpdir, bsc, cs):
     ret = []
+    flags = '-Werror -Wno-error=missing-prototypes -Wno-error=unused-variable'
     for entry in lpdir.iterdir():
         fname = entry.name
         if not fname.endswith('.c'):
@@ -383,9 +384,9 @@ def get_entries(lpdir, bsc, cs):
 
         # Add both the older and the new format to apply flags to objects
         fname = PurePath(fname).with_suffix('.o')
-        ret.append(f'CFLAGS_{fname} += -Werror -Wno-error=missing-prototypes')
+        ret.append(f'CFLAGS_{fname} += {flags}')
         fname = f'{bsc}/{fname}'
-        ret.append(f'CFLAGS_{fname} += -Werror -Wno-error=missing-prototypes')
+        ret.append(f'CFLAGS_{fname} += {flags}')
 
     return "\\n".join(ret)
 %>\

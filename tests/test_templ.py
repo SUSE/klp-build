@@ -412,12 +412,13 @@ def test_templ_kbuild_has_contents():
     extract(lp_name=lp, lp_filter=cs, no_patches=True, avoid_ext=[])
 
     kbuild_data = get_file_content(lp, cs, "Kbuild.inc")
+    flags = "-Werror -Wno-error=missing-prototypes -Wno-error=unused-variable"
     assert (
-        "CFLAGS_livepatch_bsc_test_templ_kbuild_has_contents.o += -Werror"
+        f"CFLAGS_livepatch_bsc_test_templ_kbuild_has_contents.o += {flags}"
         in kbuild_data
     )
     assert (
-        "CFLAGS_bsc_test_templ_kbuild_has_contents/livepatch_bsc_test_templ_kbuild_has_contents.o += -Werror"
+        f"CFLAGS_bsc_test_templ_kbuild_has_contents/livepatch_bsc_test_templ_kbuild_has_contents.o += {flags}"
         in kbuild_data
     )
 
