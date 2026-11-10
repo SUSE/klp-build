@@ -7,6 +7,7 @@ import argparse
 import inspect
 import json
 import logging
+import re
 
 import pytest
 
@@ -23,6 +24,7 @@ from klpbuild.plugins.extract import (
     parse_ccp_warnings,
     register_argparser,
 )
+from klpbuild.plugins import extract as extract_mod
 from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS
 
@@ -191,6 +193,29 @@ def test_get_ext_symbols_grouped_by_module(tmp_path):
     result = get_ext_symbols(tmp_path)
     assert "vmlinux" in result
     assert "my_mod" in result
+
+
+def test_get_ext_symbols_skips_non_externalized(tmp_path):
+    """Symbols matching NON_EXTERNALIZED_SYMS (e.g. __SCT__*) are dropped."""
+    content = "KALLSYMS __SCT__foo var1 vmlinux\nKALLSYMS normal_sym var2 vmlinux\n"
+    (tmp_path / "fun_exts").write_text(content)
+    assert get_ext_symbols(tmp_path) == {"vmlinux": ["normal_sym"]}
+
+
+def test_get_ext_symbols_non_externalized_requires_full_match(tmp_path):
+    """Patterns must match the whole symbol name, not a substring."""
+    (tmp_path / "fun_exts").write_text("KALLSYMS my__SCT__foo var1 vmlinux\n")
+    assert get_ext_symbols(tmp_path) == {"vmlinux": ["my__SCT__foo"]}
+
+
+def test_get_ext_symbols_non_externalized_exact_name(tmp_path, monkeypatch):
+    """Plain names in the list match exactly, not as prefixes."""
+    monkeypatch.setattr(extract_mod, "_NON_EXTERNALIZED_SYMS_RE",
+                        re.compile(r"(?:__SCT__\w+)|(?:blocked_sym)"))
+    content = ("KALLSYMS blocked_sym var1 vmlinux\n"
+               "KALLSYMS blocked_sym_foo var2 vmlinux\n")
+    (tmp_path / "fun_exts").write_text(content)
+    assert get_ext_symbols(tmp_path) == {"vmlinux": ["blocked_sym_foo"]}
 
 
 # ── lp_out_cleanup ─────────────────────────────────────────────────────────────

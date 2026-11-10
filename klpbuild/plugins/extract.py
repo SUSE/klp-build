@@ -43,6 +43,17 @@ UNWANTED_MACROS = [
     "RETPOLINE"
 ]
 
+# Symbols that must never be externalized. Each entry is a regex that must
+# match the whole symbol name (re.fullmatch), so plain names match exactly and
+# prefixes need an explicit wildcard. Note that '.' is a regex wildcard: escape
+# it (or use re.escape) when adding names such as "foo.constprop.0".
+NON_EXTERNALIZED_SYMS = [
+    # Static call trampolines. With the klpr_static_* macro rewriting,
+    # references to them should become dead code.
+    r"__SCT__\w+",
+]
+_NON_EXTERNALIZED_SYMS_RE = re.compile("|".join(f"(?:{p})" for p in NON_EXTERNALIZED_SYMS))
+
 
 def register_argparser(subparser):
     extract_opts = subparser.add_parser(
@@ -253,7 +264,7 @@ def get_missing_ext_symbols(working_cs, klp_ccp_arch="x86_64"):
         for obj, syms in obj_syms.items():
             missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
             for arch, arch_syms in missing.items():
-                blacklisted = re.findall(r"((?:__SCT__|__SCK__|__traceiter)\w+)",
+                blacklisted = re.findall(r"((?:__SCK__|__traceiter)\w+)",
                                          ' '.join(arch_syms))
                 whitelisted = set(blacklisted) ^ set(arch_syms)
                 if whitelisted:
@@ -295,6 +306,8 @@ def get_ext_symbols(out_dir):
     symbols = {}
     for ext in exts:
         sym, mod = ext[0], ext[2]
+        if _NON_EXTERNALIZED_SYMS_RE.fullmatch(sym):
+            continue
         symbols.setdefault(mod, [])
         symbols[mod].append(sym)
 
