@@ -29,6 +29,8 @@ SIMPLE_MACROS = {
     # Read the static key from memory instead of relying on jump labels.
     "klpr_static_key_false": "#define klpr_static_key_false(key) static_key_enabled(key)",
     "klpr_static_key_true": "#define klpr_static_key_true(key) static_key_enabled(key)",
+    "klpr_static_branch_unlikely": "#define klpr_static_branch_unlikely(key) static_key_enabled(key)",
+    "klpr_static_branch_likely": "#define klpr_static_branch_likely(key) static_key_enabled(key)",
     # Use the kernel's might_resched() instead of klp-ccp's expansion
     "klpr_might_resched": "#define klpr_might_resched() might_resched()",
     # Use the kernel's cond_resched() instead of klp-ccp's expansion
