@@ -106,6 +106,15 @@ def test_get_static_macros_keys_and_calls():
     assert "#define klpr_static_key_false(key) static_key_enabled(key)" in out
 
 
+
+
+def test_get_static_macros_might_resched():
+    f = _af("f.c")
+    f.set_klpr_macros("x86_64", ["klpr_might_resched"])
+    out = get_static_macros(f, "x86_64", False)
+    assert out == "#define klpr_might_resched() might_resched()"
+
+
 def test_get_static_macros_simple_only_no_static_call():
     """Using only simple macros must not emit the static call block."""
     f = _af("f.c")
