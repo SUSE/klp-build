@@ -230,6 +230,27 @@ def test_collect_static_macro_variants_keys():
     assert collect_static_macro_variants(content, tuple(SIMPLE_MACROS)) == \
         ["klpr_static_key_true"]
 
+def test_collect_static_macro_variants_might_resched():
+    content = "klpr_might_resched();\nklpr_might_resched0();\n" \
+              "__might_resched(__FILE__, __LINE__, 0);"
+    assert collect_static_macro_variants(content, ALL_MACROS) == \
+        ["klpr_might_resched"]
+
+def test_strip_klpr_static_defines_might_resched():
+    """klp-ccp's (possibly multi-line) might_resched define is dropped."""
+    cs = Codestream("15.4u0")
+    content = "#define klpr_might_resched() do {\t\\\n" \
+              "\tklpr_static_call(might_resched)();\t\\\n" \
+              "} while (0)\n" \
+              "klpr_might_resched();\n"
+    assert strip_klpr_static_defines(cs, "test.c", content) == \
+        "klpr_might_resched();\n"
+
+def test_strip_klpr_static_defines_numbered_might_resched_warning(caplog):
+    cs = Codestream("15.4u0")
+    strip_klpr_static_defines(cs, "test.c", "klpr_might_resched0();")
+    assert "Numbered klpr_ macro detected" in caplog.text
+
 def test_collect_static_macro_variants_none():
     assert collect_static_macro_variants("no macros here", STATIC_CALL_MACROS) == []
 
