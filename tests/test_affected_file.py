@@ -369,7 +369,7 @@ _FILE_FULL_DICT = {
     "ibt": False,
     "dup_symbols": {},
     "ext_symbols": {},
-    "klpp_symbols": {},
+    "patched_funcs": {},
 }
 
 
@@ -386,7 +386,7 @@ def test_file_init_extraction_defaults():
     assert f.ibt is False
     assert f.dup_symbols == {}
     assert f.ext_symbols == {}
-    assert f.klpp_symbols == {}
+    assert f.patched_funcs == {}
 
 
 def test_file_extraction_attrs_assignable():
@@ -395,11 +395,11 @@ def test_file_extraction_attrs_assignable():
     f.ibt = True
     f.add_dup_symbol("x86_64", "dup")
     f.set_ext_symbols("x86_64", {"mod": ["sym1", "sym2"]})
-    f.set_klpp_symbols("x86_64", {"sym1": "void sym1(void)"})
+    f.set_patched_funcs("x86_64", ["sym1"])
     assert f.ibt is True
     assert f.get_dup_symbols("x86_64") == ["dup"]
     assert f.get_ext_symbols("x86_64") == {"mod": ["sym1", "sym2"]}
-    assert f.get_klpp_symbols("x86_64") == {"sym1": "void sym1(void)"}
+    assert f.get_patched_funcs("x86_64") == ["sym1"]
 
 
 def test_file_init_with_kwargs():
@@ -442,7 +442,7 @@ def test_file_to_dict():
         "ibt": False,
         "dup_symbols": {},
         "ext_symbols": {},
-        "klpp_symbols": {},
+        "patched_funcs": {},
     }
 
 
@@ -454,7 +454,7 @@ def test_file_to_dict_defaults():
         "ibt": False,
         "dup_symbols": {},
         "ext_symbols": {},
-        "klpp_symbols": {},
+        "patched_funcs": {},
     }
 
 
@@ -463,10 +463,10 @@ def test_file_to_dict_with_extraction_data():
     f.ibt = True
     f.set_dup_symbols("x86_64", ["dup1", "dup2"])
     f.set_ext_symbols("x86_64", {"drivers/foo": ["bar", "baz"]})
-    f.set_klpp_symbols("x86_64", {"bar": "int bar(void)"})
+    f.set_patched_funcs("x86_64", ["bar"])
     f.set_dup_symbols("aarch64", ["dup_arm"])
     f.set_ext_symbols("aarch64", {"drivers/foo": ["bar"]})
-    f.set_klpp_symbols("aarch64", {"bar": "int bar(void)"})
+    f.set_patched_funcs("aarch64", ["bar"])
     d = f.to_dict()
     assert d["ibt"] is True
     assert d["dup_symbols"] == {"x86_64": ["dup1", "dup2"], "aarch64": ["dup_arm"]}
@@ -474,9 +474,9 @@ def test_file_to_dict_with_extraction_data():
         "x86_64": {"drivers/foo": ["bar", "baz"]},
         "aarch64": {"drivers/foo": ["bar"]},
     }
-    assert d["klpp_symbols"] == {
-        "x86_64": {"bar": "int bar(void)"},
-        "aarch64": {"bar": "int bar(void)"},
+    assert d["patched_funcs"] == {
+        "x86_64": ["bar"],
+        "aarch64": ["bar"],
     }
 
 
@@ -485,14 +485,14 @@ def test_file_to_dict_extraction_collections_are_copies():
     f = AffectedFile("foo.c")
     f.add_dup_symbol("x86_64", "a")
     f.set_ext_symbols("x86_64", {"mod": ["x"]})
-    f.set_klpp_symbols("x86_64", {"s": "p"})
+    f.set_patched_funcs("x86_64", ["s"])
     d = f.to_dict()
     d["dup_symbols"]["x86_64"].append("mutated")
     d["ext_symbols"]["x86_64"]["new_mod"] = []
-    d["klpp_symbols"]["x86_64"]["new_sym"] = ""
+    d["patched_funcs"]["x86_64"].append("new_sym")
     assert f.get_dup_symbols("x86_64") == ["a"]
     assert f.get_ext_symbols("x86_64") == {"mod": ["x"]}
-    assert f.get_klpp_symbols("x86_64") == {"s": "p"}
+    assert f.get_patched_funcs("x86_64") == ["s"]
 
 
 def test_file_from_dict_round_trip():
@@ -511,7 +511,7 @@ def test_file_from_dict_round_trip():
     assert rebuilt.ibt == original.ibt
     assert rebuilt.dup_symbols == original.dup_symbols
     assert rebuilt.ext_symbols == original.ext_symbols
-    assert rebuilt.klpp_symbols == original.klpp_symbols
+    assert rebuilt.patched_funcs == original.patched_funcs
 
 
 def test_file_from_dict_round_trip_defaults():
@@ -524,7 +524,7 @@ def test_file_from_dict_round_trip_defaults():
     assert rebuilt.ibt is False
     assert rebuilt.dup_symbols == {}
     assert rebuilt.ext_symbols == {}
-    assert rebuilt.klpp_symbols == {}
+    assert rebuilt.patched_funcs == {}
 
 
 def test_file_from_dict_round_trip_with_extraction():
@@ -537,12 +537,12 @@ def test_file_from_dict_round_trip_with_extraction():
     original.ibt = True
     original.set_dup_symbols("x86_64", ["dup_a", "dup_b"])
     original.set_ext_symbols("x86_64", {"fs/ext4/ext4": ["sym1", "sym2"]})
-    original.set_klpp_symbols("x86_64", {"sym1": "int sym1(void)"})
+    original.set_patched_funcs("x86_64", ["sym1"])
     rebuilt = AffectedFile.from_dict("fs/ext4/inode.c", original.to_dict())
     assert rebuilt.ibt is True
     assert rebuilt.get_dup_symbols("x86_64") == ["dup_a", "dup_b"]
     assert rebuilt.get_ext_symbols("x86_64") == {"fs/ext4/ext4": ["sym1", "sym2"]}
-    assert rebuilt.get_klpp_symbols("x86_64") == {"sym1": "int sym1(void)"}
+    assert rebuilt.get_patched_funcs("x86_64") == ["sym1"]
 
 
 def test_file_from_dict_strict_missing_config_name():
@@ -581,8 +581,8 @@ def test_file_from_dict_strict_missing_ext_symbols():
         AffectedFile.from_dict("foo.c", data)
 
 
-def test_file_from_dict_strict_missing_klpp_symbols():
-    data = {k: v for k, v in _FILE_FULL_DICT.items() if k != "klpp_symbols"}
+def test_file_from_dict_strict_missing_patched_funcs():
+    data = {k: v for k, v in _FILE_FULL_DICT.items() if k != "patched_funcs"}
     with pytest.raises(KeyError):
         AffectedFile.from_dict("foo.c", data)
 
@@ -595,21 +595,21 @@ def test_file_from_dict_rebuilds_set_from_list():
 
 
 def test_file_from_dict_extraction_collections_are_copies():
-    """from_dict must not retain references to the input dict's lists/dicts."""
+    """Mutating the structures after from_dict() must not affect the source data."""
     src_dup = {"x86_64": ["a"]}
     src_ext = {"x86_64": {"mod": ["x"]}}
-    src_klpp = {"x86_64": {"s": "p"}}
+    src_klpp = {"x86_64": ["s"]}
     data = dict(_FILE_FULL_DICT)
     data["dup_symbols"] = src_dup
     data["ext_symbols"] = src_ext
-    data["klpp_symbols"] = src_klpp
+    data["patched_funcs"] = src_klpp
     rebuilt = AffectedFile.from_dict("foo.c", data)
     src_dup["x86_64"].append("mutated")
     src_ext["x86_64"]["new_mod"] = []
-    src_klpp["x86_64"]["new_sym"] = ""
+    src_klpp["x86_64"].append("new_sym")
     assert rebuilt.get_dup_symbols("x86_64") == ["a"]
     assert rebuilt.get_ext_symbols("x86_64") == {"mod": ["x"]}
-    assert rebuilt.get_klpp_symbols("x86_64") == {"s": "p"}
+    assert rebuilt.get_patched_funcs("x86_64") == ["s"]
 
 
 def test_file_equality():
@@ -642,20 +642,20 @@ def test_affected_file_multi_arch_extraction_preservation():
     # Simulate x86_64 extraction
     f.add_dup_symbol("x86_64", "dup_x86")
     f.set_ext_symbols("x86_64", {"vmlinux": ["sym_x86"]})
-    f.set_klpp_symbols("x86_64", {"sym_x86": "void sym_x86(void)"})
+    f.set_patched_funcs("x86_64", ["sym_x86"])
 
     # Simulate subsequent aarch64 extraction
     f.add_dup_symbol("aarch64", "dup_arm")
     f.set_ext_symbols("aarch64", {"vmlinux": ["sym_arm"]})
-    f.set_klpp_symbols("aarch64", {"sym_arm": "void sym_arm(void)"})
+    f.set_patched_funcs("aarch64", ["sym_arm"])
 
     # Verify both archs are preserved
     assert f.get_dup_symbols("x86_64") == ["dup_x86"]
     assert f.get_dup_symbols("aarch64") == ["dup_arm"]
     assert f.get_ext_symbols("x86_64") == {"vmlinux": ["sym_x86"]}
     assert f.get_ext_symbols("aarch64") == {"vmlinux": ["sym_arm"]}
-    assert f.get_klpp_symbols("x86_64") == {"sym_x86": "void sym_x86(void)"}
-    assert f.get_klpp_symbols("aarch64") == {"sym_arm": "void sym_arm(void)"}
+    assert f.get_patched_funcs("x86_64") == ["sym_x86"]
+    assert f.get_patched_funcs("aarch64") == ["sym_arm"]
 
     # Verify round-trip serialization preserves both
     rebuilt = AffectedFile.from_dict("foo.c", f.to_dict())
@@ -663,5 +663,5 @@ def test_affected_file_multi_arch_extraction_preservation():
     assert rebuilt.get_dup_symbols("aarch64") == ["dup_arm"]
     assert rebuilt.get_ext_symbols("x86_64") == {"vmlinux": ["sym_x86"]}
     assert rebuilt.get_ext_symbols("aarch64") == {"vmlinux": ["sym_arm"]}
-    assert rebuilt.get_klpp_symbols("x86_64") == {"sym_x86": "void sym_x86(void)"}
-    assert rebuilt.get_klpp_symbols("aarch64") == {"sym_arm": "void sym_arm(void)"}
+    assert rebuilt.get_patched_funcs("x86_64") == ["sym_x86"]
+    assert rebuilt.get_patched_funcs("aarch64") == ["sym_arm"]
