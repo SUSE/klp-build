@@ -3,9 +3,8 @@
 # Copyright (C) 2021-2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import functools
-from itertools import repeat
 import json
 import logging
 import os
@@ -804,6 +803,40 @@ def extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch="x86_64"):
         start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch)
 
 
+def run_ccp_jobs(func, jobs, workers):
+    '''
+    Run func for each tuple of arguments in jobs using a pool of workers.
+
+    Stop on the first failure: the jobs not started yet are cancelled, the
+    ones already running are waited for, and the error is raised.
+    '''
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(func, *job) for job in jobs]
+        try:
+            for future in as_completed(futures):
+                future.result()
+        except BaseException as exc:
+            executor.shutdown(wait=True, cancel_futures=True)
+            if isinstance(exc, Exception):
+                raise RuntimeError(str(exc)) from exc
+            raise
+
+
+def cleanup_patches(lp_name, working_cs, no_patches):
+    '''
+    Remove the patches applied to the codestreams, without masking the error
+    that caused the cleanup.
+    '''
+    for cs in working_cs:
+        if not uses_patches(cs, no_patches):
+            continue
+        try:
+            remove_patches(lp_name, cs)
+        # Any failure here must not hide the original error
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logging.warning("%s: failed to remove the applied patches: %s", cs.full_cs_name(), exc)
+
+
 def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
     logging.info("Work directory: %s", utils.get_workdir(lp_name, True))
 
@@ -820,46 +853,44 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
             logging.error("No codestreams found")
         sys.exit(1)
 
-    # Make it perform better by spawning a process function per
-    # cs/file/funcs tuple, instead of spawning a thread per codestream
-    args = []
-    i = 1
-    make_lock = Lock()
-    for cs in working_cs:
-        # remove any previously generated files
-        shutil.rmtree(cs.get_ccp_dir(lp_name, klp_ccp_arch), ignore_errors=True)
+    try:
+        # Make it perform better by spawning a process function per
+        # cs/file/funcs tuple, instead of spawning a thread per codestream
+        args = []
+        i = 1
+        make_lock = Lock()
+        for cs in working_cs:
+            # remove any previously generated files
+            shutil.rmtree(cs.get_ccp_dir(lp_name, klp_ccp_arch), ignore_errors=True)
 
-        # Apply patches before the LPs were created
-        prepare_patches(lp_name, cs, no_patches)
+            # Apply patches before the LPs were created
+            prepare_patches(lp_name, cs, no_patches)
 
-        for fname, fdata in cs.files.items():
-            args.append((i, make_lock, fname, cs, fdata))
-            i += 1
+            for fname, fdata in cs.files.items():
+                args.append((i, make_lock, fname, cs, fdata))
+                i += 1
 
-    workers = int(get_user_settings("workers"))
-    logging.info("Extracting code using ccp for %s", klp_ccp_arch)
-    logging.info("\nGenerating livepatches for %d file(s) using %d workers...", len(args), workers)
-    logging.info("\t\tCodestream\tFile")
+        workers = int(get_user_settings("workers"))
+        logging.info("Extracting code using ccp for %s", klp_ccp_arch)
+        logging.info("\nGenerating livepatches for %d file(s) using %d workers...", len(args), workers)
+        logging.info("\t\tCodestream\tFile")
 
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        try:
-            futures = executor.map(process, repeat(lp_name), repeat(len(args)),
-                                   args, repeat(avoid_ext), repeat(no_patches), repeat(klp_ccp_arch))
-            for future in futures:
-                if future:
-                    logging.error(future)
-        except Exception as exc:
-            raise RuntimeError(str(exc)) from exc
+        run_ccp_jobs(process, [(lp_name, len(args), a, avoid_ext, no_patches, klp_ccp_arch)
+                               for a in args], workers)
 
-    # Save the ext_symbols set by execute
-    store_codestreams(lp_name, working_cs)
+        # Save the ext_symbols set by execute
+        store_codestreams(lp_name, working_cs)
 
-    # Create the livepatches per codestream
-    for cs in working_cs:
-        generate_livepatches(lp_name, cs, klp_ccp_arch)
-        # Cleanup patches after the LPs were created if they were applied
-        if uses_patches(cs, no_patches):
-            remove_patches(lp_name, cs)
+        # Create the livepatches per codestream
+        for cs in working_cs:
+            generate_livepatches(lp_name, cs, klp_ccp_arch)
+            # Cleanup patches after the LPs were created if they were applied
+            if uses_patches(cs, no_patches):
+                remove_patches(lp_name, cs)
+    except BaseException:
+        # Don't leave the LP branches and patches behind on failure
+        cleanup_patches(lp_name, working_cs, no_patches)
+        raise
 
     logging.info("\nChecking duplicated symbols...")
 

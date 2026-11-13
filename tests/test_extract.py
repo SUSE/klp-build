@@ -7,6 +7,7 @@ import argparse
 import inspect
 import json
 import logging
+import time
 
 import pytest
 
@@ -25,6 +26,7 @@ from klpbuild.plugins.extract import (
     parse_ccp_warnings,
     prepare_patches,
     register_argparser,
+    run_ccp_jobs,
 )
 from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS
@@ -529,3 +531,23 @@ def test_prepare_patches_only_for_codestreams_needing_them(monkeypatch, patches,
     prepare_patches("lp", _PatchCS(patches), no_patches)
 
     assert calls == expected
+
+
+# ── failure handling ───────────────────────────────────────────────────────────
+
+
+def test_run_ccp_jobs_stops_on_first_failure():
+    """A failing job is reported as RuntimeError and the pending jobs are
+    cancelled instead of all being run."""
+    ran = []
+
+    def job(i):
+        ran.append(i)
+        if i == 1:
+            raise ValueError("boom")
+        time.sleep(0.01)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        run_ccp_jobs(job, [(i,) for i in range(50)], workers=1)
+
+    assert len(ran) < 50
