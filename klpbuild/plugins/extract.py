@@ -321,9 +321,7 @@ def get_cmd_from_json(cs, fname, sdir, arch="x86_64"):
     if not cc_file.exists():
         return None
 
-    with open(cc_file) as f:
-        buf = f.read()
-    data = json.loads(buf)
+    data = load_compile_commands(cc_file, tuple(sorted(cs.files.keys())))
 
     output = find_compile_command(data, fname, cc_file)
 
@@ -332,6 +330,34 @@ def get_cmd_from_json(cs, fname, sdir, arch="x86_64"):
     # path by the source directory since klp-ccp needs to reach the files.
     cmd = process_make_output(output)
     return cmd.replace(" ..", f" {str(sdir)}").replace("-I..", f"-I{str(sdir)}")
+
+
+_cc_cache = {}
+_cc_cache_lock = Lock()
+
+
+def load_compile_commands(cc_file, fnames):
+    '''
+    Return the compile_commands.json entries that may belong to fnames.
+
+    The file is big and the same one is used for every file of a codestream,
+    so parse it only once. Only the entries related to fnames are kept to
+    avoid holding the whole file in memory for every codestream.
+    '''
+    key = (str(cc_file), fnames)
+
+    # One lock per file, so that different codestreams are parsed in parallel
+    with _cc_cache_lock:
+        entry = _cc_cache.setdefault(key, {"lock": Lock(), "data": None})
+
+    with entry["lock"]:
+        if entry["data"] is None:
+            with open(cc_file) as f:
+                data = json.load(f)
+            entry["data"] = [d for d in data
+                             if any(d["file"] == fn or d["file"].endswith(f"/{fn}")
+                                    for fn in fnames)]
+        return entry["data"]
 
 
 def find_compile_command(entries, fname, cc_file):
