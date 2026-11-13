@@ -807,11 +807,17 @@ def extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch="x86_64"):
 def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
     logging.info("Work directory: %s", utils.get_workdir(lp_name, True))
 
-    working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
-    working_cs = [cs for cs in working_cs if klp_ccp_arch in cs.archs]
+    filtered_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
+    working_cs = [cs for cs in filtered_cs if klp_ccp_arch in cs.archs]
 
     if len(working_cs) == 0:
-        logging.error("No codestreams found")
+        if filtered_cs:
+            cs_archs = set().union(*(cs.archs for cs in filtered_cs))
+            logging.error("None of the codestreams supports %s, the klp-ccp target "
+                          "architecture (supported: %s). Use -k to choose another one.",
+                          klp_ccp_arch, ", ".join(sorted(cs_archs)))
+        else:
+            logging.error("No codestreams found")
         sys.exit(1)
 
     # Make it perform better by spawning a process function per
@@ -883,11 +889,5 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
         logging.warning(json.dumps(missing, indent=4))
 
     group_equal_files(lp_name, working_cs, klp_ccp_arch)
-
-    pref_arch = utils.preferred_arch(working_cs)
-    if pref_arch not in ["x86_64", "aarch64"]:
-        logging.warning("ATTENTION! The current livepatch doesn't affect x86_64 or aarch64. "
-                        "klp-ccp doesn't officially support other architectures "
-                        "besides x86 and aarch64, meaning that it can generate wrong code.")
 
     logging.info("\nDone. Extract finished.")
