@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -122,20 +123,53 @@ def get_cs_code(lp_name, working_cs, klp_ccp_arch="x86_64"):
     return cs_files
 
 
-def unquote_output(matchobj):
-    return matchobj.group(0).replace('"', "")
-
-
 def process_make_output(output):
-    # some strings  have single quotes around double quotes, so remove the
-    # outer quotes
-    output = output.replace("'", "")
+    # Remove the compiler name used to compile the object. The quoting is
+    # kept, the command is split following the shell rules later on.
+    return re.sub(r'^gcc(-\d+)?\s+', '', output)
 
-    # Remove the compiler name used to compile the object.
-    output = re.sub(r'^gcc(-\d+)?\s+', '', output)
 
-    # also remove double quotes from macros like -D"KBUILD....=.."
-    return re.sub(r'-D"KBUILD_([\w\#\_\=\(\)])+"', unquote_output, output)
+# gcc options not supported by klp-ccp
+# -flive-patching and -fdump-ipa-clones are only present in upstream gcc
+# 15.4u0 options
+# -fno-allow-store-data-races and -Wno-zero-length-bounds
+# 15.4u1 options
+# -mindirect-branch-cs-prefix appear in 15.4u1
+# more options to be removed
+# -mharden-sls=all
+# 15.6 options
+# -fmin-function-alignment=16
+UNSUPPORTED_GCC_OPTS = {
+    "-flive-patching=inline-clone",
+    "-fdump-ipa-clones",
+    "-fno-allow-store-data-races",
+    "-Wno-zero-length-bounds",
+    "-mindirect-branch-cs-prefix",
+    "-mharden-sls=all",
+    "-fmin-function-alignment=16",
+    "-Wno-dangling-pointer",
+    # s390x arguments
+    "-mbackchain",
+    "-mpacked-stack",
+    "-mindirect-branch-table",
+    "-mhotpatch=0,3",
+    "-march=z196",
+    "-mtune=z13",
+}
+
+
+def split_compile_command(cmd):
+    '''
+    Split the compile command into arguments as the shell would, so that
+    quoted arguments (e.g. -DKBUILD_BASENAME='"foo"') and arguments with
+    spaces are kept intact, and drop the options not supported by klp-ccp.
+    '''
+    try:
+        args = shlex.split(cmd)
+    except ValueError as exc:
+        raise RuntimeError(f"Failed to parse the compile command ({exc}): {cmd}") from exc
+
+    return [arg for arg in args if arg not in UNSUPPORTED_GCC_OPTS]
 
 
 @functools.cache
@@ -573,35 +607,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir, klp_ccp_a
                 "--warning-level=critical", "-o",
                 f"{str(lp_out)}", "--"]
 
-    # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
-    # 15.4u0 options
-    # -fno-allow-store-data-races and -Wno-zero-length-bounds
-    # 15.4u1 options
-    # -mindirect-branch-cs-prefix appear in 15.4u1
-    # more options to be removed
-    # -mharden-sls=all
-    # 15.6 options
-    # -fmin-function-alignment=16
-    for opt in [
-        "-flive-patching=inline-clone",
-        "-fdump-ipa-clones",
-        "-fno-allow-store-data-races",
-        "-Wno-zero-length-bounds",
-        "-mindirect-branch-cs-prefix",
-        "-mharden-sls=all",
-        "-fmin-function-alignment=16",
-        "-Wno-dangling-pointer",
-        # s390x arguments
-        "-mbackchain",
-        "-mpacked-stack",
-        "-mindirect-branch-table",
-        "-mhotpatch=0,3",
-        "-march=z196",
-        "-mtune=z13",
-    ]:
-        cmd = cmd.replace(opt, "")
-
-    ccp_args.extend(cmd.split(" "))
+    ccp_args.extend(split_compile_command(cmd))
 
     ccp_args = list(filter(None, ccp_args))
 
