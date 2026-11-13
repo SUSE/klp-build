@@ -7,6 +7,7 @@ import argparse
 import inspect
 import json
 import logging
+import re
 
 import pytest
 
@@ -15,14 +16,19 @@ from klpbuild.klplib import utils
 from klpbuild.klplib.affected_file import AffectedFile
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import load_codestreams
+from klpbuild.klplib.klpr_macros import (ALL_MACROS, SIMPLE_MACROS,
+                                         STATIC_CALL_MACROS)
 from klpbuild.plugins.extract import (
     extract,
+    collect_static_macro_variants,
+    strip_klpr_static_defines,
     get_ext_symbols,
     get_patched_funcs,
     lp_out_cleanup,
     parse_ccp_warnings,
     register_argparser,
 )
+from klpbuild.plugins import extract as extract_mod
 from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS
 
@@ -124,6 +130,152 @@ def test_detect_opt_clone(caplog):
     assert "Symbol l2cap_sock_kill contains optimized clone" in caplog.text
 
 
+# ── strip_klpr_static_defines ────────────────────────────────────────────────
+
+def test_strip_klpr_static_defines_drops_defines_keeps_usages():
+    """klp-ccp's #define lines are dropped; usages are left intact."""
+    cs = Codestream("15.4u0")
+    content = "#define klpr_static_key_false(key) static_key_false(key)\n" \
+              "#define klpr_static_call(name) something(name)\n" \
+              "#define klpr___raw_static_call(name) something(name)\n" \
+              "#define klpr___static_call_cond(name) something(name)\n" \
+              "if (klpr_static_key_false(&my_key)) {\n" \
+              "    do_something();\n" \
+              "}\n" \
+              "klpr_static_call(my_func)(arg1);"
+    expected = "if (klpr_static_key_false(&my_key)) {\n" \
+               "    do_something();\n" \
+               "}\n" \
+               "klpr_static_call(my_func)(arg1);"
+
+    assert strip_klpr_static_defines(cs, "test.c", content) == expected
+
+def test_strip_klpr_static_defines_drops_multiline_define():
+    """A backslash-continued klp-ccp define is dropped in full."""
+    cs = Codestream("15.4u0")
+    content = "#define klpr_static_call(name)\t\t\t\\\n" \
+              "({\t\t\t\t\t\t\\\n" \
+              "\tvoid *func = READ_ONCE(STATIC_CALL_KEY(name).func);\t\\\n" \
+              "\tvoid __static_call_nop(void) { }\t\t\\\n" \
+              "\tif (!func)\t\t\t\t\\\n" \
+              "\t\tfunc = &__static_call_nop;\t\t\\\n" \
+              "\t(typeof(STATIC_CALL_TRAMP(name))*)func;\t\\\n" \
+              "})\n" \
+              "klpr_static_call(my_func)(arg1);\n"
+    expected = "klpr_static_call(my_func)(arg1);\n"
+
+    assert strip_klpr_static_defines(cs, "test.c", content) == expected
+
+def test_strip_klpr_static_defines_unrelated_content():
+    """Verify that unrelated text is not touched."""
+    cs = Codestream("15.4u0")
+    content = "static int my_var = 0;\n" \
+              "if (some_other_function(klpr_static_key_false))"
+
+    assert strip_klpr_static_defines(cs, "test.c", content) == content
+
+def test_strip_klpr_static_defines_numbered_warning(caplog):
+    """Verify that a numbered static key generates a warning."""
+    cs = Codestream("15.4u0")
+    content = "if (klpr_static_key_false0(&my_key))"
+
+    strip_klpr_static_defines(cs, "test.c", content)
+    assert "Numbered klpr_ macro detected" in caplog.text
+    assert "15.4u0:test.c" in caplog.text
+
+@pytest.mark.parametrize("macro", ALL_MACROS)
+def test_strip_klpr_static_defines_registry(macro):
+    """The klp-ccp define of every registered macro is dropped."""
+    cs = Codestream("15.4u0")
+    content = f"#define {macro}(x) something(x)\n{macro}(a);\n"
+    assert strip_klpr_static_defines(cs, "test.c", content) == f"{macro}(a);\n"
+
+def test_strip_klpr_static_defines_numbered_call_warning(caplog):
+    """Verify that a numbered static call generates a warning."""
+    cs = Codestream("15.4u0")
+    content = "klpr_static_call0(my_func)(arg1);"
+
+    strip_klpr_static_defines(cs, "test.c", content)
+    assert "Numbered klpr_ macro detected" in caplog.text
+    assert "15.4u0:test.c" in caplog.text
+
+def test_strip_klpr_static_defines_numbered_raw_cond_warning(caplog):
+    """Numbered raw/cond static call variants also warn."""
+    cs = Codestream("15.4u0")
+    for content in ("klpr___raw_static_call0(f)(a);",
+                    "klpr___static_call_cond0(f)(a);"):
+        strip_klpr_static_defines(cs, "test.c", content)
+    assert "Numbered klpr_ macro detected" in caplog.text
+
+
+# ── collect_static_macro_variants ────────────────────────────────────────────
+
+def test_collect_static_macro_variants_calls():
+    """Only invoked call macros are reported; numbered variants are ignored."""
+    content = "klpr_static_call(a)(x);\n" \
+              "klpr___static_call_cond(b)(y);\n" \
+              "klpr_static_call0(c)(z);"  # numbered -> ignored
+    assert collect_static_macro_variants(content, STATIC_CALL_MACROS) == \
+        ["klpr_static_call", "klpr___static_call_cond"]
+
+def test_collect_static_macro_variants_no_cross_match():
+    """klpr_static_call must not match the longer raw/cond variants."""
+    content = "klpr___raw_static_call(a)(x);\n" \
+              "klpr___static_call_cond(b)(y);"
+    assert collect_static_macro_variants(content, STATIC_CALL_MACROS) == \
+        ["klpr___raw_static_call", "klpr___static_call_cond"]
+
+def test_collect_static_macro_variants_keys():
+    content = "if (klpr_static_key_true(&k)) {}"
+    assert collect_static_macro_variants(content, tuple(SIMPLE_MACROS)) == \
+        ["klpr_static_key_true"]
+
+def test_collect_static_macro_variants_might_resched():
+    content = "klpr_might_resched();\nklpr_might_resched0();\n" \
+              "__might_resched(__FILE__, __LINE__, 0);"
+    assert collect_static_macro_variants(content, ALL_MACROS) == \
+        ["klpr_might_resched"]
+
+def test_strip_klpr_static_defines_might_resched():
+    """klp-ccp's (possibly multi-line) might_resched define is dropped."""
+    cs = Codestream("15.4u0")
+    content = "#define klpr_might_resched() do {\t\\\n" \
+              "\tklpr_static_call(might_resched)();\t\\\n" \
+              "} while (0)\n" \
+              "klpr_might_resched();\n"
+    assert strip_klpr_static_defines(cs, "test.c", content) == \
+        "klpr_might_resched();\n"
+
+def test_strip_klpr_static_defines_numbered_might_resched_warning(caplog):
+    cs = Codestream("15.4u0")
+    strip_klpr_static_defines(cs, "test.c", "klpr_might_resched0();")
+    assert "Numbered klpr_ macro detected" in caplog.text
+
+def test_collect_static_macro_variants_cond_resched():
+    content = "klpr_cond_resched();\nklpr_cond_resched0();"
+    assert collect_static_macro_variants(content, ALL_MACROS) == \
+        ["klpr_cond_resched"]
+
+def test_strip_klpr_static_defines_cond_resched():
+    """klp-ccp's (possibly multi-line) cond_resched define is dropped."""
+    cs = Codestream("15.4u0")
+    content = "#define klpr_cond_resched() ({\t\\\n" \
+              "\t__might_resched(__FILE__, __LINE__, 0);\t\\\n" \
+              "\tklpr_static_call(cond_resched)();\t\\\n" \
+              "})\n" \
+              "klpr_cond_resched();\n"
+    assert strip_klpr_static_defines(cs, "test.c", content) == \
+        "klpr_cond_resched();\n"
+
+def test_strip_klpr_static_defines_numbered_cond_resched_warning(caplog):
+    cs = Codestream("15.4u0")
+    strip_klpr_static_defines(cs, "test.c", "klpr_cond_resched0();")
+    assert "Numbered static key/call detected" in caplog.text
+
+def test_collect_static_macro_variants_none():
+    assert collect_static_macro_variants("no macros here", STATIC_CALL_MACROS) == []
+
+
 # ── get_ext_symbols ────────────────────────────────────────────────────────────
 
 
@@ -191,6 +343,29 @@ def test_get_ext_symbols_grouped_by_module(tmp_path):
     result = get_ext_symbols(tmp_path)
     assert "vmlinux" in result
     assert "my_mod" in result
+
+
+def test_get_ext_symbols_skips_non_externalized(tmp_path):
+    """Symbols matching NON_EXTERNALIZED_SYMS (e.g. __SCT__*) are dropped."""
+    content = "KALLSYMS __SCT__foo var1 vmlinux\nKALLSYMS normal_sym var2 vmlinux\n"
+    (tmp_path / "fun_exts").write_text(content)
+    assert get_ext_symbols(tmp_path) == {"vmlinux": ["normal_sym"]}
+
+
+def test_get_ext_symbols_non_externalized_requires_full_match(tmp_path):
+    """Patterns must match the whole symbol name, not a substring."""
+    (tmp_path / "fun_exts").write_text("KALLSYMS my__SCT__foo var1 vmlinux\n")
+    assert get_ext_symbols(tmp_path) == {"vmlinux": ["my__SCT__foo"]}
+
+
+def test_get_ext_symbols_non_externalized_exact_name(tmp_path, monkeypatch):
+    """Plain names in the list match exactly, not as prefixes."""
+    monkeypatch.setattr(extract_mod, "_NON_EXTERNALIZED_SYMS_RE",
+                        re.compile(r"(?:__SCT__\w+)|(?:blocked_sym)"))
+    content = ("KALLSYMS blocked_sym var1 vmlinux\n"
+               "KALLSYMS blocked_sym_foo var2 vmlinux\n")
+    (tmp_path / "fun_exts").write_text(content)
+    assert get_ext_symbols(tmp_path) == {"vmlinux": ["blocked_sym_foo"]}
 
 
 # ── lp_out_cleanup ─────────────────────────────────────────────────────────────
@@ -297,6 +472,23 @@ def test_lp_out_cleanup_collapses_multiple_empty_lines(tmp_path):
     lp_out = _make_lp_out(tmp_path, "line1\n\n\n\nline2\n")
     lp_out_cleanup(Codestream("15.4u0"), _make_fdata(), lp_out, tmp_path)
     assert "\n\n\n" not in lp_out.read_text()
+
+
+def test_lp_out_cleanup_records_klpr_macros(tmp_path):
+    """Used klpr_ macros are recorded per-arch after their defines are dropped."""
+    lp_out = _make_lp_out(
+        tmp_path,
+        "#define klpr_static_key_true(key) static_key_true(key)\n"
+        "#define klpr_static_call(name) something(name)\n"
+        "if (klpr_static_key_true(&k))\n"
+        "\tklpr_static_call(f)(a);\n",
+    )
+    fdata = _make_fdata()
+    lp_out_cleanup(Codestream("15.4u0"), fdata, lp_out, tmp_path, "aarch64")
+    assert fdata.get_klpr_macros("aarch64") == \
+        ["klpr_static_call", "klpr_static_key_true"]
+    assert fdata.get_klpr_macros("x86_64") == []
+    assert "#define klpr_" not in lp_out.read_text()
 
 
 # ── parse_ccp_warnings ─────────────────────────────────────────────────────────

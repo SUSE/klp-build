@@ -28,6 +28,7 @@ from klpbuild.klplib.kernel import (
     get_lp_branch_path, get_kernel_tag_path,
     abort_patch, create_lp_branch, delete_lp_branch, apply_patch,
 )
+from klpbuild.klplib.klpr_macros import ALL_MACROS as KLPR_MACROS
 from klpbuild.klplib.templ import generate_livepatches
 
 PLUGIN_CMD = "extract"
@@ -42,6 +43,23 @@ UNWANTED_MACROS = [
     "MODULE",
     "RETPOLINE"
 ]
+
+# Symbols that must never be externalized. Each entry is a regex that must
+# match the whole symbol name (re.fullmatch), so plain names match exactly and
+# prefixes need an explicit wildcard. Note that '.' is a regex wildcard: escape
+# it (or use re.escape) when adding names such as "foo.constprop.0".
+NON_EXTERNALIZED_SYMS = [
+    # Static call trampolines. With the klpr_static_* macro rewriting,
+    # references to them should become dead code.
+    r"__SCT__\w+",
+    # __SCK__might_resched and __SCK__cond_resched being externalized is the
+    # result of the might_resched()/cond_resched() macro expansion in klp-ccp,
+    # however, the same macro gets rewritten in the postprocessing to its
+    # original *_resched()
+    r"__SCK__might_resched",
+    r"__SCK__cond_resched",
+]
+_NON_EXTERNALIZED_SYMS_RE = re.compile("|".join(f"(?:{p})" for p in NON_EXTERNALIZED_SYMS))
 
 
 def register_argparser(subparser):
@@ -253,7 +271,7 @@ def get_missing_ext_symbols(working_cs, klp_ccp_arch="x86_64"):
         for obj, syms in obj_syms.items():
             missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
             for arch, arch_syms in missing.items():
-                blacklisted = re.findall(r"((?:__SCT__|__SCK__|__traceiter)\w+)",
+                blacklisted = re.findall(r"((?:__SCK__|__traceiter)\w+)",
                                          ' '.join(arch_syms))
                 whitelisted = set(blacklisted) ^ set(arch_syms)
                 if whitelisted:
@@ -295,6 +313,8 @@ def get_ext_symbols(out_dir):
     symbols = {}
     for ext in exts:
         sym, mod = ext[0], ext[2]
+        if _NON_EXTERNALIZED_SYMS_RE.fullmatch(sym):
+            continue
         symbols.setdefault(mod, [])
         symbols[mod].append(sym)
 
@@ -679,6 +699,39 @@ def process(lp_name, total, args, avoid_ext, no_patches, klp_ccp_arch="x86_64"):
     lp_out_cleanup(cs, cs.files[fname], lp_out, sdir, klp_ccp_arch)
 
 
+def strip_klpr_static_defines(cs, fname, lp_out):
+    """
+    Drop the ``#define`` lines that klp-ccp emits for the ``klpr_`` macros we
+    rewrite (see klplib/klpr_macros.py). Their usages are left untouched so they
+    can bind to the definitions emitted by the livepatch template.
+
+    Numbered variants (e.g. ``klpr_static_call0``) cannot be rewritten
+    automatically and require manual inspection, so warn about them.
+    """
+    macros = "|".join(re.escape(m) for m in KLPR_MACROS)
+
+    numbered = re.search(rf"\b(?:{macros})\d+\b", lp_out)
+    if numbered:
+        logging.warning("%s:%s: Numbered klpr_ macro detected (e.g. %s). "
+                        "Manual inspection required.",
+                        cs.full_cs_name(), fname, numbered.group(0))
+
+    # klp-ccp's static call macro spans multiple lines (backslash-continued), so
+    # consume all the continuation lines as well, not just the first one.
+    return re.sub(rf"#define (?:{macros})\b(?:.*\\\n)*.*\n", "", lp_out)
+
+
+def collect_static_macro_variants(lp_out, macros):
+    """
+    Return the macros from ``macros`` that are actually invoked in ``lp_out``.
+
+    Matching is anchored on the opening parenthesis so numbered variants
+    (``klpr_static_call0(``) are ignored and the shorter ``klpr_static_call``
+    does not cross-match the longer ``klpr___raw_static_call`` / ``klpr___static_call_cond``.
+    """
+    return [m for m in macros if re.search(rf"\b{re.escape(m)}\(", lp_out)]
+
+
 def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
     """
     Open the file, read, seek to the beginning, write the new data, and
@@ -689,6 +742,10 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
     - Remove unsupported macro definitions.
     - Remove the attributes left by klp-ccp, since they don't mean much for
       kernel modules.
+    - Drop klp-ccp's defines for the ``klpr_`` macros we rewrite (see
+      klplib/klpr_macros.py); the livepatch template emits our own definitions
+      in their place. Record which macros the file uses so the template only
+      emits what's needed.
     - Remove typeof(...) declarations left by klp-ccp.
     - Remove big chunks of empty lines.
     """
@@ -703,6 +760,13 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
+        file_buf = strip_klpr_static_defines(cs, fdata.filename, file_buf)
+
+        # Record the klpr_ macros still used after dropping the defines, so
+        # the template can emit matching definitions.
+        fdata.set_klpr_macros(arch,
+            collect_static_macro_variants(file_buf, KLPR_MACROS))
+
         file_buf = re.sub(r'\n{3,}', r'\n', file_buf)
         f.write(file_buf)
         f.truncate()
