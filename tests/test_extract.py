@@ -25,8 +25,10 @@ from klpbuild.plugins.extract import (
     lp_out_cleanup,
     parse_ccp_warnings,
     prepare_patches,
+    process_make_output,
     register_argparser,
     run_ccp_jobs,
+    split_compile_command,
 )
 from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS
@@ -551,3 +553,21 @@ def test_run_ccp_jobs_stops_on_first_failure():
         run_ccp_jobs(job, [(i,) for i in range(50)], workers=1)
 
     assert len(ran) < 50
+
+
+# ── compile command splitting ──────────────────────────────────────────────────
+
+
+def test_split_compile_command_keeps_arguments_with_spaces():
+    cmd = "gcc -DFOO='\"a b\"' -include \"/path with space/x.h\" -c -o a.o a.c"
+
+    assert split_compile_command(process_make_output(cmd)) == [
+        '-DFOO="a b"', "-include", "/path with space/x.h", "-c", "-o", "a.o", "a.c"]
+
+
+def test_split_compile_command_drops_whole_options_only():
+    """Options are only dropped when the whole argument matches."""
+    cmd = "gcc -march=z196 -march=z196x -fdump-ipa-clones-extra -c a.c"
+
+    assert split_compile_command(process_make_output(cmd)) == [
+        "-march=z196x", "-fdump-ipa-clones-extra", "-c", "a.c"]
