@@ -101,7 +101,7 @@ def get_cs_code(lp_name, working_cs, klp_ccp_arch="x86_64"):
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f"{utils.get_datadir(klp_ccp_arch)}.+{fname}", "", src)
+                src = re.sub(f"{re.escape(str(utils.get_datadir(klp_ccp_arch)))}.+{re.escape(fname)}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(r"\.lineno = \d+,", "", src)
@@ -183,7 +183,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         f.write("\n")
         f.flush()
 
-        ofname = "." + filename.name.replace(".c", ".o.d")
+        ofname = "." + filename.with_suffix(".o.d").name
         ofname = Path(filename.parent, ofname)
 
         try:
@@ -201,9 +201,12 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         # 15.6 onwards we don't have -isystem.
         #      Also, it's more difficult to eliminate the objtool command
         #      line, so try to search until the fixdep script
+        # Escape the paths, they are matched literally
+        e_ofname, e_filename = re.escape(str(ofname)), re.escape(str(filename))
+        e_file, e_sdir = re.escape(file_), re.escape(str(sdir))
         for regex in [
-                rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});",
-                rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+.*-c -o {file_} {sdir}/{filename})\s+;.*fixdep"
+                rf"(-Wp,(\-MD|\-MMD),{e_ofname}\s+-nostdinc\s+-isystem.*{e_filename});",
+                rf"(-Wp,(\-MD|\-MMD),{e_ofname}\s+-nostdinc\s+.*-c -o {e_file} {e_sdir}/{e_filename})\s+;.*fixdep"
                 ]:
             f.write(f"Searching for the pattern: {regex}\n")
             f.flush()
@@ -778,7 +781,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
         orig.write(file_buf)
         f.seek(0)
         file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
-        file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
+        file_buf = re.sub(fr"#include \"{re.escape(str(sdir))}.*\.h\"", '', file_buf)
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
