@@ -141,3 +141,23 @@ def test_get_file_mod_builtin_arch_config():
     assert mod.name == "kvm"
     assert "kvm" in cs.modules
     assert "vmlinux" not in cs.modules
+
+
+def test_check_symbol_archs_skips_given_arch(monkeypatch):
+    """The skipped architecture is the one passed by the caller (the klp-ccp
+    target), regardless of the host architecture."""
+    cs = Codestream("15.5u15", archs=["x86_64", "ppc64le", "s390x"])
+
+    checked = []
+
+    def fake_check(self, arch, mod, symbols, check_patchable):
+        checked.append(arch)
+        return [f"{arch}_sym"]
+
+    monkeypatch.setattr(Codestream, "_Codestream__check_symbol", fake_check)
+
+    ret = cs.check_symbol_archs(["x86_64", "ppc64le", "s390x"], "vmlinux", ["sym"],
+                                "ppc64le", False)
+
+    assert sorted(checked) == ["s390x", "x86_64"]
+    assert set(ret) == {"s390x", "x86_64"}

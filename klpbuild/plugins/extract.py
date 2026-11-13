@@ -251,7 +251,8 @@ def get_missing_ext_symbols(working_cs, klp_ccp_arch="x86_64"):
                 obj_syms[obj].extend(syms)
 
         for obj, syms in obj_syms.items():
-            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
+            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms,
+                                            klp_ccp_arch, False)
             for arch, arch_syms in missing.items():
                 blacklisted = re.findall(r"((?:__SCT__|__SCK__|__traceiter)\w+)",
                                          ' '.join(arch_syms))
