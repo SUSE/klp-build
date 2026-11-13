@@ -4,6 +4,7 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from concurrent.futures import ThreadPoolExecutor
+import functools
 from itertools import repeat
 import json
 import logging
@@ -137,6 +138,22 @@ def process_make_output(output):
     return re.sub(r'-D"KBUILD_([\w\#\_\=\(\)])+"', unquote_output, output)
 
 
+@functools.cache
+def get_make_cc():
+    '''
+    Return the compiler to be passed to make. It doesn't change during the
+    run, so it is only looked up once.
+    '''
+    gcc_ver = int(subprocess.check_output(["gcc", "-dumpversion"]).decode().strip().split(".", maxsplit=1)[0])
+    # gcc12 and higher have a problem with kernel and xrealloc implementation
+    if gcc_ver < 12:
+        return "gcc"
+    # if gcc12 or higher is the default compiler, check if gcc7 is available
+    if shutil.which("gcc-7"):
+        return "gcc-7"
+    raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
+
+
 def get_make_cmd(out_dir, cs, filename, odir, sdir):
     filename = PurePath(filename)
     file_ = str(filename.with_suffix(".o"))
@@ -151,15 +168,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         if filename.parent == PurePath("arch/x86/lib") or filename.parent == PurePath("drivers/block/aoe"):
             file_ = str(filename.parent) + "/"
 
-        gcc_ver = int(subprocess.check_output(["gcc", "-dumpversion"]).decode().strip())
-        # gcc12 and higher have a problem with kernel and xrealloc implementation
-        if gcc_ver < 12:
-            cc = "gcc"
-        # if gcc12 or higher is the default compiler, check if gcc7 is available
-        elif shutil.which("gcc-7"):
-            cc = "gcc-7"
-        else:
-            raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
+        cc = get_make_cc()
 
         # Use -C/O= to point make at the source tree directly, bypassing
         # the obj dir wrapper Makefile that hardcodes a relative include
