@@ -17,6 +17,7 @@ from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.plugins.extract import (
     extract,
+    find_compile_command,
     get_ext_symbols,
     get_patched_funcs,
     lp_out_cleanup,
@@ -435,3 +436,21 @@ def test_extract_argparser_klp_ccp_arch():
     args_default = parser.parse_args(["extract", "-n", "test_lp"])
     assert args_default.klp_ccp_arch == utils.ARCH
 
+
+# ── find_compile_command ───────────────────────────────────────────────────────
+
+
+def _cc_entry(src):
+    obj = src.removesuffix(".c") + ".o"
+    return {"directory": "/build", "file": f"../{src}",
+            "command": f"gcc -c -o {obj} ../{src}"}
+
+
+def test_find_compile_command_does_not_match_path_suffix():
+    """kernel/time.c must not pick the entry of arch/x86/kernel/time.c,
+    even when that one comes first."""
+    entries = [_cc_entry("arch/x86/kernel/time.c"), _cc_entry("kernel/time.c")]
+
+    cmd = find_compile_command(entries, "kernel/time.c", "cc.json")
+
+    assert cmd == "gcc -c -o kernel/time.o ../kernel/time.c"

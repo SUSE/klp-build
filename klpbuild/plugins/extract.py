@@ -324,16 +324,47 @@ def get_cmd_from_json(cs, fname, sdir, arch="x86_64"):
     with open(cc_file) as f:
         buf = f.read()
     data = json.loads(buf)
-    for d in data:
-        if fname in d["file"]:
-            output = d["command"]
-            # The arguments found on the file point to '..', since they are generated
-            # when the kernel is compiled. Replace the first '..' on each file
-            # path by the source directory since klp-ccp needs to reach the files.
-            cmd = process_make_output(output)
-            return cmd.replace(" ..", f" {str(sdir)}").replace("-I..", f"-I{str(sdir)}")
 
-    raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
+    output = find_compile_command(data, fname, cc_file)
+
+    # The arguments found on the file point to '..', since they are generated
+    # when the kernel is compiled. Replace the first '..' on each file
+    # path by the source directory since klp-ccp needs to reach the files.
+    cmd = process_make_output(output)
+    return cmd.replace(" ..", f" {str(sdir)}").replace("-I..", f"-I{str(sdir)}")
+
+
+def find_compile_command(entries, fname, cc_file):
+    '''
+    Return the compile command of fname from the compile_commands.json
+    entries.
+
+    First keep the entries whose file path ends with fname, matching only
+    after a '/'. This isn't enough to identify the file: kernel/time.c is
+    also a suffix of arch/x86/kernel/time.c. So if more than one entry is
+    left, pick the one whose command has "-o <fname with .o suffix>". Kbuild
+    writes the object path relative to the obj dir, so it is unique per
+    source file: kernel/time.o vs arch/x86/kernel/time.o. If the entry is
+    still ambiguous, fail instead of guessing.
+    '''
+    candidates = [d for d in entries
+                  if d["file"] == fname or d["file"].endswith(f"/{fname}")]
+
+    if not candidates:
+        raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
+
+    if len(candidates) > 1:
+        obj = re.escape(str(PurePath(fname).with_suffix(".o")))
+        by_obj = [d for d in candidates
+                  if re.search(rf"(^|\s)-o\s+{obj}(\s|$)", d["command"])]
+        if by_obj:
+            candidates = by_obj
+
+    if len(candidates) > 1:
+        files = ", ".join(d["file"] for d in candidates)
+        raise RuntimeError(f"Found multiple cmdlines for {fname} on {str(cc_file)}: {files}. Aborting")
+
+    return candidates[0]["command"]
 
 
 def print_env_vars(fhandle, env):
