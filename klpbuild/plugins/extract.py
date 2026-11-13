@@ -417,6 +417,26 @@ def remove_patches(lp_name, cs):
     delete_lp_branch(lp_name, cs)
 
 
+def uses_patches(cs, no_patches):
+    '''
+    Whether the codestream is extracted from its patched LP branch.
+    '''
+    return not no_patches and cs.needs_patches()
+
+
+def prepare_patches(lp_name, cs, no_patches):
+    '''
+    Remove leftovers from previous runs and apply the patches required by the
+    codestream. Nothing is done for codestreams extracted from the unpatched
+    kernel tag, since their LP branch is never used.
+    '''
+    if not uses_patches(cs, no_patches):
+        return
+
+    remove_patches(lp_name, cs)
+    apply_all_patches(lp_name, cs)
+
+
 def apply_all_patches(lp_name, cs):
     create_lp_branch(lp_name, cs)
 
@@ -686,7 +706,7 @@ def process(lp_name, total, args, avoid_ext, no_patches, klp_ccp_arch="x86_64"):
 
     odir = cs.get_obj_dir(klp_ccp_arch)
 
-    if not no_patches and cs.needs_patches():
+    if uses_patches(cs, no_patches):
         sdir = get_lp_branch_path(lp_name, cs)
     else:
         sdir = get_kernel_tag_path(cs.kernel)
@@ -788,13 +808,11 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
     i = 1
     make_lock = Lock()
     for cs in working_cs:
-        # remove any previously generated files and leftover patches
+        # remove any previously generated files
         shutil.rmtree(cs.get_ccp_dir(lp_name, klp_ccp_arch), ignore_errors=True)
-        remove_patches(lp_name, cs)
 
         # Apply patches before the LPs were created
-        if not no_patches:
-            apply_all_patches(lp_name, cs)
+        prepare_patches(lp_name, cs, no_patches)
 
         for fname, fdata in cs.files.items():
             args.append((i, make_lock, fname, cs, fdata))
@@ -822,7 +840,7 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
     for cs in working_cs:
         generate_livepatches(lp_name, cs, klp_ccp_arch)
         # Cleanup patches after the LPs were created if they were applied
-        if not no_patches:
+        if uses_patches(cs, no_patches):
             remove_patches(lp_name, cs)
 
     logging.info("\nChecking duplicated symbols...")

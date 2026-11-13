@@ -23,6 +23,7 @@ from klpbuild.plugins.extract import (
     get_patched_funcs,
     lp_out_cleanup,
     parse_ccp_warnings,
+    prepare_patches,
     register_argparser,
 )
 from klpbuild.plugins.setup import run as setup
@@ -490,3 +491,41 @@ def test_get_cs_code_returns_files_sorted(tmp_path, monkeypatch):
 
     assert [f for f, _ in cs_files["15.4u0"]] == sorted(names)
     assert cs_files["15.4u0"] == cs_files["15.4u1"]
+
+
+# ── patches handling ───────────────────────────────────────────────────────────
+
+
+class _PatchCS:
+    kernel = "5.14.21"
+
+    def __init__(self, patches, dirs=("15.4u0", "15.4")):
+        self._patches = patches
+        self._dirs = list(dirs)
+
+    def full_cs_name(self):
+        return "15.4u0"
+
+    def needs_patches(self):
+        return bool(self._patches)
+
+    def get_required_patches(self):
+        return self._patches[:]
+
+    def get_candidate_patches_dirs(self):
+        return self._dirs
+
+
+@pytest.mark.parametrize("patches,no_patches,expected", [
+    (["fix.patch"], False, ["remove", "apply"]),
+    (["fix.patch"], True, []),
+    ([], False, []),
+])
+def test_prepare_patches_only_for_codestreams_needing_them(monkeypatch, patches, no_patches, expected):
+    calls = []
+    monkeypatch.setattr("klpbuild.plugins.extract.remove_patches", lambda *_: calls.append("remove"))
+    monkeypatch.setattr("klpbuild.plugins.extract.apply_all_patches", lambda *_: calls.append("apply"))
+
+    prepare_patches("lp", _PatchCS(patches), no_patches)
+
+    assert calls == expected
