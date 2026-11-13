@@ -85,9 +85,10 @@ def get_cs_code(lp_name, working_cs, klp_ccp_arch="x86_64"):
     for cs in working_cs:
         cs_files.setdefault(cs.full_cs_name(), [])
 
-        for fpath in cs.get_lp_dir(lp_name, klp_ccp_arch).iterdir():
+        # Sort the files, since the lists are compared element by element
+        for fpath in sorted(cs.get_lp_dir(lp_name, klp_ccp_arch).iterdir()):
             fname = fpath.name
-            with open(fpath.absolute(), "r+") as fi:
+            with open(fpath.absolute(), "r") as fi:
                 src = fi.read()
 
                 src = re.sub(r'#include ".+kconfig\.h"\n', "", src)

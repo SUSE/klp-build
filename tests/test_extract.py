@@ -18,6 +18,7 @@ from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.plugins.extract import (
     extract,
     find_compile_command,
+    get_cs_code,
     get_ext_symbols,
     get_patched_funcs,
     lp_out_cleanup,
@@ -454,3 +455,38 @@ def test_find_compile_command_does_not_match_path_suffix():
     cmd = find_compile_command(entries, "kernel/time.c", "cc.json")
 
     assert cmd == "gcc -c -o kernel/time.o ../kernel/time.c"
+
+
+# ── get_cs_code ────────────────────────────────────────────────────────────────
+
+
+class _LpDirCS:
+    def __init__(self, name, lp_dir):
+        self._name = name
+        self._lp_dir = lp_dir
+
+    def full_cs_name(self):
+        return self._name
+
+    def get_lp_dir(self, _lp_name, _arch):
+        return self._lp_dir
+
+
+def test_get_cs_code_returns_files_sorted(tmp_path, monkeypatch):
+    """Files are returned in a stable order, so that codestreams with the same
+    content compare equal regardless of the directory listing order."""
+    monkeypatch.setattr("klpbuild.plugins.extract.utils.get_datadir", lambda _arch: tmp_path / "data")
+
+    names = ["livepatch_b.c", "kbuild", "livepatch_a.c", "livepatch.h"]
+    dirs = {}
+    for cs_name, order in [("15.4u0", names), ("15.4u1", list(reversed(names)))]:
+        lp_dir = tmp_path / cs_name
+        lp_dir.mkdir()
+        for name in order:
+            (lp_dir / name).write_text(f"content of {name}\n")
+        dirs[cs_name] = lp_dir
+
+    cs_files = get_cs_code("lp", [_LpDirCS(n, d) for n, d in dirs.items()])
+
+    assert [f for f, _ in cs_files["15.4u0"]] == sorted(names)
+    assert cs_files["15.4u0"] == cs_files["15.4u1"]
