@@ -132,7 +132,7 @@ def test_templ_without_externalized_vars():
 # CVE is not all architectures supported by the given codestream.
 def test_is_enabled_only_on_cs_arcs():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u11"
+    cs = "6.0u32"
 
     setup_args = {
         "cve" : None,
@@ -234,7 +234,7 @@ def test_check_header_file_included():
 
 def test_templ_cve_specified():
     lp = "bsc1227320"
-    cs = "15.5u30"
+    cs = "15.5u40"
 
     setup_args = {
         "cve" : None,
@@ -304,7 +304,7 @@ def test_templ_micro_is_ibt():
     For IBT we don't need to use kallsyms, so the _init and _cleanup should be empty;
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u11"
+    cs = "6.0u32"
 
     setup_args = {
         "cve" : None,
@@ -338,7 +338,7 @@ def test_templ_micro_is_ibt():
 
 def test_templ_ibt_without_externalized_vars():
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u11"
+    cs = "6.0u32"
 
     setup_args = {
         "cve" : None,
@@ -392,7 +392,7 @@ def test_templ_kbuild_has_contents():
     Making sure that Kbuild.inc has the correct content
     """
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    cs = "6.0u11"
+    cs = "6.0u32"
 
     setup_args = {
         "cve" : None,

@@ -10,7 +10,7 @@ from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib import utils
 from tests.utils import get_codestreams_file
 
-CS = "15.5u30"
+CS = "15.5u40"
 DEFAULT_DATA = {"lp_filter": CS, "conf": "CONFIG_TUN", "no_check": True}
 
 
@@ -111,7 +111,7 @@ def test_invalid_sym(caplog):
 def test_valid_micro_patchid():
     # Make sure that patchid is informed for SLE MICRO
     lp = "bsc_" + inspect.currentframe().f_code.co_name
-    micro_cs = "6.0u11"
+    micro_cs = "6.0u32"
     micro_data = {"lp_filter": micro_cs, "conf": "CONFIG_TUN", "no_check": True}
 
     setup_args = {
