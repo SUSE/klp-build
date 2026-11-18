@@ -672,13 +672,15 @@ class Codestream:
     # architectures before creating the livepatches.
     #
     # It is also used when we want to check if a symbol externalized in one
-    # architecture exists in the other supported ones. In this case skip_on_host
-    # will be True, since we trust the decisions made by the extractor tool.
-    def check_symbol_archs(self, lp_archs, mod, symbols, skip_on_host, check_patchable):
+    # architecture exists in the other supported ones. In this case skip_arch
+    # is the architecture targeted by the extractor tool, since we trust the
+    # decisions it made. Otherwise skip_arch is None and no architecture is
+    # skipped.
+    def check_symbol_archs(self, lp_archs, mod, symbols, skip_arch, check_patchable):
         arch_sym = {}
         # Validate only architectures supported by the codestream
         for arch in self.archs:
-            if arch == ARCH and skip_on_host:
+            if arch == skip_arch:
                 continue
 
             # Skip if the arch is not supported by the livepatch code
