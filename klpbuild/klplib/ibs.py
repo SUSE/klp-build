@@ -20,9 +20,9 @@ from lxml import etree
 from natsort import natsorted
 from osctiny import Osc
 
-from klpbuild.klplib.affected_file import AffectedModule
 from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.config import get_user_settings
+from klpbuild.klplib.symbol_checker import get_symbol_checker
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir
 
 logging.getLogger("osctiny").setLevel(logging.WARNING)
@@ -146,20 +146,12 @@ def get_cs_packages(cs_list, dest):
 
 
 def find_missing_symbols(cs, arch, lp_mod_path):
-    vmlinux_path = get_datadir(arch) / cs.find_obj_path(arch, AffectedModule.VMLINUX)
-    vmlinux_syms = get_all_symbols_from_object(vmlinux_path, True)
-
     # Get list of UNDEFINED symbols from the livepatch module
     lp_und_symbols = get_all_symbols_from_object(lp_mod_path, False)
 
-    missing_syms = []
     # Find all UNDEFINED symbols that exists in the livepatch module that
     # aren't defined in the vmlinux
-    for sym in lp_und_symbols:
-        if sym not in vmlinux_syms:
-            missing_syms.append(sym)
-
-    return missing_syms
+    return get_symbol_checker(cs).missing_in_vmlinux(arch, lp_und_symbols)
 
 
 def validate_livepatch_module(cs, arch, rpm_dir, rpm):

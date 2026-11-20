@@ -59,6 +59,15 @@ kernel_src_dir=/home/user/repos/kernel-source
 kgr_patches_dir=/home/user/repos/kgr_patches
 ```
 
+### **Symbol Checks**
+
+Symbol and module checks (does a symbol exist in vmlinux or a module, is a module supported) are answered by one of two backends:
+
+* **klp\_data**: queries the pre-synced `$KLP_DATA_DIR/symbols.db` through the `klp_data` Python bindings. It is much faster, and is used automatically when the bindings and the database are available. Populate the database with `klp-data sync`. `symbols.db` is looked up in `$KLP_DATA_DIR` and, if it isn't there, in the `data_dir` of klp-build.
+* **ELF**: parses the kernel objects with pyelftools. It is the fallback when `klp_data` is not available.
+
+Set `KLPBUILD_NO_KLP_DATA=1` to force the ELF backend. The checks that a symbol can be livepatched (`setup --full-checks`) need the trace addresses of vmlinux, which are not in the database, so they are only performed by the ELF backend.
+
 ## **Usage**
 
 ### **Synopsis**

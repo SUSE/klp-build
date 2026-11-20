@@ -533,6 +533,14 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir, klp_ccp_a
     env["KCP_READELF"] = "readelf"
     env["KCP_RENAME_PREFIX"] = "klp"
 
+    # klp-ccp needs the arch and the codestream to look up the symbols with
+    # klp-data. Don't pass them when klp-data is disabled with
+    # KLPBUILD_NO_KLP_DATA, so that klp-ccp doesn't use the klp-data backend
+    # either, and both tools parse the kernel objects instead.
+    if not os.environ.get("KLPBUILD_NO_KLP_DATA"):
+        env["KCP_ARCH"] = klp_ccp_arch
+        env["KCP_CODESTREAM"] = cs.full_cs_name()
+
     # List of symbols that are currently not resolvable for klp-ccp
     avoid_syms = [
         "__xadd_wrong_size",

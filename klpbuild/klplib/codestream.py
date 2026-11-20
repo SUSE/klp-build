@@ -3,7 +3,6 @@
 # Copyright (C) 2024 SUSE
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
-import bisect
 import re
 import subprocess
 import sys
@@ -15,7 +14,8 @@ from importlib import resources
 
 from klpbuild.klplib.affected_file import AffectedConfig, AffectedFile, AffectedModule, ConfigState
 from klpbuild.klplib.ksrc import ksrc_read_rpm_file, ksrc_is_module_supported
-from klpbuild.klplib.utils import ARCH, get_workdir, get_elf_object, get_datadir, preferred_arch
+from klpbuild.klplib.symbol_checker import get_symbol_checker
+from klpbuild.klplib.utils import ARCH, get_workdir, get_datadir, preferred_arch
 from klpbuild.klplib.kernel import file_exists_in_tag, read_file_in_tag, get_kernel_tag_path
 from klpbuild.klplib.ksrc import KERNEL_BRANCHES
 
@@ -557,115 +557,6 @@ class Codestream:
         fpath = f'{str(fname).replace("/", "_").replace("-", "_")}'
         return f"{lp_name}_{fpath}"
 
-    def __check_patchable_sym(self, arch, name, sym, trace_addrs):
-        val = sym["st_value"]
-
-        # For IBT enabled kernels, some functions might have ENDBR instructions
-        # at the first offset of the symbol. To make the check catch all cases,
-        # always check for the trace addr and also the same trace addr - 4, to
-        # match the symbol table on functions that don't have the IBT enabled.
-        for val in [sym["st_value"], sym["st_value"] + 4]:
-            pos = bisect.bisect_left(trace_addrs, val)
-
-            # Check if the symbol was found
-            if pos != len(trace_addrs) and trace_addrs[pos] == val:
-                return
-
-        logging.error("%s-%s (%s): Symbol %s has tracing disabled.", self.full_cs_name(), arch, self.kernel, name)
-        sys.exit(1)
-
-    # On ppc64le the trace_address points to symbol descriptor table, and not
-    # the symbol itself, so we need to check for the address range
-    def __check_patchable_sym_ppc64le(self, arch, name, sym, trace_addrs):
-        code_start = sym["st_value"]
-        code_end = code_start + sym["st_size"]
-
-        pos = bisect.bisect_left(trace_addrs, code_start)
-        if pos == len(trace_addrs) or trace_addrs[pos] > code_end:
-            logging.error("%s-%s (%s): Symbol %s has tracing disabled.",  self.full_cs_name(),
-                          arch, self.kernel, name)
-            sys.exit(1)
-
-    def __get_trace_addresses(self, arch, elf_obj):
-        # Get all addresses related to the functions that can be traced/livepatched
-        # and populate an array for later inspection
-        symtab = elf_obj.get_section_by_name(".symtab")
-
-        start_mcount = symtab.get_symbol_by_name("__start_mcount_loc")[0]
-        stop_mcount = symtab.get_symbol_by_name("__stop_mcount_loc")[0]
-
-        sec = elf_obj.get_section(start_mcount["st_shndx"])
-
-        start = start_mcount["st_value"] - sec["sh_addr"]
-        stop = stop_mcount["st_value"] - sec["sh_addr"]
-
-        order = "big" if arch == "s390x" else "little"
-
-        sec_data = sec.data()[start:stop]
-        syms = []
-
-        for i in range(0, len(sec_data), 8):
-            ptr = sec_data[i:i+8]
-
-            data = int.from_bytes(ptr, byteorder=order)
-            if data > 0:
-                syms.append(data)
-
-        syms.sort()
-
-        return syms
-
-    # Return all the symbols not found per arch/obj
-    def __check_symbol(self, arch, mod, symbols, check_patchable):
-        ret = []
-
-        obj = get_datadir(arch) / self.find_obj_path(arch, mod)
-        elf_obj = get_elf_object(obj)
-
-        trace_addrs = []
-
-        # Get the addresses of the traceable objects on vmlinux
-        if mod == AffectedModule.VMLINUX and check_patchable:
-            trace_addrs = self.__get_trace_addresses(arch, elf_obj)
-
-        symtab = elf_obj.get_section_by_name(".symtab")
-
-        for symbol in symbols:
-            syms = symtab.get_symbol_by_name(symbol)
-            # can return None is the symbol is not found, or a list if the symbol
-            # is not unique
-            if not syms:
-                ret.append(symbol)
-                continue
-
-            if len(syms) > 1:
-                logging.warning("%s-%s (%s): symbol %s duplicated on %s", self.full_cs_name(), arch, self.kernel, symbol, mod)
-
-            # If len(syms) == 1 means that we found a unique symbol, which is
-            # what we expect
-
-            # Check if the symbol itself can be traced. There are cases where
-            # the symbol is found, but it was instructed to not be possible
-            # to trace, so we can't livepatch it either
-            # For now only check this on vmlinux. The support for modules
-            # required applying relocation, which is far more complicated.
-            #
-            # This method is called on setup and extraction phase, but check
-            # is only necessary for setup, since the extractor knows if a symbol
-            # is traceable or not.
-            #
-            # TODO: implement support for modules as well
-            if trace_addrs:
-                # The symbol is unique, so we can grab the first entry safely
-                # TODO: missing support for aarch64
-                if arch in ["x86_64", "s390x"]:
-                    self.__check_patchable_sym(arch, symbol, syms[0], trace_addrs)
-
-                elif arch in ["ppc64le"]:
-                    self.__check_patchable_sym_ppc64le(arch, symbol, syms[0], trace_addrs)
-
-        return ret
-
     # This functions is used to check if the symbols exist in the module that
     # will be livepatched. In this case skip_on_host argument will be false,
     # meaning that we want the symbol to checked against all supported
@@ -686,7 +577,7 @@ class Codestream:
                 continue
 
             # Assign the not found symbols on arch
-            syms = self.__check_symbol(arch, mod, symbols, check_patchable)
+            syms = get_symbol_checker(self).missing_symbols(arch, mod, symbols, check_patchable)
             if syms:
                 arch_sym[arch] = syms
 
