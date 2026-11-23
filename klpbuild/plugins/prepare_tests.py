@@ -20,7 +20,7 @@ from klpbuild.klplib.codestreams_data import (
     get_codestream_by_name,
     get_codestreams_list,
 )
-from klpbuild.klplib.config import get_user_settings
+from klpbuild.klplib.config import get_workers
 from klpbuild.klplib.ibs import (
     RPMData,
     convert_prj_to_cs,
@@ -154,7 +154,7 @@ def run(lp_name, lp_filter):
 
         # Validate modules in parallel using processes (not threads) to avoid
         # thread-safety issues with underlying C libraries
-        workers = int(get_user_settings("workers"))
+        workers = get_workers("prepare_tests_workers")
         with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
             futures = [
                 executor.submit(validate_module_and_move, cs, arch, lp_name, test_arch_path)
