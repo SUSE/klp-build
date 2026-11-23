@@ -18,6 +18,7 @@ from klpbuild.klplib.codestreams_data import (
     store_codestreams,
 )
 from klpbuild.klplib.supported import get_supported_codestreams
+from klpbuild.klplib.symbol_checker import get_symbol_checker
 from klpbuild.klplib.templ import generate_commit_msg_file
 from klpbuild.klplib.utils import data_lock
 from klpbuild.plugins.scan import scan
@@ -297,10 +298,8 @@ def __setup_check_mod(cs, mod, arch):
     if mod.get_obj_path(arch):
         return
 
-    mod_path = cs.find_obj_path(arch, mod.name)
-
     # Validate if the module being livepatched is supported or not
-    if utils.check_module_unsupported(arch, mod_path):
+    if get_symbol_checker(cs).module_unsupported(arch, mod.name):
         logging.warning("%s (%s): Module %s is not supported by SLE",
                         cs.full_cs_name(), cs.kernel, mod.name)
 

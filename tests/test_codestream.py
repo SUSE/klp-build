@@ -6,6 +6,7 @@
 import pytest
 
 from klpbuild.klplib.codestream import Codestream
+from klpbuild.klplib.symbol_checker import ElfSymbolChecker
 from klpbuild.klplib.utils import ARCHS
 
 
@@ -150,11 +151,11 @@ def test_check_symbol_archs_skips_given_arch(monkeypatch):
 
     checked = []
 
-    def fake_check(self, arch, mod, symbols, check_patchable):
+    def fake_check(self, arch, mod, symbols, check_patchable=False):
         checked.append(arch)
         return [f"{arch}_sym"]
 
-    monkeypatch.setattr(Codestream, "_Codestream__check_symbol", fake_check)
+    monkeypatch.setattr(ElfSymbolChecker, "missing_symbols", fake_check)
 
     ret = cs.check_symbol_archs(["x86_64", "ppc64le", "s390x"], "vmlinux", ["sym"],
                                 "ppc64le", False)
