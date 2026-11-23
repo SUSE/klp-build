@@ -35,6 +35,8 @@ SIMPLE_MACROS = {
     "klpr_might_resched": "#define klpr_might_resched() might_resched()",
     # Use the kernel's cond_resched() instead of klp-ccp's expansion
     "klpr_cond_resched": "#define klpr_cond_resched() cond_resched()",
+    # __ADDRESSABLE() only keeps a symbol alive for the linker; drop it.
+    "KLPR___ADDRESSABLE": "#define KLPR___ADDRESSABLE(sym)",
 }
 
 ALL_MACROS = (*STATIC_CALL_MACROS, *SIMPLE_MACROS)

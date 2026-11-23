@@ -277,6 +277,25 @@ def test_strip_klpr_static_defines_numbered_cond_resched_warning(caplog):
     strip_klpr_static_defines(cs, "test.c", "klpr_cond_resched0();")
     assert "Numbered static key/call detected" in caplog.text
 
+def test_collect_static_macro_variants_addressable():
+    content = "KLPR___ADDRESSABLE(sym)\nKLPR___ADDRESSABLE0(sym)"
+    assert collect_static_macro_variants(content, ALL_MACROS) == \
+        ["KLPR___ADDRESSABLE"]
+
+def test_strip_klpr_static_defines_addressable():
+    """klp-ccp's (possibly multi-line) __ADDRESSABLE define is dropped."""
+    cs = Codestream("15.4u0")
+    content = "#define KLPR___ADDRESSABLE(sym) \\\n" \
+              "\tstatic void * __addressable_##sym = (void *)&sym\n" \
+              "KLPR___ADDRESSABLE(foo)\n"
+    assert strip_klpr_static_defines(cs, "test.c", content) == \
+        "KLPR___ADDRESSABLE(foo)\n"
+
+def test_strip_klpr_static_defines_numbered_addressable_warning(caplog):
+    cs = Codestream("15.4u0")
+    strip_klpr_static_defines(cs, "test.c", "KLPR___ADDRESSABLE0(sym)")
+    assert "Numbered klpr_ macro detected" in caplog.text
+
 def test_collect_static_macro_variants_none():
     assert collect_static_macro_variants("no macros here", STATIC_CALL_MACROS) == []
 

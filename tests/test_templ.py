@@ -120,6 +120,13 @@ def test_get_static_macros_cond_resched():
     assert out == "#define klpr_cond_resched() cond_resched()"
 
 
+def test_get_static_macros_addressable():
+    f = _af("f.c")
+    f.set_klpr_macros("x86_64", ["KLPR___ADDRESSABLE"])
+    out = get_static_macros(f, "x86_64", False)
+    assert out == "#define KLPR___ADDRESSABLE(sym)"
+
+
 def test_get_static_macros_simple_only_no_static_call():
     """Using only simple macros must not emit the static call block."""
     f = _af("f.c")
