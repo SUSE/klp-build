@@ -4,11 +4,13 @@
 # Author: Marcos Paulo de Souza <mpdesouza@suse.com>
 
 from concurrent.futures import ThreadPoolExecutor
+import functools
 from itertools import repeat
 import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -85,9 +87,10 @@ def get_cs_code(lp_name, working_cs, klp_ccp_arch="x86_64"):
     for cs in working_cs:
         cs_files.setdefault(cs.full_cs_name(), [])
 
-        for fpath in cs.get_lp_dir(lp_name, klp_ccp_arch).iterdir():
+        # Sort the files, since the lists are compared element by element
+        for fpath in sorted(cs.get_lp_dir(lp_name, klp_ccp_arch).iterdir()):
             fname = fpath.name
-            with open(fpath.absolute(), "r+") as fi:
+            with open(fpath.absolute(), "r") as fi:
                 src = fi.read()
 
                 src = re.sub(r'#include ".+kconfig\.h"\n', "", src)
@@ -100,7 +103,7 @@ def get_cs_code(lp_name, working_cs, klp_ccp_arch="x86_64"):
                 # We have problems with externalized symbols on macros. Ignore
                 # codestream names specified on paths that are placed on the
                 # expanded macros
-                src = re.sub(f"{utils.get_datadir(klp_ccp_arch)}.+{fname}", "", src)
+                src = re.sub(f"{re.escape(str(utils.get_datadir(klp_ccp_arch)))}.+{re.escape(fname)}", "", src)
                 # We can have more details that can differ for long expanded
                 # macros, like the patterns bellow
                 src = re.sub(r"\.lineno = \d+,", "", src)
@@ -120,20 +123,69 @@ def get_cs_code(lp_name, working_cs, klp_ccp_arch="x86_64"):
     return cs_files
 
 
-def unquote_output(matchobj):
-    return matchobj.group(0).replace('"', "")
-
-
 def process_make_output(output):
-    # some strings  have single quotes around double quotes, so remove the
-    # outer quotes
-    output = output.replace("'", "")
+    # Remove the compiler name used to compile the object. The quoting is
+    # kept, the command is split following the shell rules later on.
+    return re.sub(r'^gcc(-\d+)?\s+', '', output)
 
-    # Remove the compiler name used to compile the object.
-    output = re.sub(r'^gcc(-\d+)?\s+', '', output)
 
-    # also remove double quotes from macros like -D"KBUILD....=.."
-    return re.sub(r'-D"KBUILD_([\w\#\_\=\(\)])+"', unquote_output, output)
+# gcc options not supported by klp-ccp
+# -flive-patching and -fdump-ipa-clones are only present in upstream gcc
+# 15.4u0 options
+# -fno-allow-store-data-races and -Wno-zero-length-bounds
+# 15.4u1 options
+# -mindirect-branch-cs-prefix appear in 15.4u1
+# more options to be removed
+# -mharden-sls=all
+# 15.6 options
+# -fmin-function-alignment=16
+UNSUPPORTED_GCC_OPTS = {
+    "-flive-patching=inline-clone",
+    "-fdump-ipa-clones",
+    "-fno-allow-store-data-races",
+    "-Wno-zero-length-bounds",
+    "-mindirect-branch-cs-prefix",
+    "-mharden-sls=all",
+    "-fmin-function-alignment=16",
+    "-Wno-dangling-pointer",
+    # s390x arguments
+    "-mbackchain",
+    "-mpacked-stack",
+    "-mindirect-branch-table",
+    "-mhotpatch=0,3",
+    "-march=z196",
+    "-mtune=z13",
+}
+
+
+def split_compile_command(cmd):
+    '''
+    Split the compile command into arguments as the shell would, so that
+    quoted arguments (e.g. -DKBUILD_BASENAME='"foo"') and arguments with
+    spaces are kept intact, and drop the options not supported by klp-ccp.
+    '''
+    try:
+        args = shlex.split(cmd)
+    except ValueError as exc:
+        raise RuntimeError(f"Failed to parse the compile command ({exc}): {cmd}") from exc
+
+    return [arg for arg in args if arg not in UNSUPPORTED_GCC_OPTS]
+
+
+@functools.cache
+def get_make_cc():
+    '''
+    Return the compiler to be passed to make. It doesn't change during the
+    run, so it is only looked up once.
+    '''
+    gcc_ver = int(subprocess.check_output(["gcc", "-dumpversion"]).decode().strip().split(".", maxsplit=1)[0])
+    # gcc12 and higher have a problem with kernel and xrealloc implementation
+    if gcc_ver < 12:
+        return "gcc"
+    # if gcc12 or higher is the default compiler, check if gcc7 is available
+    if shutil.which("gcc-7"):
+        return "gcc-7"
+    raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
 
 
 def get_make_cmd(out_dir, cs, filename, odir, sdir):
@@ -150,15 +202,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         if filename.parent == PurePath("arch/x86/lib") or filename.parent == PurePath("drivers/block/aoe"):
             file_ = str(filename.parent) + "/"
 
-        gcc_ver = int(subprocess.check_output(["gcc", "-dumpversion"]).decode().strip())
-        # gcc12 and higher have a problem with kernel and xrealloc implementation
-        if gcc_ver < 12:
-            cc = "gcc"
-        # if gcc12 or higher is the default compiler, check if gcc7 is available
-        elif shutil.which("gcc-7"):
-            cc = "gcc-7"
-        else:
-            raise RuntimeError("Only gcc12 or higher are available, and it's problematic with kernel sources")
+        cc = get_make_cc()
 
         # Use -C/O= to point make at the source tree directly, bypassing
         # the obj dir wrapper Makefile that hardcodes a relative include
@@ -182,7 +226,7 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         f.write("\n")
         f.flush()
 
-        ofname = "." + filename.name.replace(".c", ".o.d")
+        ofname = "." + filename.with_suffix(".o.d").name
         ofname = Path(filename.parent, ofname)
 
         try:
@@ -200,9 +244,12 @@ def get_make_cmd(out_dir, cs, filename, odir, sdir):
         # 15.6 onwards we don't have -isystem.
         #      Also, it's more difficult to eliminate the objtool command
         #      line, so try to search until the fixdep script
+        # Escape the paths, they are matched literally
+        e_ofname, e_filename = re.escape(str(ofname)), re.escape(str(filename))
+        e_file, e_sdir = re.escape(file_), re.escape(str(sdir))
         for regex in [
-                rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+-isystem.*{str(filename)});",
-                rf"(-Wp,(\-MD|\-MMD),{ofname}\s+-nostdinc\s+.*-c -o {file_} {sdir}/{filename})\s+;.*fixdep"
+                rf"(-Wp,(\-MD|\-MMD),{e_ofname}\s+-nostdinc\s+-isystem.*{e_filename});",
+                rf"(-Wp,(\-MD|\-MMD),{e_ofname}\s+-nostdinc\s+.*-c -o {e_file} {e_sdir}/{e_filename})\s+;.*fixdep"
                 ]:
             f.write(f"Searching for the pattern: {regex}\n")
             f.flush()
@@ -251,7 +298,8 @@ def get_missing_ext_symbols(working_cs, klp_ccp_arch="x86_64"):
                 obj_syms[obj].extend(syms)
 
         for obj, syms in obj_syms.items():
-            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms, True, False)
+            missing = cs.check_symbol_archs(get_codestreams_data('archs'), obj, syms,
+                                            klp_ccp_arch, False)
             for arch, arch_syms in missing.items():
                 blacklisted = re.findall(r"((?:__SCT__|__SCK__|__traceiter)\w+)",
                                          ' '.join(arch_syms))
@@ -321,19 +369,76 @@ def get_cmd_from_json(cs, fname, sdir, arch="x86_64"):
     if not cc_file.exists():
         return None
 
-    with open(cc_file) as f:
-        buf = f.read()
-    data = json.loads(buf)
-    for d in data:
-        if fname in d["file"]:
-            output = d["command"]
-            # The arguments found on the file point to '..', since they are generated
-            # when the kernel is compiled. Replace the first '..' on each file
-            # path by the source directory since klp-ccp needs to reach the files.
-            cmd = process_make_output(output)
-            return cmd.replace(" ..", f" {str(sdir)}").replace("-I..", f"-I{str(sdir)}")
+    data = load_compile_commands(cc_file, tuple(sorted(cs.files.keys())))
 
-    raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
+    output = find_compile_command(data, fname, cc_file)
+
+    # The arguments found on the file point to '..', since they are generated
+    # when the kernel is compiled. Replace the first '..' on each file
+    # path by the source directory since klp-ccp needs to reach the files.
+    cmd = process_make_output(output)
+    return cmd.replace(" ..", f" {str(sdir)}").replace("-I..", f"-I{str(sdir)}")
+
+
+_cc_cache = {}
+_cc_cache_lock = Lock()
+
+
+def load_compile_commands(cc_file, fnames):
+    '''
+    Return the compile_commands.json entries that may belong to fnames.
+
+    The file is big and the same one is used for every file of a codestream,
+    so parse it only once. Only the entries related to fnames are kept to
+    avoid holding the whole file in memory for every codestream.
+    '''
+    key = (str(cc_file), fnames)
+
+    # One lock per file, so that different codestreams are parsed in parallel
+    with _cc_cache_lock:
+        entry = _cc_cache.setdefault(key, {"lock": Lock(), "data": None})
+
+    with entry["lock"]:
+        if entry["data"] is None:
+            with open(cc_file) as f:
+                data = json.load(f)
+            entry["data"] = [d for d in data
+                             if any(d["file"] == fn or d["file"].endswith(f"/{fn}")
+                                    for fn in fnames)]
+        return entry["data"]
+
+
+def find_compile_command(entries, fname, cc_file):
+    '''
+    Return the compile command of fname from the compile_commands.json
+    entries.
+
+    First keep the entries whose file path ends with fname, matching only
+    after a '/'. This isn't enough to identify the file: kernel/time.c is
+    also a suffix of arch/x86/kernel/time.c. So if more than one entry is
+    left, pick the one whose command has "-o <fname with .o suffix>". Kbuild
+    writes the object path relative to the obj dir, so it is unique per
+    source file: kernel/time.o vs arch/x86/kernel/time.o. If the entry is
+    still ambiguous, fail instead of guessing.
+    '''
+    candidates = [d for d in entries
+                  if d["file"] == fname or d["file"].endswith(f"/{fname}")]
+
+    if not candidates:
+        raise RuntimeError(f"Couldn't find cmdline for {fname} on {str(cc_file)}. Aborting")
+
+    if len(candidates) > 1:
+        obj = re.escape(str(PurePath(fname).with_suffix(".o")))
+        by_obj = [d for d in candidates
+                  if re.search(rf"(^|\s)-o\s+{obj}(\s|$)", d["command"])]
+        if by_obj:
+            candidates = by_obj
+
+    if len(candidates) > 1:
+        files = ", ".join(d["file"] for d in candidates)
+        raise RuntimeError(f"Found multiple cmdlines for {fname} on {str(cc_file)}: {files}. Aborting")
+
+    return candidates[0]["command"]
 
 
 def print_env_vars(fhandle, env):
@@ -356,6 +461,26 @@ def remove_patches(lp_name, cs):
     '''
     abort_patch()
     delete_lp_branch(lp_name, cs)
+
+
+def uses_patches(cs, no_patches):
+    '''
+    Whether the codestream is extracted from its patched LP branch.
+    '''
+    return not no_patches and cs.needs_patches()
+
+
+def prepare_patches(lp_name, cs, no_patches):
+    '''
+    Remove leftovers from previous runs and apply the patches required by the
+    codestream. Nothing is done for codestreams extracted from the unpatched
+    kernel tag, since their LP branch is never used.
+    '''
+    if not uses_patches(cs, no_patches):
+        return
+
+    remove_patches(lp_name, cs)
+    apply_all_patches(lp_name, cs)
 
 
 def apply_all_patches(lp_name, cs):
@@ -482,35 +607,7 @@ def cmd_args(lp_name, cs, fname, out_dir, fdata, cmd, avoid_ext, sdir, klp_ccp_a
                 "--warning-level=critical", "-o",
                 f"{str(lp_out)}", "--"]
 
-    # -flive-patching and -fdump-ipa-clones are only present in upstream gcc
-    # 15.4u0 options
-    # -fno-allow-store-data-races and -Wno-zero-length-bounds
-    # 15.4u1 options
-    # -mindirect-branch-cs-prefix appear in 15.4u1
-    # more options to be removed
-    # -mharden-sls=all
-    # 15.6 options
-    # -fmin-function-alignment=16
-    for opt in [
-        "-flive-patching=inline-clone",
-        "-fdump-ipa-clones",
-        "-fno-allow-store-data-races",
-        "-Wno-zero-length-bounds",
-        "-mindirect-branch-cs-prefix",
-        "-mharden-sls=all",
-        "-fmin-function-alignment=16",
-        "-Wno-dangling-pointer",
-        # s390x arguments
-        "-mbackchain",
-        "-mpacked-stack",
-        "-mindirect-branch-table",
-        "-mhotpatch=0,3",
-        "-march=z196",
-        "-mtune=z13",
-    ]:
-        cmd = cmd.replace(opt, "")
-
-    ccp_args.extend(cmd.split(" "))
+    ccp_args.extend(split_compile_command(cmd))
 
     ccp_args = list(filter(None, ccp_args))
 
@@ -627,7 +724,7 @@ def process(lp_name, total, args, avoid_ext, no_patches, klp_ccp_arch="x86_64"):
 
     odir = cs.get_obj_dir(klp_ccp_arch)
 
-    if not no_patches and cs.needs_patches():
+    if uses_patches(cs, no_patches):
         sdir = get_lp_branch_path(lp_name, cs)
     else:
         sdir = get_kernel_tag_path(cs.kernel)
@@ -699,7 +796,7 @@ def lp_out_cleanup(cs, fdata: AffectedFile, lp_out, sdir, arch="x86_64"):
         orig.write(file_buf)
         f.seek(0)
         file_buf = file_buf.replace(f"from {str(sdir)}/", "from ")
-        file_buf = re.sub(fr"#include \"{str(sdir)}.*\.h\"", '', file_buf)
+        file_buf = re.sub(fr"#include \"{re.escape(str(sdir))}.*\.h\"", '', file_buf)
         file_buf = re.sub(fr"#define\s({macros}).*", '', file_buf)
         file_buf = re.sub(r" __(init|exit)", ' ', file_buf)
         file_buf = re.sub(r'^typeof\(.*?;\n?', '', file_buf, flags=re.MULTILINE | re.DOTALL)
@@ -716,11 +813,17 @@ def extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch="x86_64"):
 def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
     logging.info("Work directory: %s", utils.get_workdir(lp_name, True))
 
-    working_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
-    working_cs = [cs for cs in working_cs if klp_ccp_arch in cs.archs]
+    filtered_cs = utils.filter_codestreams(lp_filter, get_codestreams_list(), verbose=True)
+    working_cs = [cs for cs in filtered_cs if klp_ccp_arch in cs.archs]
 
     if len(working_cs) == 0:
-        logging.error("No codestreams found")
+        if filtered_cs:
+            cs_archs = set().union(*(cs.archs for cs in filtered_cs))
+            logging.error("None of the codestreams supports %s, the klp-ccp target "
+                          "architecture (supported: %s). Use -k to choose another one.",
+                          klp_ccp_arch, ", ".join(sorted(cs_archs)))
+        else:
+            logging.error("No codestreams found")
         sys.exit(1)
 
     # Make it perform better by spawning a process function per
@@ -729,13 +832,11 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
     i = 1
     make_lock = Lock()
     for cs in working_cs:
-        # remove any previously generated files and leftover patches
+        # remove any previously generated files
         shutil.rmtree(cs.get_ccp_dir(lp_name, klp_ccp_arch), ignore_errors=True)
-        remove_patches(lp_name, cs)
 
         # Apply patches before the LPs were created
-        if not no_patches:
-            apply_all_patches(lp_name, cs)
+        prepare_patches(lp_name, cs, no_patches)
 
         for fname, fdata in cs.files.items():
             args.append((i, make_lock, fname, cs, fdata))
@@ -763,7 +864,7 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
     for cs in working_cs:
         generate_livepatches(lp_name, cs, klp_ccp_arch)
         # Cleanup patches after the LPs were created if they were applied
-        if not no_patches:
+        if uses_patches(cs, no_patches):
             remove_patches(lp_name, cs)
 
     logging.info("\nChecking duplicated symbols...")
@@ -794,11 +895,5 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
         logging.warning(json.dumps(missing, indent=4))
 
     group_equal_files(lp_name, working_cs, klp_ccp_arch)
-
-    pref_arch = utils.preferred_arch(working_cs)
-    if pref_arch not in ["x86_64", "aarch64"]:
-        logging.warning("ATTENTION! The current livepatch doesn't affect x86_64 or aarch64. "
-                        "klp-ccp doesn't officially support other architectures "
-                        "besides x86 and aarch64, meaning that it can generate wrong code.")
 
     logging.info("\nDone. Extract finished.")

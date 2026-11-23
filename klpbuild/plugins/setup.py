@@ -317,7 +317,7 @@ def __symbol_check(cs, mod, syms, archs, full_checks):
     mod_syms = {}
     for arch in archs:
         # Verify if the functions exist in the specified object
-        mod_syms.update(cs.check_symbol_archs(arch, mod, syms, False, full_checks))
+        mod_syms.update(cs.check_symbol_archs(arch, mod, syms, None, full_checks))
 
     # Reverse the dict, checking in which architectures are the symbol is not
     # present. It it's not found on all architectures, it can mean that it's

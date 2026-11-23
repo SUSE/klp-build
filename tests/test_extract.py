@@ -17,11 +17,16 @@ from klpbuild.klplib.codestream import Codestream
 from klpbuild.klplib.codestreams_data import load_codestreams
 from klpbuild.plugins.extract import (
     extract,
+    find_compile_command,
+    get_cs_code,
     get_ext_symbols,
     get_patched_funcs,
     lp_out_cleanup,
     parse_ccp_warnings,
+    prepare_patches,
+    process_make_output,
     register_argparser,
+    split_compile_command,
 )
 from klpbuild.plugins.setup import run as setup
 from tests.utils import FakeCS
@@ -435,3 +440,112 @@ def test_extract_argparser_klp_ccp_arch():
     args_default = parser.parse_args(["extract", "-n", "test_lp"])
     assert args_default.klp_ccp_arch == utils.ARCH
 
+
+# ── find_compile_command ───────────────────────────────────────────────────────
+
+
+def _cc_entry(src):
+    obj = src.removesuffix(".c") + ".o"
+    return {"directory": "/build", "file": f"../{src}",
+            "command": f"gcc -c -o {obj} ../{src}"}
+
+
+def test_find_compile_command_does_not_match_path_suffix():
+    """kernel/time.c must not pick the entry of arch/x86/kernel/time.c,
+    even when that one comes first."""
+    entries = [_cc_entry("arch/x86/kernel/time.c"), _cc_entry("kernel/time.c")]
+
+    cmd = find_compile_command(entries, "kernel/time.c", "cc.json")
+
+    assert cmd == "gcc -c -o kernel/time.o ../kernel/time.c"
+
+
+# ── get_cs_code ────────────────────────────────────────────────────────────────
+
+
+class _LpDirCS:
+    def __init__(self, name, lp_dir):
+        self._name = name
+        self._lp_dir = lp_dir
+
+    def full_cs_name(self):
+        return self._name
+
+    def get_lp_dir(self, _lp_name, _arch):
+        return self._lp_dir
+
+
+def test_get_cs_code_returns_files_sorted(tmp_path, monkeypatch):
+    """Files are returned in a stable order, so that codestreams with the same
+    content compare equal regardless of the directory listing order."""
+    monkeypatch.setattr("klpbuild.plugins.extract.utils.get_datadir", lambda _arch: tmp_path / "data")
+
+    names = ["livepatch_b.c", "kbuild", "livepatch_a.c", "livepatch.h"]
+    dirs = {}
+    for cs_name, order in [("15.4u0", names), ("15.4u1", list(reversed(names)))]:
+        lp_dir = tmp_path / cs_name
+        lp_dir.mkdir()
+        for name in order:
+            (lp_dir / name).write_text(f"content of {name}\n")
+        dirs[cs_name] = lp_dir
+
+    cs_files = get_cs_code("lp", [_LpDirCS(n, d) for n, d in dirs.items()])
+
+    assert [f for f, _ in cs_files["15.4u0"]] == sorted(names)
+    assert cs_files["15.4u0"] == cs_files["15.4u1"]
+
+
+# ── patches handling ───────────────────────────────────────────────────────────
+
+
+class _PatchCS:
+    kernel = "5.14.21"
+
+    def __init__(self, patches, dirs=("15.4u0", "15.4")):
+        self._patches = patches
+        self._dirs = list(dirs)
+
+    def full_cs_name(self):
+        return "15.4u0"
+
+    def needs_patches(self):
+        return bool(self._patches)
+
+    def get_required_patches(self):
+        return self._patches[:]
+
+    def get_candidate_patches_dirs(self):
+        return self._dirs
+
+
+@pytest.mark.parametrize("patches,no_patches,expected", [
+    (["fix.patch"], False, ["remove", "apply"]),
+    (["fix.patch"], True, []),
+    ([], False, []),
+])
+def test_prepare_patches_only_for_codestreams_needing_them(monkeypatch, patches, no_patches, expected):
+    calls = []
+    monkeypatch.setattr("klpbuild.plugins.extract.remove_patches", lambda *_: calls.append("remove"))
+    monkeypatch.setattr("klpbuild.plugins.extract.apply_all_patches", lambda *_: calls.append("apply"))
+
+    prepare_patches("lp", _PatchCS(patches), no_patches)
+
+    assert calls == expected
+
+
+# ── compile command splitting ──────────────────────────────────────────────────
+
+
+def test_split_compile_command_keeps_arguments_with_spaces():
+    cmd = "gcc -DFOO='\"a b\"' -include \"/path with space/x.h\" -c -o a.o a.c"
+
+    assert split_compile_command(process_make_output(cmd)) == [
+        '-DFOO="a b"', "-include", "/path with space/x.h", "-c", "-o", "a.o", "a.c"]
+
+
+def test_split_compile_command_drops_whole_options_only():
+    """Options are only dropped when the whole argument matches."""
+    cmd = "gcc -march=z196 -march=z196x -fdump-ipa-clones-extra -c a.c"
+
+    assert split_compile_command(process_make_output(cmd)) == [
+        "-march=z196x", "-fdump-ipa-clones-extra", "-c", "a.c"]
