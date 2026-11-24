@@ -59,6 +59,27 @@ def get_user_settings(entry, isopt=False):
 
 
 @__check_config_is_loaded
+def get_workers(entry=None):
+    """
+    Retrieves the number of workers (or jobs) to use for a given purpose.
+
+    Falls back to the generic 'workers' setting when the specific entry is
+    not set (or empty).
+
+    Args:
+        entry (str): The specific setting entry to look up first.
+
+    Raises:
+        ValueError: If neither the specific entry nor 'workers' is found.
+
+    Returns:
+        int: The number of workers.
+    """
+    val = get_user_settings(entry, isopt=True) if entry else ""
+    return int(val or get_user_settings("workers"))
+
+
+@__check_config_is_loaded
 def get_user_path(entry, isdir=True, isopt=False):
     """
     Retrieves the path for a given entry from the configuration and checks its validity.

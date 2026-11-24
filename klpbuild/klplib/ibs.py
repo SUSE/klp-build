@@ -22,7 +22,7 @@ from osctiny import Osc
 
 from klpbuild.klplib.affected_file import AffectedModule
 from klpbuild.klplib.codestream import Codestream
-from klpbuild.klplib.config import get_user_settings
+from klpbuild.klplib.config import get_workers
 from klpbuild.klplib.utils import ARCH, ARCHS, get_all_symbols_from_object, get_datadir
 
 logging.getLogger("osctiny").setLevel(logging.WARNING)
@@ -54,7 +54,7 @@ def do_work(func, args: list[RPMData]):
     if len(args) == 0:
         return
 
-    workers = int(get_user_settings("workers"))
+    workers = get_workers("ibs_workers")
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         results = executor.map(func, args, repeat(len(args)))
         for result in results:

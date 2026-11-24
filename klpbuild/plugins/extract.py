@@ -25,7 +25,7 @@ from klpbuild.klplib.affected_file import AffectedFile, AffectedModule
 from klpbuild.klplib.utils import data_lock
 from klpbuild.klplib.cmd import add_arg_lp_name, add_arg_lp_filter
 from klpbuild.klplib.codestreams_data import store_codestreams, get_codestreams_data, get_codestreams_list
-from klpbuild.klplib.config import get_user_settings
+from klpbuild.klplib.config import get_workers
 from klpbuild.klplib.kernel import (
     get_lp_branch_path, get_kernel_tag_path,
     abort_patch, create_lp_branch, delete_lp_branch, apply_patch,
@@ -842,7 +842,7 @@ def start_extract(lp_name, lp_filter, no_patches, avoid_ext, klp_ccp_arch):
             args.append((i, make_lock, fname, cs, fdata))
             i += 1
 
-    workers = int(get_user_settings("workers"))
+    workers = get_workers("extract_workers")
     logging.info("Extracting code using ccp for %s", klp_ccp_arch)
     logging.info("\nGenerating livepatches for %d file(s) using %d workers...", len(args), workers)
     logging.info("\t\tCodestream\tFile")

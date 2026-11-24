@@ -59,6 +59,27 @@ kernel_src_dir=/home/user/repos/kernel-source
 kgr_patches_dir=/home/user/repos/kgr_patches
 ```
 
+### **Settings**
+
+Optional variables in the `[Settings]` section. Each of the specific worker options falls back to `workers` when not set.
+
+| Variable | Description | Default |
+| :---- | :---- | :---- |
+| workers | Generic number of parallel workers, used when a specific option below is not set. | 4 |
+| ibs\_workers | Number of parallel workers for IBS operations. | `workers` |
+| extract\_workers | Number of parallel workers for livepatch code extraction. | `workers` |
+| prepare\_tests\_workers | Number of parallel workers for test module validation. | `workers` |
+| make\_jobs | Number of jobs (`make -j`) used when building the livepatch kernel module. | `workers` |
+| bugzilla\_api\_key | Bugzilla API key. | N/A |
+
+**Example Config:**
+```
+[Settings]
+workers=4
+ibs_workers=8
+make_jobs=16
+```
+
 ## **Usage**
 
 ### **Synopsis**

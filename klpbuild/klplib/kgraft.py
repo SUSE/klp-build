@@ -14,7 +14,7 @@ from pathlib import Path
 
 from klpbuild.klplib.config import get_repos_dir, get_user_path
 from klpbuild.klplib.utils import get_workdir
-from klpbuild.klplib.config import get_user_settings
+from klpbuild.klplib.config import get_workers
 
 TREE_NAME = "kgraft"
 __KGR_PATH = ""
@@ -174,7 +174,7 @@ def make(prj_path, cs, gcc_version, gcc_log):
         Return:
             0 if succeeded. > 0 otherwise.
     '''
-    workers = int(get_user_settings("workers"))
+    workers = get_workers("make_jobs")
     sdir = cs.get_src_dir()
     odir = cs.get_obj_dir()
 
