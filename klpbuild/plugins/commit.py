@@ -33,6 +33,10 @@ def register_argparser(subparser):
                      help="Overwrite existing livepatches in kgraft repository.")
 
 
+def _group_branch(lp_name, group):
+    return f"{lp_name}_{group.replace(' ', '_')}"
+
+
 def commit(lp_name, codestreams, force):
     for cs in codestreams:
         if "x86_64" not in cs.archs:
@@ -41,7 +45,14 @@ def commit(lp_name, codestreams, force):
 
     init_kgraft()
 
-    branches = find_lp_branches(f"{lp_name}_*")
+    groups = get_lp_groups(lp_name, codestreams)
+
+    # Only consider the branches of the groups that are going to be
+    # (re)created, so that a filtered run never touches the others.
+    targets = {_group_branch(lp_name, group) for group in groups}
+    existing = find_lp_branches(f"{lp_name}_*") or []
+    branches = [b for b in existing if b in targets]
+
     if branches and not force:
         branches_str = '\n\t' + '\n\t'.join(branches)
         logging.info("Found already commited livepatches: %s", branches_str)
@@ -49,11 +60,14 @@ def commit(lp_name, codestreams, force):
 
     logging.info("Commiting livepatch to kgraft...")
 
+    if branches:
+        logging.info("Overwriting existing branches: %s",
+                     '\n\t' + '\n\t'.join(branches))
     delete_lp_branches(branches)
 
-    for group, cs_list in get_lp_groups(lp_name, codestreams).items():
+    for group, cs_list in groups.items():
         # Create git branch and add+commit livepatch dir
-        branch = f"{lp_name}_{group.replace(' ', '_')}"
+        branch = _group_branch(lp_name, group)
         create_lp_branch(branch)
 
         code_path = cs_list[0].get_lp_dir(lp_name)
